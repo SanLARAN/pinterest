@@ -1,0 +1,17 @@
+/* Pinwave: restrained, true-black interface. */
+html.pinwave-dark,html.pinwave-dark body{background:#000!important;color:#f5f5f5!important;color-scheme:dark}
+html.pinwave-dark body [data-test-id="header"]{background:#000!important;color:#f5f5f5!important;border-bottom:1px solid #171717!important;box-shadow:none!important}
+html.pinwave-dark body [data-test-id="header"] a,html.pinwave-dark body [data-test-id="header"] button{color:inherit!important}
+html.pinwave-dark body [data-test-id="search-box"]{background:#111!important;color:#f5f5f5!important;border:1px solid #262626!important;box-shadow:none!important}
+html.pinwave-dark body input,html.pinwave-dark body textarea{background:#111!important;color:#f5f5f5!important}
+html.pinwave-dark body [data-test-id="pin"],html.pinwave-dark body [data-test-id="pinRep"]{background:transparent!important;box-shadow:none!important}
+html.pinwave-dark body [data-test-id="pin"] [data-test-id="pin-title"]{color:#f5f5f5!important}
+html.pinwave-dark body [data-test-id="pin"] button,html.pinwave-dark body [data-test-id="pinRep"] button{box-shadow:none!important}
+html.pinwave-compact body [data-test-id="homefeed-feed"]{column-gap:7px!important}
+html.pinwave-compact body [data-test-id="homefeed-feed"] [data-test-id="pin"],html.pinwave-compact body [data-test-id="pinRep"]{margin-bottom:7px!important}
+html.pinwave-focus body [data-test-id="navigation"]:not(:hover),html.pinwave-focus body [data-test-id="sidebar"]:not(:hover){opacity:.2;transition:opacity .18s ease}
+html.pinwave-focus body [data-test-id="navigation"]:hover,html.pinwave-focus body [data-test-id="sidebar"]:hover{opacity:1}
+/* Short, subtle entrance for pins as infinite scroll brings them into view. */
+[data-test-id="pin"].pinwave-revealed,[data-test-id="pinRep"].pinwave-revealed{animation:pinwave-enter .42s cubic-bezier(.2,.7,.25,1) both}
+@keyframes pinwave-enter{from{opacity:0;transform:translate3d(0,14px,0) scale(.985)}to{opacity:1;transform:translate3d(0,0,0) scale(1)}}
+@media(prefers-reduced-motion:reduce){html.pinwave-focus body [data-test-id="navigation"],html.pinwave-focus body [data-test-id="sidebar"]{transition:none}html [data-test-id="pin"],html [data-test-id="pinRep"]{animation:none!important}}
