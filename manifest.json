@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "Pinwave — Pinterest, по-новому",
+  "version": "1.0.0",
+  "description": "Новый визуальный режим, компактная сетка и фокус без отвлекающих элементов для Pinterest.",
+  "permissions": ["storage"],
+  "host_permissions": ["https://www.pinterest.com/*", "https://pinterest.com/*"],
+  "action": {
+    "default_title": "Настроить Pinwave",
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.pinterest.com/*", "https://pinterest.com/*"],
+      "js": ["content.js"],
+      "css": ["styles.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}
