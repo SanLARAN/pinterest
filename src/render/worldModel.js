@@ -209,6 +209,7 @@ export function buildWorld(layout) {
 
   const terrainGeo = terrainGeometry(layout);
   const terrain = new THREE.Mesh(terrainGeo, terrainMat);
+  terrain.userData.ground = true; // receives shadows only (see game.js castShadows)
   group.add(terrain);
 
   const propAcc = new GeoAccumulator();

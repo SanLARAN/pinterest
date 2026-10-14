@@ -93,6 +93,8 @@ export class Game {
     // Bitmap look: the 3D world is drawn at 1/pixelScale resolution and upscaled
     // with nearest-neighbour filtering (see .game-canvas in style.css). No MSAA.
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.pixelScale = this.isTouch ? RENDER.touchPixelScale : RENDER.pixelScale;
     this.pr = 1 / this.pixelScale;
     this.renderer.setPixelRatio(this.pr);
@@ -106,6 +108,14 @@ export class Game {
     this.scene.add(new THREE.HemisphereLight(0xa9b8ff, 0x1a1426, 1.3));
     const sun = new THREE.DirectionalLight(0xbfd0ff, 0.95); // cold moonlight
     sun.position.set(-14, 26, 10);
+    // real shadows from the moon: the map is 58 units in radius, so the box covers all of it
+    sun.castShadow = true;
+    const sc = sun.shadow.camera;
+    sc.left = -64; sc.right = 64; sc.top = 64; sc.bottom = -64; sc.near = 1; sc.far = 120;
+    sun.shadow.mapSize.set(this.isTouch ? 1024 : 2048, this.isTouch ? 1024 : 2048);
+    sun.shadow.bias = -0.0008;
+    sun.shadow.normalBias = 0.04;
+    this.scene.add(sun.target);
     this.scene.add(sun);
 
     this.camera = new THREE.PerspectiveCamera(CAMERA.baseFov, 1, 0.5, 400);
@@ -117,6 +127,7 @@ export class Game {
     this.shadows = new ShadowPool(this.scene, 160);
     this.heroShadows = new ShadowPool(this.scene, 2);
     this.hero = new Hero(this.scene);
+    this.enableShadows(this.hero.model.root);
     this.enemies = new EnemyManager(this.scene, this.shadows);
     this.pickups = new Pickups(this.scene);
     this.arrows = new Arrows(this.scene);
@@ -234,6 +245,19 @@ export class Game {
     window.addEventListener('keydown', unlock, { capture: true });
   }
 
+  /**
+   * Casters: solid bitmap-lit meshes (castle, props, base, merchant, hero).
+   * Receivers: every mesh, including the ground. Additive glow sprites and the terrain never cast,
+   * so halos and braziers do not paint dark spots on the ground.
+   */
+  enableShadows(root) {
+    root.traverse((o) => {
+      if (!o.isMesh) return;
+      o.receiveShadow = true;
+      o.castShadow = !o.userData.ground && !o.material.isMeshBasicMaterial;
+    });
+  }
+
   // ---- world & run lifecycle -------------------------------------------------
   buildWorld(seed) {
     if (this.world) {
@@ -249,12 +273,14 @@ export class Game {
     this.layout = buildLayout(seed);
     this.world = buildWorld(this.layout);
     this.scene.add(this.world.group);
+    this.enableShadows(this.world.group);
     if (this.base) {
       this.scene.remove(this.base.group);
       this.base.dispose();
     }
     this.base = buildBaseModel(this.layout);
     this.scene.add(this.base.group);
+    this.enableShadows(this.base.group);
     this.fadeUnits = [...this.world.fadeUnits, ...this.base.fadeUnits];
     this.flow = new FlowField(this.layout.blocked);
     // Only rifts the hero can reach may spawn foes: a rift walled into a pocket would
@@ -306,6 +332,7 @@ export class Game {
     this.stallPos = { x, z };
     this.stallModel = buildMerchant(x, L.heightAt(x, z), z);
     this.scene.add(this.stallModel.group);
+    this.enableShadows(this.stallModel.group);
   }
 
   /** Resets all run state. The world is rebuilt only when `rebuild` is true. */
