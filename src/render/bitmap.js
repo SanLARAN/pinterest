@@ -42,9 +42,9 @@ export function bitmapMaterial({ sway = 0 } = {}) {
         '#include <dithering_fragment>',
         `#include <dithering_fragment>
         {
+          // colour bands only: no screen-wide Bayer dot grid (the fog frame is the only grid)
           float L = uLevels;
-          float d = (bitmapBayer4(floor(gl_FragCoord.xy)) - 0.5) / L;
-          gl_FragColor.rgb = floor((gl_FragColor.rgb + d) * L + 0.5) / L;
+          gl_FragColor.rgb = floor(gl_FragColor.rgb * L + 0.5) / L;
         }`,
       );
   };
