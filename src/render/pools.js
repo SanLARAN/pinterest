@@ -9,9 +9,22 @@ const WHITE = new THREE.Color(1, 1, 1);
 export class ShadowPool {
   constructor(parent, max = 128) {
     const geo = new THREE.CircleGeometry(1, 16).rotateX(-Math.PI / 2);
+    // bitmap-style blob: a stepped radial falloff (dark core, two soft rings) instead of a flat disk
+    const S = 32;
+    const px = new Uint8Array(S * S * 4);
+    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+      const d = Math.hypot((x + 0.5) / S * 2 - 1, (y + 0.5) / S * 2 - 1);
+      const a = d < 0.5 ? 1 : d < 0.75 ? 0.6 : d < 0.95 ? 0.25 : 0;
+      const i = (y * S + x) * 4;
+      px[i] = 10; px[i + 1] = 6; px[i + 2] = 20; px[i + 3] = Math.round(a * 255);
+    }
+    const tex = new THREE.DataTexture(px, S, S);
+    tex.magFilter = THREE.NearestFilter;
+    tex.minFilter = THREE.NearestFilter;
+    tex.needsUpdate = true;
     this.mesh = new THREE.InstancedMesh(
       geo,
-      new THREE.MeshBasicMaterial({ color: 0x1d1230, transparent: true, opacity: 0.32, depthWrite: false }),
+      new THREE.MeshBasicMaterial({ color: 0xffffff, map: tex, transparent: true, opacity: 0.85, depthWrite: false }),
       max,
     );
     this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);

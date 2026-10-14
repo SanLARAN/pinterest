@@ -1407,7 +1407,7 @@ export class Game {
 
     // blob shadow for the hero
     this.heroShadows.begin();
-    if (this.hero.model.root.visible) this.heroShadows.put(this.hero.x, this.hero.y, this.hero.z, 0.5 * (1 + this.hero.squash.x * 0.1));
+    if (this.hero.model.root.visible) this.heroShadows.put(this.hero.x, this.hero.y, this.hero.z, 0.7 * (1 + this.hero.squash.x * 0.1));
     this.heroShadows.end();
 
     this.updateHud(realDt);
