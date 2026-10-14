@@ -113,6 +113,18 @@ export class Sound {
     this.noiseBurst(0.12, { type: 'lowpass', f0: 900, vol: 0.16 });
   }
 
+  psi(kind) {
+    if (kind === 'burst') {
+      this.tone(180, 0.35, { type: 'sine', vol: 0.22, freqEnd: 60 });
+      this.tone(880, 0.25, { type: 'triangle', vol: 0.08, freqEnd: 1320, delay: 0.02 });
+    } else if (kind === 'lance') {
+      this.tone(1400, 0.18, { type: 'sine', vol: 0.09, freqEnd: 2600 });
+      this.noiseBurst(0.1, { type: 'highpass', f0: 3000, vol: 0.06 });
+    } else {
+      this.tone(300, 0.5, { type: 'sine', vol: 0.14, freqEnd: 900 });
+    }
+  }
+
   dash() {
     this.noiseBurst(0.22, { type: 'bandpass', f0: 500, f1: 2600, q: 1.2, vol: 0.2 });
   }

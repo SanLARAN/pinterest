@@ -93,11 +93,17 @@ test('navigation: flow field steers around the castle wall through a gate', () =
   const flow = new FlowField(L.blocked);
   flow.setGoal(L.start.x, L.start.z); // hero in the courtyard, south of the keep
   const out = { x: 0, z: 0 };
-  // enemy north of the wall, off the gate axis, so it must route around
-  const ok = flow.steer(-8, -20, L.start.x, L.start.z, out);
+  // enemy north of the wall, off the gate axis, so it must route around.
+  // Pick a free, reachable cell there (props differ with the map size).
+  let spot = null;
+  for (let z = -20; z >= -24 && !spot; z--) for (let x = -3; x >= -12 && !spot; x--) {
+    if (!L.blocked[flow.cellOf(x, z)] && flow.dist[flow.cellOf(x, z)] > 0) spot = { x, z };
+  }
+  assert.ok(spot, 'a free reachable cell exists north of the wall');
+  const ok = flow.steer(spot.x, spot.z, L.start.x, L.start.z, out);
   assert.ok(ok);
   assert.ok(Math.hypot(out.x, out.z) > 0.5);
-  assert.ok(flow.dist[flow.cellOf(-8, -20)] > 0, 'enemy cell is reachable');
+  assert.ok(flow.dist[flow.cellOf(spot.x, spot.z)] > 0, 'enemy cell is reachable');
 });
 
 test('collision: pushes a body out of a tower and out of a wall', () => {

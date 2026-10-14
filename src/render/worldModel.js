@@ -233,7 +233,28 @@ export function buildWorld(layout) {
   });
   group.add(flames);
 
+  // glowing braziers: a ground halo and a soft orb above each bowl (additive, two draw calls)
+  const haloGeo = new THREE.CircleGeometry(3.2, 18).rotateX(-Math.PI / 2);
+  const haloMat = new THREE.MeshBasicMaterial({
+    color: W.flame, transparent: true, opacity: 0.2, depthWrite: false, blending: THREE.AdditiveBlending,
+  });
+  const halos = new THREE.InstancedMesh(haloGeo, haloMat, layout.braziers.length);
+  halos.frustumCulled = false;
+  const orbGeo = new THREE.IcosahedronGeometry(0.42, 0);
+  const orbMat = new THREE.MeshBasicMaterial({
+    color: W.flame, transparent: true, opacity: 0.35, depthWrite: false, blending: THREE.AdditiveBlending,
+  });
+  const orbs = new THREE.InstancedMesh(orbGeo, orbMat, layout.braziers.length);
+  orbs.frustumCulled = false;
+  group.add(halos, orbs);
+
   const dispose = () => {
+    haloGeo.dispose();
+    haloMat.dispose();
+    orbGeo.dispose();
+    orbMat.dispose();
+    halos.dispose();
+    orbs.dispose();
     terrainGeo.dispose();
     propsGeo.dispose();
     castle.geometry.dispose();
@@ -249,8 +270,17 @@ export function buildWorld(layout) {
       _m.makeScale(1, f * 1.1, 1);
       _m.setPosition(b.x, 1.4, b.z);
       flames.setMatrixAt(i, _m);
+      const pulse = 1 + Math.sin(t * 5 + i * 2.3) * 0.06 + (f - 1) * 0.4;
+      _m.makeScale(pulse, pulse, pulse);
+      _m.setPosition(b.x, 1.6, b.z);
+      orbs.setMatrixAt(i, _m);
+      _m.makeScale(pulse, 1, pulse);
+      _m.setPosition(b.x, 0.1, b.z);
+      halos.setMatrixAt(i, _m);
     });
     flames.instanceMatrix.needsUpdate = true;
+    orbs.instanceMatrix.needsUpdate = true;
+    halos.instanceMatrix.needsUpdate = true;
   };
   update(0);
 

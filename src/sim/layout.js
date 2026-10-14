@@ -24,8 +24,8 @@ export function roadWeight(x, z) {
   const h = CASTLE.half;
   const ax = Math.abs(x);
   const az = Math.abs(z);
-  const alongZ = (1 - smoothstep(1.3, 2.4, ax)) * smoothstep(h + 0.5, h + 2.5, az) * (1 - smoothstep(34, 40, az));
-  const alongX = (1 - smoothstep(1.3, 2.4, az)) * smoothstep(h + 0.5, h + 2.5, ax) * (1 - smoothstep(34, 40, ax));
+  const alongZ = (1 - smoothstep(1.3, 2.4, ax)) * smoothstep(h + 0.5, h + 2.5, az) * (1 - smoothstep(49, 58, az));
+  const alongX = (1 - smoothstep(1.3, 2.4, az)) * smoothstep(h + 0.5, h + 2.5, ax) * (1 - smoothstep(49, 58, ax));
   return Math.max(alongZ, alongX);
 }
 
@@ -49,7 +49,7 @@ export function buildLayout(seed) {
       const castleBlend = smoothstep(CASTLE.half + 1.5, CASTLE.half + 10, Math.max(Math.abs(x), Math.abs(z)));
       h *= castleBlend;
       // distant mountains wrap the arena
-      h += smoothstep(34, 50, r) * (9 + 4 * fbm(detailN, x * 0.05, z * 0.05, 3));
+      h += smoothstep(49, 72, r) * (9 + 4 * fbm(detailN, x * 0.05, z * 0.05, 3));
       // roads are kept gentle
       const road = roadWeight(x, z);
       h = lerp(h, 0.12, road * 0.85);
@@ -121,7 +121,7 @@ export function buildLayout(seed) {
   };
   for (const rf of rifts) spaced.push({ x: rf.x, z: rf.z, r: 2.5 });
   const castleZone = (x, z) => Math.max(Math.abs(x), Math.abs(z)) < h + 2.6;
-  for (let a = 0; a < 3200; a++) {
+  for (let a = 0; a < 6000; a++) {
     const x = rng.range(-PLAY_RADIUS - 3, PLAY_RADIUS + 3);
     const z = rng.range(-PLAY_RADIUS - 3, PLAY_RADIUS + 3);
     if (Math.hypot(x, z) > PLAY_RADIUS - 1) continue;

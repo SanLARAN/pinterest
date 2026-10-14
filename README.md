@@ -8,6 +8,11 @@ realm from simplex noise: rolling terrain, forests, rocks, roads and mountains a
 procedurally placed castle. Five chapters per cycle; a boss (the Hollow Champion) closes each
 fifth chapter.
 
+The realm is about 1.45x larger than the first version (176 x 176 cells, play radius 58), and
+the 3D world is drawn in a dark, pixelated style: a low internal resolution upscaled with
+nearest-neighbour filtering, moonlit fog and palette, glowing braziers, a vignette and scanlines.
+The parchment UI stays crisp on top.
+
 ## Play
 
 ```bash
@@ -26,6 +31,9 @@ npm test           # simulation unit tests (node:test)
 | Swing | Click, hold Space / J | Tap or drag the right stick (auto-swings) |
 | Aim | Mouse cursor | Right stick |
 | Dash | Shift / right-click / K | DASH button |
+| Psi Burst | Q | Psi button (BURST) |
+| Mind Lance | E | Psi button (LANCE) |
+| Telekinetic Pull | C | Psi button (PULL) |
 | Pause | Esc / P | Pause button (top right) |
 | Restart | R / Enter (after game over) | Restart button |
 | Mute | M | Sound button |
@@ -42,6 +50,11 @@ Without a manual aim, the swing assists toward the nearest foe in range.
   half health). Enemies emerge from rift markers after a telegraph.
 - **Pathing:** BFS flow field on a 1-unit grid (8-directional, no corner cutting) with a
   line-of-sight shortcut.
+- **Psi energy:** a 100-point meter regenerates about 7 per second and gains 5 per kill.
+  Q **Psi Burst** (35): radial shockwave that damages and knocks back nearby foes and stuns them
+  briefly. E **Mind Lance** (25): a piercing bolt along your aim that strikes each foe once.
+  C **Telekinetic Pull** (40): drags everything in range toward you and stuns it for about 1.4s.
+  Each skill has its own short cooldown. The rules live in `src/sim/psi.js`.
 - **Progression:** shards fill the XP bar; each level offers 3 random boons from 9 upgrades.
 - **Scoring:** kill points × combo multiplier (×1 to ×5), coins +5, chapter clear bonus 100 × chapter.
 - **High scores:** top 10 stored locally in the browser. Name entry happens on game over.
@@ -50,9 +63,9 @@ Without a manual aim, the swing assists toward the nearest foe in range.
 
 ```
 src/
-  config.js          tuning knobs (timestep, hero, camera, storage keys)
+  config.js          tuning knobs (timestep, world size, pixel scale, camera, storage keys)
   util/              seeded RNG, simplex noise, math helpers
-  sim/               pure simulation: layout, nav, collision, waves, scoring, upgrades, high scores
+  sim/               pure simulation: layout, nav, collision, waves, scoring, upgrades, psi, high scores
   render/            geometry builders, palette, pooled particles, world & character models
   game/              orchestrator (game.js), hero, enemies, pickups, arrows, juice (FX)
   core/              input (keyboard/mouse/touch), audio (WebAudio synth), storage

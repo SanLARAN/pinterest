@@ -9,6 +9,7 @@ const KEY_MAP = {
   Space: 'attack', KeyJ: 'attack',
   ShiftLeft: 'dash', ShiftRight: 'dash', KeyK: 'dash',
   Escape: 'pause', KeyP: 'pause',
+  KeyQ: 'skill1', KeyE: 'skill2', KeyC: 'skill3',
   Enter: 'confirm', NumpadEnter: 'confirm',
   KeyR: 'restart',
   KeyM: 'mute',

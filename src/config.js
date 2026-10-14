@@ -4,11 +4,19 @@ export const FIXED_DT = 1 / 120; // simulation step (seconds)
 export const MAX_STEPS_PER_FRAME = 12;
 
 export const WORLD = {
-  half: 60, // terrain spans [-half, half] in both axes
-  playRadius: 40, // hard limit for hero and enemies
-  riftCount: 10,
-  riftMinR: 27,
-  riftMaxR: 33,
+  half: 88, // terrain spans [-half, half] in both axes (was 60: map is ~1.45x larger)
+  playRadius: 58, // hard limit for hero and enemies
+  riftCount: 12,
+  riftMinR: 40,
+  riftMaxR: 49,
+};
+
+// Bitmap look: the 3D world is rendered at 1/pixelScale resolution and upscaled
+// with nearest-neighbour filtering. The scale relaxes if frames run long.
+export const RENDER = {
+  pixelScale: 2.5,
+  touchPixelScale: 3,
+  maxPixelScale: 4.5,
 };
 
 export const HERO_BASE = {

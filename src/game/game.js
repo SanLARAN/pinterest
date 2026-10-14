@@ -1,9 +1,11 @@
 // Game orchestrator: owns the renderer, the run lifecycle and the fixed-step simulation.
 // State machine: menu -> playing <-> paused | levelup ; playing -> over -> (restart | menu).
 import * as THREE from 'three';
-import { FIXED_DT, MAX_STEPS_PER_FRAME, CAMERA } from '../config.js';
+import { FIXED_DT, MAX_STEPS_PER_FRAME, CAMERA, RENDER, WORLD } from '../config.js';
 import { buildLayout } from '../sim/layout.js';
 import { FlowField } from '../sim/nav.js';
+import { Psi, PSI, SKILL_IDS } from '../sim/psi.js';
+import { COLORS } from '../render/palette.js';
 import { ScoreKeeper } from '../sim/scoring.js';
 import { WaveDirector } from '../sim/waves.js';
 import { drawUpgrades } from '../sim/upgrades.js';
@@ -23,7 +25,10 @@ import { Sound } from '../core/audio.js';
 import { loadScores, saveScores, loadName, saveName, loadMuted, saveMuted } from '../core/storage.js';
 import { UI } from '../ui/ui.js';
 
-const FOG_COLOR = 0xf1c9a0;
+const FOG_COLOR = 0x191330; // dark indigo haze
+const PSI_CORE = COLORS.psi.core;
+const PSI_GLOW = COLORS.psi.glow;
+const PSI_DEEP = COLORS.psi.deep;
 const SLASH_FADE = 0.2;
 const DEATH_REAL_TIME = 1.8; // seconds of slow-motion before the game-over screen
 const DEATH_TIMESCALE = 0.35;
@@ -62,22 +67,25 @@ export class Game {
       onQuit: () => this.toTitle(),
       onSaveName: (name) => this.saveEntry(name),
       onDashButton: () => this.input.press('dash'),
+      onSkill: (id) => this.input.press(id),
     });
     this.ui.setTouch(this.isTouch);
 
     // ---- renderer / scene --------------------------------------------------
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: !this.isTouch, powerPreference: 'high-performance' });
-    this.maxPR = this.isTouch ? 1.5 : 2;
-    this.pr = Math.min(window.devicePixelRatio || 1, this.maxPR);
+    // Bitmap look: the 3D world is drawn at 1/pixelScale resolution and upscaled
+    // with nearest-neighbour filtering (see .game-canvas in style.css). No MSAA.
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
+    this.pixelScale = this.isTouch ? RENDER.touchPixelScale : RENDER.pixelScale;
+    this.pr = 1 / this.pixelScale;
     this.renderer.setPixelRatio(this.pr);
     this.renderer.setClearColor(FOG_COLOR, 1);
 
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(FOG_COLOR);
-    this.fog = new THREE.Fog(FOG_COLOR, 26, 92);
+    this.fog = new THREE.Fog(FOG_COLOR, 30, 110);
     this.scene.fog = this.fog;
-    this.scene.add(new THREE.HemisphereLight(0xfff3dc, 0x8a5a6e, 1.9));
-    const sun = new THREE.DirectionalLight(0xffd7a0, 1.6);
+    this.scene.add(new THREE.HemisphereLight(0xa9b8ff, 0x1a1426, 1.3));
+    const sun = new THREE.DirectionalLight(0xbfd0ff, 0.95); // cold moonlight
     sun.position.set(-14, 26, 10);
     this.scene.add(sun);
 
@@ -105,6 +113,15 @@ export class Game {
     this.slashArc = -1;
     this.slashReach = -1;
     this.slashT = 0;
+
+    // psi (energy) skills: pure state in Psi, visuals and hit logic here
+    this.psi = new Psi();
+    this.skillReq = new Set();
+    this.lances = [];
+    this.lanceGeo = new THREE.BoxGeometry(0.22, 0.22, 1);
+    this.lanceMat = new THREE.MeshBasicMaterial({
+      color: PSI_CORE, transparent: true, opacity: 0.9, depthWrite: false, blending: THREE.AdditiveBlending,
+    });
 
     this.raycaster = new THREE.Raycaster();
     this.ndc = new THREE.Vector2();
@@ -191,6 +208,11 @@ export class Game {
     this.world = buildWorld(this.layout);
     this.scene.add(this.world.group);
     this.flow = new FlowField(this.layout.blocked);
+    // Only rifts the hero can reach may spawn foes: a rift walled into a pocket would
+    // otherwise produce enemies that can never reach the hero and never let a chapter clear.
+    this.flow.setGoal(this.layout.start.x, this.layout.start.z);
+    const reachable = this.layout.rifts.filter((rf) => this.flow.dist[this.flow.cellOf(rf.x, rf.z)] >= 0);
+    this.spawnRifts = reachable.length ? reachable : this.layout.rifts;
     this.enemyCtx.layout = this.layout;
     this.enemyCtx.flow = this.flow;
   }
@@ -214,6 +236,9 @@ export class Game {
     this.comboTick = 0;
     this.simT = 0;
     this.slash.visible = false;
+    this.psi.reset();
+    this.skillReq.clear();
+    this.clearLances();
     this.hero.reset(this.layout.start.x, this.layout.start.z);
     this.hero.model.root.visible = true;
     this.enemyCtx.hero = this.hero;
@@ -256,6 +281,8 @@ export class Game {
     this.state = 'menu';
     this.enemies.clear();
     this.arrows.clear();
+    this.clearLances();
+    this.skillReq.clear();
     this.pickups.clear();
     this.juice.clearParticles();
     this.juice.clearTexts();
@@ -273,6 +300,7 @@ export class Game {
   togglePause(forceResume = false) {
     if (this.state === 'playing' && !forceResume) {
       this.state = 'paused';
+      this.skillReq.clear();
       this.ui.showPause(this.sound.muted);
       this.sound.stopMusic();
     } else if (this.state === 'paused') {
@@ -320,6 +348,11 @@ export class Game {
       case 'pick2':
       case 'pick3':
         if (this.state === 'levelup') this.pickUpgrade(Number(action.slice(4)) - 1);
+        break;
+      case 'skill1':
+      case 'skill2':
+      case 'skill3':
+        if (this.state === 'playing') this.skillReq.add(action); // consumed in the next sim step
         break;
       default:
         break;
@@ -399,7 +432,7 @@ export class Game {
   }
 
   queueSpawn(type, hpScale) {
-    const rifts = this.layout.rifts;
+    const rifts = this.spawnRifts;
     const rf = rifts[Math.floor(this.rng.next() * rifts.length)];
     const isBoss = type === 'boss';
     const p = { type, hpScale, x: rf.x, z: rf.z, t: isBoss ? 1.8 : 0.9, total: isBoss ? 1.8 : 0.9, fx: 0 };
@@ -556,8 +589,10 @@ export class Game {
     }
   }
 
-  hitEnemy(e, base, nx, nz) {
-    const crit = Math.random() < 0.12;
+  /** Melee and psi hits. `opts` (psi only) overrides knockback and marks the hit as psychic. */
+  hitEnemy(e, base, nx, nz, opts = null) {
+    const psi = opts !== null;
+    const crit = !psi && Math.random() < 0.12;
     const dmg = Math.max(1, Math.round(base * (crit ? 1.8 : 1)));
     const def = e.def;
     const boss = e.type === 'boss';
@@ -565,12 +600,13 @@ export class Game {
     e.flashT = 0.12;
     e.squash.impulse(boss ? -2 : -4);
     const k = boss ? 0.25 : 1;
-    e.kx = nx * def.knock * k;
-    e.kz = nz * def.knock * k;
-    const col = ACCENT_COLOR[e.type] ?? 0xffffff;
-    this.juice.text(String(dmg), crit ? 'crit' : 'dmg', e.x, e.y + e.radius * 2 + 0.7, e.z);
+    const knock = psi && opts.knock !== undefined ? opts.knock : def.knock;
+    e.kx = nx * knock * k;
+    e.kz = nz * knock * k;
+    const col = psi ? PSI_CORE : ACCENT_COLOR[e.type] ?? 0xffffff;
+    this.juice.text(String(dmg), crit ? 'crit' : psi ? 'psi' : 'dmg', e.x, e.y + e.radius * 2 + 0.7, e.z);
     this.juice.sparks(e.x, e.y + 0.7, e.z, crit ? 0xffe27a : col, crit ? 16 : 8, crit ? 1.4 : 1);
-    this.hitstop = Math.max(this.hitstop, crit ? 0.06 : 0.035);
+    this.hitstop = Math.max(this.hitstop, crit ? 0.06 : psi ? 0.04 : 0.035);
     this.juice.addTrauma(crit ? 0.22 : 0.12);
     if (crit) this.sound.crit();
     else this.sound.hit();
@@ -584,6 +620,7 @@ export class Game {
     const prevMult = this.score.multiplier;
     const r = this.score.kill(def.score);
     this.comboTick++;
+    this.psi.gain(PSI.killGain);
     this.enemies.kill(e);
     if (h.stats.lifesteal > 0) h.heal(h.stats.lifesteal);
 
@@ -665,10 +702,126 @@ export class Game {
     if (this.slashT <= 0) this.slash.visible = false;
   }
 
+  // ---- psi skills -------------------------------------------------------------------
+  castSkill(id) {
+    const h = this.hero;
+    if (h.dead) return;
+    if (!this.psi.cast(id)) {
+      // only explain an energy shortfall; cooldown flicker stays silent
+      if (!this.psi.cooldownFrac(id) && this.psi.energy < PSI.skills[id].cost) {
+        this.throttle('nopsi', 0.4, () => this.juice.text('Low psi', 'dim', h.x, h.y + 2.4, h.z));
+      }
+      return;
+    }
+    if (id === 'skill1') this.psiBurst();
+    else if (id === 'skill2') this.psiLance();
+    else if (id === 'skill3') this.psiPull();
+    this.ui.flashSkill(id);
+    this.juice.text(PSI.skills[id].name, 'psi', h.x, h.y + 2.6, h.z);
+  }
+
+  /** Q: radial shockwave that damages and knocks back everything close around the hero. */
+  psiBurst() {
+    const h = this.hero;
+    const { radius, damage, knock, stun } = PSI.burst;
+    this.juice.ring(h.x, 0.12, h.z, radius, PSI_CORE, 0.55, 1.4);
+    this.juice.ring(h.x, 0.14, h.z, radius * 0.55, PSI_GLOW, 0.4, 1);
+    this.juice.disk(h.x, 0.05, h.z, radius, PSI_DEEP, 0.4, 'burst', 0.5);
+    this.juice.burst(h.x, 0.7, h.z, PSI_CORE, 30, 1.7);
+    this.juice.addTrauma(0.35);
+    this.hitstop = Math.max(this.hitstop, 0.05);
+    this.sound.psi('burst');
+    for (const e of this.enemies.targets()) {
+      const dx = e.x - h.x;
+      const dz = e.z - h.z;
+      const d = Math.hypot(dx, dz);
+      if (d - e.radius > radius) continue;
+      e.stunT = Math.max(e.stunT, stun);
+      this.hitEnemy(e, damage, d > 1e-4 ? dx / d : 0, d > 1e-4 ? dz / d : 0, { knock });
+    }
+  }
+
+  /** E: a piercing bolt along the aim direction. */
+  psiLance() {
+    const h = this.hero;
+    const a = h.facing;
+    const dx = Math.sin(a);
+    const dz = Math.cos(a);
+    const mesh = new THREE.Mesh(this.lanceGeo, this.lanceMat);
+    mesh.rotation.y = a;
+    mesh.scale.z = 2.6;
+    this.scene.add(mesh);
+    this.lances.push({ x: h.x + dx * 0.6, z: h.z + dz * 0.6, dx, dz, travel: 0, hit: new Set(), mesh });
+    this.juice.burst(h.x + dx, h.y + 0.9, h.z + dz, PSI_GLOW, 10, 1);
+    this.juice.addTrauma(0.08);
+    this.sound.psi('lance');
+  }
+
+  updateLances(dt) {
+    const { speed, range, width, damage } = PSI.lance;
+    const flow = this.flow;
+    for (let i = this.lances.length - 1; i >= 0; i--) {
+      const L = this.lances[i];
+      const step = speed * dt;
+      L.x += L.dx * step;
+      L.z += L.dz * step;
+      L.travel += step;
+      for (const e of this.enemies.targets()) {
+        if (L.hit.has(e.id)) continue;
+        const d = Math.hypot(e.x - L.x, e.z - L.z);
+        if (d > e.radius + width) continue;
+        L.hit.add(e.id); // a lance pierces: each foe is struck once
+        this.hitEnemy(e, damage, L.dx, L.dz, { knock: 5 });
+      }
+      if (Math.random() < 0.6) this.juice.sparks(L.x, this.layout.heightAt(L.x, L.z) + 0.9, L.z, PSI_GLOW, 1, 0.5);
+      const wall = flow.blocked[flow.cellOf(L.x, L.z)];
+      const outside = Math.hypot(L.x, L.z) > WORLD.playRadius;
+      if (L.travel >= range || wall || outside) {
+        this.scene.remove(L.mesh);
+        this.lances.splice(i, 1);
+        this.juice.burst(L.x, this.layout.heightAt(L.x, L.z) + 0.8, L.z, PSI_CORE, 8, 0.8);
+        continue;
+      }
+      L.mesh.position.set(L.x, this.layout.heightAt(L.x, L.z) + 0.9, L.z);
+    }
+  }
+
+  clearLances() {
+    for (const L of this.lances) this.scene.remove(L.mesh);
+    this.lances.length = 0;
+  }
+
+  /** C: pulls everything nearby into the hero and stuns it briefly. */
+  psiPull() {
+    const h = this.hero;
+    const { radius, speed, stun } = PSI.pull;
+    this.juice.ring(h.x, 0.12, h.z, radius, PSI_GLOW, 0.5, 1.2);
+    this.juice.disk(h.x, 0.05, h.z, radius, PSI_DEEP, 0.4, 'burst', 0.35);
+    this.juice.addTrauma(0.2);
+    this.hitstop = Math.max(this.hitstop, 0.03);
+    this.sound.psi('pull');
+    let n = 0;
+    for (const e of this.enemies.targets()) {
+      const dx = h.x - e.x;
+      const dz = h.z - e.z;
+      const d = Math.hypot(dx, dz);
+      if (d > radius + e.radius) continue;
+      n++;
+      e.kx = d > 1e-4 ? (dx / d) * speed : 0;
+      e.kz = d > 1e-4 ? (dz / d) * speed : 0;
+      e.stunT = Math.max(e.stunT, stun);
+      e.flashT = 0.12;
+      e.squash.impulse(-3);
+      this.juice.sparks(e.x, e.y + 0.6, e.z, PSI_GLOW, 6, 0.8);
+    }
+    if (n > 1) this.juice.text(`${n} held`, 'psi', h.x, h.y + 2.0, h.z);
+  }
+
   // ---- simulation step ------------------------------------------------------------
   step(dt) {
     const h = this.hero;
     this.simT += dt;
+    this.psi.update(dt);
     // Aim assist: without a manual aim, face the nearest foe in striking range.
     if (!this.input.manualAim && !h.dead) {
       const t = this.nearestTarget(2.6);
@@ -683,8 +836,13 @@ export class Game {
       this.resolveSwing();
       this.director.update(dt, this.waveEnv);
     }
+    if (this.skillReq.size) {
+      for (const id of this.skillReq) this.castSkill(id);
+      this.skillReq.clear();
+    }
     this.updatePending(dt);
     this.enemies.update(dt, this.enemyCtx);
+    this.updateLances(dt);
     this.arrows.update(dt, h, this.layout, this.arrowHooks);
     this.pickups.update(dt, h, this.layout, h.stats.magnet, (kind, value, x, y, z) => this.collect(kind, value, x, y, z));
     this.score.update(dt);
@@ -737,16 +895,19 @@ export class Game {
     p.sum += realDt * 1000;
     if (p.acc >= 1.5) {
       const avg = p.sum / p.n;
-      if (avg > 19 && this.pr > 0.61) this.setPixelRatio(Math.max(0.6, this.pr - 0.1));
+      if (avg > 19 && this.pixelScale < RENDER.maxPixelScale) {
+        this.setPixelScale(Math.min(RENDER.maxPixelScale, this.pixelScale + 0.5));
+      }
       p.acc = 0;
       p.n = 0;
       p.sum = 0;
     }
   }
 
-  setPixelRatio(pr) {
-    this.pr = pr;
-    this.renderer.setPixelRatio(pr);
+  setPixelScale(scale) {
+    this.pixelScale = scale;
+    this.pr = 1 / scale;
+    this.renderer.setPixelRatio(this.pr);
     this.resize();
   }
 
@@ -758,8 +919,8 @@ export class Game {
     const need = 13.5 / (Math.tan(THREE.MathUtils.degToRad(CAMERA.baseFov / 2)) * this.camera.aspect);
     this.zoom = clamp(need / 18.34, 1, 2.2);
     this.camera.updateProjectionMatrix();
-    this.fog.near = 26 * this.zoom;
-    this.fog.far = 92 * this.zoom;
+    this.fog.near = 30 * this.zoom;
+    this.fog.far = 110 * this.zoom;
     this.juice.setSize(w, h);
   }
 
@@ -787,8 +948,8 @@ export class Game {
     const cam = this.camera;
     if (this.state === 'menu') {
       this.menuA += realDt * 0.1;
-      const r = 36 * this.zoom;
-      cam.position.set(Math.sin(this.menuA) * r, 27 * this.zoom, Math.cos(this.menuA) * r);
+      const r = 52 * this.zoom; // the map is larger than before, so the title orbit is wider
+      cam.position.set(Math.sin(this.menuA) * r, 34 * this.zoom, Math.cos(this.menuA) * r);
       cam.lookAt(0, 0, 0);
       return;
     }
@@ -885,6 +1046,7 @@ export class Game {
       foes: this.enemies.aliveCount + this.pending.length,
       dashReady: h.dashCd <= 0,
       dashFrac: h.dashCd / h.stats.dashCooldown,
+      psi: this.psi,
     });
     this.debugAcc -= realDt;
     if (this.debugOn && this.debugAcc <= 0) {
@@ -892,10 +1054,10 @@ export class Game {
       const info = this.renderer.info;
       ui.setDebug(
         [
-          `fps ${this.fps.toFixed(0)}  pr ${this.pr.toFixed(2)}  zoom ${this.zoom.toFixed(2)}`,
+          `fps ${this.fps.toFixed(0)}  pixel ${this.pixelScale.toFixed(1)}  zoom ${this.zoom.toFixed(2)}`,
           `draws ${info.render.calls}  tris ${info.render.triangles}  geo ${info.memory.geometries}`,
           `state ${this.state}  seed ${seedCode(this.seed)}`,
-          `enemies ${this.enemies.list.length}  pending ${this.pending.length}  arrows ${this.arrows.items?.length ?? 0}`,
+          `enemies ${this.enemies.list.length}  pending ${this.pending.length}  arrows ${this.arrows.items?.length ?? 0}  lances ${this.lances.length}`,
           `wave ${this.director.wave} phase ${this.director.phase}  hero ${h.x.toFixed(1)},${h.z.toFixed(1)}`,
         ].join('\n'),
         true,

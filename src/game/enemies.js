@@ -3,6 +3,7 @@ import { ENEMY_DEFS } from '../sim/defs.js';
 import { createEnemyModel } from '../render/enemyModels.js';
 import { resolveStatic, clampToArena } from '../sim/collision.js';
 import { damp, clamp, angleLerp, Spring, easeOutBack } from '../util/math.js';
+import { HALF, SIZE } from '../sim/layout.js';
 
 let nextId = 1;
 const _steer = { x: 0, z: 0 };
@@ -70,6 +71,10 @@ export class EnemyManager {
       wanderX: x,
       wanderZ: z,
       wanderT: 0,
+      stunT: 0,
+      stallT: 0,
+      stallX: x,
+      stallZ: z,
     };
     model.root.position.set(x, 0, z);
     model.root.scale.setScalar(0.001);
@@ -112,6 +117,7 @@ export class EnemyManager {
         e.model.root.position.set(e.x, e.y, e.z);
         continue;
       }
+      this.checkStall(e, dt, ctx);
       this.think(e, dt, ctx);
     }
     this.separate();
@@ -153,11 +159,82 @@ export class EnemyManager {
     }
   }
 
+  /**
+   * Anti-stuck safeguard. A foe that makes no progress for ~2.5s while far from the hero
+   * (wedged between colliders, or on a pocket the flow field cannot leave) is moved to
+   * the nearest free cell that is closer to the hero along the flow field. Without this a
+   * single stuck foe would keep the chapter from ever clearing.
+   */
+  checkStall(e, dt, ctx) {
+    const hero = ctx.hero;
+    const flow = ctx.flow;
+    const busy = e.phase === 'windup' || e.phase === 'charge' || e.stunT > 0; // hops still count: a hop-in-place is a stall
+    const far = Math.hypot(hero.x - e.x, hero.z - e.z) > 6;
+    if (e.decor || busy || !far || Math.hypot(e.x - e.stallX, e.z - e.stallZ) > 0.4) {
+      e.stallT = 0;
+      e.stallX = e.x;
+      e.stallZ = e.z;
+      return;
+    }
+    e.stallT += dt;
+    if (e.stallT < 2.5) return;
+    e.stallT = 0;
+    e.stallX = e.x;
+    e.stallZ = e.z;
+    const here = flow.dist[flow.cellOf(e.x, e.z)];
+    const ci = Math.round(e.x) + HALF;
+    const cj = Math.round(e.z) + HALF;
+    let best = -1;
+    let bestScore = Infinity;
+    for (let dj = -5; dj <= 5; dj++) {
+      for (let di = -5; di <= 5; di++) {
+        const i = ci + di;
+        const j = cj + dj;
+        if (i < 0 || j < 0 || i > SIZE - 1 || j > SIZE - 1) continue;
+        const idx = j * SIZE + i;
+        if (flow.blocked[idx] || flow.dist[idx] < 0) continue;
+        const better = here < 0 || flow.dist[idx] < here ? 0 : 1000;
+        const score = better + flow.dist[idx] + Math.hypot(di, dj) * 0.5;
+        if (score < bestScore) {
+          bestScore = score;
+          best = idx;
+        }
+      }
+    }
+    if (best < 0) {
+      // nothing reachable nearby: the foe is walled in for good, so retire it quietly
+      this.destroy(e);
+      return;
+    }
+    e.x = (best % SIZE) - HALF;
+    e.z = Math.floor(best / SIZE) - HALF;
+    e.squash.impulse(-3);
+  }
+
   think(e, dt, ctx) {
     const def = e.def;
     const hero = ctx.hero;
     const layout = ctx.layout;
     e.t += dt;
+    if (e.stunT > 0) {
+      // psi stun: no AI and no contact damage; knockback carries on and damps out
+      e.stunT -= dt;
+      e.touchCd -= dt;
+      e.flashT -= dt;
+      e.glow = { r: 0.5, g: 0.95, b: 1 };
+      e.glowAmt = 0.4 + 0.25 * Math.sin(e.t * 40);
+      e.vx = damp(e.vx, 0, 20, dt);
+      e.vz = damp(e.vz, 0, 20, dt);
+      e.kx = damp(e.kx, 0, 8, dt);
+      e.kz = damp(e.kz, 0, 8, dt);
+      e.x += (e.vx + e.kx) * dt;
+      e.z += (e.vz + e.kz) * dt;
+      resolveStatic(layout, e);
+      clampToArena(e);
+      e.y = layout.heightAt(e.x, e.z);
+      this.animate(e, dt);
+      return;
+    }
     e.touchCd -= dt;
     e.flashT -= dt;
     e.glow = null;

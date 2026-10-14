@@ -52,10 +52,10 @@ kbd {
 .app {
   position: fixed;
   inset: 0;
-  background:
-    radial-gradient(120% 80% at 50% 0%, #fff3d6 0%, #f7d9b0 40%, #e9b99a 75%, #c99aa9 100%);
+  background: radial-gradient(120% 80% at 50% 0%, #2a2040 0%, #130e1f 70%, #0a0712 100%);
   overflow: hidden;
 }
+/* The 3D world is drawn at a low resolution; nearest-neighbour upscaling keeps it pixelated. */
 .game-canvas {
   position: absolute;
   inset: 0;
@@ -63,6 +63,18 @@ kbd {
   height: 100%;
   display: block;
   outline: none;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+/* Dark bitmap grade: a deep vignette plus faint scanlines over the world (under the HUD and screens). */
+.grade {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0) 0, rgba(0, 0, 0, 0) 2px, rgba(0, 0, 0, .14) 3px, rgba(0, 0, 0, 0) 4px),
+    radial-gradient(ellipse at center, rgba(0, 0, 0, 0) 52%, rgba(6, 3, 14, .72) 100%);
+  mix-blend-mode: multiply;
 }
 .vignette {
   position: absolute;
@@ -98,6 +110,8 @@ kbd {
 .floater.coin { color: #ffe27a; font-size: 16px; }
 .floater.big { color: var(--gold); font-size: 30px; }
 .floater.combo { color: #bfa6ff; font-size: 20px; }
+.floater.psi { color: #d9c2ff; font-size: 20px; text-shadow: 0 0 10px #8c5cf0, 0 2px 0 var(--ink); }
+.floater.dim { color: #9aa3c7; font-size: 14px; }
 
 /* ---------- virtual sticks ---------- */
 .sticks { position: absolute; inset: 0; pointer-events: none; }
@@ -177,6 +191,9 @@ kbd {
 .bar.hp.low .fill { animation: blink .6s steps(2) infinite; }
 @keyframes blink { 50% { filter: brightness(1.6); } }
 .bar.xp { height: 12px; margin-top: 8px; border-width: 2px; }
+.bar.psi { height: 12px; margin-top: 8px; border-width: 2px; }
+.bar.psi .fill { background: linear-gradient(180deg, #e6d4ff 0%, #a77bff 50%, var(--violet) 100%); }
+.bar.psi .bar-text { font-size: 9px; line-height: 1; }
 .bar.xp .fill { background: linear-gradient(180deg, #a6fff0 0%, var(--teal) 50%, var(--teal-d) 100%); }
 .bar-text {
   position: absolute;
@@ -389,6 +406,105 @@ kbd {
 }
 .dash-btn:active { transform: translateY(4px); box-shadow: 0 2px 0 var(--ink); }
 
+/* psi skill chips (desktop HUD) */
+.skills {
+  display: flex;
+  gap: 8px;
+  pointer-events: none;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.skill {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px 6px 4px;
+  min-width: 0;
+  background: linear-gradient(180deg, var(--parch) 0%, var(--parch-2) 100%);
+  border: 3px solid var(--ink);
+  border-radius: 12px;
+  box-shadow: 0 4px 0 var(--ink);
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: .03em;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.skill kbd { margin: 0; opacity: 1; font-size: 12px; }
+.skill .sk-cost {
+  margin-left: 2px;
+  font-family: var(--body);
+  font-weight: 900;
+  font-size: 11px;
+  color: #6a3fd1;
+}
+.skill .sk-cd {
+  position: absolute;
+  inset: 0;
+  background: rgba(43, 29, 58, .55);
+  transform-origin: left center;
+  transform: scaleX(var(--cd, 0));
+  pointer-events: none;
+}
+.skill[data-state='ready'] { border-color: var(--violet); box-shadow: 0 4px 0 var(--ink), 0 0 12px rgba(140, 92, 240, .55); }
+.skill[data-state='low'] { opacity: .55; }
+.skill[data-state='low'] .sk-cost { color: var(--crimson); }
+.skill.fired { animation: skillfire .32s ease-out; }
+@keyframes skillfire { 0% { transform: scale(1.12); } 100% { transform: scale(1); } }
+
+/* touch skill buttons: a column above DASH */
+.touch-skills {
+  position: absolute;
+  right: max(24px, env(safe-area-inset-right));
+  bottom: calc(max(24px, env(safe-area-inset-bottom)) + 262px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  pointer-events: none;
+}
+.skill-btn {
+  position: relative;
+  overflow: hidden;
+  width: 64px;
+  height: 64px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  border-radius: 50%;
+  border: 3px solid var(--ink);
+  background: radial-gradient(circle at 35% 30%, #f0e2ff, #b48bff 55%, #6a3fd1);
+  box-shadow: 0 5px 0 var(--ink);
+  color: #fff;
+  font-family: var(--display);
+  font-weight: 900;
+  font-size: 9px;
+  letter-spacing: .04em;
+  text-shadow: 0 1px 0 var(--ink);
+  pointer-events: auto;
+  touch-action: none;
+}
+.skill-btn b { position: relative; line-height: 1; }
+.skill-btn small { position: relative; font-family: var(--body); font-size: 10px; line-height: 1; opacity: .9; }
+.skill-btn .sk-cd {
+  position: absolute;
+  inset: 0;
+  background: rgba(43, 29, 58, .6);
+  transform-origin: bottom center;
+  transform: scaleY(var(--cd, 0));
+  pointer-events: none;
+}
+.skill-btn[data-state='low'] { filter: saturate(.25) brightness(.7); }
+.skill-btn:active { transform: translateY(3px); box-shadow: 0 2px 0 var(--ink); }
+.skill-btn.fired { animation: skillfire .32s ease-out; }
+@media (max-width: 560px) {
+  .skills .sk-name { display: none; }
+}
+
 /* ---------- screens & panels ---------- */
 .screen {
   position: absolute;
@@ -488,6 +604,7 @@ kbd {
 body.is-touch .touch-only { display: inline; }
 body.is-touch .kbd-only { display: none; }
 body.is-touch .dash-ind { display: none; }
+body.is-touch .skills { display: none; }
 
 .board-panel {
   background: #fff3d1;

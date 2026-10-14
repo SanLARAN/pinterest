@@ -1,8 +1,16 @@
 // DOM controller: start / pause / level-up / game-over screens and the in-game HUD.
 // Writes to the DOM only when a value changes, keeping the per-frame cost tiny.
 import { cleanName, DEFAULT_NAME } from '../sim/highscores.js';
+import { PSI, SKILL_IDS } from '../sim/psi.js';
 
 const $ = (id) => document.getElementById(id);
+
+// every element that shows a psi skill: the desktop HUD chip and the touch button
+const SKILL_NODES = {
+  skill1: ['sk1', 'btnSkill1'],
+  skill2: ['sk2', 'btnSkill2'],
+  skill3: ['sk3', 'btnSkill3'],
+};
 
 // Inline SVG badges for boons (emoji fonts are not guaranteed on every platform).
 const BOON_ICONS = {
@@ -45,6 +53,9 @@ export class UI {
     on('btnOverTitle', 'click', () => this.a.onQuit());
     on('btnSaveName', 'click', () => this.a.onSaveName($('nameInput').value));
     on('btnDash', 'pointerdown', (e) => { e.preventDefault(); this.a.onDashButton(); });
+    for (const id of SKILL_IDS) {
+      on(SKILL_NODES[id][1], 'pointerdown', (e) => { e.preventDefault(); this.a.onSkill(id); });
+    }
     $('nameInput').addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
         e.preventDefault();
@@ -184,6 +195,26 @@ export class UI {
     const dash = $('dashInd');
     this.setStyle('dashRing', '--p', String(s.dashReady ? 1 : 1 - s.dashFrac).slice(0, 5));
     dash.classList.toggle('ready', !!s.dashReady);
+    this.setPsi(s.psi);
+  }
+
+  /** Psi energy bar plus the three skill states (ready / cooling down / short on energy). */
+  setPsi(psi) {
+    if (!psi) return;
+    this.setStyle('psiFill', 'width', `${((psi.energy / PSI.max) * 100).toFixed(1)}%`);
+    this.setText('psiText', `${Math.floor(psi.energy)}`);
+    for (const id of SKILL_IDS) {
+      const frac = psi.cooldownFrac(id);
+      const state = psi.canCast(id) ? 'ready' : frac > 0 ? 'cd' : 'low';
+      for (const node of SKILL_NODES[id]) {
+        const key = `state:${node}`;
+        if (this.cache[key] !== state) {
+          this.cache[key] = state;
+          $(node).dataset.state = state;
+        }
+        this.setStyle(node, '--cd', frac.toFixed(3));
+      }
+    }
   }
 
   hurtFlash() {
@@ -235,6 +266,15 @@ export class UI {
     const label = muted ? 'Sound: Off' : 'Sound: On';
     for (const id of ['btnMuteStart', 'btnMutePause']) $(id).textContent = label;
     $('btnMuteHud').style.opacity = muted ? '0.55' : '1';
+  }
+
+  flashSkill(id) {
+    for (const node of SKILL_NODES[id]) {
+      const el = $(node);
+      el.classList.remove('fired');
+      void el.offsetWidth;
+      el.classList.add('fired');
+    }
   }
 
   setTouch(on) {
