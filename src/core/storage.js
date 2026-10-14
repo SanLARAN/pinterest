@@ -18,17 +18,24 @@ function set(key, value) {
   }
 }
 
-export function loadScores() {
+const SCORE_KEYS = { classic: STORAGE.scores, checkpoint: STORAGE.scoresCheckpoint };
+
+/** High-score table for a mode ('classic' | 'checkpoint'). Unknown modes fall back to classic. */
+export function loadScores(mode = 'classic') {
   try {
-    return sanitizeEntries(JSON.parse(get(STORAGE.scores) || '[]'));
+    return sanitizeEntries(JSON.parse(get(SCORE_KEYS[mode] ?? STORAGE.scores) || '[]'));
   } catch {
     return [];
   }
 }
 
-export function saveScores(list) {
-  set(STORAGE.scores, JSON.stringify(list));
+export function saveScores(list, mode = 'classic') {
+  set(SCORE_KEYS[mode] ?? STORAGE.scores, JSON.stringify(list));
 }
+
+/** Checkpoint after each boss. Off unless the player turns it on. */
+export const loadCheckpoints = () => get(STORAGE.checkpoints) === '1';
+export const saveCheckpoints = (on) => set(STORAGE.checkpoints, on ? '1' : '0');
 
 export const loadName = () => get(STORAGE.name) || '';
 export const saveName = (name) => set(STORAGE.name, name);

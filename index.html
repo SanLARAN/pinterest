@@ -148,6 +148,7 @@
           </div>
           <aside class="board-panel">
             <h2>Hall of Heroes</h2>
+            <p id="boardModeStart" class="muted small board-mode"></p>
             <div id="boardStart" class="board"></div>
           </aside>
         </div>
@@ -198,6 +199,11 @@
             <input id="transSlider" type="range" min="0" max="100" step="5" value="50" />
           </label>
           <p class="muted small">0% keeps every wall solid. 100% lets them fade almost away.</p>
+          <label class="setting setting-toggle" for="cpToggle">
+            <span class="setting-row"><span>Checkpoint after each boss</span><b id="cpVal">Off</b></span>
+            <input id="cpToggle" type="checkbox" />
+          </label>
+          <p class="muted small">When the knight falls, they rise again at the last boss slain, with that run's gear. Checkpoint runs have their own high-score table.</p>
           <div class="stack">
             <button id="btnSettingsBack" class="btn btn-primary" type="button">Back <kbd>Esc</kbd></button>
           </div>
@@ -264,6 +270,7 @@
           </div>
           <aside class="board-panel">
             <h2>Hall of Heroes</h2>
+            <p id="boardModeOver" class="muted small board-mode"></p>
             <div id="boardOver" class="board"></div>
           </aside>
         </div>

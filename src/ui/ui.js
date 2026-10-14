@@ -1,9 +1,9 @@
 // DOM controller: start / pause / level-up / game-over screens and the in-game HUD.
 // Writes to the DOM only when a value changes, keeping the per-frame cost tiny.
-import { cleanName, DEFAULT_NAME } from '../sim/highscores.js';
+import { cleanName, DEFAULT_NAME, MODE_LABELS } from '../sim/highscores.js';
 import { PSI, SKILL_IDS } from '../sim/psi.js';
 import { ITEMS, INV_SLOTS, sellPrice } from '../sim/items.js';
-import { loadTranslucency } from '../core/storage.js';
+import { loadTranslucency, loadCheckpoints } from '../core/storage.js';
 import { isKnown } from '../sim/atlas.js';
 import { drawWorldMap } from './map.js';
 
@@ -95,6 +95,11 @@ export class UI {
       $('transVal').textContent = `${v}%`;
       this.a.onTranslucency(v);
     });
+    $('cpToggle').addEventListener('change', (e) => {
+      e.stopPropagation();
+      this.setCheckpointLabel(e.target.checked);
+      this.a.onCheckpoints(e.target.checked);
+    });
     on('btnStart', 'click', () => this.a.onStart());
     on('btnMuteStart', 'click', () => this.a.onToggleMute());
     on('btnMutePause', 'click', () => this.a.onToggleMute());
@@ -146,8 +151,8 @@ export class UI {
   }
 
   // ---- screens --------------------------------------------------------------
-  showStart(list, muted) {
-    this.renderBoard($('boardStart'), list);
+  showStart(list, muted, checkpoints = loadCheckpoints()) {
+    this.refreshBoard(list, checkpoints);
     this.setMuted(muted);
     this.show('screenStart');
     this.hide('screenPause');
@@ -155,6 +160,16 @@ export class UI {
     this.hide('screenOver');
     this.hide('screenShop');
     this.hide('hud');
+  }
+
+  /** Redraws the title table for a mode and labels which table it is. */
+  refreshBoard(list, checkpoints = loadCheckpoints()) {
+    this.renderBoard($('boardStart'), list);
+    $('boardModeStart').textContent = `Table: ${MODE_LABELS[checkpoints ? 'checkpoint' : 'classic']}`;
+  }
+
+  setCheckpointLabel(on) {
+    $('cpVal').textContent = on ? 'On' : 'Off';
   }
 
   hideStart() {
@@ -168,6 +183,9 @@ export class UI {
     const v = loadTranslucency();
     $('transSlider').value = String(v);
     $('transVal').textContent = `${v}%`;
+    const cp = loadCheckpoints();
+    $('cpToggle').checked = cp;
+    this.setCheckpointLabel(cp);
     this.hide(from === 'pause' ? 'screenPause' : 'screenStart');
     this.show('screenSettings');
   }
@@ -221,6 +239,7 @@ export class UI {
     $('overLevel').textContent = String(d.level);
     $('overSeed').textContent = d.seedCode;
     $('overTitle').textContent = d.won ? 'Victory' : 'Fallen';
+    $('boardModeOver').textContent = `Table: ${MODE_LABELS[d.mode] ?? MODE_LABELS.classic}`;
     $('overSub').textContent = d.won
       ? (d.qualifies ? 'The throne is shattered and your name is carved in the hall.' : 'The throne is shattered. Emberkeep is free.')
       : d.qualifies

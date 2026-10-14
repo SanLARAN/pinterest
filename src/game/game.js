@@ -15,7 +15,8 @@ import { drawUpgrades } from '../sim/upgrades.js';
 import { PICKUPS } from '../sim/defs.js';
 import { BOSS_DEFS } from '../sim/bosses.js';
 import { Inventory, ITEMS, SHOP_STOCK, buy, sell, trade, makeStock, chapterLoot, bossLoot, applyItem, passiveTotals } from '../sim/items.js';
-import { qualifies, addScore, cleanName } from '../sim/highscores.js';
+import { qualifies, addScore, cleanName, modeOf } from '../sim/highscores.js';
+import { captureCheckpoint } from '../sim/checkpoint.js';
 import { createRng, seedCode } from '../util/rng.js';
 import { buildWorld } from '../render/worldModel.js';
 import { buildMerchant } from '../render/merchantModel.js';
@@ -33,7 +34,7 @@ import { Arrows } from './projectiles.js';
 import { Juice } from './juice.js';
 import { Input } from '../core/input.js';
 import { Sound } from '../core/audio.js';
-import { loadScores, saveScores, loadName, saveName, loadMuted, saveMuted, loadTranslucency, saveTranslucency, loadAtlasRaw, saveAtlasRaw } from '../core/storage.js';
+import { loadScores, saveScores, loadCheckpoints, saveCheckpoints, loadName, saveName, loadMuted, saveMuted, loadTranslucency, saveTranslucency, loadAtlasRaw, saveAtlasRaw } from '../core/storage.js';
 import { UI } from '../ui/ui.js';
 
 // the stall stands this far up the map from the keep, on the first reachable open cell
@@ -47,6 +48,7 @@ const PSI_GLOW = COLORS.psi.glow;
 const PSI_DEEP = COLORS.psi.deep;
 const SLASH_FADE = 0.2;
 const DEATH_REAL_TIME = 1.8; // seconds of slow-motion before the game-over screen
+const CHECKPOINT_IFRAMES = 2; // seconds of invulnerability after rising at a checkpoint
 const DEATH_TIMESCALE = 0.35;
 const THRONE_HP = 300; // the enemy throne: swings and psi wear it down once the gates open
 const THRONE_R = 1.6; // its hit radius for swings, psi and lances
@@ -75,7 +77,10 @@ export class Game {
     this.input.onBlur = () => this.onBlur();
     this.input.onPointerInGame = null;
 
-    this.list = loadScores();
+    this.checkpointsOn = loadCheckpoints(); // the setting; takes effect at the next run
+    this.runCheckpoints = false; // the mode of the run in progress
+    this.checkpoint = null; // last boss snapshot in checkpoint mode
+    this.list = loadScores(modeOf(this.checkpointsOn));
     this.pendingEntry = null;
     this.snd = {};
 
@@ -93,6 +98,7 @@ export class Game {
       onShopAct: (act, i) => this.shopAct(act, i),
       onShopLeave: () => this.closeShop(),
       onTranslucency: (v) => this.setTranslucency(v),
+      onCheckpoints: (on) => this.setCheckpoints(on),
       onAtlas: () => this.openAtlas(),
       onStats: () => this.onAction('stats'),
     });
@@ -238,7 +244,7 @@ export class Game {
     this.seed = newSeed();
     this.buildWorld(this.seed);
     this.hero.model.root.visible = false;
-    this.ui.showStart(this.list, this.sound.muted);
+    this.ui.showStart(this.list, this.sound.muted, this.checkpointsOn);
     this.bindUnlock();
     this.loop = (t) => {
       this.frame(t);
@@ -354,10 +360,13 @@ export class Game {
   }
 
   /** Resets all run state. The world is rebuilt only when `rebuild` is true. */
-  resetRun(rebuild) {
+  /** `cp` (checkpoint mode only) resumes a run from the snapshot taken at the last boss. */
+  resetRun(rebuild, cp = null) {
     if (rebuild) this.buildWorld(newSeed());
+    this.checkpoint = cp;
     this.rng = createRng(this.seed ^ 0x9e3779b9);
     this.director = new WaveDirector(this.rng);
+    if (cp) this.director.wave = cp.wave; // nextWave below starts the wave after the slain boss
     this.score = new ScoreKeeper();
     this.enemies.clear();
     this.arrows.clear();
@@ -399,12 +408,58 @@ export class Game {
     this.enemyCtx.hero = this.hero;
     this.flow.goal = -1;
     this.flow.setGoal(this.hero.x, this.hero.z);
+    if (cp) this.restoreCheckpoint(cp);
     this.camInit = false;
     this.director.nextWave(this.waveEnv);
   }
 
+  /** Puts the carried state from a checkpoint back after the world and hero were reset. */
+  restoreCheckpoint(cp) {
+    const h = this.hero;
+    this.bossesSlain = cp.bossesSlain;
+    this.throneHp = cp.throneHp;
+    this.score.score = cp.score;
+    this.score.kills = cp.kills;
+    this.score.coins = cp.coins;
+    h.level = cp.level;
+    h.xp = cp.xp;
+    h.xpNext = cp.xpNext;
+    h.stats = { ...cp.stats };
+    h.hp = h.stats.maxHp;
+    h.invT = CHECKPOINT_IFRAMES;
+    this.inv.slots = [...cp.inv];
+    this.psi.levels = { ...cp.psiLevels };
+    this.passive = passiveTotals(this.inv.slots);
+    if (cp.gatesOpen) this.openGates();
+  }
+
+  /** Hero died in checkpoint mode: rise again at the last boss snapshot. The boss stays dead. */
+  respawnAtCheckpoint() {
+    this.buildWorld(this.seed); // same seed, same map; the stronghold, gates and throne are rebuilt
+    this.resetRun(false, this.checkpoint);
+    this.ui.toast('Rising again at the last checkpoint');
+  }
+
+  /** Switches to the table of the mode chosen in settings. Only called between runs. */
+  adoptMode() {
+    this.runCheckpoints = this.checkpointsOn;
+    this.list = loadScores(modeOf(this.runCheckpoints));
+  }
+
+  setCheckpoints(on) {
+    this.checkpointsOn = !!on;
+    saveCheckpoints(this.checkpointsOn);
+    if (this.state === 'menu') {
+      this.adoptMode();
+      this.ui.refreshBoard(this.list, this.checkpointsOn);
+    } else {
+      this.ui.toast('Checkpoint setting applies from the next run');
+    }
+  }
+
   beginRun() {
     if (this.state !== 'menu') return;
+    this.adoptMode();
     if (!this.worldFresh) this.resetRun(true);
     else this.resetRun(false);
     this.worldFresh = false;
@@ -424,6 +479,7 @@ export class Game {
     this.ui.hideLevel();
     this.ui.hideBanner();
     this.ui.hideShop();
+    this.adoptMode();
     this.resetRun(true);
     this.state = 'playing';
     this.ui.showHud();
@@ -451,7 +507,7 @@ export class Game {
     this.ui.hideLevel();
     this.ui.hideBanner();
     this.sound.stopMusic();
-    this.ui.showStart(this.list, this.sound.muted);
+    this.ui.showStart(this.list, this.sound.muted, this.checkpointsOn);
   }
 
   togglePause(forceResume = false) {
@@ -751,7 +807,7 @@ export class Game {
     const entry = { ...this.pendingEntry, name: clean };
     const res = addScore(this.list, entry);
     this.list = res.list;
-    saveScores(this.list);
+    saveScores(this.list, modeOf(this.runCheckpoints));
     saveName(clean);
     this.pendingEntry = null;
     this.ui.afterSave(clean, res.rank, this.list);
@@ -788,6 +844,7 @@ export class Game {
       won: this.won,
       name: loadName(),
       list: this.list,
+      mode: modeOf(this.runCheckpoints),
       highlight: -1,
     });
   }
@@ -1113,6 +1170,25 @@ export class Game {
       this.bossesSlain++;
       if (this.bossesSlain >= GATE_BOSSES) this.openGates();
       else this.ui.toast(`Bosses slain ${this.bossesSlain}/${GATE_BOSSES}: the gates stay sealed`);
+      if (this.runCheckpoints) {
+        const h = this.hero;
+        this.checkpoint = captureCheckpoint({
+          wave: this.director.wave,
+          bossesSlain: this.bossesSlain,
+          gatesOpen: this.gatesOpen,
+          throneHp: this.throneHp,
+          score: this.score.score,
+          kills: this.score.kills,
+          coins: this.score.coins,
+          level: h.level,
+          xp: h.xp,
+          xpNext: h.xpNext,
+          stats: h.stats,
+          inv: this.inv.slots,
+          psiLevels: this.psi.levels,
+        });
+        this.ui.toast('Checkpoint reached');
+      }
     }
   }
 
@@ -1645,7 +1721,8 @@ export class Game {
         this.acc -= FIXED_DT;
         steps++;
         if (this.hero.dead && this.deathReal >= DEATH_REAL_TIME) {
-          this.finishRun();
+          if (this.runCheckpoints && this.checkpoint) this.respawnAtCheckpoint();
+          else this.finishRun();
           break;
         }
       }

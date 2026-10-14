@@ -1227,4 +1227,6 @@ body.is-touch .skills { display: none; }
 .setting { display: block; margin: 14px 0 6px; }
 .setting-row { display: flex; justify-content: space-between; align-items: baseline; font: 700 16px var(--body); color: var(--ink); }
 .setting input[type="range"] { width: 100%; margin-top: 8px; accent-color: var(--gold-d); cursor: pointer; }
+.setting-toggle input[type="checkbox"] { margin-top: 8px; width: 20px; height: 20px; accent-color: var(--gold-d); cursor: pointer; }
+.board-mode { margin: 6px 0 2px; text-align: center; }
 .muted.small { font-size: 13px; }
