@@ -7,6 +7,7 @@ import { HALF, SIZE } from '../sim/layout.js';
 import { BOSS_DEFS, BOSS_SKILLS } from '../sim/bosses.js';
 
 let nextId = 1;
+const OUTLINE_NEAR = 4.2; // red outline when a foe's rim is this close to the hero
 const _steer = { x: 0, z: 0 };
 
 export const BOSS_SLAM = { radius: 5.2, windup: 1.0, damage: 22 };
@@ -120,6 +121,9 @@ export class EnemyManager {
 
   update(dt, ctx) {
     for (const e of this.list) {
+      // red threat outline for foes close to the hero (decor critters never get one)
+      const near = !e.decor && e.state !== 'dying' && Math.hypot(ctx.hero.x - e.x, ctx.hero.z - e.z) - e.radius < OUTLINE_NEAR;
+      e.model.outline.visible = near;
       if (e.state === 'dying') {
         this.animateDeath(e, dt);
         continue;

@@ -97,14 +97,28 @@ function boss() {
 
 const BUILDERS = { slime, imp, archer, brute, boss };
 
+// Red threat outline: an inverted hull. The body's own geometry is pushed out along its normals
+// and drawn back-face only, so it reads as a solid red rim. One shared material for every foe.
+const OUTLINE_MAT = new THREE.ShaderMaterial({
+  uniforms: { uW: { value: 0.09 }, uColor: { value: new THREE.Color(0xff2a2a) } },
+  vertexShader: 'uniform float uW; void main(){ vec3 p = position + normal * uW; gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0); }',
+  fragmentShader: 'uniform vec3 uColor; void main(){ gl_FragColor = vec4(uColor, 1.0); }',
+  side: THREE.BackSide,
+});
+
 /**
  * Creates a fresh enemy model (own material so hit flashes don't affect others).
- * Returns { root, body, mat, glowColor }.
+ * Returns { root, body, mat, ring, outline }. The outline is hidden until the foe is near the hero.
  */
 export function createEnemyModel(type) {
   const root = new THREE.Group();
   const body = new THREE.Mesh(BUILDERS[type]().build(), bitmapMaterial());
   root.add(body);
+  const outline = new THREE.Mesh(body.geometry, OUTLINE_MAT);
+  outline.visible = false;
+  outline.castShadow = false;
+  outline.receiveShadow = false;
+  body.add(outline);
   let ring = null;
   if (type === 'boss') {
     ring = new THREE.Mesh(
@@ -114,5 +128,5 @@ export function createEnemyModel(type) {
     ring.position.y = 0.03;
     root.add(ring);
   }
-  return { root, body, mat: body.material, ring };
+  return { root, body, mat: body.material, ring, outline };
 }
