@@ -48,6 +48,13 @@ export function resolveStatic(layout, body) {
   return hit;
 }
 
+/** Removes every static box of one kind (e.g. 'gate' when the stronghold gates open). */
+export function removeStaticKind(layout, kind) {
+  for (let i = layout.boxes.length - 1; i >= 0; i--) {
+    if (layout.boxes[i].kind === kind) layout.boxes.splice(i, 1);
+  }
+}
+
 /** Keeps a body inside the playable circle. */
 export function clampToArena(body, radius = PLAY_RADIUS) {
   const d = Math.hypot(body.x, body.z);

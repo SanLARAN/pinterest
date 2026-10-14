@@ -9,6 +9,7 @@ const KEY_MAP = {
   Space: 'attack', KeyJ: 'attack',
   ShiftLeft: 'dash', ShiftRight: 'dash', KeyK: 'dash',
   Escape: 'pause', KeyP: 'pause',
+  Tab: 'stats',
   KeyQ: 'skill1', KeyE: 'skill2', KeyC: 'skill3',
   Enter: 'confirm', NumpadEnter: 'confirm',
   KeyR: 'restart',
@@ -79,6 +80,7 @@ export class Input {
     if (action === 'attack' || action === 'confirm' || action === 'dash' || action === 'up' || action === 'down' || action === 'left' || action === 'right') {
       if (e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault();
     }
+    if (action === 'stats') e.preventDefault(); // TAB must not move focus
     this.keys.add(e.code);
     if (!action || e.repeat) return;
     this.touchMode = false;

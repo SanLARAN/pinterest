@@ -130,6 +130,15 @@ export function buildLayout(seed) {
     baseTowers.push({ x: BASE.x + sx * bH, z: BASE.z + sz * bH });
   }
   const baseThrone = { x: BASE.x, z: BASE.z, half: BASE.throneHalf };
+  // the stronghold is solid: walls and towers always block; the sealed gates and the throne block
+  // until the gates open and the throne falls (game.js removes them by kind: 'gate', 'throne')
+  for (const w of baseWalls) boxes.push({ minX: w.minX, maxX: w.maxX, minZ: w.minZ, maxZ: w.maxZ, kind: 'base' });
+  for (const t of baseTowers) circles.push({ x: t.x, z: t.z, r: 1.2, kind: 'base-tower' });
+  for (const g of baseGates) boxes.push({ ...g.box, kind: 'gate' });
+  boxes.push({
+    minX: baseThrone.x - baseThrone.half, maxX: baseThrone.x + baseThrone.half,
+    minZ: baseThrone.z - baseThrone.half, maxZ: baseThrone.z + baseThrone.half, kind: 'throne',
+  });
   const braziers = [];
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
     braziers.push({ x: sx * 7.5, z: sz * 7.5 });
@@ -219,7 +228,8 @@ export function buildLayout(seed) {
     }
   };
   for (const c of circles) markCircle(c);
-  for (const b of boxes) markBox(b);
+  // stronghold pieces are marked separately below, so gate cells can be told apart
+  for (const b of boxes) if (b.kind !== 'base' && b.kind !== 'gate' && b.kind !== 'throne') markBox(b);
   for (const b of baseWalls) markBox(b);
   for (const t of baseTowers) markCircle({ x: t.x, z: t.z, r: 1.2 });
   markBox({ minX: baseThrone.x - baseThrone.half, maxX: baseThrone.x + baseThrone.half,

@@ -5,6 +5,7 @@ import { PSI, SKILL_IDS } from '../sim/psi.js';
 import { ITEMS, INV_SLOTS, sellPrice } from '../sim/items.js';
 import { loadTranslucency } from '../core/storage.js';
 import { isKnown } from '../sim/atlas.js';
+import { drawWorldMap } from './map.js';
 
 const SKILL_LABEL = { slam: 'Slam', charge: 'Charge', blink: 'Blink', quake: 'Quake', summon: 'Summon', volley: 'Volley', nova: 'Nova', lance: 'Lance' };
 
@@ -78,6 +79,7 @@ export class UI {
     on('btnSettingsPause', 'click', () => this.showSettings('pause'));
     on('btnSettingsBack', 'click', () => this.hideSettings());
     on('btnAtlas', 'click', () => this.a.onAtlas());
+    on('btnStats', 'click', () => this.a.onStats());
     on('btnAtlasBack', 'click', () => this.hideAtlas());
     for (const b of document.querySelectorAll('.atlas-tab')) {
       b.addEventListener('click', (e) => {
@@ -624,6 +626,32 @@ export class UI {
     if (sel.skills) for (const s of sel.skills) tags += `<span class="atlas-tag">${escapeHtml(SKILL_LABEL[s] ?? s)}</span>`;
     if (sel.passive) tags += '<span class="atlas-tag">Passive</span>';
     det.innerHTML = `<div class="atlas-portrait">${art}</div><h3>${escapeHtml(sel.name)}</h3><div>${tags}</div><p>${escapeHtml(sel.desc)}</p>`;
+  }
+
+  /** TAB panel: character sheet, skills, run totals and the map. */
+  setStatsOpen(open) {
+    const el = $('statsPanel');
+    if (el.classList.contains('hidden') === !open) return;
+    el.classList.toggle('hidden', !open);
+  }
+
+  setStats(s) {
+    const key = JSON.stringify(s);
+    if (this.cache.stats === key) return;
+    this.cache.stats = key;
+    const rows = (list) => list.map(([k, v]) => `<dt>${escapeHtml(k)}</dt><dd>${escapeHtml(v)}</dd>`).join('');
+    $('statsCharacter').innerHTML = rows(s.character);
+    $('statsRun').innerHTML = rows(s.run);
+    $('statsSkills').innerHTML = s.skills
+      .map((k) => `<div class="stat-skill"><b>${escapeHtml(k.name)}</b><span>${escapeHtml(k.level)}</span><small>${escapeHtml(k.desc)}</small></div>`)
+      .join('');
+    $('statsItems').textContent = s.items.length ? s.items.join(' · ') : 'Empty pack';
+  }
+
+  drawMap(m) {
+    const canvas = $('mapCanvas');
+    if (!canvas) return;
+    drawWorldMap(canvas.getContext('2d'), canvas.width, m);
   }
 
   /** Dawn wash, 0..1: grows through the finale. */

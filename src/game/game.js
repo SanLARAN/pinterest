@@ -4,8 +4,10 @@ import * as THREE from 'three';
 import { FIXED_DT, MAX_STEPS_PER_FRAME, CAMERA, RENDER, WORLD } from '../config.js';
 import { buildLayout, HALF, SIZE, BASE, GATE_BOSSES } from '../sim/layout.js';
 import { FlowField } from '../sim/nav.js';
-import { Psi, PSI, SKILL_IDS, skillOffers, isSkillLevel } from '../sim/psi.js';
+import { Psi, PSI, SKILL_IDS, skillOffers, isSkillLevel, skillSummary } from '../sim/psi.js';
 import { dangerLevel } from '../sim/danger.js';
+import { removeStaticKind } from '../sim/collision.js';
+import { drawWorldMap } from '../ui/map.js';
 import { COLORS } from '../render/palette.js';
 import { ScoreKeeper } from '../sim/scoring.js';
 import { WaveDirector } from '../sim/waves.js';
@@ -92,6 +94,7 @@ export class Game {
       onShopLeave: () => this.closeShop(),
       onTranslucency: (v) => this.setTranslucency(v),
       onAtlas: () => this.openAtlas(),
+      onStats: () => this.onAction('stats'),
     });
     this.ui.setTouch(this.isTouch);
 
@@ -173,6 +176,8 @@ export class Game {
     this.comboTick = 0;
     this.overAt = 0;
     this.simT = 0;
+    this.statsOpen = false; // TAB panel
+    this.mapAcc = 0;
     this.worldFresh = true; // the title world is still unused
     this.realT = 0; // real seconds, drives shader and ambient animation
     this.inv = new Inventory();
@@ -378,6 +383,7 @@ export class Game {
     this.dmgScale = 1;
     this.bossesSlain = 0;
     this.gatesOpen = false;
+    this.statsOpen = false;
     this.throneHp = THRONE_HP;
     this.won = false;
     this.winT = -1;
@@ -477,6 +483,66 @@ export class Game {
   }
 
   /** What the objective card shows: the boss count, then the throne's health. */
+  /** TAB: the knight's sheet and the map. Toggles without pausing the fight. */
+  toggleStats() {
+    this.statsOpen = !this.statsOpen;
+    this.mapAcc = 0; // refresh right away
+  }
+
+  statsSnapshot() {
+    const h = this.hero;
+    const s = h.stats;
+    const psi = this.psi;
+    return {
+      character: [
+        ['Level', String(h.level)],
+        ['Experience', `${Math.floor(h.xp)} / ${h.xpNext}`],
+        ['Health', `${Math.ceil(h.hp)} / ${s.maxHp}`],
+        ['Psi energy', `${Math.floor(psi.energy)} / ${PSI.max}`],
+        ['Sword damage', String(Math.round(s.damage))],
+        ['Swing reach', s.reach.toFixed(2)],
+        ['Swing arc', `${Math.round((s.arc * 180) / Math.PI)}°`],
+        ['Swing interval', `${s.swingCooldown.toFixed(2)} s`],
+        ['Move speed', s.speed.toFixed(1)],
+        ['Dash cooldown', `${s.dashCooldown.toFixed(2)} s`],
+        ['Lifesteal', `${s.lifesteal} per kill`],
+        ['Ember magnet', s.magnet.toFixed(1)],
+        ['Psi regen', `${(PSI.regen + s.psiRegen).toFixed(1)} / s`],
+      ],
+      skills: SKILL_IDS.map((id) => ({
+        name: PSI.skills[id].name,
+        level: `Lv ${psi.level(id)} / ${PSI.maxLevel}`,
+        desc: skillSummary(id, psi.level(id)),
+      })),
+      run: [
+        ['Wave', String(this.director.wave)],
+        ['Score', this.score.score.toLocaleString()],
+        ['Kills', String(this.score.kills)],
+        ['Bosses slain', `${this.bossesSlain} / ${GATE_BOSSES}`],
+        ['Coins', String(this.score.coins)],
+      ],
+      items: this.inv.slots.filter(Boolean).map((id) => ITEMS[id]?.name ?? id),
+    };
+  }
+
+  mapSnapshot() {
+    const L = this.layout;
+    const h = this.hero;
+    return {
+      radius: WORLD.playRadius,
+      castleHalf: L.castle.half,
+      keepHalf: L.castle.keepHalf,
+      base: { x: L.base.x, z: L.base.z, half: L.base.half, gates: L.base.gates.map((g) => g.box) },
+      throne: L.base.throne,
+      gatesOpen: this.gatesOpen,
+      rifts: L.rifts,
+      baseRifts: L.base.rifts,
+      stall: this.stallPos,
+      hero: { x: h.x, z: h.z, facing: h.facing, dead: h.dead },
+      foes: [...this.enemies.targets()].map((e) => ({ x: e.x, z: e.z, boss: e.type === 'boss' })),
+    };
+  }
+
   objectiveInfo() {
     if (this.won) return { text: 'Dawn breaks over Emberkeep', frac: 1, done: true };
     if (this.cut) return { text: 'The throne falls…', frac: 1 };
@@ -508,6 +574,9 @@ export class Game {
         break;
       case 'restart':
         if (this.state === 'playing' || this.state === 'paused' || this.state === 'levelup' || this.state === 'over' || this.state === 'shop') this.restart();
+        break;
+      case 'stats':
+        if (this.state === 'playing' || this.statsOpen) this.toggleStats();
         break;
       case 'pause':
         if (this.state === 'shop') this.closeShop();
@@ -934,6 +1003,7 @@ export class Game {
     this.gatesOpen = true;
     const L = this.layout;
     for (const k of L.base.gateCells) L.blocked[k] = 0;
+    removeStaticKind(L, 'gate'); // the gates no longer block the knight
     this.base.setOpen(true);
     // re-solve the flow field: the stronghold is now reachable from outside
     this.flow.goal = -1;
@@ -966,6 +1036,7 @@ export class Game {
   throneFall() {
     const T = this.layout.base.throne;
     this.base.throneDown();
+    removeStaticKind(this.layout, 'throne');
     this.cut = { t: 0, beat: 0 }; // real-time cutscene: flyover and cellar, see updateCutscene
     this.acc = 0;
     this.juice.burst(T.x, 1.5, T.z, 0xb070ff, 90, 2.6);
@@ -1618,6 +1689,16 @@ export class Game {
     if (this.state === 'menu') return;
     const h = this.hero;
     ui.setLowHp(h.hp / h.stats.maxHp < 0.3 && !h.dead);
+    const showStats = this.statsOpen && this.state === 'playing';
+    ui.setStatsOpen(showStats);
+    if (showStats) {
+      this.mapAcc -= realDt;
+      if (this.mapAcc <= 0) {
+        this.mapAcc = 0.1; // the panel and map refresh ten times a second
+        ui.setStats(this.statsSnapshot());
+        ui.drawMap(this.mapSnapshot());
+      }
+    }
     ui.setHud({
       level: h.level,
       hp: h.hp,

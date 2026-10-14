@@ -49,6 +49,9 @@
             <button id="btnPause" class="icon-btn" type="button" aria-label="Pause">
               <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1.2"/><rect x="14" y="5" width="4" height="14" rx="1.2"/></svg>
             </button>
+            <button id="btnStats" class="icon-btn" type="button" aria-label="Character and map (Tab)">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5.5c3-1.2 6-1.2 9 .6 3-1.8 6-1.8 9-.6v13c-3-1.2-6-1.2-9 .6-3-1.8-6-1.8-9-.6z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M12 6.1v13" stroke="currentColor" stroke-width="1.6"/></svg>
+            </button>
             <button id="btnMuteHud" class="icon-btn" type="button" aria-label="Toggle sound">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z"/><path class="wave" d="M16 8.5a5 5 0 0 1 0 7M18.8 6a8.8 8.8 0 0 1 0 12" fill="none" stroke-width="2" stroke-linecap="round"/></svg>
             </button>
@@ -75,6 +78,30 @@
             <span>DASH</span>
           </div>
         </div>
+        <section id="statsPanel" class="stats-panel hidden" aria-label="Character and map">
+          <div class="stats-col">
+            <h2 class="panel-title small">Knight</h2>
+            <dl id="statsCharacter" class="stat-list"></dl>
+            <h3 class="stats-sub">Psi skills</h3>
+            <div id="statsSkills" class="stat-skills"></div>
+            <h3 class="stats-sub">This run</h3>
+            <dl id="statsRun" class="stat-list"></dl>
+            <h3 class="stats-sub">Pack</h3>
+            <p id="statsItems" class="stat-items"></p>
+          </div>
+          <div class="stats-col map-col">
+            <h2 class="panel-title small">Map</h2>
+            <canvas id="mapCanvas" width="420" height="420" aria-label="World map"></canvas>
+            <ul class="map-legend">
+              <li><i class="lg hero"></i>You</li>
+              <li><i class="lg foe"></i>Foes</li>
+              <li><i class="lg boss"></i>Boss</li>
+              <li><i class="lg rift"></i>Rifts</li>
+              <li><i class="lg keep"></i>Enemy keep</li>
+            </ul>
+          </div>
+          <p class="stats-hint">Tab closes this panel</p>
+        </section>
         <div id="banner" class="banner hidden">
           <div class="kicker" id="bannerKicker"></div>
           <div class="title" id="bannerTitle"></div>
