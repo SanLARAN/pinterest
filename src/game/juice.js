@@ -75,6 +75,7 @@ class FloatingText {
 export class Juice {
   constructor(scene, camera, popupRoot) {
     this.scene = scene;
+    this.ground = null; // (x, z) -> terrain height, set once the layout exists
     this.bolts = []; // short-lived lightning polylines
     this.camera = camera;
     this.trauma = 0;
@@ -148,18 +149,27 @@ export class Juice {
     this.texts.update(realDt, camera, this.size.w, this.size.h);
   }
 
+  setGround(fn) {
+    this.ground = fn;
+  }
+
+  groundAt(x, z) {
+    return this.ground ? this.ground(x, z) : 0;
+  }
+
   /**
    * Yellow lightning that crackles out from (x, z) when a dash ends: a few jagged bolts,
    * a bright flash on the ground and a spark burst. Lives in real time, so it reads in hitstop too.
    */
   lightning(x, z, count = 4) {
+    const g = this.groundAt(x, z);
     const YELLOW = 0xffe64a;
     const total = 0.24;
     for (let k = 0; k < count; k++) {
       const a = (k / count) * Math.PI * 2 + Math.random() * 0.6;
       const pts = [];
       let px = x;
-      let py = 0.9;
+      let py = g + 0.9;
       let pz = z;
       pts.push(px, py, pz);
       const len = 1.5 + Math.random() * 0.9;
@@ -168,7 +178,7 @@ export class Juice {
         const jitter = (Math.random() - 0.5) * 0.7 * (1 - t * 0.4);
         px = x + Math.sin(a) * len * t + Math.cos(a) * jitter;
         pz = z + Math.cos(a) * len * t - Math.sin(a) * jitter;
-        py = 0.9 + (Math.random() - 0.5) * 0.5;
+        py = g + 0.9 + (Math.random() - 0.5) * 0.5;
         pts.push(px, py, pz);
       }
       const geo = new THREE.BufferGeometry();
@@ -182,7 +192,7 @@ export class Juice {
       this.bolts.push({ line, life: total, total });
     }
     this.disk(x, 0.06, z, 1.7, YELLOW, 0.22, 'burst', 0.7);
-    this.sparks(x, 0.8, z, YELLOW, 14, 1.4);
+    this.sparks(x, g + 0.8, z, YELLOW, 14, 1.4);
   }
 
   burst(x, y, z, color, count = 12, power = 1) {
@@ -226,10 +236,12 @@ export class Juice {
   }
 
   ring(x, y, z, r1, color, dur = 0.4, intensity = 1) {
+    y += this.groundAt(x, z); // flat decals follow the terrain, y is an offset above it
     this.rings.spawn({ x, y, z, r0: 0.3, r1, dur, color, mode: 'burst', intensity });
   }
 
   disk(x, y, z, r1, color, dur = 0.5, mode = 'burst', intensity = 0.6) {
+    y += this.groundAt(x, z);
     return this.disks.spawn({ x, y, z, r0: 0.2, r1, dur, color, mode, intensity });
   }
 

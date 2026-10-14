@@ -52,9 +52,17 @@ function terrainGeometry(layout) {
       const hz = H[Math.min(SIZE - 1, j + 1) * SIZE + i] - H[Math.max(0, j - 1) * SIZE + i];
       const slope = Math.hypot(hx, hz) * 0.5;
       const c = colorOf(x, z, h, slope);
-      col[idx * 3] = c.r;
-      col[idx * 3 + 1] = c.g;
-      col[idx * 3 + 2] = c.b;
+      // ambient-occlusion-like shading from the terrain shape: hollows go darker, crests lighter,
+      // so the grass reads as geometry instead of one flat green
+      const at = (ii, jj) => H[Math.min(SIZE - 1, Math.max(0, jj)) * SIZE + Math.min(SIZE - 1, Math.max(0, ii))];
+      const avg = (at(i - 1, j) + at(i + 1, j) + at(i, j - 1) + at(i, j + 1)
+        + at(i - 1, j - 1) + at(i + 1, j + 1) + at(i - 1, j + 1) + at(i + 1, j - 1)) / 8;
+      const cav = smoothstep(0, 0.3, avg - h);
+      const ridge = smoothstep(0, 0.3, h - avg);
+      const shade = (1 - 0.45 * cav) * (1 + 0.14 * ridge);
+      col[idx * 3] = c.r * shade;
+      col[idx * 3 + 1] = c.g * shade;
+      col[idx * 3 + 2] = c.b * shade;
     }
   }
   const index = new Uint32Array(N * N * 6);
@@ -209,7 +217,7 @@ export function buildWorld(layout) {
 
   const terrainGeo = terrainGeometry(layout);
   const terrain = new THREE.Mesh(terrainGeo, terrainMat);
-  terrain.userData.ground = true; // receives shadows only (see game.js castShadows)
+  terrain.userData.ground = true; // hills and hollows cast and receive shadows
   group.add(terrain);
 
   const propAcc = new GeoAccumulator();

@@ -247,14 +247,14 @@ export class Game {
 
   /**
    * Casters: solid bitmap-lit meshes (castle, props, base, merchant, hero).
-   * Receivers: every mesh, including the ground. Additive glow sprites and the terrain never cast,
-   * so halos and braziers do not paint dark spots on the ground.
+   * Receivers: every mesh, including the ground. The terrain also casts, so hills and hollows shade
+   * each other. Additive glow sprites never cast, so halos and braziers do not paint dark spots.
    */
   enableShadows(root) {
     root.traverse((o) => {
       if (!o.isMesh) return;
       o.receiveShadow = true;
-      o.castShadow = !o.userData.ground && !o.material.isMeshBasicMaterial;
+      o.castShadow = !o.material.isMeshBasicMaterial;
     });
   }
 
@@ -274,6 +274,7 @@ export class Game {
     this.world = buildWorld(this.layout);
     this.scene.add(this.world.group);
     this.enableShadows(this.world.group);
+    this.juice.setGround((x, z) => this.layout.heightAt(x, z));
     if (this.base) {
       this.scene.remove(this.base.group);
       this.base.dispose();
