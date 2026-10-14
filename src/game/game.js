@@ -2,7 +2,7 @@
 // State machine: menu -> playing <-> paused | levelup ; playing -> over -> (restart | menu).
 import * as THREE from 'three';
 import { FIXED_DT, MAX_STEPS_PER_FRAME, CAMERA, RENDER, WORLD } from '../config.js';
-import { buildLayout } from '../sim/layout.js';
+import { buildLayout, HALF, SIZE } from '../sim/layout.js';
 import { FlowField } from '../sim/nav.js';
 import { Psi, PSI, SKILL_IDS } from '../sim/psi.js';
 import { COLORS } from '../render/palette.js';
@@ -10,9 +10,13 @@ import { ScoreKeeper } from '../sim/scoring.js';
 import { WaveDirector } from '../sim/waves.js';
 import { drawUpgrades } from '../sim/upgrades.js';
 import { PICKUPS } from '../sim/defs.js';
+import { BOSS_DEFS } from '../sim/bosses.js';
+import { Inventory, ITEMS, SHOP_STOCK, buy, sell, trade, makeStock, chapterLoot, bossLoot, applyItem } from '../sim/items.js';
 import { qualifies, addScore, cleanName } from '../sim/highscores.js';
 import { createRng, seedCode } from '../util/rng.js';
 import { buildWorld } from '../render/worldModel.js';
+import { buildMerchant } from '../render/merchantModel.js';
+import { bitmapUniforms, bandedSkyTexture } from '../render/bitmap.js';
 import { ShadowPool } from '../render/pools.js';
 import { clamp, damp, wrapAngle } from '../util/math.js';
 import { Hero } from './hero.js';
@@ -24,6 +28,11 @@ import { Input } from '../core/input.js';
 import { Sound } from '../core/audio.js';
 import { loadScores, saveScores, loadName, saveName, loadMuted, saveMuted } from '../core/storage.js';
 import { UI } from '../ui/ui.js';
+
+// the stall stands this far up the map from the keep, on the first reachable open cell
+const STALL_SEARCH = { x: 0, z: 20, rings: 60 };
+const SHOP_OPEN_R = 2.4; // step inside to open
+const SHOP_REARM_R = 3.6; // must step back out past this before it reopens
 
 const FOG_COLOR = 0x191330; // dark indigo haze
 const PSI_CORE = COLORS.psi.core;
@@ -68,6 +77,9 @@ export class Game {
       onSaveName: (name) => this.saveEntry(name),
       onDashButton: () => this.input.press('dash'),
       onSkill: (id) => this.input.press(id),
+      onSlot: (i) => this.onAction(`slot${i + 1}`),
+      onShopAct: (act, i) => this.shopAct(act, i),
+      onShopLeave: () => this.closeShop(),
     });
     this.ui.setTouch(this.isTouch);
 
@@ -81,7 +93,8 @@ export class Game {
     this.renderer.setClearColor(FOG_COLOR, 1);
 
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(FOG_COLOR);
+    // banded dusk sky: a few hard colour steps read as bitmap bands
+    this.scene.background = bandedSkyTexture(['#120c2a', '#1f1656', '#3a2862', '#5e3a5e', '#2a1d33']);
     this.fog = new THREE.Fog(FOG_COLOR, 30, 110);
     this.scene.fog = this.fog;
     this.scene.add(new THREE.HemisphereLight(0xa9b8ff, 0x1a1426, 1.3));
@@ -138,6 +151,15 @@ export class Game {
     this.overAt = 0;
     this.simT = 0;
     this.worldFresh = true; // the title world is still unused
+    this.realT = 0; // real seconds, drives shader and ambient animation
+    this.inv = new Inventory();
+    this.stock = [];
+    this.shopSel = 0; // pack slot chosen for sell / trade
+    this.stockSel = 0; // merchant stock card highlighted by the keyboard
+    this.shopArmed = true;
+    this.dmgScale = 1;
+    this.stallModel = null;
+    this.stallPos = null;
 
     // ---- sim context shared with entity modules ----------------------------
     this.enemyCtx = { hero: this.hero, layout: null, flow: null, ev: this.buildEnemyEvents() };
@@ -152,7 +174,7 @@ export class Game {
     };
     this.waveEnv = {
       onChapter: (spec) => this.onChapter(spec),
-      spawn: (type, hpScale) => this.queueSpawn(type, hpScale),
+      spawn: (type, hpScale, bossId) => this.queueSpawn(type, hpScale, bossId),
       alive: () => this.enemies.aliveCount + this.pending.length,
       onCleared: (spec) => this.onCleared(spec),
     };
@@ -203,6 +225,11 @@ export class Game {
       this.scene.remove(this.world.group);
       this.world.dispose();
     }
+    if (this.stallModel) {
+      this.scene.remove(this.stallModel.group);
+      this.stallModel.dispose();
+      this.stallModel = null;
+    }
     this.seed = seed;
     this.layout = buildLayout(seed);
     this.world = buildWorld(this.layout);
@@ -215,6 +242,48 @@ export class Game {
     this.spawnRifts = reachable.length ? reachable : this.layout.rifts;
     this.enemyCtx.layout = this.layout;
     this.enemyCtx.flow = this.flow;
+    this.placeStall();
+  }
+
+  /** Spirals out from STALL_SEARCH to the nearest reachable cell with a clear 3x3 patch. */
+  placeStall() {
+    const L = this.layout;
+    const flow = this.flow;
+    const ci = Math.round(STALL_SEARCH.x + HALF);
+    const cj = Math.round(STALL_SEARCH.z + HALF);
+    const clear = (i, j) => {
+      for (let dj = -1; dj <= 1; dj++) {
+        for (let di = -1; di <= 1; di++) {
+          const ii = i + di;
+          const jj = j + dj;
+          if (ii < 1 || jj < 1 || ii >= SIZE - 1 || jj >= SIZE - 1) return false;
+          const k = jj * SIZE + ii;
+          if (L.blocked[k] || flow.dist[k] < 0) return false;
+        }
+      }
+      return true;
+    };
+    let found = null;
+    for (let r = 0; r <= STALL_SEARCH.rings && !found; r++) {
+      for (let dj = -r; dj <= r && !found; dj++) {
+        for (let di = -r; di <= r; di++) {
+          if (Math.max(Math.abs(di), Math.abs(dj)) !== r) continue;
+          if (clear(ci + di, cj + dj)) {
+            found = { i: ci + di, j: cj + dj };
+            break;
+          }
+        }
+      }
+    }
+    if (!found) {
+      this.stallPos = null;
+      return;
+    }
+    const x = found.i - HALF;
+    const z = found.j - HALF;
+    this.stallPos = { x, z };
+    this.stallModel = buildMerchant(x, L.heightAt(x, z), z);
+    this.scene.add(this.stallModel.group);
   }
 
   /** Resets all run state. The world is rebuilt only when `rebuild` is true. */
@@ -239,6 +308,12 @@ export class Game {
     this.psi.reset();
     this.skillReq.clear();
     this.clearLances();
+    this.inv.reset();
+    this.stock = makeStock(this.rng, SHOP_STOCK);
+    this.shopSel = 0;
+    this.stockSel = 0;
+    this.shopArmed = true;
+    this.dmgScale = 1;
     this.hero.reset(this.layout.start.x, this.layout.start.z);
     this.hero.model.root.visible = true;
     this.enemyCtx.hero = this.hero;
@@ -268,6 +343,7 @@ export class Game {
     this.ui.hidePause();
     this.ui.hideLevel();
     this.ui.hideBanner();
+    this.ui.hideShop();
     this.resetRun(true);
     this.state = 'playing';
     this.ui.showHud();
@@ -288,6 +364,7 @@ export class Game {
     this.juice.clearTexts();
     this.hero.model.root.visible = false;
     this.slash.visible = false;
+    this.ui.hideShop();
     this.ui.hideHud();
     this.ui.hideOver();
     this.ui.hidePause();
@@ -333,10 +410,11 @@ export class Game {
         else if (this.state === 'over' && now - this.overAt >= OVER_GUARD) this.restart();
         break;
       case 'restart':
-        if (this.state === 'playing' || this.state === 'paused' || this.state === 'levelup' || this.state === 'over') this.restart();
+        if (this.state === 'playing' || this.state === 'paused' || this.state === 'levelup' || this.state === 'over' || this.state === 'shop') this.restart();
         break;
       case 'pause':
-        if (this.state === 'playing' || this.state === 'paused') this.togglePause();
+        if (this.state === 'shop') this.closeShop();
+        else if (this.state === 'playing' || this.state === 'paused') this.togglePause();
         break;
       case 'mute':
         this.toggleMute();
@@ -344,10 +422,26 @@ export class Game {
       case 'debug':
         this.debugOn = !this.debugOn;
         break;
-      case 'pick1':
-      case 'pick2':
-      case 'pick3':
-        if (this.state === 'levelup') this.pickUpgrade(Number(action.slice(4)) - 1);
+      case 'slot1':
+      case 'slot2':
+      case 'slot3':
+      case 'slot4':
+      case 'slot5':
+      case 'slot6':
+        this.onSlot(Number(action.slice(4)) - 1);
+        break;
+      case 'buy':
+      case 'trade':
+        if (this.state === 'shop') this.shopAct(action, this.stockSel);
+        break;
+      case 'sell':
+        if (this.state === 'shop') this.shopAct(action, 0);
+        break;
+      case 'cycle':
+        if (this.state === 'shop') {
+          this.stockSel = (this.stockSel + 1) % this.stock.length;
+          this.refreshShop();
+        }
         break;
       case 'skill1':
       case 'skill2':
@@ -357,6 +451,123 @@ export class Game {
       default:
         break;
     }
+  }
+
+  // ---- inventory and merchant --------------------------------------------------------
+  /** Digit keys and slot buttons: use an item in play, pick a boon in level-up, select in the shop. */
+  onSlot(i) {
+    if (this.state === 'playing') this.useSlot(i);
+    else if (this.state === 'levelup' && i < this.offers.length) this.pickUpgrade(i);
+    else if (this.state === 'shop') {
+      this.shopSel = i;
+      this.refreshShop();
+    }
+  }
+
+  useSlot(i) {
+    const h = this.hero;
+    const id = this.inv.slots[i];
+    if (!id || h.dead) {
+      if (!id) this.ui.toast('That slot is empty');
+      return;
+    }
+    this.inv.take(i);
+    const before = h.hp;
+    applyItem(id, {
+      stats: h.stats,
+      psi: this.psi,
+      heal: (n) => h.heal(n),
+    });
+    const healed = Math.round(h.hp - before);
+    const it = ITEMS[id];
+    this.juice.text(it.name, 'big', h.x, h.y + 2.2, h.z);
+    if (healed > 0) this.juice.text(`+${healed}`, 'heal', h.x, h.y + 2.8, h.z);
+    this.juice.burst(h.x, h.y + 0.9, h.z, parseInt(it.color.slice(1), 16), 18, 1.2);
+    this.juice.ring(h.x, 0.1, h.z, 2.2, parseInt(it.color.slice(1), 16), 0.6, 1);
+    this.sound.heal();
+    this.ui.flashSlot(i);
+  }
+
+  /** Walking into the stall opens the shop; the sim freezes until the hero leaves or closes it. */
+  updateStall() {
+    const h = this.hero;
+    const sp = this.stallPos;
+    if (!sp || h.dead) return;
+    const d = Math.hypot(h.x - sp.x, h.z - sp.z);
+    if (this.shopArmed && d < SHOP_OPEN_R) {
+      this.shopArmed = false;
+      this.openShop();
+    } else if (!this.shopArmed && d > SHOP_REARM_R) {
+      this.shopArmed = true;
+    }
+  }
+
+  openShop() {
+    this.state = 'shop';
+    this.skillReq.clear();
+    this.input.clearLatched();
+    this.input.edges.clear();
+    this.acc = 0;
+    this.shopSel = Math.max(0, this.inv.slots.findIndex((id) => id));
+    this.stockSel = 0;
+    this.ui.showShop(this.shopView());
+    this.sound.pick();
+  }
+
+  closeShop() {
+    if (this.state !== 'shop') return;
+    this.state = 'playing';
+    this.ui.hideShop();
+    this.input.clearLatched();
+    this.input.edges.clear();
+    this.acc = 0;
+  }
+
+  shopView() {
+    return {
+      stock: this.stock.slice(),
+      pack: this.inv.slots.slice(),
+      gold: this.score.coins,
+      sel: this.shopSel,
+      stockSel: this.stockSel,
+    };
+  }
+
+  refreshShop() {
+    if (this.state === 'shop') this.ui.renderShop(this.shopView());
+  }
+
+  /** Merchant actions from buttons (act + index) or keyboard. */
+  shopAct(act, i) {
+    if (this.state !== 'shop') return;
+    if (act === 'select') {
+      this.shopSel = i;
+      this.refreshShop();
+      return;
+    }
+    if (act === 'stock') {
+      this.stockSel = i;
+      this.refreshShop();
+      return;
+    }
+    if (act === 'leave') {
+      this.closeShop();
+      return;
+    }
+    let r = null;
+    if (act === 'buy') r = buy(this.stock, i, this.inv, this.score.coins);
+    else if (act === 'sell') r = sell(this.inv, this.shopSel, this.score.coins);
+    else if (act === 'trade') r = trade(this.stock, i, this.inv, this.shopSel, this.score.coins);
+    if (!r) return;
+    this.score.coins = r.gold;
+    this.ui.toast(r.msg);
+    if (r.ok) {
+      this.sound.coin(4);
+      this.juice.text(r.msg, 'coin', this.hero.x, this.hero.y + 2.4, this.hero.z);
+    } else {
+      this.sound.hurt();
+    }
+    this.refreshShop();
   }
 
   // ---- high scores ------------------------------------------------------------
@@ -413,6 +624,7 @@ export class Game {
 
   // ---- waves & spawns ----------------------------------------------------------
   onChapter(spec) {
+    this.dmgScale = spec.dmgScale ?? 1;
     this.ui.banner(`Chapter ${spec.number}${spec.isBoss ? ' · Boss' : ''}`, spec.title, spec.story, 3.4);
     if (spec.isBoss) this.sound.boss();
     else this.sound.waveStart();
@@ -421,7 +633,8 @@ export class Game {
   onCleared(spec) {
     const bonus = this.score.waveBonus(spec.number);
     const h = this.hero;
-    this.ui.banner('Chapter cleared', spec.title, `+${bonus} bonus · the walls hold`, 2.6);
+    this.ui.banner('Chapter cleared', spec.title, `+${bonus} bonus · a relic drops`, 2.6);
+    this.pickups.drop('loot', h.x + 1.1, h.z, 1, chapterLoot(this.rng));
     this.sound.waveClear();
     this.juice.text(`+${bonus}`, 'big', h.x, h.y + 1.6, h.z);
     this.juice.burst(h.x, 0.8, h.z, 0xf6c24f, 36, 1.6);
@@ -431,11 +644,11 @@ export class Game {
     this.juice.addTrauma(0.2);
   }
 
-  queueSpawn(type, hpScale) {
+  queueSpawn(type, hpScale, bossId = null) {
     const rifts = this.spawnRifts;
     const rf = rifts[Math.floor(this.rng.next() * rifts.length)];
     const isBoss = type === 'boss';
-    const p = { type, hpScale, x: rf.x, z: rf.z, t: isBoss ? 1.8 : 0.9, total: isBoss ? 1.8 : 0.9, fx: 0 };
+    const p = { type, hpScale, bossId, x: rf.x, z: rf.z, t: isBoss ? 1.8 : 0.9, total: isBoss ? 1.8 : 0.9, fx: 0 };
     this.pending.push(p);
     const col = ACCENT_COLOR[type] ?? 0xffffff;
     this.juice.disk(rf.x, 0.05, rf.z, isBoss ? 3.2 : 2.2, col, p.t, 'rift', 0.7);
@@ -453,12 +666,14 @@ export class Game {
       }
       if (p.t <= 0) {
         this.pending.splice(i, 1);
-        this.enemies.spawn(p.type, p.x, p.z, p.hpScale);
+        this.enemies.spawn(p.type, p.x, p.z, p.hpScale, { bossId: p.bossId });
         const col = ACCENT_COLOR[p.type] ?? 0xffffff;
         const big = p.type === 'boss';
         this.juice.burst(p.x, 0.6, p.z, col, big ? 40 : 14, big ? 1.8 : 1);
         this.juice.ring(p.x, 0.1, p.z, big ? 6 : 2.6, col, big ? 0.9 : 0.5, 1.2);
         if (big) {
+          const bd = BOSS_DEFS[p.bossId] ?? BOSS_DEFS.champion;
+          this.ui.banner('A boss appears', bd.name, bd.story, 3.2);
           this.sound.boss();
           this.juice.addTrauma(0.5);
         } else {
@@ -520,7 +735,7 @@ export class Game {
         this.juice.ring(e.x, 0.2, e.z, 7, 0xff4a3a, 0.9, 1.4);
         this.juice.addTrauma(0.7);
         this.sound.boss();
-        this.ui.banner('The Hollow Champion', 'Enraged!', 'It roars and quickens its stride.', 1.8);
+        this.ui.banner(e.def.name, 'Enraged!', 'It roars and quickens its stride.', 1.8);
       },
     };
   }
@@ -545,8 +760,9 @@ export class Game {
   }
 
   // ---- combat ---------------------------------------------------------------------
-  damageHero(dmg, fx, fz) {
+  damageHero(dmg0, fx, fz) {
     const h = this.hero;
+    const dmg = dmg0 * this.dmgScale;
     if (!h.takeHit(dmg, fx, fz)) return false;
     this.hitstop = Math.max(this.hitstop, 0.06);
     this.juice.addTrauma(0.45);
@@ -593,7 +809,8 @@ export class Game {
   hitEnemy(e, base, nx, nz, opts = null) {
     const psi = opts !== null;
     const crit = !psi && Math.random() < 0.12;
-    const dmg = Math.max(1, Math.round(base * (crit ? 1.8 : 1)));
+    const mul = 1 - (e.armor ?? 0); // the Mire Colossus shrugs off part of each blow
+    const dmg = Math.max(1, Math.round(base * mul * (crit ? 1.8 : 1)));
     const def = e.def;
     const boss = e.type === 'boss';
     e.hp -= dmg;
@@ -643,7 +860,14 @@ export class Game {
     this.juice.addTrauma(boss ? 0.9 : 0.2);
     if (boss) {
       this.juice.ring(e.x, 0.2, e.z, 9, 0x6ff3ff, 1.1, 1.6);
-      this.ui.banner('The Hollow Champion', 'Vanquished!', 'The rift shudders and dims a little.', 2.4);
+      this.ui.banner(def.name, 'Vanquished!', def.banner, 2.6);
+      // a boss kill drops three relics and the merchant restocks
+      for (let k = 0; k < 3; k++) {
+        this.pickups.drop('loot', e.x + (k - 1) * 0.5, e.z + (k % 2) * 0.4, 1, bossLoot(this.rng));
+      }
+      this.stock = makeStock(this.rng, SHOP_STOCK);
+      this.refreshShop();
+      this.throttle('restock', 1, () => this.ui.toast('The merchant restocks his stall'));
     }
   }
 
@@ -821,7 +1045,7 @@ export class Game {
   step(dt) {
     const h = this.hero;
     this.simT += dt;
-    this.psi.update(dt);
+    this.psi.update(dt, h.stats.psiRegen);
     // Aim assist: without a manual aim, face the nearest foe in striking range.
     if (!this.input.manualAim && !h.dead) {
       const t = this.nearestTarget(2.6);
@@ -847,6 +1071,7 @@ export class Game {
     this.pickups.update(dt, h, this.layout, h.stats.magnet, (kind, value, x, y, z) => this.collect(kind, value, x, y, z));
     this.score.update(dt);
     this.updateSlash(dt);
+    this.updateStall();
   }
 
   nearestTarget(maxGap) {
@@ -880,6 +1105,18 @@ export class Game {
       this.juice.text(`+${Math.round(h.hp - before)}`, 'heal', x, y + 0.6, z);
       this.juice.burst(x, y, z, 0xff7a9a, 12, 0.9);
       this.sound.heal();
+    } else if (kind === 'loot') {
+      // false = no room in the pack; the pickup stays on the ground and retries later
+      const slot = this.inv.add(value);
+      if (slot < 0) {
+        this.throttle('packfull', 0.8, () => this.juice.text('Pack full', 'dim', x, y + 0.8, z));
+        return false;
+      }
+      const it = ITEMS[value];
+      this.juice.text(it.name, 'big', x, y + 0.9, z);
+      this.juice.burst(x, y + 0.4, z, parseInt(it.color.slice(1), 16), 14, 1);
+      this.sound.pick();
+      this.ui.flashSlot(slot);
     }
   }
 
@@ -979,6 +1216,10 @@ export class Game {
   frame(now) {
     const realDt = clamp((now - this.lastT) / 1000, 0, 0.1);
     this.lastT = now;
+    this.realT += realDt;
+    bitmapUniforms.uTime.value = this.realT;
+    if (this.world) this.world.update(this.realT);
+    if (this.stallModel) this.stallModel.update(this.realT);
     this.trackPerf(realDt);
     this.fpsFrames++;
     this.fpsAcc += realDt;
@@ -1047,6 +1288,8 @@ export class Game {
       dashReady: h.dashCd <= 0,
       dashFrac: h.dashCd / h.stats.dashCooldown,
       psi: this.psi,
+      coins: this.score.coins,
+      inv: this.inv.slots,
     });
     this.debugAcc -= realDt;
     if (this.debugOn && this.debugAcc <= 0) {
@@ -1058,7 +1301,7 @@ export class Game {
           `draws ${info.render.calls}  tris ${info.render.triangles}  geo ${info.memory.geometries}`,
           `state ${this.state}  seed ${seedCode(this.seed)}`,
           `enemies ${this.enemies.list.length}  pending ${this.pending.length}  arrows ${this.arrows.items?.length ?? 0}  lances ${this.lances.length}`,
-          `wave ${this.director.wave} phase ${this.director.phase}  hero ${h.x.toFixed(1)},${h.z.toFixed(1)}`,
+          `wave ${this.director.wave} phase ${this.director.phase}  hero ${h.x.toFixed(1)},${h.z.toFixed(1)}  stall ${this.stallPos ? `${this.stallPos.x},${this.stallPos.z}` : 'none'}`,
         ].join('\n'),
         true,
       );

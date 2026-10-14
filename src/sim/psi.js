@@ -2,7 +2,7 @@
 export const PSI = {
   max: 100,
   start: 60,
-  regen: 7, // energy per second
+  regen: 3, // base energy per second (bonus regen comes from boons and items)
   killGain: 5, // energy restored per kill
   skills: {
     skill1: { id: 'skill1', key: 'Q', name: 'Psi Burst', cost: 35, cooldown: 0.7 },
@@ -26,8 +26,9 @@ export class Psi {
     this.cd = { skill1: 0, skill2: 0, skill3: 0 };
   }
 
-  update(dt) {
-    this.energy = Math.min(PSI.max, this.energy + PSI.regen * dt);
+  /** `bonus` is extra regen per second from boons and items (hero.stats.psiRegen). */
+  update(dt, bonus = 0) {
+    this.energy = Math.min(PSI.max, this.energy + (PSI.regen + bonus) * dt);
     for (const id of SKILL_IDS) this.cd[id] = Math.max(0, this.cd[id] - dt);
   }
 

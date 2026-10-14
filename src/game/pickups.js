@@ -8,6 +8,7 @@ const KIND = {
   coin: { max: 120, color: 0xf6c343, emissive: 0x7a5200, scale: 1 },
   shard: { max: 90, color: 0x43d3c1, emissive: 0x0c5a52, scale: 1 },
   heart: { max: 16, color: 0xff5d7a, emissive: 0x5a0d1c, scale: 1 },
+  loot: { max: 24, color: 0xffb347, emissive: 0x6a3a00, scale: 1 },
 };
 const _m = new THREE.Matrix4();
 const _q = new THREE.Quaternion();
@@ -32,11 +33,13 @@ export class Pickups {
       coin: new THREE.CylinderGeometry(0.26, 0.26, 0.07, 12),
       shard: new THREE.OctahedronGeometry(0.2, 0),
       heart: heartGeometry(),
+      loot: new THREE.BoxGeometry(0.28, 0.28, 0.28),
     };
     const mats = {
       coin: new THREE.MeshLambertMaterial({ color: KIND.coin.color, emissive: KIND.coin.emissive }),
       shard: new THREE.MeshLambertMaterial({ color: KIND.shard.color, emissive: KIND.shard.emissive, flatShading: true }),
       heart: new THREE.MeshLambertMaterial({ color: KIND.heart.color, emissive: KIND.heart.emissive, flatShading: true }),
+      loot: new THREE.MeshLambertMaterial({ color: KIND.loot.color, emissive: KIND.loot.emissive, flatShading: true }),
     };
     for (const kind of Object.keys(KIND)) {
       const mesh = new THREE.InstancedMesh(geos[kind], mats[kind], KIND[kind].max);
@@ -75,7 +78,7 @@ export class Pickups {
         t: 0,
         value: value ?? (kind === 'coin' ? PICKUPS.coinValue : kind === 'heart' ? PICKUPS.heartHeal : 0),
         grounded: false,
-        life: kind === 'heart' ? 14 : 16,
+        life: kind === 'heart' ? 14 : kind === 'loot' ? 40 : 16,
         spin: Math.random() * 6,
       });
     }
@@ -95,6 +98,7 @@ export class Pickups {
       const it = this.items[i];
       it.t += dt;
       it.life -= dt;
+      if (it.cd > 0) it.cd -= dt;
       it.spin += dt * 4;
       if (!it.grounded) {
         it.vy -= 22 * dt;
@@ -129,10 +133,14 @@ export class Pickups {
         it.y += dy * k;
         it.grounded = true;
       }
-      if (d < 0.8 && it.t > 0.12) {
-        this.items.splice(i, 1);
-        onCollect(it.kind, it.value, it.x, it.y, it.z);
-        continue;
+      if (d < 0.8 && it.t > 0.12 && !(it.cd > 0)) {
+        // onCollect returns false when the pickup cannot be taken (e.g. a full pack);
+        // it then stays on the ground and retries after a short pause.
+        if (onCollect(it.kind, it.value, it.x, it.y, it.z) !== false) {
+          this.items.splice(i, 1);
+          continue;
+        }
+        it.cd = 1.2;
       }
       if (it.life <= 0) this.items.splice(i, 1);
     }
@@ -140,9 +148,8 @@ export class Pickups {
   }
 
   render() {
-    const counts = { coin: 0, shard: 0, heart: 0 };
-    const idx = { coin: 0, shard: 0, heart: 0 };
-    for (const it of this.items) counts[it.kind]++;
+    const idx = {};
+    for (const kind of Object.keys(KIND)) idx[kind] = 0;
     for (const it of this.items) {
       const mesh = this.meshes[it.kind];
       const i = idx[it.kind]++;

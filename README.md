@@ -34,6 +34,8 @@ npm test           # simulation unit tests (node:test)
 | Psi Burst | Q | Psi button (BURST) |
 | Mind Lance | E | Psi button (LANCE) |
 | Telekinetic Pull | C | Psi button (PULL) |
+| Use pack item | 1–6 | Tap a pack slot |
+| Merchant: select / buy / trade / sell / leave | 1–6 select, F next stock, B buy, T trade, X sell, Esc leave | Tap cards and buttons |
 | Pause | Esc / P | Pause button (top right) |
 | Restart | R / Enter (after game over) | Restart button |
 | Mute | M | Sound button |
@@ -46,17 +48,37 @@ Without a manual aim, the swing assists toward the nearest foe in range.
 - **Combat:** arc swings with sweep-tracked hits, hit-stop, trauma-based screen shake,
   damage popups, additive sparks, death slow-motion before the game-over screen.
 - **Enemies:** Gloopling (hops), Shade Imp (weaving), Bonewarden archer (telegraphed shots),
-  Mire Ogre (windup and charge), and the Hollow Champion boss (shockwave slams, enrages at
-  half health). Enemies emerge from rift markers after a telegraph.
+  Mire Ogre (windup and charge). Enemies emerge from rift markers after a telegraph.
+- **Bosses:** every 5th chapter is a boss, rotating through four unique bosses, each with three
+  telegraphed skills (`src/sim/bosses.js`):
+  Hollow Champion (slam, charge, blink), Ash Witch (volley, nova, summon),
+  Mire Colossus (quake, charge, summon, takes 35% less damage), Ember Wraith (nova, blink, volley).
+  Bosses enrage below half health. Each boss kill drops three relics and restocks the merchant.
+- **Items:** a 6-slot pack of one-use items and permanent boosts: Healing Draught (heal 40),
+  Ether Vial (psi +60), Whetstone (swing damage +3), Heart Fruit (max HP +20, heal 20),
+  Wind Feather (speed +0.4), Mind Crystal (psi regen +1/s). Relics drop from boss kills
+  (three) and from each cleared chapter (one). When the pack is full, a relic stays on the
+  ground until a slot frees up.
+- **Merchant:** a stall stands on the map. Walking into it opens the shop, which freezes the
+  game. Buy stock for coins, sell a pack item for half its price, or trade a pack item for a
+  stock item (the price difference is settled in coins). Esc or Leave closes it. It reopens
+  only after you step back out of range.
 - **Pathing:** BFS flow field on a 1-unit grid (8-directional, no corner cutting) with a
   line-of-sight shortcut.
-- **Psi energy:** a 100-point meter regenerates about 7 per second and gains 5 per kill.
+- **Psi energy:** a 100-point meter regenerates about 3 per second (plus boons and items, such as
+  Mind Spring and Mind Crystal) and gains 5 per kill.
   Q **Psi Burst** (35): radial shockwave that damages and knocks back nearby foes and stuns them
   briefly. E **Mind Lance** (25): a piercing bolt along your aim that strikes each foe once.
   C **Telekinetic Pull** (40): drags everything in range toward you and stuns it for about 1.4s.
   Each skill has its own short cooldown. The rules live in `src/sim/psi.js`.
-- **Progression:** shards fill the XP bar; each level offers 3 random boons from 9 upgrades.
+- **Progression:** shards fill the XP bar; each level offers 3 random boons from 10 upgrades.
 - **Scoring:** kill points × combo multiplier (×1 to ×5), coins +5, chapter clear bonus 100 × chapter.
+  Coins are also the shop currency; they are tracked separately from score.
+- **Waves:** harder than the first cut: more foes per chapter, faster spawns, tougher foes, and
+  hits that scale with the chapter.
+- **Look:** a dark bitmap style: posterized colour bands with an ordered Bayer dither on the
+  vertex-coloured models, wind sway on foliage, a banded sky, and drifting fireflies
+  (`src/render/bitmap.js`).
 - **High scores:** top 10 stored locally in the browser. Name entry happens on game over.
 
 ### Project layout
@@ -65,8 +87,8 @@ Without a manual aim, the swing assists toward the nearest foe in range.
 src/
   config.js          tuning knobs (timestep, world size, pixel scale, camera, storage keys)
   util/              seeded RNG, simplex noise, math helpers
-  sim/               pure simulation: layout, nav, collision, waves, scoring, upgrades, psi, high scores
-  render/            geometry builders, palette, pooled particles, world & character models
+  sim/               pure simulation: layout, nav, collision, waves, scoring, upgrades, psi, bosses, items & shop, high scores
+  render/            geometry builders, bitmap shader, palette, pooled particles, world, character, merchant models
   game/              orchestrator (game.js), hero, enemies, pickups, arrows, juice (FX)
   core/              input (keyboard/mouse/touch), audio (WebAudio synth), storage
   ui/                DOM HUD and screens

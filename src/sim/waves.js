@@ -1,4 +1,5 @@
 // Chapter/wave director. Pure: all side effects go through the `env` callbacks.
+import { bossForWave } from './bosses.js';
 export const CHAPTERS = [
   { title: 'The Gate Breaks', story: 'A rift tore open beneath Emberkeep gate. Gloopings spill from the cracks. Hold the courtyard!' },
   { title: 'Imps in the Orchard', story: 'Shade imps dart over the walls, hunting the king\u2019s gardens. Be quick, Sir Pip.' },
@@ -8,25 +9,32 @@ export const CHAPTERS = [
 ];
 
 export function chapterFor(n) {
+  if (n % 5 === 0) {
+    const b = bossForWave(n);
+    return { title: b.title, story: b.story };
+  }
   if (n >= 1 && n <= CHAPTERS.length) return CHAPTERS[n - 1];
   return { title: `Rift Tide ${n}`, story: 'The rift breathes harder. More shapes pour from the cracks.' };
 }
 
 export function waveSpec(n) {
   const isBoss = n % 5 === 0;
-  const total = Math.min(60, 7 + n * 3);
-  const pool = [{ item: 'slime', weight: 10 }];
-  if (n >= 2) pool.push({ item: 'imp', weight: 4 + n * 0.5 });
-  if (n >= 3) pool.push({ item: 'archer', weight: 2 + n * 0.4 });
-  if (n >= 4) pool.push({ item: 'brute', weight: 1 + n * 0.35 });
+  // Harder than the first cut: more foes, faster spawns, tougher foes, harder hits.
+  const total = Math.min(90, 10 + n * 4);
+  const pool = [{ item: 'slime', weight: 9 }];
+  if (n >= 2) pool.push({ item: 'imp', weight: 5 + n * 0.6 });
+  if (n >= 2) pool.push({ item: 'archer', weight: 2 + n * 0.5 });
+  if (n >= 3) pool.push({ item: 'brute', weight: 1.5 + n * 0.45 });
   return {
     number: n,
     isBoss,
+    bossId: isBoss ? bossForWave(n).id : null,
     total,
-    interval: Math.max(0.45, 1.45 - n * 0.06),
-    maxAlive: Math.min(12 + n * 2, 28),
+    interval: Math.max(0.32, 1.2 - n * 0.07),
+    maxAlive: Math.min(14 + n * 3, 40),
     pool,
-    hpScale: 1 + (n - 1) * 0.08,
+    hpScale: 1 + (n - 1) * 0.14,
+    dmgScale: 1 + (n - 1) * 0.05,
     introTime: n === 1 ? 1.2 : 2.4,
     ...chapterFor(n),
   };
@@ -69,7 +77,7 @@ export class WaveDirector {
       case 'spawning': {
         if (spec.isBoss && !this.bossSpawned) {
           this.bossSpawned = true;
-          env.spawn('boss', spec.hpScale);
+          env.spawn('boss', spec.hpScale, spec.bossId);
         }
         this.spawnTimer -= dt;
         const alive = env.alive();

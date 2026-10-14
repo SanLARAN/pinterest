@@ -1,6 +1,7 @@
 // Chibi low-poly knight: big head, small body, plume, cape, shield and sword.
 import * as THREE from 'three';
-import { GeoAccumulator, part, G, vertexMaterial } from './geo.js';
+import { GeoAccumulator, part, G } from './geo.js';
+import { bitmapMaterial } from './bitmap.js';
 import { COLORS } from './palette.js';
 
 const HIP = 0.42;
@@ -14,7 +15,7 @@ export function createHeroModel() {
   const u = (y) => y - HIP; // world height -> upper-local height
 
   const mats = [];
-  const bodyMat = vertexMaterial();
+  const bodyMat = bitmapMaterial();
   mats.push(bodyMat);
 
   // ---- torso, head, helmet, face ------------------------------------------

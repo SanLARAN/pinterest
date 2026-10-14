@@ -225,3 +225,14 @@ test('defs: every enemy type has sane stats', () => {
     assert.ok(d.hp > 0 && d.speed > 0 && d.radius > 0 && d.score > 0 && d.xp > 0, t);
   }
 });
+
+test('waves: later chapters are harder than earlier ones (more foes, tougher, harder hits)', () => {
+  const a = waveSpec(1);
+  const b = waveSpec(6);
+  assert.ok(b.total > a.total);
+  assert.ok(b.hpScale > a.hpScale);
+  assert.ok(b.dmgScale > a.dmgScale);
+  assert.ok(b.interval < a.interval);
+  assert.ok(b.maxAlive > a.maxAlive);
+  assert.ok(b.pool.some((p) => p.item === 'brute'));
+});

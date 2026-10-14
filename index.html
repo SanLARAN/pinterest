@@ -41,6 +41,7 @@
             <span class="label">Score</span>
             <span class="value" id="score">0</span>
             <span class="combo" id="combo"></span>
+            <span class="coins" id="coins">0 coins</span>
           </div>
           <div class="hud-actions no-game">
             <button id="btnPause" class="icon-btn" type="button" aria-label="Pause">
@@ -51,6 +52,7 @@
             </button>
           </div>
         </div>
+        <div id="invBar" class="inv-bar no-game" aria-label="Pack"></div>
         <div class="hud-bottom">
           <div class="hud-card chapter" id="chapter">Chapter 1</div>
           <div class="skills" aria-label="Psi skills">
@@ -99,6 +101,8 @@
               <li><b>Swing</b> click / Space / J<span class="touch-only"> &middot; drag right stick or tap</span></li>
               <li><b>Dash</b> Shift / right-click / K<span class="touch-only"> &middot; DASH button</span></li>
               <li><b>Psi</b> Q burst &middot; E lance &middot; C pull<span class="touch-only"> &middot; skill buttons</span></li>
+              <li><b>Pack</b> 1&ndash;6 use an item<span class="touch-only"> &middot; tap a slot</span></li>
+              <li><b>Merchant</b> walk up to the stall to trade &middot; Esc leaves<span class="touch-only"> &middot; tap to use</span></li>
               <li><b>Pause</b> Esc / P</li>
             </ul>
           </div>
@@ -130,6 +134,27 @@
           <p class="muted" id="levelSub">Choose a boon for your knight.</p>
           <div id="cards" class="cards"></div>
           <p class="muted tiny">Press 1, 2 or 3 &middot; or tap a card</p>
+        </div>
+      </section>
+
+      <!-- Merchant (opened by walking up to the stall) -->
+      <section id="screenShop" class="screen hidden">
+        <div class="screen-panel shop-panel">
+          <h2 class="panel-title">Wandering Merchant</h2>
+          <p class="muted" id="shopSub"></p>
+          <div class="shop-gold">Coins <b id="shopGold">0</b></div>
+          <h3 class="shop-h">For sale</h3>
+          <div id="shopStock" class="shop-grid"></div>
+          <h3 class="shop-h">Your pack <small>tap a slot to sell or trade it</small></h3>
+          <div class="shop-packrow">
+            <div id="shopPack" class="shop-pack"></div>
+            <button id="shopSell" type="button" class="btn btn-small btn-ghost" data-act="sell">Sell</button>
+          </div>
+          <p id="shopDetail" class="shop-detail"></p>
+          <div class="stack">
+            <button type="button" class="btn btn-primary" data-act="leave">Leave <kbd>Esc</kbd></button>
+          </div>
+          <p class="muted tiny">1&ndash;6 pack &middot; F next stock &middot; B buy &middot; T trade &middot; X sell</p>
         </div>
       </section>
 

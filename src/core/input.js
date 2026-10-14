@@ -13,7 +13,8 @@ const KEY_MAP = {
   Enter: 'confirm', NumpadEnter: 'confirm',
   KeyR: 'restart',
   KeyM: 'mute',
-  Digit1: 'pick1', Digit2: 'pick2', Digit3: 'pick3',
+  Digit1: 'slot1', Digit2: 'slot2', Digit3: 'slot3', Digit4: 'slot4', Digit5: 'slot5', Digit6: 'slot6',
+  KeyB: 'buy', KeyT: 'trade', KeyX: 'sell', KeyF: 'cycle', // merchant shortcuts
   F3: 'debug', Backquote: 'debug',
 };
 const GAME_EDGES = new Set(['attack', 'dash']);

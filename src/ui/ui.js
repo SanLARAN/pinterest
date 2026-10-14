@@ -2,6 +2,7 @@
 // Writes to the DOM only when a value changes, keeping the per-frame cost tiny.
 import { cleanName, DEFAULT_NAME } from '../sim/highscores.js';
 import { PSI, SKILL_IDS } from '../sim/psi.js';
+import { ITEMS, INV_SLOTS, sellPrice } from '../sim/items.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -14,6 +15,7 @@ const SKILL_NODES = {
 
 // Inline SVG badges for boons (emoji fonts are not guaranteed on every platform).
 const BOON_ICONS = {
+  mind: '<circle cx="12" cy="12" r="8" fill="#fff" stroke="currentColor" stroke-width="1.6"/><path d="M12 6.5a5.5 5.5 0 1 0 4 9.3" fill="none" stroke="#8c5cf0" stroke-width="2.2" stroke-linecap="round"/><circle cx="12" cy="12" r="1.8" fill="#8c5cf0"/>',
   steel: '<path d="M12 3l2.2 9.5H9.8z" fill="#fff" stroke="currentColor"/><path d="M7 13h10" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M12 13v7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>',
   reach: '<path d="M16 4a9 9 0 1 0 4 12A7 7 0 0 1 16 4z" fill="#fff" stroke="currentColor"/>',
   arc: '<path d="M4 15a9 9 0 0 1 16 0" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><path d="M7 19a6 6 0 0 1 10 0" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>',
@@ -25,6 +27,20 @@ const BOON_ICONS = {
   magnet: '<path d="M6 4v8a6 6 0 0 0 12 0V4h-4v8a2 2 0 0 1-4 0V4z" fill="#fff" stroke="currentColor" stroke-width="1.6"/><path d="M6 8h4M14 8h4" stroke="#e0344a" stroke-width="3"/>',
 };
 const boonIcon = (id) => `<svg viewBox="0 0 24 24" width="40" height="40" aria-hidden="true">${BOON_ICONS[id] || ''}</svg>`;
+
+// Inline SVG for consumables and permanent boosts (same look as the boon badges).
+const ITEM_ICONS = {
+  potion: '<path d="M9 3h6v3l3 4v8a3 3 0 0 1-3 3H9a3 3 0 0 1-3-3v-8l3-4z" fill="#ff5d6c" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M7.5 13h9" stroke="#fff" stroke-width="1.6" opacity=".6"/>',
+  vial: '<path d="M9 3h6M10 3v6l-4.5 7.5A3 3 0 0 0 8.1 21h7.8a3 3 0 0 0 2.6-4.5L14 9V3" fill="#9f7bff" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="11" cy="16" r="1.2" fill="#fff"/><circle cx="14" cy="14" r=".9" fill="#fff"/>',
+  blade: '<path d="M14.5 3.5l6 6-9 9-3.6-.4-.4-3.6z" fill="#e4e8f2" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M5 19l2.5-2.5M3.2 20.8l1.6-1.6" stroke="#f6c24f" stroke-width="2.4" stroke-linecap="round"/>',
+  fruit: '<circle cx="12" cy="14" r="7" fill="#ff7aa2" stroke="currentColor" stroke-width="1.6"/><path d="M12 7c0-2 1-3.5 3-4" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/><path d="M13 5c2 -1.4 3.8-.5 4.5.5-1.9.9-3.4.6-4.5-.5z" fill="#6cbd5a"/>',
+  feather: '<path d="M19 4c-7 0-12 5-13 13l-1.5 3 3-1.5C15 17 20 12 20 5z" fill="#bfe9ff" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M4 20L14 10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>',
+  crystal: '<path d="M12 2l6 7-6 13-6-13z" fill="#7ff0e0" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M6 9h12M12 2v20" stroke="#fff" stroke-width="1" opacity=".7"/>',
+};
+const itemIcon = (id) => {
+  const it = id ? ITEMS[id] : null;
+  return `<svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true">${it ? ITEM_ICONS[it.icon] || '' : ''}</svg>`;
+};
 
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -56,6 +72,24 @@ export class UI {
     for (const id of SKILL_IDS) {
       on(SKILL_NODES[id][1], 'pointerdown', (e) => { e.preventDefault(); this.a.onSkill(id); });
     }
+    // inventory bar: tap a slot to use it (play) or select it (shop)
+    $('invBar').addEventListener('click', (e) => {
+      const el = e.target.closest('[data-slot]');
+      if (!el) return;
+      e.stopPropagation();
+      this.a.onSlot(Number(el.dataset.slot));
+    });
+    $('invBar').addEventListener('pointerdown', (e) => e.stopPropagation());
+    // merchant screen: buttons and cards carry data-act / data-i
+    $('screenShop').addEventListener('click', (e) => {
+      e.stopPropagation();
+      const el = e.target.closest('[data-act]');
+      if (!el) return;
+      const act = el.dataset.act;
+      if (act === 'leave') this.a.onShopLeave();
+      else this.a.onShopAct(act, Number(el.dataset.i ?? 0));
+    });
+    $('screenShop').addEventListener('pointerdown', (e) => e.stopPropagation());
     $('nameInput').addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
         e.preventDefault();
@@ -77,6 +111,7 @@ export class UI {
     this.hide('screenPause');
     this.hide('screenLevel');
     this.hide('screenOver');
+    this.hide('screenShop');
     this.hide('hud');
   }
 
@@ -183,6 +218,8 @@ export class UI {
     document.querySelector('.bar.hp')?.classList.toggle('low', low);
     this.setStyle('xpFill', 'width', `${Math.min(100, (s.xp / s.xpNext) * 100).toFixed(1)}%`);
     this.setText('score', s.score.toLocaleString());
+    this.setText('coins', `${s.coins} coins`);
+    this.setInv(s.inv);
     this.setText('combo', s.combo >= 2 ? `Combo ×${s.combo} · ×${s.multiplier} pts` : '');
     if (s.comboTick !== this.cache.comboTick) {
       this.cache.comboTick = s.comboTick;
@@ -215,6 +252,96 @@ export class UI {
         this.setStyle(node, '--cd', frac.toFixed(3));
       }
     }
+  }
+
+  /** Pack bar: six slots, filled lazily and only rewritten when the contents change. */
+  setInv(slots) {
+    if (!slots) return;
+    const key = slots.join('|');
+    if (this.cache.inv === key) return;
+    this.cache.inv = key;
+    const bar = $('invBar');
+    if (!bar.childElementCount) {
+      for (let i = 0; i < INV_SLOTS; i++) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'inv-slot';
+        b.dataset.slot = String(i);
+        b.setAttribute('aria-label', `Pack slot ${i + 1}`);
+        b.innerHTML = `<kbd>${i + 1}</kbd><span class="inv-ico"></span><span class="inv-name"></span>`;
+        bar.appendChild(b);
+      }
+    }
+    slots.forEach((id, i) => {
+      const b = bar.children[i];
+      b.classList.toggle('full', !!id);
+      b.querySelector('.inv-ico').innerHTML = id ? itemIcon(id) : '';
+      b.querySelector('.inv-name').textContent = id ? ITEMS[id].name : '';
+      b.title = id ? `${ITEMS[id].name}: ${ITEMS[id].desc}` : 'Empty';
+    });
+  }
+
+  flashSlot(i) {
+    const el = $('invBar').children[i];
+    if (!el) return;
+    el.classList.remove('flash');
+    void el.offsetWidth;
+    el.classList.add('flash');
+  }
+
+  // ---- merchant -------------------------------------------------------------
+  showShop(view) {
+    this.renderShop(view);
+    this.show('screenShop');
+    this.hide('screenPause');
+    this.hide('screenLevel');
+  }
+
+  hideShop() {
+    this.hide('screenShop');
+  }
+
+  /** Stock cards, pack slots, and the detail line for the selected pack item. */
+  renderShop(v) {
+    $('shopGold').textContent = String(v.gold);
+    const stock = v.stock.map((id, i) => {
+      if (!id) return `<div class="shop-card sold"><span class="shop-empty">Sold out</span></div>`;
+      const it = ITEMS[id];
+      const sel = i === v.stockSel ? ' sel' : '';
+      const can = v.gold >= it.price;
+      return `<div class="shop-card${sel}" data-act="stock" data-i="${i}">
+        <span class="shop-ico">${itemIcon(id)}</span>
+        <b class="shop-name">${escapeHtml(it.name)}</b>
+        <small class="shop-desc">${escapeHtml(it.desc)}</small>
+        <span class="shop-price${can ? '' : ' short'}">${it.price} coins</span>
+        <span class="shop-btns">
+          <button type="button" class="btn btn-small btn-primary" data-act="buy" data-i="${i}">Buy</button>
+          <button type="button" class="btn btn-small btn-gold" data-act="trade" data-i="${i}">Trade</button>
+        </span>
+      </div>`;
+    }).join('');
+    $('shopStock').innerHTML = stock;
+
+    const pack = v.pack.map((id, j) => {
+      const sel = j === v.sel ? ' sel' : '';
+      return `<button type="button" class="shop-slot${id ? ' full' : ''}${sel}" data-act="select" data-i="${j}" aria-label="Pack slot ${j + 1}">
+        <kbd>${j + 1}</kbd><span class="shop-ico">${itemIcon(id)}</span></button>`;
+    }).join('');
+    $('shopPack').innerHTML = pack;
+
+    const cur = v.pack[v.sel];
+    let detail;
+    if (!cur) {
+      detail = 'Pick a pack slot. Sell it for coins, or trade it for a stock item.';
+    } else {
+      const it = ITEMS[cur];
+      const want = v.stock[v.stockSel];
+      const trade = want ? ` · trade for ${ITEMS[want].name} (${ITEMS[want].price - it.price >= 0 ? `+${ITEMS[want].price - it.price}` : ITEMS[want].price - it.price} coins)` : '';
+      detail = `${it.name}: ${it.desc}. Sell for ${sellPrice(cur)} coins${trade}.`;
+    }
+    $('shopDetail').textContent = detail;
+    $('shopSub').textContent = 'Coins buy stock, sell for half value, or trade for a stock item.';
+    $('shopSell').disabled = !cur;
   }
 
   hurtFlash() {

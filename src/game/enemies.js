@@ -4,6 +4,7 @@ import { createEnemyModel } from '../render/enemyModels.js';
 import { resolveStatic, clampToArena } from '../sim/collision.js';
 import { damp, clamp, angleLerp, Spring, easeOutBack } from '../util/math.js';
 import { HALF, SIZE } from '../sim/layout.js';
+import { BOSS_DEFS, BOSS_SKILLS } from '../sim/bosses.js';
 
 let nextId = 1;
 const _steer = { x: 0, z: 0 };
@@ -24,9 +25,14 @@ export class EnemyManager {
     return n;
   }
 
-  spawn(type, x, z, hpScale = 1, { decor = false } = {}) {
-    const def = ENEMY_DEFS[type];
+  spawn(type, x, z, hpScale = 1, { decor = false, bossId = null } = {}) {
+    const bdef = type === 'boss' ? BOSS_DEFS[bossId] ?? BOSS_DEFS.champion : null;
+    const def = bdef ? { ...ENEMY_DEFS.boss, ...bdef } : ENEMY_DEFS[type];
     const model = createEnemyModel(type);
+    if (bdef) {
+      model.mat.color.setHex(bdef.tint);
+      if (model.ring) model.ring.material.color.setHex(bdef.accent);
+    }
     this.scene.add(model.root);
     const e = {
       id: nextId++,
@@ -57,7 +63,7 @@ export class EnemyManager {
       // brutes and bosses have no idle phase: they start straight in the chase state
       phase: type === 'brute' || type === 'boss' ? 'chase' : 'wait',
       phaseT: 0.4 + Math.random() * 0.6,
-      cool: 0.8 + Math.random() * 1.5,
+      cool: bdef ? 2.5 : 0.8 + Math.random() * 1.5,
       recoil: 0,
       airY: 0,
       hopX: 0,
@@ -75,6 +81,14 @@ export class EnemyManager {
       stallT: 0,
       stallX: x,
       stallZ: z,
+      bossId: bdef ? bdef.id : null,
+      skills: bdef ? bdef.skills : null,
+      skillI: 0,
+      curSkill: null,
+      armor: def.armor ?? 0,
+      summonType: def.summonType ?? 'slime',
+      blinkX: x,
+      blinkZ: z,
     };
     model.root.position.set(x, 0, z);
     model.root.scale.setScalar(0.001);
@@ -351,13 +365,14 @@ export class EnemyManager {
         }
         break;
       }
-      case 'brute':
       case 'boss': {
-        const isBoss = e.type === 'boss';
-        if (isBoss && !e.enraged && e.hp < e.maxHp * 0.5) {
-          e.enraged = true;
-          ctx.ev.roar(e);
-        }
+        const r = this.bossBrain(e, dt, ctx, dist, hdx, hdz, pathTo);
+        wantX = r.wx;
+        wantZ = r.wz;
+        accel = r.accel;
+        break;
+      }
+      case 'brute': {
         if (e.decor) {
           const d = pathTo(e.wanderX, e.wanderZ);
           wantX = d.x * def.speed * 0.3;
@@ -367,37 +382,24 @@ export class EnemyManager {
         if (e.phase === 'chase') {
           accel = 7;
           const d = pathTo(hero.x, hero.z);
-          const sp = def.speed * (isBoss ? enrage : 1);
-          wantX = d.x * sp;
-          wantZ = d.z * sp;
+          wantX = d.x * def.speed;
+          wantZ = d.z * def.speed;
           e.cool -= dt;
-          if (!isBoss && e.cool <= 0 && dist < 4.6) {
+          if (e.cool <= 0 && dist < 4.6) {
             e.phase = 'windup';
             e.phaseT = 0.8;
-          }
-          if (isBoss && e.cool <= 0 && dist < 9) {
-            e.phase = 'windup';
-            e.phaseT = BOSS_SLAM.windup;
-            ctx.ev.warn(e.x, e.z, BOSS_SLAM.radius, BOSS_SLAM.windup);
           }
         } else if (e.phase === 'windup') {
           accel = 30;
           e.phaseT -= dt;
-          e.glow = isBoss ? { r: 0.45, g: 0.95, b: 1 } : { r: 1, g: 0.25, b: 0.15 };
+          e.glow = { r: 1, g: 0.25, b: 0.15 };
           e.glowAmt = 0.3 + 0.35 * Math.abs(Math.sin(e.t * 22));
           if (e.phaseT <= 0) {
-            if (isBoss) {
-              ctx.ev.slam(e.x, e.z, BOSS_SLAM.radius, BOSS_SLAM.damage);
-              e.phase = 'recover';
-              e.phaseT = 0.75;
-              e.cool = e.enraged ? 2.4 : 3.2;
-            } else {
-              e.phase = 'charge';
-              e.phaseT = 0.45;
-              e.chargeX = hdx;
-              e.chargeZ = hdz;
-              ctx.ev.stomp(e);
-            }
+            e.phase = 'charge';
+            e.phaseT = 0.45;
+            e.chargeX = hdx;
+            e.chargeZ = hdz;
+            ctx.ev.stomp(e);
           }
         } else if (e.phase === 'charge') {
           accel = 60;
@@ -451,6 +453,162 @@ export class EnemyManager {
       if (ctx.ev.hit(dmg, e.x, e.z, e)) e.touchCd = 0.8;
     }
     this.animate(e, dt);
+  }
+
+  /**
+   * Boss brain: chase, then cast one of its three skills. Every cast has a telegraph
+   * (windup) before it lands, then a recovery window. Below half health it enrages.
+   */
+  bossBrain(e, dt, ctx, dist, hdx, hdz, pathTo) {
+    const hero = ctx.hero;
+    if (!e.enraged && e.hp < e.maxHp * 0.5) {
+      e.enraged = true;
+      ctx.ev.roar(e);
+    }
+    let wx = 0;
+    let wz = 0;
+    let accel = 7;
+    switch (e.phase) {
+      case 'chase': {
+        const d = pathTo(hero.x, hero.z);
+        const sp = e.def.speed * (e.enraged ? 1.2 : 1);
+        wx = d.x * sp;
+        wz = d.z * sp;
+        e.cool -= dt * (e.enraged ? 1.25 : 1);
+        if (e.cool <= 0 && dist < 16) this.bossStart(e, ctx, hdx, hdz);
+        break;
+      }
+      case 'windup': {
+        accel = 30;
+        e.phaseT -= dt;
+        e.glow = { r: 1, g: 0.42, b: 0.25 };
+        e.glowAmt = 0.3 + 0.35 * Math.abs(Math.sin(e.t * 22));
+        if (e.phaseT <= 0) this.bossExecute(e, ctx, hdx, hdz);
+        break;
+      }
+      case 'charge': {
+        accel = 60;
+        wx = e.chargeX * 14;
+        wz = e.chargeZ * 14;
+        e.phaseT -= dt;
+        if (e.phaseT <= 0) this.bossRecover(e, BOSS_SKILLS.charge.recover);
+        break;
+      }
+      case 'recover': {
+        accel = 10;
+        e.phaseT -= dt;
+        if (e.phaseT <= 0) e.phase = 'chase';
+        break;
+      }
+      default:
+        break;
+    }
+    return { wx, wz, accel };
+  }
+
+  bossRecover(e, t) {
+    e.phase = 'recover';
+    e.phaseT = t;
+  }
+
+  /** Picks the next skill in the boss's rotation and telegraphs it. */
+  bossStart(e, ctx, hdx, hdz) {
+    const id = e.skills[e.skillI % e.skills.length];
+    e.skillI++;
+    e.curSkill = id;
+    const sd = BOSS_SKILLS[id];
+    const hero = ctx.hero;
+    e.phase = 'windup';
+    e.phaseT = sd.windup * (e.enraged ? 0.8 : 1);
+    e.chargeX = hdx;
+    e.chargeZ = hdz;
+    switch (id) {
+      case 'slam':
+        ctx.ev.warn(e.x, e.z, BOSS_SLAM.radius, e.phaseT);
+        break;
+      case 'quake':
+        ctx.ev.warn(e.x, e.z, 7.5, e.phaseT);
+        break;
+      case 'charge':
+        ctx.ev.warn(e.x + hdx * 7, e.z + hdz * 7, 1.6, e.phaseT);
+        break;
+      case 'volley':
+        ctx.ev.warn(e.x, e.z, 1.4, e.phaseT);
+        break;
+      case 'nova':
+        ctx.ev.warn(e.x, e.z, 11, e.phaseT);
+        break;
+      case 'blink': {
+        // land just behind the hero, away from the boss; fall back to the hero's own spot
+        let bx = hero.x + hdx * 2;
+        let bz = hero.z + hdz * 2;
+        if (ctx.flow.blocked[ctx.flow.cellOf(bx, bz)]) {
+          bx = hero.x;
+          bz = hero.z;
+        }
+        e.blinkX = bx;
+        e.blinkZ = bz;
+        ctx.ev.warn(bx, bz, 1.2, e.phaseT);
+        break;
+      }
+      case 'summon':
+        ctx.ev.warn(e.x, e.z, 2.2, e.phaseT);
+        break;
+      default:
+        break;
+    }
+  }
+
+  /** Lands the telegraphed skill. */
+  bossExecute(e, ctx, hdx, hdz) {
+    const id = e.curSkill;
+    const sd = BOSS_SKILLS[id];
+    const def = e.def;
+    e.cool = sd.cool * (e.enraged ? 0.75 : 1);
+    switch (id) {
+      case 'slam':
+        ctx.ev.slam(e.x, e.z, BOSS_SLAM.radius, def.slamDmg);
+        this.bossRecover(e, sd.recover);
+        break;
+      case 'quake':
+        ctx.ev.slam(e.x, e.z, 7.5, def.quakeDmg);
+        this.bossRecover(e, sd.recover);
+        break;
+      case 'charge':
+        e.chargeX = hdx;
+        e.chargeZ = hdz;
+        e.phase = 'charge';
+        e.phaseT = 0.7;
+        ctx.ev.stomp(e);
+        break;
+      case 'volley':
+      case 'nova': {
+        const fan = id === 'volley';
+        const n = fan ? 5 : 10;
+        const a0 = Math.atan2(hdx, hdz);
+        for (let k = 0; k < n; k++) {
+          const a = fan ? a0 + (k - 2) * 0.22 : (k / n) * Math.PI * 2;
+          const sx = Math.sin(a);
+          const sz = Math.cos(a);
+          ctx.ev.arrow(e.x + sx * 1.2, 1.2, e.z + sz * 1.2, e.x + sx * 14, 0.8, e.z + sz * 14, fan ? 9 : 8);
+        }
+        this.bossRecover(e, sd.recover);
+        break;
+      }
+      case 'blink':
+        e.x = e.blinkX;
+        e.z = e.blinkZ;
+        ctx.ev.stomp(e);
+        this.bossRecover(e, sd.recover);
+        break;
+      case 'summon':
+        ctx.ev.summon(e.x, e.z, e.summonType, 3);
+        this.bossRecover(e, sd.recover);
+        break;
+      default:
+        this.bossRecover(e, 0.5);
+        break;
+    }
   }
 
   animate(e, dt) {

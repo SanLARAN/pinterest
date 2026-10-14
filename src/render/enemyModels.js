@@ -1,6 +1,7 @@
 // Low-poly chibi enemy models. Each is one merged mesh with its origin at the feet.
 import * as THREE from 'three';
-import { GeoAccumulator, part, G, vertexMaterial } from './geo.js';
+import { GeoAccumulator, part, G } from './geo.js';
+import { bitmapMaterial } from './bitmap.js';
 import { ENEMY_DEFS } from '../sim/defs.js';
 
 const WHITE = 0xffffff;
@@ -102,7 +103,7 @@ const BUILDERS = { slime, imp, archer, brute, boss };
  */
 export function createEnemyModel(type) {
   const root = new THREE.Group();
-  const body = new THREE.Mesh(BUILDERS[type]().build(), vertexMaterial());
+  const body = new THREE.Mesh(BUILDERS[type]().build(), bitmapMaterial());
   root.add(body);
   let ring = null;
   if (type === 'boss') {

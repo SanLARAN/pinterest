@@ -1,0 +1,111 @@
+// Unique bosses. Each boss rotates through its own three skills. Pure data + helpers.
+// Skill timings are in seconds; damage numbers are base values before wave scaling.
+
+export const BOSS_SKILLS = {
+  slam: { windup: 1.0, recover: 0.75, cool: 3.2, label: 'Ground Slam' },
+  quake: { windup: 1.2, recover: 0.9, cool: 3.6, label: 'Quake' },
+  charge: { windup: 0.9, recover: 0.8, cool: 3.2, label: 'Charge' },
+  volley: { windup: 0.7, recover: 0.6, cool: 2.6, label: 'Arrow Volley' },
+  nova: { windup: 0.9, recover: 0.7, cool: 3.2, label: 'Thorn Nova' },
+  blink: { windup: 0.5, recover: 0.5, cool: 2.6, label: 'Blink' },
+  summon: { windup: 0.9, recover: 0.8, cool: 4.0, label: 'Summon' },
+};
+
+export const BOSS_DEFS = {
+  champion: {
+    id: 'champion',
+    name: 'The Hollow Champion',
+    title: 'Hollow Champion',
+    story: 'The Hollow King\u2019s champion strides through the rift. Defeat him and the keep is free.',
+    hp: 520,
+    speed: 2.1,
+    radius: 1.25,
+    touchDmg: 22,
+    chargeDmg: 30,
+    slamDmg: 22,
+    quakeDmg: 16,
+    score: 500,
+    xp: 40,
+    knock: 0.8,
+    armor: 0,
+    summonType: 'slime',
+    tint: 0xffffff,
+    accent: 0x6ff3ff,
+    skills: ['slam', 'charge', 'blink'],
+    banner: 'Vanquished! The champion kneels, and the keep is free.',
+  },
+  witch: {
+    id: 'witch',
+    name: 'The Ash Witch',
+    title: 'Ash Witch',
+    story: 'From the ash of Mirewood she calls arrows out of the air and tears the walls apart with thorns.',
+    hp: 420,
+    speed: 1.8,
+    radius: 1.0,
+    touchDmg: 18,
+    chargeDmg: 24,
+    slamDmg: 16,
+    quakeDmg: 12,
+    score: 600,
+    xp: 44,
+    knock: 1.2,
+    armor: 0,
+    summonType: 'imp',
+    tint: 0xbfa6ff,
+    accent: 0xc69bff,
+    skills: ['volley', 'nova', 'summon'],
+    banner: 'Vanquished! The witch\u2019s ash scatters on the wind.',
+  },
+  colossus: {
+    id: 'colossus',
+    name: 'The Mire Colossus',
+    title: 'Mire Colossus',
+    story: 'A hill of stone and bog rises from the moat. Its hide turns blows aside; only the cracks bleed.',
+    hp: 760,
+    speed: 1.5,
+    radius: 1.5,
+    touchDmg: 26,
+    chargeDmg: 34,
+    slamDmg: 24,
+    quakeDmg: 20,
+    score: 700,
+    xp: 50,
+    knock: 0.3,
+    armor: 0.35, // takes 35% less damage from melee and psi
+    summonType: 'slime',
+    tint: 0xd9b48a,
+    accent: 0x9ad47a,
+    skills: ['quake', 'charge', 'summon'],
+    banner: 'Vanquished! The colossus crumbles back into the mire.',
+  },
+  wraith: {
+    id: 'wraith',
+    name: 'The Ember Wraith',
+    title: 'Ember Wraith',
+    story: 'It burns with the last light of the keep and lashes the courtyard with fire-thorned vines.',
+    hp: 380,
+    speed: 2.6,
+    radius: 0.95,
+    touchDmg: 20,
+    chargeDmg: 26,
+    slamDmg: 14,
+    quakeDmg: 10,
+    score: 800,
+    xp: 56,
+    knock: 1.5,
+    armor: 0,
+    summonType: 'imp',
+    tint: 0xff8a5a,
+    accent: 0xffc857,
+    skills: ['nova', 'blink', 'volley'],
+    banner: 'Vanquished! The wraith gutters out like a dying coal.',
+  },
+};
+
+export const BOSS_ORDER = ['champion', 'witch', 'colossus', 'wraith'];
+
+/** The boss that closes chapter n (n is a multiple of 5). Cycles through the roster. */
+export function bossForWave(n) {
+  const k = Math.max(0, Math.floor(n / 5) - 1);
+  return BOSS_DEFS[BOSS_ORDER[k % BOSS_ORDER.length]];
+}

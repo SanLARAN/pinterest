@@ -44,6 +44,7 @@ export class Hero {
       dashCooldown: HERO_BASE.dashCooldown,
       magnet: HERO_BASE.magnet,
       lifesteal: HERO_BASE.lifesteal,
+      psiRegen: 0, // bonus psi energy per second (boons and items)
     };
     this.hp = this.stats.maxHp;
     this.level = 1;

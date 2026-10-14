@@ -1,7 +1,8 @@
 // Builds the static world: noise terrain, merged props (trees, rocks, bushes),
 // the castle, and animated braziers. Static geometry is merged to keep draw calls low.
 import * as THREE from 'three';
-import { GeoAccumulator, G, vertexMaterial } from './geo.js';
+import { GeoAccumulator, G } from './geo.js';
+import { bitmapMaterial } from './bitmap.js';
 import { COLORS } from './palette.js';
 import { HALF, N, SIZE, CASTLE, roadWeight } from '../sim/layout.js';
 import { smoothstep } from '../util/math.js';
@@ -197,10 +198,12 @@ function matAt(x, y, z, ry = 0) {
  */
 export function buildWorld(layout) {
   const group = new THREE.Group();
-  const mat = vertexMaterial();
+  const terrainMat = bitmapMaterial();
+  const propMat = bitmapMaterial({ sway: 1 });
+  const castleMat = bitmapMaterial();
 
   const terrainGeo = terrainGeometry(layout);
-  const terrain = new THREE.Mesh(terrainGeo, mat);
+  const terrain = new THREE.Mesh(terrainGeo, terrainMat);
   group.add(terrain);
 
   const propAcc = new GeoAccumulator();
@@ -211,12 +214,12 @@ export function buildWorld(layout) {
     else addBush(propAcc, p, y);
   }
   const propsGeo = propAcc.build();
-  const props = new THREE.Mesh(propsGeo, mat);
+  const props = new THREE.Mesh(propsGeo, propMat);
   group.add(props);
 
   const castleAcc = new GeoAccumulator();
   buildCastle(layout, castleAcc);
-  const castle = new THREE.Mesh(castleAcc.build(), mat);
+  const castle = new THREE.Mesh(castleAcc.build(), castleMat);
   group.add(castle);
 
   // animated braziers
@@ -259,12 +262,46 @@ export function buildWorld(layout) {
     propsGeo.dispose();
     castle.geometry.dispose();
     flameGeo.dispose();
-    mat.dispose();
+    terrainMat.dispose();
+    propMat.dispose();
+    castleMat.dispose();
     flames.material.dispose();
     flames.dispose();
+    fireGeo.dispose();
+    fireMat.dispose();
+    fireflies.dispose();
   };
 
+  // fireflies: slow drifting motes over the meadow (one draw call)
+  const FIREFLIES = 60;
+  const fireGeo = new THREE.SphereGeometry(0.07, 4, 3);
+  const fireMat = new THREE.MeshBasicMaterial({
+    color: 0xd8ffe8, transparent: true, opacity: 0.9, depthWrite: false, blending: THREE.AdditiveBlending,
+  });
+  const fireflies = new THREE.InstancedMesh(fireGeo, fireMat, FIREFLIES);
+  fireflies.frustumCulled = false;
+  const fireBase = [];
+  for (let i = 0; i < FIREFLIES; i++) {
+    const a = i * 2.399963; // golden angle spreads them evenly
+    const r = 10 + ((i * 37) % 100) * 0.42;
+    const x = Math.cos(a) * r;
+    const z = Math.sin(a) * r;
+    fireBase.push({ x, z, y: layout.heightAt(x, z) + 1.2 + (i % 5) * 0.25, ph: i * 1.7 });
+  }
+  group.add(fireflies);
+
   const update = (t) => {
+    for (let i = 0; i < FIREFLIES; i++) {
+      const f = fireBase[i];
+      const x = f.x + Math.sin(t * 0.7 + f.ph) * 1.2;
+      const z = f.z + Math.cos(t * 0.55 + f.ph * 1.3) * 1.2;
+      const y = f.y + Math.sin(t * 1.4 + f.ph) * 0.5;
+      const sc = 0.55 + 0.45 * Math.sin(t * 3 + f.ph);
+      _m.makeScale(sc, sc, sc);
+      _m.setPosition(x, y, z);
+      fireflies.setMatrixAt(i, _m);
+    }
+    fireflies.instanceMatrix.needsUpdate = true;
     layout.braziers.forEach((b, i) => {
       const f = 1 + Math.sin(t * 17 + i * 1.7) * 0.12 + Math.sin(t * 29 + i) * 0.08;
       _m.makeScale(1, f * 1.1, 1);
