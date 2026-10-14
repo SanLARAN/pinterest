@@ -1321,6 +1321,7 @@ export class Game {
     }
     this.passive = passiveTotals(this.inv.slots);
     h.dashMul = this.passive.dashMul;
+    this.psi.cdMul = this.passive.cdMul;
     if (!h.dead && this.passive.regen > 0) h.heal(this.passive.regen * dt);
     h.update(dt, this.input, this.layout, this.heroEv);
     this.flow.setGoal(h.x, h.z);

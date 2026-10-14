@@ -110,3 +110,19 @@ test('psi: reset puts every skill back to level 1', () => {
   p.reset();
   assert.equal(p.level('skill1'), 1);
 });
+
+test('psi: skill cooldowns are long enough to matter', () => {
+  const p = new Psi();
+  assert.ok(p.cooldownOf('skill1') >= 2.5, 'burst at level 1 is a real cooldown');
+  assert.ok(p.cooldownOf('skill2') >= 2, 'lance at level 1 is a real cooldown');
+  assert.ok(p.cooldownOf('skill3') >= 4.5, 'pull at level 1 is a real cooldown');
+});
+
+test('psi: item cooldown multiplier shortens every skill cooldown', () => {
+  const p = new Psi();
+  const base = p.cooldownOf('skill1');
+  p.cdMul = 0.9 ** 3;
+  assert.ok(Math.abs(p.cooldownOf('skill1') - base * 0.9 ** 3) < 1e-9);
+  p.cast('skill1');
+  assert.ok(Math.abs(p.cd.skill1 - base * 0.9 ** 3) < 1e-9, 'cast uses the reduced cooldown');
+});

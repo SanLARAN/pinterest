@@ -52,6 +52,14 @@ const PASSIVES = {
     id: 'fang', name: 'Wolf Fang', desc: 'Passive: melee swings deal 10% more damage', price: 20, color: '#e8e0d0', icon: 'fang',
     passive: true, effect: { damageMul: 1.1 },
   },
+  quartz: {
+    id: 'quartz', name: 'Quartz Focus', desc: 'Passive: psi skill cooldowns 10% shorter, up to 3 stacks', price: 24, color: '#b9a6ff', icon: 'quartz',
+    passive: true, maxStack: 3, effect: { cdMul: 0.9 },
+  },
+  hourglass: {
+    id: 'hourglass', name: 'Hourglass Sand', desc: 'Passive: psi skill cooldowns 8% shorter, up to 3 stacks', price: 22, color: '#e6c77a', icon: 'hourglass',
+    passive: true, maxStack: 3, effect: { cdMul: 0.92 },
+  },
 };
 Object.assign(ITEMS, PASSIVES);
 
@@ -69,6 +77,8 @@ const CHAPTER_POOL = [
   { item: 'charm', weight: 1.5 },
   { item: 'anklet', weight: 1.2 },
   { item: 'fang', weight: 1.2 },
+  { item: 'quartz', weight: 1.2 },
+  { item: 'hourglass', weight: 1.2 },
 ];
 const BOSS_POOL = [
   { item: 'heartfruit', weight: 3 },
@@ -81,6 +91,8 @@ const BOSS_POOL = [
   { item: 'charm', weight: 2 },
   { item: 'anklet', weight: 2 },
   { item: 'fang', weight: 2 },
+  { item: 'quartz', weight: 2 },
+  { item: 'hourglass', weight: 2 },
 ];
 
 /** Item dropped when a chapter is cleared. `rng.weighted` returns the item id. */
@@ -93,18 +105,25 @@ export function bossLoot(rng) {
   return rng.weighted(BOSS_POOL);
 }
 
-/** Sums what the carried passive items give. Empty pack = neutral values. */
+/**
+ * Sums what the carried passive items give. Empty pack = neutral values.
+ * Copies of one item stack; an item with `maxStack` only counts that many copies.
+ */
 export function passiveTotals(slots) {
-  const t = { regen: 0, takenMul: 1, coinMul: 1, dashMul: 1, damageMul: 1 };
-  for (const id of slots) {
-    const it = id ? ITEMS[id] : null;
+  const t = { regen: 0, takenMul: 1, coinMul: 1, dashMul: 1, damageMul: 1, cdMul: 1 };
+  const counts = {};
+  for (const id of slots) if (id) counts[id] = (counts[id] ?? 0) + 1;
+  for (const id of Object.keys(counts)) {
+    const it = ITEMS[id];
     if (!it || !it.passive) continue;
+    const n = Math.min(counts[id], it.maxStack ?? Infinity);
     const e = it.effect;
-    if (e.regen) t.regen += e.regen;
-    if (e.guard) t.takenMul *= 1 - e.guard;
-    if (e.coinMul) t.coinMul *= e.coinMul;
-    if (e.dashMul) t.dashMul *= e.dashMul;
-    if (e.damageMul) t.damageMul *= e.damageMul;
+    if (e.regen) t.regen += e.regen * n;
+    if (e.guard) t.takenMul *= (1 - e.guard) ** n;
+    if (e.coinMul) t.coinMul *= e.coinMul ** n;
+    if (e.dashMul) t.dashMul *= e.dashMul ** n;
+    if (e.damageMul) t.damageMul *= e.damageMul ** n;
+    if (e.cdMul) t.cdMul *= e.cdMul ** n;
   }
   return t;
 }

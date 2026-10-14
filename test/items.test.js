@@ -93,7 +93,7 @@ test('loot: chapter and boss drops are always known items', () => {
 test('passive items: totals only count carried passives and are neutral when empty', async () => {
   const { passiveTotals, ITEMS } = await import('../src/sim/items.js');
   const none = passiveTotals([null, 'potion', 'ether']);
-  assert.deepEqual(none, { regen: 0, takenMul: 1, coinMul: 1, dashMul: 1, damageMul: 1 });
+  assert.deepEqual(none, { regen: 0, takenMul: 1, coinMul: 1, dashMul: 1, damageMul: 1, cdMul: 1 });
   const t = passiveTotals(['ironring', 'bracer', 'charm', 'anklet', 'fang', 'fang']);
   assert.equal(t.regen, 1);
   assert.ok(Math.abs(t.takenMul - 0.8) < 1e-9);
@@ -110,4 +110,26 @@ test('passive items are in the shop pool and loot tables', async () => {
   const seen = new Set();
   for (let i = 0; i < 400; i++) { seen.add(chapterLoot(rng)); seen.add(bossLoot(rng)); }
   assert.ok(seen.has('fang') && seen.has('ironring'));
+});
+
+test('cooldown items: each stacks up to three copies and no more', async () => {
+  const { passiveTotals, ITEMS } = await import('../src/sim/items.js');
+  assert.equal(ITEMS.quartz.maxStack, 3);
+  assert.equal(ITEMS.hourglass.maxStack, 3);
+  const three = passiveTotals(['quartz', 'quartz', 'quartz']);
+  assert.ok(Math.abs(three.cdMul - 0.9 ** 3) < 1e-9, 'three quartz = 0.9^3');
+  const five = passiveTotals(['quartz', 'quartz', 'quartz', 'quartz', 'quartz']);
+  assert.ok(Math.abs(five.cdMul - 0.9 ** 3) < 1e-9, 'a fourth and fifth copy add nothing');
+});
+
+test('cooldown items: quartz and hourglass multiply together', async () => {
+  const { passiveTotals } = await import('../src/sim/items.js');
+  const t = passiveTotals(['quartz', 'hourglass', 'hourglass', 'hourglass', 'hourglass']);
+  assert.ok(Math.abs(t.cdMul - 0.9 * 0.92 ** 3) < 1e-9);
+});
+
+test('cooldown items: they are in the shop and the loot pools', async () => {
+  const { ITEM_IDS, ITEMS } = await import('../src/sim/items.js');
+  assert.ok(ITEM_IDS.includes('quartz') && ITEM_IDS.includes('hourglass'));
+  assert.ok(ITEMS.quartz.passive && ITEMS.hourglass.passive);
 });

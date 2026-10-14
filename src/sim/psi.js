@@ -19,7 +19,7 @@ export const PSI = {
 export const SKILL_TABLES = {
   skill1: { // Psi Burst: shockwave around the knight
     cost: [35, 34, 33, 32, 30, 28],
-    cooldown: [0.7, 0.65, 0.6, 0.55, 0.5, 0.45],
+    cooldown: [3.0, 2.9, 2.8, 2.6, 2.5, 2.4],
     damage: [26, 32, 39, 47, 56, 66],
     radius: [4.6, 5.0, 5.4, 5.8, 6.2, 6.7],
     knock: [9, 10, 11, 12, 13, 14],
@@ -27,14 +27,14 @@ export const SKILL_TABLES = {
   },
   skill2: { // Mind Lance: piercing bolt along the aim
     cost: [25, 24, 23, 22, 21, 20],
-    cooldown: [0.8, 0.74, 0.68, 0.62, 0.56, 0.5],
+    cooldown: [2.4, 2.3, 2.2, 2.1, 2.0, 1.9],
     damage: [20, 25, 31, 38, 46, 55],
     range: [13, 14, 15.5, 17, 18.5, 20],
     width: [0.7, 0.75, 0.8, 0.9, 1.0, 1.1],
   },
   skill3: { // Telekinetic Pull: drags foes in and holds them
     cost: [40, 38, 36, 34, 32, 30],
-    cooldown: [1.5, 1.4, 1.3, 1.2, 1.1, 1.0],
+    cooldown: [5.0, 4.8, 4.6, 4.4, 4.2, 4.0],
     damage: [0, 6, 10, 14, 18, 24],
     radius: [7.5, 8.0, 8.6, 9.2, 9.8, 10.5],
     speed: [13, 14, 15, 16, 17, 18],
@@ -92,6 +92,7 @@ export class Psi {
     this.energy = PSI.start;
     this.cd = { skill1: 0, skill2: 0, skill3: 0 };
     this.levels = { skill1: 1, skill2: 1, skill3: 1 };
+    this.cdMul = 1; // cooldown multiplier from passive items (quartz, hourglass), set by the game
   }
 
   /** `bonus` is extra regen per second from boons and items (hero.stats.psiRegen). */
@@ -117,8 +118,9 @@ export class Psi {
     return this.stats(id)?.cost ?? Infinity;
   }
 
+  /** Cooldown after the item multiplier. */
   cooldownOf(id) {
-    return this.stats(id)?.cooldown ?? 0;
+    return (this.stats(id)?.cooldown ?? 0) * this.cdMul;
   }
 
   canUpgrade(id) {
