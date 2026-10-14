@@ -3,6 +3,7 @@
 import { cleanName, DEFAULT_NAME } from '../sim/highscores.js';
 import { PSI, SKILL_IDS } from '../sim/psi.js';
 import { ITEMS, INV_SLOTS, sellPrice } from '../sim/items.js';
+import { loadTranslucency } from '../core/storage.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -30,6 +31,11 @@ const boonIcon = (id) => `<svg viewBox="0 0 24 24" width="40" height="40" aria-h
 
 // Inline SVG for consumables and permanent boosts (same look as the boon badges).
 const ITEM_ICONS = {
+  ring: '<circle cx="12" cy="12.5" r="6.5" fill="none" stroke="currentColor" stroke-width="3.2"/><path d="M9.5 5.5l2.5-2 2.5 2" fill="#f6c24f" stroke="currentColor" stroke-width="1.2"/><path d="M12 6v0" stroke="#ff5d6c" stroke-width="2.2" stroke-linecap="round"/>',
+  bracer: '<path d="M5 8h14v8H5z" fill="#9aa3b5" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M9 8v8M15 8v8" stroke="#e4e8f2" stroke-width="1.4"/><circle cx="12" cy="12" r="1.4" fill="#f6c24f"/>',
+  charm: '<circle cx="12" cy="12" r="7.5" fill="#ffd45c" stroke="currentColor" stroke-width="1.6"/><path d="M12 7.5l1.3 2.7 2.9.4-2.1 2 .5 2.9-2.6-1.4-2.6 1.4.5-2.9-2.1-2 2.9-.4z" fill="#b5771a"/>',
+  anklet: '<ellipse cx="12" cy="14" rx="7" ry="4.5" fill="none" stroke="#7fe0a0" stroke-width="3"/><circle cx="17.5" cy="10" r="1.8" fill="#f6c24f" stroke="currentColor" stroke-width="1"/>',
+  fang: '<path d="M7 4c4 2 6 6 5 16-3-5-6-9-5-16z" fill="#f3ecdc" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M13 6c3 2 4.5 5 4 12-2-3.6-4-7-4-12z" fill="#d8cfbb" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>',
   potion: '<path d="M9 3h6v3l3 4v8a3 3 0 0 1-3 3H9a3 3 0 0 1-3-3v-8l3-4z" fill="#ff5d6c" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M7.5 13h9" stroke="#fff" stroke-width="1.6" opacity=".6"/>',
   vial: '<path d="M9 3h6M10 3v6l-4.5 7.5A3 3 0 0 0 8.1 21h7.8a3 3 0 0 0 2.6-4.5L14 9V3" fill="#9f7bff" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="11" cy="16" r="1.2" fill="#fff"/><circle cx="14" cy="14" r=".9" fill="#fff"/>',
   blade: '<path d="M14.5 3.5l6 6-9 9-3.6-.4-.4-3.6z" fill="#e4e8f2" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M5 19l2.5-2.5M3.2 20.8l1.6-1.6" stroke="#f6c24f" stroke-width="2.4" stroke-linecap="round"/>',
@@ -57,6 +63,15 @@ export class UI {
 
   bind() {
     const on = (id, ev, fn) => $(id).addEventListener(ev, (e) => { e.stopPropagation(); fn(e); });
+    on('btnSettings', 'click', () => this.showSettings('start'));
+    on('btnSettingsPause', 'click', () => this.showSettings('pause'));
+    on('btnSettingsBack', 'click', () => this.hideSettings());
+    $('transSlider').addEventListener('input', (e) => {
+      e.stopPropagation();
+      const v = Number(e.target.value);
+      $('transVal').textContent = `${v}%`;
+      this.a.onTranslucency(v);
+    });
     on('btnStart', 'click', () => this.a.onStart());
     on('btnMuteStart', 'click', () => this.a.onToggleMute());
     on('btnMutePause', 'click', () => this.a.onToggleMute());
@@ -117,6 +132,22 @@ export class UI {
 
   hideStart() {
     this.hide('screenStart');
+    this.hide('screenSettings');
+  }
+
+  /** Settings can be opened from the title or the pause menu; Back returns to where it came from. */
+  showSettings(from) {
+    this.settingsFrom = from;
+    const v = loadTranslucency();
+    $('transSlider').value = String(v);
+    $('transVal').textContent = `${v}%`;
+    this.hide(from === 'pause' ? 'screenPause' : 'screenStart');
+    this.show('screenSettings');
+  }
+
+  hideSettings() {
+    this.hide('screenSettings');
+    this.show(this.settingsFrom === 'pause' ? 'screenPause' : 'screenStart');
   }
 
   showPause(muted) {
@@ -126,6 +157,7 @@ export class UI {
 
   hidePause() {
     this.hide('screenPause');
+    this.hide('screenSettings');
   }
 
   showLevel(choices, onPick, level) {
@@ -156,9 +188,12 @@ export class UI {
     $('overCombo').textContent = `×${d.bestCombo}`;
     $('overLevel').textContent = String(d.level);
     $('overSeed').textContent = d.seedCode;
-    $('overSub').textContent = d.qualifies
-      ? 'The hall remembers the brave.'
-      : 'The rift claims another knight.';
+    $('overTitle').textContent = d.won ? 'Victory' : 'Fallen';
+    $('overSub').textContent = d.won
+      ? (d.qualifies ? 'The throne is shattered and your name is carved in the hall.' : 'The throne is shattered. Emberkeep is free.')
+      : d.qualifies
+        ? 'The hall remembers the brave.'
+        : 'The rift claims another knight.';
     const box = $('nameBox');
     box.classList.toggle('hidden', !d.qualifies);
     if (d.qualifies) {
@@ -220,6 +255,8 @@ export class UI {
     this.setText('score', s.score.toLocaleString());
     this.setText('coins', `${s.coins} coins`);
     this.setInv(s.inv);
+    this.setPassive(s.passive, s.inv);
+    this.setObjective(s.objective);
     this.setText('combo', s.combo >= 2 ? `Combo ×${s.combo} · ×${s.multiplier} pts` : '');
     if (s.comboTick !== this.cache.comboTick) {
       this.cache.comboTick = s.comboTick;
@@ -279,6 +316,43 @@ export class UI {
       b.querySelector('.inv-name').textContent = id ? ITEMS[id].name : '';
       b.title = id ? `${ITEMS[id].name}: ${ITEMS[id].desc}` : 'Empty';
     });
+  }
+
+  /** Objective card: text changes rarely, the bar width is cheap to set every frame. */
+  setObjective(o) {
+    if (!o) return;
+    if (this.cache.objText !== o.text) {
+      this.cache.objText = o.text;
+      $('objText').textContent = o.text;
+    }
+    $('objective').classList.toggle('done', !!o.done);
+    this.setStyle('objFill', 'width', `${(Math.max(0, Math.min(1, o.frac)) * 100).toFixed(1)}%`);
+  }
+
+  /** Passive badge: lists the carried passive items with their icons and summed effects. */
+  setPassive(p, slots) {
+    if (!p || !slots) return;
+    const key = slots.join('|');
+    if (this.cache.passKey === key) return;
+    this.cache.passKey = key;
+    const bar = $('invBar');
+    slots.forEach((id, i) => bar.children[i]?.classList.toggle('passive', !!id && !!ITEMS[id].passive));
+    const owned = slots.filter((id) => id && ITEMS[id].passive);
+    const badge = $('passiveBadge');
+    badge.classList.toggle('hidden', owned.length === 0);
+    if (!owned.length) {
+      badge.innerHTML = '';
+      return;
+    }
+    const fx = [];
+    if (p.regen > 0) fx.push(`+${+p.regen.toFixed(1)} HP/s`);
+    if (p.takenMul < 1) fx.push(`−${Math.round((1 - p.takenMul) * 100)}% damage taken`);
+    if (p.coinMul > 1) fx.push(`×${p.coinMul} coins`);
+    if (p.dashMul < 1) fx.push(`dash ${Math.round((1 - p.dashMul) * 100)}% faster`);
+    if (p.damageMul > 1) fx.push(`+${Math.round((p.damageMul - 1) * 100)}% melee`);
+    badge.innerHTML = `<span class="pb-title">Passive ×${owned.length}</span>`
+      + `<span class="pb-icons">${owned.map((id) => `<span class="pb-ico" title="${escapeHtml(ITEMS[id].name)}">${itemIcon(id)}</span>`).join('')}</span>`
+      + `<span class="pb-fx">${escapeHtml(fx.join(' · '))}</span>`;
   }
 
   flashSlot(i) {

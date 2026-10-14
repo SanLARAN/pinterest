@@ -56,6 +56,7 @@ export class Hero {
     this.hurtBlink = false;
     this.dashT = 0;
     this.dashCd = 0;
+    this.dashMul = 1; // passive items shorten the dash cooldown
     this.swingT = SWING_OUT;
     this.swingDirA = 0;
     this.swingCd = 0;
@@ -145,6 +146,7 @@ export class Hero {
    * onDash(hero), onSwing(hero), dust(x,z,dx,dz,amount), step(hero)
    */
   update(dt, input, layout, ev) {
+    const wasDashing = this.dashT > 0;
     this.time += dt;
     this.sweeping = false;
     if (this.dead) {
@@ -172,7 +174,7 @@ export class Hero {
       const d = moving ? { x: mv.x / moveLen, z: mv.z / moveLen } : dirFromAngle(this.facing);
       this.dashDir = d;
       this.dashT = HERO_BASE.dashTime;
-      this.dashCd = this.stats.dashCooldown;
+      this.dashCd = this.stats.dashCooldown * this.dashMul;
       this.invT = Math.max(this.invT, HERO_BASE.dashIframes);
       this.swingT = SWING_OUT; // dash cancels a swing
       this.bufDash = 0;
@@ -235,6 +237,8 @@ export class Hero {
     }
     clampToArena(this);
     this.y = layout.heightAt(this.x, this.z);
+
+    if (wasDashing && this.dashT <= 0 && ev.onDashEnd) ev.onDashEnd(this);
 
     // footstep dust
     if (moving && !this.swinging) {

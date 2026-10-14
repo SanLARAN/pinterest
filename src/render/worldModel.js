@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { GeoAccumulator, G } from './geo.js';
 import { bitmapMaterial } from './bitmap.js';
+import { Fader } from './fade.js';
 import { COLORS } from './palette.js';
 import { HALF, N, SIZE, CASTLE, roadWeight } from '../sim/layout.js';
 import { smoothstep } from '../util/math.js';
@@ -124,7 +125,8 @@ function addBush(acc, p, y) {
   }
 }
 
-function buildCastle(layout, acc) {
+/** Castle geometry, split into per-side accumulators (N, S, E, W, keep) so each can fade on its own. */
+function buildCastle(layout, accs) {
   const h = CASTLE.half;
   const wallH = CASTLE.wallH;
   // walls: boxes that are not the keep
@@ -134,6 +136,8 @@ function buildCastle(layout, acc) {
     const sz = b.maxZ - b.minZ;
     const cx = (b.minX + b.maxX) / 2;
     const cz = (b.minZ + b.maxZ) / 2;
+    const side = Math.abs(cz + h) < 0.01 ? 'N' : Math.abs(cz - h) < 0.01 ? 'S' : Math.abs(cx + h) < 0.01 ? 'W' : 'E';
+    const acc = accs[side];
     acc.add(G.box(sx, wallH, sz), W.stone, matAt(cx, wallH / 2, cz));
     acc.add(G.box(sx + 0.18, 0.5, sz + 0.18), W.stoneDark, matAt(cx, 0.25, cz));
     const along = sx > sz ? sx : sz;
@@ -146,9 +150,10 @@ function buildCastle(layout, acc) {
     }
   }
   // gate lintels
-  for (const sz of [-1, 1]) acc.add(G.box(CASTLE.gate * 2, 1.0, 1.4), W.stone, matAt(0, wallH - 0.4, sz * h));
+  for (const sz of [-1, 1]) accs[sz < 0 ? 'N' : 'S'].add(G.box(CASTLE.gate * 2, 1.0, 1.4), W.stone, matAt(0, wallH - 0.4, sz * h));
   // towers
   for (const t of layout.towers) {
+    const acc = accs[t.z < 0 ? 'N' : 'S'];
     acc.add(G.cyl(1.5, 1.6, 6.4, 10), W.stone, matAt(t.x, 3.2, t.z));
     acc.add(G.cyl(1.62, 1.62, 0.4, 10), W.stoneDark, matAt(t.x, 0.2, t.z));
     for (let k = 0; k < 8; k++) {
@@ -161,6 +166,7 @@ function buildCastle(layout, acc) {
     acc.add(G.box(0.02, 0.45, 0.7), W.roof, matAt(t.x + 0.35, 10.1, t.z));
   }
   // keep
+  const acc = accs.keep;
   const K = CASTLE.keepHalf;
   acc.add(G.box(K * 2, CASTLE.keepH, K * 2), W.stone, matAt(0, CASTLE.keepH / 2, 0));
   acc.add(G.box(K * 2 + 0.3, 0.5, K * 2 + 0.3), W.stoneDark, matAt(0, 0.25, 0));
@@ -200,7 +206,6 @@ export function buildWorld(layout) {
   const group = new THREE.Group();
   const terrainMat = bitmapMaterial();
   const propMat = bitmapMaterial({ sway: 1 });
-  const castleMat = bitmapMaterial();
 
   const terrainGeo = terrainGeometry(layout);
   const terrain = new THREE.Mesh(terrainGeo, terrainMat);
@@ -217,10 +222,27 @@ export function buildWorld(layout) {
   const props = new THREE.Mesh(propsGeo, propMat);
   group.add(props);
 
-  const castleAcc = new GeoAccumulator();
-  buildCastle(layout, castleAcc);
-  const castle = new THREE.Mesh(castleAcc.build(), castleMat);
-  group.add(castle);
+  // castle: one mesh per side plus the keep, each with its own fader (see render/fade.js)
+  const castleAccs = { N: new GeoAccumulator(), S: new GeoAccumulator(), E: new GeoAccumulator(), W: new GeoAccumulator(), keep: new GeoAccumulator() };
+  buildCastle(layout, castleAccs);
+  const K = CASTLE.keepHalf;
+  const H = CASTLE.half;
+  const T = 1.7; // generous box so towers at the corners are included
+  const castleBoxes = {
+    N: { minX: -H - T, maxX: H + T, minY: 0, maxY: 11, minZ: -H - T, maxZ: -H + T },
+    S: { minX: -H - T, maxX: H + T, minY: 0, maxY: 11, minZ: H - T, maxZ: H + T },
+    W: { minX: -H - T, maxX: -H + T, minY: 0, maxY: 11, minZ: -H - T, maxZ: H + T },
+    E: { minX: H - T, maxX: H + T, minY: 0, maxY: 11, minZ: -H - T, maxZ: H + T },
+    keep: { minX: -K - 0.3, maxX: K + 0.3, minY: 0, maxY: CASTLE.keepH + 4, minZ: -K - 0.3, maxZ: K + 0.3 },
+  };
+  const castleMats = [];
+  const fadeUnits = [];
+  for (const key of ['N', 'S', 'E', 'W', 'keep']) {
+    const mat = bitmapMaterial();
+    castleMats.push(mat);
+    group.add(new THREE.Mesh(castleAccs[key].build(), mat));
+    fadeUnits.push(new Fader([mat], castleBoxes[key]));
+  }
 
   // animated braziers
   const flameGeo = G.cone(0.2, 0.6, 5).translate(0, 0.3, 0);
@@ -260,11 +282,11 @@ export function buildWorld(layout) {
     orbs.dispose();
     terrainGeo.dispose();
     propsGeo.dispose();
-    castle.geometry.dispose();
     flameGeo.dispose();
     terrainMat.dispose();
     propMat.dispose();
-    castleMat.dispose();
+    for (const m of castleMats) m.dispose();
+    group.traverse((o) => { if (o.geometry) o.geometry.dispose(); });
     flames.material.dispose();
     flames.dispose();
     fireGeo.dispose();
@@ -321,5 +343,5 @@ export function buildWorld(layout) {
   };
   update(0);
 
-  return { group, flames, update, dispose };
+  return { group, flames, update, dispose, fadeUnits };
 }

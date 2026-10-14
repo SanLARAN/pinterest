@@ -19,6 +19,19 @@ export const CASTLE = {
 };
 export const AGENT_R = 0.55; // blocking margin used for navigation
 
+// The enemy stronghold: a walled compound on the north road. Its four gates stay sealed
+// until the hero has slain GATE_BOSSES bosses. The throne inside is the win objective.
+export const BASE = {
+  x: 0,
+  z: -44,
+  half: 7, // interior half-size (walls sit at +-half)
+  wallT: 0.7,
+  gate: 1.8, // half-width of each gate opening
+  wallH: 3.6,
+  throneHalf: 1.3,
+};
+export const GATE_BOSSES = 6;
+
 /** Road influence (0..1) along the two crossing roads that lead to the gates. */
 export function roadWeight(x, z) {
   const h = CASTLE.half;
@@ -50,6 +63,9 @@ export function buildLayout(seed) {
       h *= castleBlend;
       // distant mountains wrap the arena
       h += smoothstep(49, 72, r) * (9 + 4 * fbm(detailN, x * 0.05, z * 0.05, 3));
+      // the enemy stronghold sits on level ground
+      const bcheb = Math.max(Math.abs(x - BASE.x), Math.abs(z - BASE.z));
+      h = lerp(0.15, h, smoothstep(BASE.half + 3, BASE.half + 6.5, bcheb));
       // roads are kept gentle
       const road = roadWeight(x, z);
       h = lerp(h, 0.12, road * 0.85);
@@ -93,6 +109,27 @@ export function buildLayout(seed) {
   }
   const K = CASTLE.keepHalf;
   boxes.push({ minX: -K, maxX: K, minZ: -K, maxZ: K, kind: 'keep' });
+  // ---- enemy stronghold colliders ----------------------------------------
+  const bH = BASE.half;
+  const bT = BASE.wallT;
+  const bG = BASE.gate;
+  const baseWalls = []; // {minX,maxX,minZ,maxZ,side}
+  const baseGates = []; // sealed openings, marked blocked until opened
+  for (const side of ['N', 'S', 'E', 'W']) {
+    const sgn = side === 'N' || side === 'W' ? -1 : 1;
+    const horiz = side === 'N' || side === 'S'; // wall runs along x
+    const c = horiz ? BASE.z + sgn * bH : BASE.x + sgn * bH; // the wall's centre line
+    const seg = (a, b) => (horiz
+      ? { minX: BASE.x + a, maxX: BASE.x + b, minZ: c - bT, maxZ: c + bT, side }
+      : { minX: c - bT, maxX: c + bT, minZ: BASE.z + a, maxZ: BASE.z + b, side });
+    baseWalls.push(seg(-bH, -bG), seg(bG, bH));
+    baseGates.push({ side, box: seg(-bG, bG) });
+  }
+  const baseTowers = [];
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+    baseTowers.push({ x: BASE.x + sx * bH, z: BASE.z + sz * bH });
+  }
+  const baseThrone = { x: BASE.x, z: BASE.z, half: BASE.throneHalf };
   const braziers = [];
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
     braziers.push({ x: sx * 7.5, z: sz * 7.5 });
@@ -106,6 +143,16 @@ export function buildLayout(seed) {
     const r = rng.range(WORLD.riftMinR, WORLD.riftMaxR);
     rifts.push({ x: Math.cos(ang) * r, z: Math.sin(ang) * r });
   }
+
+  // rifts inside the stronghold only come alive when its gates open (see baseRifts)
+  const inBaseZone = (x, z, pad) => Math.max(Math.abs(x - BASE.x), Math.abs(z - BASE.z)) < bH + pad;
+  const outerRifts = rifts.filter((rf) => !inBaseZone(rf.x, rf.z, 6));
+  rifts.length = 0;
+  rifts.push(...outerRifts);
+  const baseRifts = [
+    { x: BASE.x - 3.6, z: BASE.z + 2.8 },
+    { x: BASE.x + 3.6, z: BASE.z - 2.4 },
+  ];
 
   // ---- props ---------------------------------------------------------------
   const props = [];
@@ -126,6 +173,7 @@ export function buildLayout(seed) {
     const z = rng.range(-PLAY_RADIUS - 3, PLAY_RADIUS + 3);
     if (Math.hypot(x, z) > PLAY_RADIUS - 1) continue;
     if (castleZone(x, z) || roadWeight(x, z) > 0.2) continue;
+    if (inBaseZone(x, z, 3.2)) continue;
     const forest = smoothstep(-0.15, 0.45, forestN(x * 0.06, z * 0.06));
     const roll = rng.next();
     let type = null;
@@ -172,6 +220,15 @@ export function buildLayout(seed) {
   };
   for (const c of circles) markCircle(c);
   for (const b of boxes) markBox(b);
+  for (const b of baseWalls) markBox(b);
+  for (const t of baseTowers) markCircle({ x: t.x, z: t.z, r: 1.2 });
+  markBox({ minX: baseThrone.x - baseThrone.half, maxX: baseThrone.x + baseThrone.half,
+    minZ: baseThrone.z - baseThrone.half, maxZ: baseThrone.z + baseThrone.half });
+  // gates: marked after the walls so we can tell which cells only the gate blocks
+  const wallsOnly = blocked.slice();
+  for (const g of baseGates) markBox(g.box);
+  const baseGateCells = [];
+  for (let k = 0; k < blocked.length; k++) if (blocked[k] && !wallsOnly[k]) baseGateCells.push(k);
   for (let j = 0; j < SIZE; j++) for (let i = 0; i < SIZE; i++) {
     if (Math.hypot(i - HALF, j - HALF) > PLAY_RADIUS + 1) blocked[j * SIZE + i] = 1;
   }
@@ -193,5 +250,14 @@ export function buildLayout(seed) {
     detailNoise: detailN,
     start: { x: 0, z: 7.5 },
     castle: { ...CASTLE },
+    base: {
+      ...BASE,
+      walls: baseWalls,
+      gates: baseGates,
+      gateCells: baseGateCells,
+      towers: baseTowers,
+      throne: baseThrone,
+      rifts: baseRifts,
+    },
   };
 }

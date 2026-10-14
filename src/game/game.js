@@ -2,7 +2,7 @@
 // State machine: menu -> playing <-> paused | levelup ; playing -> over -> (restart | menu).
 import * as THREE from 'three';
 import { FIXED_DT, MAX_STEPS_PER_FRAME, CAMERA, RENDER, WORLD } from '../config.js';
-import { buildLayout, HALF, SIZE } from '../sim/layout.js';
+import { buildLayout, HALF, SIZE, BASE, GATE_BOSSES } from '../sim/layout.js';
 import { FlowField } from '../sim/nav.js';
 import { Psi, PSI, SKILL_IDS } from '../sim/psi.js';
 import { COLORS } from '../render/palette.js';
@@ -11,11 +11,12 @@ import { WaveDirector } from '../sim/waves.js';
 import { drawUpgrades } from '../sim/upgrades.js';
 import { PICKUPS } from '../sim/defs.js';
 import { BOSS_DEFS } from '../sim/bosses.js';
-import { Inventory, ITEMS, SHOP_STOCK, buy, sell, trade, makeStock, chapterLoot, bossLoot, applyItem } from '../sim/items.js';
+import { Inventory, ITEMS, SHOP_STOCK, buy, sell, trade, makeStock, chapterLoot, bossLoot, applyItem, passiveTotals } from '../sim/items.js';
 import { qualifies, addScore, cleanName } from '../sim/highscores.js';
 import { createRng, seedCode } from '../util/rng.js';
 import { buildWorld } from '../render/worldModel.js';
 import { buildMerchant } from '../render/merchantModel.js';
+import { buildBaseModel } from '../render/baseModel.js';
 import { bitmapUniforms, bandedSkyTexture } from '../render/bitmap.js';
 import { ShadowPool } from '../render/pools.js';
 import { clamp, damp, wrapAngle } from '../util/math.js';
@@ -26,7 +27,7 @@ import { Arrows } from './projectiles.js';
 import { Juice } from './juice.js';
 import { Input } from '../core/input.js';
 import { Sound } from '../core/audio.js';
-import { loadScores, saveScores, loadName, saveName, loadMuted, saveMuted } from '../core/storage.js';
+import { loadScores, saveScores, loadName, saveName, loadMuted, saveMuted, loadTranslucency, saveTranslucency } from '../core/storage.js';
 import { UI } from '../ui/ui.js';
 
 // the stall stands this far up the map from the keep, on the first reachable open cell
@@ -41,6 +42,10 @@ const PSI_DEEP = COLORS.psi.deep;
 const SLASH_FADE = 0.2;
 const DEATH_REAL_TIME = 1.8; // seconds of slow-motion before the game-over screen
 const DEATH_TIMESCALE = 0.35;
+const THRONE_HP = 300; // the enemy throne: swings and psi wear it down once the gates open
+const THRONE_R = 1.6; // its hit radius for swings, psi and lances
+const THRONE_WIN_DELAY = 3.2; // real seconds between the throne falling and the victory screen
+const VICTORY_BONUS = 2000;
 const OVER_GUARD = 0.6; // ignore confirm/restart briefly so mashing attack doesn't skip the screen
 
 const ACCENT_COLOR = {
@@ -80,6 +85,7 @@ export class Game {
       onSlot: (i) => this.onAction(`slot${i + 1}`),
       onShopAct: (act, i) => this.shopAct(act, i),
       onShopLeave: () => this.closeShop(),
+      onTranslucency: (v) => this.setTranslucency(v),
     });
     this.ui.setTouch(this.isTouch);
 
@@ -158,6 +164,15 @@ export class Game {
     this.stockSel = 0; // merchant stock card highlighted by the keyboard
     this.shopArmed = true;
     this.dmgScale = 1;
+    this.passive = passiveTotals([]); // carried passive items, recomputed every step
+    this.bossesSlain = 0;
+    this.gatesOpen = false;
+    this.throneHp = THRONE_HP;
+    this.won = false;
+    this.winT = -1;
+    this.translucency = loadTranslucency(); // 0..100, see render/fade.js
+    this.fadeUnits = [];
+    this.base = null;
     this.stallModel = null;
     this.stallPos = null;
 
@@ -234,6 +249,13 @@ export class Game {
     this.layout = buildLayout(seed);
     this.world = buildWorld(this.layout);
     this.scene.add(this.world.group);
+    if (this.base) {
+      this.scene.remove(this.base.group);
+      this.base.dispose();
+    }
+    this.base = buildBaseModel(this.layout);
+    this.scene.add(this.base.group);
+    this.fadeUnits = [...this.world.fadeUnits, ...this.base.fadeUnits];
     this.flow = new FlowField(this.layout.blocked);
     // Only rifts the hero can reach may spawn foes: a rift walled into a pocket would
     // otherwise produce enemies that can never reach the hero and never let a chapter clear.
@@ -314,6 +336,13 @@ export class Game {
     this.stockSel = 0;
     this.shopArmed = true;
     this.dmgScale = 1;
+    this.bossesSlain = 0;
+    this.gatesOpen = false;
+    this.throneHp = THRONE_HP;
+    this.won = false;
+    this.winT = -1;
+    this.passive = passiveTotals(this.inv.slots);
+    this.base.setOpen(false);
     this.hero.reset(this.layout.start.x, this.layout.start.z);
     this.hero.model.root.visible = true;
     this.enemyCtx.hero = this.hero;
@@ -400,6 +429,22 @@ export class Game {
     saveMuted(this.sound.muted);
     this.ui.setMuted(this.sound.muted);
     this.ui.toast(this.sound.muted ? 'Sound off' : 'Sound on');
+  }
+
+  /** What the objective card shows: the boss count, then the throne's health. */
+  objectiveInfo() {
+    if (this.won) return { text: 'The throne lies in ruins', frac: 0, done: true };
+    if (this.gatesOpen) {
+      return { text: `Shatter the Hollow King's throne · ${Math.ceil(this.throneHp)} / ${THRONE_HP}`, frac: this.throneHp / THRONE_HP };
+    }
+    const n = Math.min(this.bossesSlain, GATE_BOSSES);
+    return { text: `Slay bosses to open the gates · ${n} / ${GATE_BOSSES}`, frac: n / GATE_BOSSES };
+  }
+
+  /** Settings: building translucency 0..100 (saved; applied each frame in frame()). */
+  setTranslucency(v) {
+    this.translucency = Math.max(0, Math.min(100, Math.round(v)));
+    saveTranslucency(this.translucency);
   }
 
   onAction(action) {
@@ -596,6 +641,7 @@ export class Game {
     const score = this.score.score;
     const entry = {
       score,
+      won: this.won,
       wave: this.director.wave,
       kills: this.score.kills,
       level: h.level,
@@ -616,6 +662,7 @@ export class Game {
       level: entry.level,
       seedCode: entry.seed,
       qualifies: q,
+      won: this.won,
       name: loadName(),
       list: this.list,
       highlight: -1,
@@ -751,6 +798,10 @@ export class Game {
         this.throttle('swing', 0.05, () => this.sound.swing());
         this.showSlash(h);
       },
+      onDashEnd: (h) => {
+        this.juice.lightning(h.x, h.z);
+        this.throttle('zap', 0.1, () => this.sound.psi('lance'));
+      },
       dust: (x, z, dx, dz, amount) => this.juice.dust(x, z, dx, dz, amount),
       step: (h) => {
         this.juice.dust(h.x, h.z, 0, 0, 0.3);
@@ -762,7 +813,8 @@ export class Game {
   // ---- combat ---------------------------------------------------------------------
   damageHero(dmg0, fx, fz) {
     const h = this.hero;
-    const dmg = dmg0 * this.dmgScale;
+    if (this.won) return false; // the throne has fallen: nothing can touch the hero now
+    const dmg = dmg0 * this.dmgScale * this.passive.takenMul;
     if (!h.takeHit(dmg, fx, fz)) return false;
     this.hitstop = Math.max(this.hitstop, 0.06);
     this.juice.addTrauma(0.45);
@@ -801,8 +853,74 @@ export class Game {
       const halfW = d > e.radius ? Math.asin(Math.min(1, e.radius / d)) : Math.PI / 2;
       if (ang + halfW < lo || ang - halfW > hi) continue;
       h.swingSet.add(e.id);
-      this.hitEnemy(e, h.stats.damage, d > 1e-4 ? dx / d : 0, d > 1e-4 ? dz / d : 0);
+      this.hitEnemy(e, h.stats.damage * this.passive.damageMul, d > 1e-4 ? dx / d : 0, d > 1e-4 ? dz / d : 0);
     }
+    // the throne (once the gates are open) is a target too: one hit per swing
+    if (this.gatesOpen && this.throneHp > 0 && !h.swingSet.has('throne')) {
+      const T = this.layout.base.throne;
+      const dx = T.x - h.x;
+      const dz = T.z - h.z;
+      const d = Math.hypot(dx, dz);
+      if (d - THRONE_R <= reach) {
+        const ang = wrapAngle(Math.atan2(dx, dz) - h.swingDirA);
+        const halfW = d > THRONE_R ? Math.asin(Math.min(1, THRONE_R / d)) : Math.PI / 2;
+        if (!(ang + halfW < lo || ang - halfW > hi)) {
+          h.swingSet.add('throne');
+          this.damageThrone(Math.round(h.stats.damage * this.passive.damageMul));
+        }
+      }
+    }
+  }
+
+  /** Gates open: the stronghold's two inner rifts start spawning and the throne becomes a target. */
+  openGates() {
+    if (this.gatesOpen) return;
+    this.gatesOpen = true;
+    const L = this.layout;
+    for (const k of L.base.gateCells) L.blocked[k] = 0;
+    this.base.setOpen(true);
+    // re-solve the flow field: the stronghold is now reachable from outside
+    this.flow.goal = -1;
+    this.flow.setGoal(L.start.x, L.start.z);
+    const reach = (rf) => this.flow.dist[this.flow.cellOf(rf.x, rf.z)] >= 0;
+    const outer = L.rifts.filter(reach);
+    const inner = L.base.rifts.filter(reach);
+    this.spawnRifts = [...(outer.length ? outer : L.rifts), ...inner];
+    this.flow.goal = -1;
+    this.flow.setGoal(this.hero.x, this.hero.z);
+    for (const g of L.base.gates) this.juice.dust((g.box.minX + g.box.maxX) / 2, (g.box.minZ + g.box.maxZ) / 2, 0, 0, 3);
+    this.juice.addTrauma(0.6);
+    this.sound.waveStart();
+    this.ui.banner('The gates open', 'Emberkeep lies open', 'March on the throne of the Hollow King!', 3.2);
+  }
+
+  damageThrone(dmg) {
+    if (!this.gatesOpen || this.won || this.throneHp <= 0) return;
+    const T = this.layout.base.throne;
+    this.throneHp = Math.max(0, this.throneHp - dmg);
+    this.base.hitThrone();
+    this.juice.text(String(dmg), 'dmg', T.x, 3.4, T.z);
+    this.juice.sparks(T.x, 1.8, T.z, 0xb070ff, 10, 1.4);
+    this.juice.addTrauma(0.25);
+    this.hitstop = Math.max(this.hitstop, 0.04);
+    this.sound.hit();
+    if (this.throneHp <= 0) this.throneFall();
+  }
+
+  throneFall() {
+    const T = this.layout.base.throne;
+    this.base.throneDown();
+    this.won = true;
+    this.winT = THRONE_WIN_DELAY;
+    this.score.score += VICTORY_BONUS;
+    this.juice.burst(T.x, 1.5, T.z, 0xb070ff, 90, 2.6);
+    this.juice.burst(T.x, 1.0, T.z, 0xffe64a, 40, 2);
+    this.juice.ring(T.x, 0.2, T.z, 9, 0xb070ff, 1.2, 1.6);
+    this.juice.text(`+${VICTORY_BONUS}`, 'big', T.x, 4.2, T.z);
+    this.juice.addTrauma(1);
+    this.hitstop = Math.max(this.hitstop, 0.2);
+    this.sound.boss();
+    this.ui.banner('Throne shattered', 'Emberkeep is free!', 'The Hollow King falls at last.', THRONE_WIN_DELAY);
   }
 
   /** Melee and psi hits. `opts` (psi only) overrides knockback and marks the hit as psychic. */
@@ -868,6 +986,9 @@ export class Game {
       this.stock = makeStock(this.rng, SHOP_STOCK);
       this.refreshShop();
       this.throttle('restock', 1, () => this.ui.toast('The merchant restocks his stall'));
+      this.bossesSlain++;
+      if (this.bossesSlain >= GATE_BOSSES) this.openGates();
+      else this.ui.toast(`Bosses slain ${this.bossesSlain}/${GATE_BOSSES}: the gates stay sealed`);
     }
   }
 
@@ -963,6 +1084,10 @@ export class Game {
       e.stunT = Math.max(e.stunT, stun);
       this.hitEnemy(e, damage, d > 1e-4 ? dx / d : 0, d > 1e-4 ? dz / d : 0, { knock });
     }
+    if (this.gatesOpen) {
+      const T = this.layout.base.throne;
+      if (Math.hypot(T.x - h.x, T.z - h.z) - THRONE_R <= radius) this.damageThrone(damage);
+    }
   }
 
   /** E: a piercing bolt along the aim direction. */
@@ -996,6 +1121,13 @@ export class Game {
         if (d > e.radius + width) continue;
         L.hit.add(e.id); // a lance pierces: each foe is struck once
         this.hitEnemy(e, damage, L.dx, L.dz, { knock: 5 });
+      }
+      if (this.gatesOpen && !L.hit.has('throne')) {
+        const T = this.layout.base.throne;
+        if (Math.hypot(T.x - L.x, T.z - L.z) < THRONE_R + width) {
+          L.hit.add('throne');
+          this.damageThrone(damage);
+        }
       }
       if (Math.random() < 0.6) this.juice.sparks(L.x, this.layout.heightAt(L.x, L.z) + 0.9, L.z, PSI_GLOW, 1, 0.5);
       const wall = flow.blocked[flow.cellOf(L.x, L.z)];
@@ -1054,11 +1186,21 @@ export class Game {
         this.input.aimAngle = Math.atan2(t.x - h.x, t.z - h.z);
       }
     }
+    this.passive = passiveTotals(this.inv.slots);
+    h.dashMul = this.passive.dashMul;
+    if (!h.dead && this.passive.regen > 0) h.heal(this.passive.regen * dt);
     h.update(dt, this.input, this.layout, this.heroEv);
     this.flow.setGoal(h.x, h.z);
     if (!h.dead) {
       this.resolveSwing();
-      this.director.update(dt, this.waveEnv);
+      if (!this.won) this.director.update(dt, this.waveEnv);
+    }
+    if (this.won) {
+      this.winT -= dt;
+      if (this.winT <= 0) {
+        this.finishRun();
+        return;
+      }
     }
     if (this.skillReq.size) {
       for (const id of this.skillReq) this.castSkill(id);
@@ -1091,8 +1233,9 @@ export class Game {
   collect(kind, value, x, y, z) {
     const h = this.hero;
     if (kind === 'coin') {
-      this.score.collectCoin(value);
-      this.juice.text(`+${value}`, 'coin', x, y + 0.6, z);
+      const v = Math.round(value * this.passive.coinMul);
+      this.score.collectCoin(v);
+      this.juice.text(`+${v}`, 'coin', x, y + 0.6, z);
       this.juice.sparks(x, y, z, 0xffe27a, 5, 0.6);
       this.throttle('coin', 0.04, () => this.sound.coin(Math.min(12, this.score.coins % 12)));
     } else if (kind === 'shard') {
@@ -1220,6 +1363,7 @@ export class Game {
     bitmapUniforms.uTime.value = this.realT;
     if (this.world) this.world.update(this.realT);
     if (this.stallModel) this.stallModel.update(this.realT);
+    if (this.base) this.base.update(this.realT, realDt);
     this.trackPerf(realDt);
     this.fpsFrames++;
     this.fpsAcc += realDt;
@@ -1255,6 +1399,11 @@ export class Game {
 
     this.updateCamera(realDt);
     this.juice.update(simDt, realDt, this.camera);
+    // building translucency: buildings between camera and hero fade out (setting 0..100)
+    if (this.fadeUnits.length) {
+      const amount = this.translucency / 100;
+      for (const f of this.fadeUnits) f.update(realDt, this.camera.position, this.hero, amount);
+    }
 
     // blob shadow for the hero
     this.heroShadows.begin();
@@ -1290,6 +1439,8 @@ export class Game {
       psi: this.psi,
       coins: this.score.coins,
       inv: this.inv.slots,
+      passive: this.passive,
+      objective: this.objectiveInfo(),
     });
     this.debugAcc -= realDt;
     if (this.debugOn && this.debugAcc <= 0) {

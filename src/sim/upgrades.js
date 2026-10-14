@@ -12,7 +12,7 @@ export const UPGRADES = [
   { id: 'wind', icon: '💨', name: 'Second Wind', desc: '-25% dash cooldown', apply: (s) => { s.dashCooldown *= 0.75; } },
   { id: 'vamp', icon: '🩸', name: 'Vampire Edge', desc: 'Heal 2 HP per kill', apply: (s) => { s.lifesteal += 2; } },
   { id: 'magnet', icon: '🧲', name: 'Ember Magnet', desc: 'Embers are pulled in from further away', apply: (s) => { s.magnet *= 1.5; } },
-  { id: 'mind', icon: '🔮', name: 'Mind Spring', desc: '+1.5 psi energy regen per second', apply: (s) => { s.psiRegen += 1.5; } },
+  { id: 'mind', icon: '🔮', name: 'Mind Spring', desc: '+0.6 psi energy regen per second', apply: (s) => { s.psiRegen += 0.6; } },
 ];
 
 /** Picks `count` distinct boons at random. */

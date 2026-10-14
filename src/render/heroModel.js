@@ -22,10 +22,13 @@ export function createHeroModel() {
   const body = new GeoAccumulator();
   part(body, G.cyl(0.3, 0.36, 0.6, 8), C.tunic, { y: u(0.75) });
   part(body, G.cyl(0.38, 0.38, 0.1, 8), C.gold, { y: u(0.56) });
-  part(body, G.sphere(0.5, 14, 10), C.skin, { y: u(1.3) });
-  part(body, G.sphere(0.54, 14, 8, 0, Math.PI * 2, 0, Math.PI * 0.55), C.steel, { y: u(1.36) });
+  // faceted head and helmet (low-poly), gem crest, plume
+  part(body, G.ico(0.5, 1), C.skin, { y: u(1.3) });
+  part(body, G.ico(0.57, 1), C.steel, { y: u(1.5), sy: 0.8 });
+  part(body, G.box(0.62, 0.07, 0.5), C.gold, { y: u(1.44), z: 0.02 });
   part(body, G.cone(0.1, 0.5, 5), C.plume, { y: u(1.95), z: -0.06, rx: -0.2 });
-  part(body, G.sphere(0.1, 6, 4), C.gold, { y: u(1.72), z: 0.0 });
+  part(body, G.ico(0.1, 0), C.gold, { y: u(1.72), z: 0.0 });
+  part(body, G.ico(0.07, 0), C.glint, { y: u(1.98), z: 0.0 });
   for (const s of [-1, 1]) {
     part(body, G.sphere(0.075, 8, 6), C.eye, { x: s * 0.18, y: u(1.2), z: 0.44, sz: 0.6 });
     part(body, G.sphere(0.03, 6, 4), C.glint, { x: s * 0.2, y: u(1.24), z: 0.5 });
@@ -33,14 +36,32 @@ export function createHeroModel() {
     part(body, G.sphere(0.13, 8, 6), C.steel, { x: s * 0.42, y: u(0.98) });
   }
   part(body, G.box(0.1, 0.03, 0.02), C.eye, { y: u(1.12), z: 0.48 });
+  // belt, buckle, heraldic tabard and gold pauldrons
+  part(body, G.cyl(0.33, 0.36, 0.12, 8), C.leather, { y: u(0.6) });
+  part(body, G.box(0.1, 0.1, 0.04), C.gold, { y: u(0.6), z: 0.36 });
+  part(body, G.box(0.34, 0.5, 0.04), C.plume, { y: u(0.78), z: 0.33 });
+  part(body, G.box(0.12, 0.12, 0.02), C.gold, { y: u(0.8), z: 0.36, rz: Math.PI / 4 });
+  for (const s of [-1, 1]) {
+    part(body, G.ico(0.2, 0), C.gold, { x: s * 0.44, y: u(1.22), sy: 0.7 });
+    part(body, G.cyl(0.16, 0.18, 0.06, 6), C.steel, { x: s * 0.44, y: u(1.1) });
+  }
   const bodyMesh = new THREE.Mesh(body.build(), bodyMat);
   upper.add(bodyMesh);
 
   // ---- cape ----------------------------------------------------------------
   const capeMat = new THREE.MeshLambertMaterial({ color: C.cape, side: THREE.DoubleSide });
   mats.push(capeMat);
-  const capeGeo = new THREE.PlaneGeometry(0.66, 0.96, 1, 2);
+  const capeGeo = new THREE.PlaneGeometry(0.66, 0.96, 3, 4);
   capeGeo.translate(0, -0.48, 0);
+  // torn, faceted hem: every other bottom vertex hangs lower
+  {
+    const pos = capeGeo.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      const y = pos.getY(i);
+      if (y < -0.9 && i % 4 % 2 === 1) pos.setY(i, y - 0.14);
+    }
+    capeGeo.computeVertexNormals();
+  }
   const cape = new THREE.Group();
   cape.position.set(0, u(1.04), -0.24);
   cape.add(new THREE.Mesh(capeGeo, capeMat));

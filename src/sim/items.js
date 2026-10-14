@@ -25,10 +25,35 @@ export const ITEMS = {
     effect: { speed: 0.4 },
   },
   crystal: {
-    id: 'crystal', name: 'Mind Crystal', desc: '+1 psi regen per second, permanently', price: 22, color: '#7ff0e0', icon: 'crystal',
-    effect: { psiRegen: 1 },
+    id: 'crystal', name: 'Mind Crystal', desc: '+0.5 psi regen per second, permanently', price: 22, color: '#7ff0e0', icon: 'crystal',
+    effect: { psiRegen: 0.5 },
   },
 };
+
+// Passive items stay in the pack and work for as long as they are carried. Using one does nothing.
+const PASSIVES = {
+  ironring: {
+    id: 'ironring', name: 'Iron Ring', desc: 'Passive: regenerate 1 HP per second', price: 20, color: '#c9c9d6', icon: 'ring',
+    passive: true, effect: { regen: 1 },
+  },
+  bracer: {
+    id: 'bracer', name: 'Stone Bracer', desc: 'Passive: take 20% less damage', price: 22, color: '#9aa3b5', icon: 'bracer',
+    passive: true, effect: { guard: 0.2 },
+  },
+  charm: {
+    id: 'charm', name: 'Lucky Charm', desc: 'Passive: coin pickups are worth double', price: 18, color: '#ffd45c', icon: 'charm',
+    passive: true, effect: { coinMul: 2 },
+  },
+  anklet: {
+    id: 'anklet', name: 'Quickstep Anklet', desc: 'Passive: dash recharges 30% faster', price: 16, color: '#7fe0a0', icon: 'anklet',
+    passive: true, effect: { dashMul: 0.7 },
+  },
+  fang: {
+    id: 'fang', name: 'Wolf Fang', desc: 'Passive: melee swings deal 10% more damage', price: 20, color: '#e8e0d0', icon: 'fang',
+    passive: true, effect: { damageMul: 1.1 },
+  },
+};
+Object.assign(ITEMS, PASSIVES);
 
 export const ITEM_IDS = Object.keys(ITEMS);
 
@@ -39,13 +64,23 @@ const CHAPTER_POOL = [
   { item: 'heartfruit', weight: 2 },
   { item: 'feather', weight: 2 },
   { item: 'crystal', weight: 1.5 },
+  { item: 'ironring', weight: 1.5 },
+  { item: 'bracer', weight: 1.5 },
+  { item: 'charm', weight: 1.5 },
+  { item: 'anklet', weight: 1.2 },
+  { item: 'fang', weight: 1.2 },
 ];
 const BOSS_POOL = [
   { item: 'heartfruit', weight: 3 },
   { item: 'whetstone', weight: 3 },
-  { item: 'crystal', weight: 3 },
+  { item: 'crystal', weight: 2 },
   { item: 'feather', weight: 2 },
   { item: 'potion', weight: 2 },
+  { item: 'ironring', weight: 2 },
+  { item: 'bracer', weight: 2 },
+  { item: 'charm', weight: 2 },
+  { item: 'anklet', weight: 2 },
+  { item: 'fang', weight: 2 },
 ];
 
 /** Item dropped when a chapter is cleared. `rng.weighted` returns the item id. */
@@ -56,6 +91,22 @@ export function chapterLoot(rng) {
 /** Item dropped by a boss. Bosses drop three of these. */
 export function bossLoot(rng) {
   return rng.weighted(BOSS_POOL);
+}
+
+/** Sums what the carried passive items give. Empty pack = neutral values. */
+export function passiveTotals(slots) {
+  const t = { regen: 0, takenMul: 1, coinMul: 1, dashMul: 1, damageMul: 1 };
+  for (const id of slots) {
+    const it = id ? ITEMS[id] : null;
+    if (!it || !it.passive) continue;
+    const e = it.effect;
+    if (e.regen) t.regen += e.regen;
+    if (e.guard) t.takenMul *= 1 - e.guard;
+    if (e.coinMul) t.coinMul *= e.coinMul;
+    if (e.dashMul) t.dashMul *= e.dashMul;
+    if (e.damageMul) t.damageMul *= e.damageMul;
+  }
+  return t;
 }
 
 export function sellPrice(id) {

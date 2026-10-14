@@ -2,7 +2,7 @@
 export const PSI = {
   max: 100,
   start: 60,
-  regen: 3, // base energy per second (bonus regen comes from boons and items)
+  regen: 1.2, // base energy per second (bonus regen comes from boons and items)
   killGain: 5, // energy restored per kill
   skills: {
     skill1: { id: 'skill1', key: 'Q', name: 'Psi Burst', cost: 35, cooldown: 0.7 },

@@ -74,6 +74,8 @@ class FloatingText {
 
 export class Juice {
   constructor(scene, camera, popupRoot) {
+    this.scene = scene;
+    this.bolts = []; // short-lived lightning polylines
     this.camera = camera;
     this.trauma = 0;
     this.shakeT = 0;
@@ -127,12 +129,60 @@ export class Juice {
 
   /** Update time-based effects. simDt is scaled by hitstop / slow-mo, realDt is wall time. */
   update(simDt, realDt, camera) {
+    for (let i = this.bolts.length - 1; i >= 0; i--) {
+      const b = this.bolts[i];
+      b.life -= realDt;
+      b.line.material.opacity = Math.max(0, b.life / b.total);
+      if (b.life <= 0) {
+        this.scene.remove(b.line);
+        b.line.geometry.dispose();
+        b.line.material.dispose();
+        this.bolts.splice(i, 1);
+      }
+    }
     this.chunks.update(simDt);
     this.sparkPool.update(simDt);
     this.puffs.update(simDt);
     this.disks.update(simDt);
     this.rings.update(simDt);
     this.texts.update(realDt, camera, this.size.w, this.size.h);
+  }
+
+  /**
+   * Yellow lightning that crackles out from (x, z) when a dash ends: a few jagged bolts,
+   * a bright flash on the ground and a spark burst. Lives in real time, so it reads in hitstop too.
+   */
+  lightning(x, z, count = 4) {
+    const YELLOW = 0xffe64a;
+    const total = 0.24;
+    for (let k = 0; k < count; k++) {
+      const a = (k / count) * Math.PI * 2 + Math.random() * 0.6;
+      const pts = [];
+      let px = x;
+      let py = 0.9;
+      let pz = z;
+      pts.push(px, py, pz);
+      const len = 1.5 + Math.random() * 0.9;
+      for (let s = 1; s <= 6; s++) {
+        const t = s / 6;
+        const jitter = (Math.random() - 0.5) * 0.7 * (1 - t * 0.4);
+        px = x + Math.sin(a) * len * t + Math.cos(a) * jitter;
+        pz = z + Math.cos(a) * len * t - Math.sin(a) * jitter;
+        py = 0.9 + (Math.random() - 0.5) * 0.5;
+        pts.push(px, py, pz);
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+      const mat = new THREE.LineBasicMaterial({
+        color: YELLOW, transparent: true, opacity: 1, depthWrite: false, blending: THREE.AdditiveBlending,
+      });
+      const line = new THREE.Line(geo, mat);
+      line.frustumCulled = false;
+      this.scene.add(line);
+      this.bolts.push({ line, life: total, total });
+    }
+    this.disk(x, 0.06, z, 1.7, YELLOW, 0.22, 'burst', 0.7);
+    this.sparks(x, 0.8, z, YELLOW, 14, 1.4);
   }
 
   burst(x, y, z, color, count = 12, power = 1) {
@@ -192,6 +242,12 @@ export class Juice {
   }
 
   clearParticles() {
+    for (const b of this.bolts) {
+      this.scene.remove(b.line);
+      b.line.geometry.dispose();
+      b.line.material.dispose();
+    }
+    this.bolts.length = 0;
     this.chunks.life.fill(0);
     this.sparkPool.life.fill(0);
     this.puffs.life.fill(0);

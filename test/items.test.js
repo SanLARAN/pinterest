@@ -89,3 +89,25 @@ test('loot: chapter and boss drops are always known items', () => {
     assert.ok(ITEMS[bossLoot(rng)]);
   }
 });
+
+test('passive items: totals only count carried passives and are neutral when empty', async () => {
+  const { passiveTotals, ITEMS } = await import('../src/sim/items.js');
+  const none = passiveTotals([null, 'potion', 'ether']);
+  assert.deepEqual(none, { regen: 0, takenMul: 1, coinMul: 1, dashMul: 1, damageMul: 1 });
+  const t = passiveTotals(['ironring', 'bracer', 'charm', 'anklet', 'fang', 'fang']);
+  assert.equal(t.regen, 1);
+  assert.ok(Math.abs(t.takenMul - 0.8) < 1e-9);
+  assert.equal(t.coinMul, 2);
+  assert.ok(Math.abs(t.dashMul - 0.7) < 1e-9);
+  assert.ok(Math.abs(t.damageMul - 1.21) < 1e-9, 'two fangs stack');
+  assert.ok(ITEMS.ironring.passive && ITEMS.fang.passive);
+});
+
+test('passive items are in the shop pool and loot tables', async () => {
+  const { ITEM_IDS, chapterLoot, bossLoot } = await import('../src/sim/items.js');
+  for (const id of ['ironring', 'bracer', 'charm', 'anklet', 'fang']) assert.ok(ITEM_IDS.includes(id));
+  const rng = createRng(9);
+  const seen = new Set();
+  for (let i = 0; i < 400; i++) { seen.add(chapterLoot(rng)); seen.add(bossLoot(rng)); }
+  assert.ok(seen.has('fang') && seen.has('ironring'));
+});

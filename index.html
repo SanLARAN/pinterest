@@ -13,6 +13,7 @@
       <canvas id="game" class="game-canvas"></canvas>
       <div class="grade" aria-hidden="true"></div>
       <div id="vignette" class="vignette"></div>
+      <div class="bitmap-frame" aria-hidden="true"></div>
       <div id="popups" class="popups"></div>
 
       <div id="sticks" class="sticks">
@@ -53,8 +54,16 @@
           </div>
         </div>
         <div id="invBar" class="inv-bar no-game" aria-label="Pack"></div>
+        <div id="passiveBadge" class="passive-badge hidden no-game" aria-live="polite"></div>
         <div class="hud-bottom">
-          <div class="hud-card chapter" id="chapter">Chapter 1</div>
+          <div class="hud-stack">
+            <div class="hud-card chapter" id="chapter">Chapter 1</div>
+            <div class="hud-card objective" id="objective">
+              <span class="obj-kicker">Objective</span>
+              <span class="obj-text" id="objText">Slay bosses to open the gates</span>
+              <div class="bar obj-bar"><div class="fill" id="objFill"></div></div>
+            </div>
+          </div>
           <div class="skills" aria-label="Psi skills">
             <div class="skill" id="sk1" data-state="ready"><kbd>Q</kbd><span class="sk-name">Psi Burst</span><span class="sk-cost">35</span><i class="sk-cd"></i></div>
             <div class="skill" id="sk2" data-state="ready"><kbd>E</kbd><span class="sk-name">Mind Lance</span><span class="sk-cost">25</span><i class="sk-cd"></i></div>
@@ -95,6 +104,7 @@
             <div class="start-actions">
               <button id="btnStart" class="btn btn-primary" type="button">Begin the Siege <kbd>Enter</kbd></button>
               <button id="btnMuteStart" class="btn btn-ghost" type="button">Sound: On</button>
+              <button id="btnSettings" class="btn btn-ghost" type="button">Settings</button>
             </div>
             <ul class="howto">
               <li><b>Move</b> WASD / arrows<span class="touch-only"> &middot; left stick</span></li>
@@ -103,6 +113,7 @@
               <li><b>Psi</b> Q burst &middot; E lance &middot; C pull<span class="touch-only"> &middot; skill buttons</span></li>
               <li><b>Pack</b> 1&ndash;6 use an item<span class="touch-only"> &middot; tap a slot</span></li>
               <li><b>Merchant</b> walk up to the stall to trade &middot; Esc leaves<span class="touch-only"> &middot; tap to use</span></li>
+              <li><b>Goal</b> slay six bosses to open the enemy gates, then shatter the throne</li>
               <li><b>Pause</b> Esc / P</li>
             </ul>
           </div>
@@ -122,7 +133,24 @@
             <button id="btnResume" class="btn btn-primary" type="button">Resume <kbd>Esc</kbd></button>
             <button id="btnRestartPause" class="btn btn-gold" type="button">Restart <kbd>R</kbd></button>
             <button id="btnMutePause" class="btn btn-ghost" type="button">Sound: On</button>
+            <button id="btnSettingsPause" class="btn btn-ghost" type="button">Settings</button>
             <button id="btnQuit" class="btn btn-ghost" type="button">Back to title</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Settings -->
+      <section id="screenSettings" class="screen hidden">
+        <div class="screen-panel small-panel">
+          <h2 class="panel-title">Settings</h2>
+          <p class="muted">How see-through buildings and scaffolding get when they hide the knight.</p>
+          <label class="setting" for="transSlider">
+            <span class="setting-row"><span>Building translucency</span><b id="transVal">50%</b></span>
+            <input id="transSlider" type="range" min="0" max="100" step="5" value="50" />
+          </label>
+          <p class="muted small">0% keeps every wall solid. 100% lets them fade almost away.</p>
+          <div class="stack">
+            <button id="btnSettingsBack" class="btn btn-primary" type="button">Back <kbd>Esc</kbd></button>
           </div>
         </div>
       </section>
@@ -162,7 +190,7 @@
       <section id="screenOver" class="screen hidden">
         <div class="screen-panel over-panel">
           <div class="over-main">
-            <h2 class="panel-title">Fallen</h2>
+            <h2 class="panel-title" id="overTitle">Fallen</h2>
             <p class="muted" id="overSub">The rift claims another knight.</p>
             <div class="stats">
               <div><span>Score</span><b id="overScore">0</b></div>

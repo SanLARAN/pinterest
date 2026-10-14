@@ -52,6 +52,7 @@ export const STORAGE = {
   scores: 'hollowkeep.highscores.v1',
   muted: 'hollowkeep.muted.v1',
   name: 'hollowkeep.name.v1',
+  translucency: 'hollowkeep.translucency.v1',
 };
 
 export const xpForLevel = (level) => 8 + (level - 1) * 6;
