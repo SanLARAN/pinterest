@@ -1,6 +1,7 @@
 // The chibi knight: movement, dash, swing, stats and animation.
 import { HERO_BASE, xpForLevel } from '../config.js';
 import { createHeroModel } from '../render/heroModel.js';
+import { dangerLevel } from '../sim/danger.js';
 import { damp, clamp, lerp, angleLerp, easeOutCubic, easeOutBack, Spring } from '../util/math.js';
 import { resolveStatic, clampToArena } from '../sim/collision.js';
 
@@ -260,6 +261,7 @@ export class Hero {
 
   animate(dt) {
     const M = this.model;
+    M.setDanger(this.dead ? 0 : dangerLevel(this.hp, this.stats.maxHp), dt);
     const speed = Math.hypot(this.vx, this.vz);
     this.moveAmt = damp(this.moveAmt, clamp(speed / this.stats.speed, 0, 1), 14, dt);
     this.walk += speed * dt * 1.6;

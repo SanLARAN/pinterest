@@ -451,6 +451,29 @@ kbd {
 .skill[data-state='low'] { opacity: .55; }
 .skill[data-state='low'] .sk-cost { color: var(--crimson); }
 .skill.fired { animation: skillfire .32s ease-out; }
+/* skill icons and level badges */
+.sk-ico { display: block; flex: none; width: 22px; height: 22px; }
+.sk-ico svg { display: block; width: 100%; height: 100%; color: #6a3fd1; }
+.skill[data-state='low'] .sk-ico svg { color: var(--crimson); }
+.sk-lv {
+  flex: none;
+  padding: 1px 5px;
+  font: 800 9px var(--body);
+  letter-spacing: .02em;
+  color: var(--gold);
+  background: var(--ink);
+  border-radius: 6px;
+}
+.skill-btn .sk-ico { position: relative; width: 22px; height: 22px; margin: 0 auto; }
+.skill-btn .sk-ico svg { color: #fff; filter: drop-shadow(0 1px 0 var(--ink)); }
+.skill-btn em.sk-lv {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 2;
+  padding: 1px 4px;
+  font-size: 8px;
+}
 @keyframes skillfire { 0% { transform: scale(1.12); } 100% { transform: scale(1); } }
 
 /* touch skill buttons: a column above DASH */

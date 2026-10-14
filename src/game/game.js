@@ -4,7 +4,8 @@ import * as THREE from 'three';
 import { FIXED_DT, MAX_STEPS_PER_FRAME, CAMERA, RENDER, WORLD } from '../config.js';
 import { buildLayout, HALF, SIZE, BASE, GATE_BOSSES } from '../sim/layout.js';
 import { FlowField } from '../sim/nav.js';
-import { Psi, PSI, SKILL_IDS } from '../sim/psi.js';
+import { Psi, PSI, SKILL_IDS, skillOffers, isSkillLevel } from '../sim/psi.js';
+import { dangerLevel } from '../sim/danger.js';
 import { COLORS } from '../render/palette.js';
 import { ScoreKeeper } from '../sim/scoring.js';
 import { WaveDirector } from '../sim/waves.js';
@@ -1048,11 +1049,12 @@ export class Game {
     if (this.state !== 'levelup') return;
     const u = this.offers[i];
     if (!u) return;
-    u.apply(this.hero.stats, this.hero);
+    if (u.kind === 'skill') this.psi.upgrade(u.id);
+    else u.apply(this.hero.stats, this.hero);
     this.state = 'playing';
     this.ui.hideLevel();
     this.sound.pick();
-    this.juice.text(u.name, 'big', this.hero.x, this.hero.y + 2.2, this.hero.z);
+    this.juice.text(u.kind === 'skill' ? `${u.name} · Lv ${u.to}` : u.name, 'big', this.hero.x, this.hero.y + 2.2, this.hero.z);
     this.input.clearLatched();
     this.input.edges.clear();
   }
@@ -1062,9 +1064,11 @@ export class Game {
     this.state = 'levelup';
     this.input.clearLatched();
     this.input.edges.clear();
-    this.offers = drawUpgrades(this.rng, 3);
-    this.sound.levelUp();
     const h = this.hero;
+    // every third level is spent on a psi skill; the other levels draw boons as before
+    const skills = isSkillLevel(h.level) ? skillOffers(this.psi) : [];
+    this.offers = skills.length ? skills : drawUpgrades(this.rng, 3);
+    this.sound.levelUp();
     this.juice.burst(h.x, h.y + 1, h.z, 0xf6c24f, 30, 1.6);
     this.juice.ring(h.x, 0.1, h.z, 4.5, 0x43d3c1, 0.8, 1.2);
     this.ui.showLevel(this.offers, (i) => this.pickUpgrade(i), h.level);
@@ -1105,7 +1109,7 @@ export class Game {
     if (h.dead) return;
     if (!this.psi.cast(id)) {
       // only explain an energy shortfall; cooldown flicker stays silent
-      if (!this.psi.cooldownFrac(id) && this.psi.energy < PSI.skills[id].cost) {
+      if (!this.psi.cooldownFrac(id) && this.psi.energy < this.psi.costOf(id)) {
         this.throttle('nopsi', 0.4, () => this.juice.text('Low psi', 'dim', h.x, h.y + 2.4, h.z));
       }
       return;
@@ -1120,7 +1124,7 @@ export class Game {
   /** Q: radial shockwave that damages and knocks back everything close around the hero. */
   psiBurst() {
     const h = this.hero;
-    const { radius, damage, knock, stun } = PSI.burst;
+    const { radius, damage, knock, stun } = this.psi.stats('skill1');
     this.juice.ring(h.x, 0.12, h.z, radius, PSI_CORE, 0.55, 1.4);
     this.juice.ring(h.x, 0.14, h.z, radius * 0.55, PSI_GLOW, 0.4, 1);
     this.juice.disk(h.x, 0.05, h.z, radius, PSI_DEEP, 0.4, 'burst', 0.5);
@@ -1152,18 +1156,22 @@ export class Game {
     mesh.rotation.y = a;
     mesh.scale.z = 2.6;
     this.scene.add(mesh);
-    this.lances.push({ x: h.x + dx * 0.6, z: h.z + dz * 0.6, dx, dz, travel: 0, hit: new Set(), mesh });
+    const s = this.psi.stats('skill2');
+    this.lances.push({
+      x: h.x + dx * 0.6, z: h.z + dz * 0.6, dx, dz, travel: 0, hit: new Set(), mesh,
+      range: s.range, width: s.width, damage: s.damage,
+    });
     this.juice.burst(h.x + dx, h.y + 0.9, h.z + dz, PSI_GLOW, 10, 1);
     this.juice.addTrauma(0.08);
     this.sound.psi('lance');
   }
 
   updateLances(dt) {
-    const { speed, range, width, damage } = PSI.lance;
     const flow = this.flow;
     for (let i = this.lances.length - 1; i >= 0; i--) {
       const L = this.lances[i];
-      const step = speed * dt;
+      const { range, width, damage } = L;
+      const step = PSI.lanceSpeed * dt;
       L.x += L.dx * step;
       L.z += L.dz * step;
       L.travel += step;
@@ -1202,7 +1210,7 @@ export class Game {
   /** C: pulls everything nearby into the hero and stuns it briefly. */
   psiPull() {
     const h = this.hero;
-    const { radius, speed, stun } = PSI.pull;
+    const { radius, speed, stun, damage } = this.psi.stats('skill3');
     this.juice.ring(h.x, 0.12, h.z, radius, PSI_GLOW, 0.5, 1.2);
     this.juice.disk(h.x, 0.05, h.z, radius, PSI_DEEP, 0.4, 'burst', 0.35);
     this.juice.addTrauma(0.2);
@@ -1215,6 +1223,8 @@ export class Game {
       const d = Math.hypot(dx, dz);
       if (d > radius + e.radius) continue;
       n++;
+      // the pull tears at the foe as it drags it in (higher skill levels only)
+      if (damage > 0) this.hitEnemy(e, damage, d > 1e-4 ? dx / d : 0, d > 1e-4 ? dz / d : 0, { knock: 0 });
       e.kx = d > 1e-4 ? (dx / d) * speed : 0;
       e.kz = d > 1e-4 ? (dz / d) * speed : 0;
       e.stunT = Math.max(e.stunT, stun);
@@ -1573,6 +1583,12 @@ export class Game {
     const simDt = steps * FIXED_DT;
 
     if (this.cut && this.state === 'playing') this.updateCutscene(realDt);
+    // a low-health knight throws embers off the burning crest
+    const danger = this.hero.dead ? 0 : dangerLevel(this.hero.hp, this.hero.stats.maxHp);
+    if (danger > 0.2 && this.state === 'playing' && Math.random() < danger * 0.4) {
+      const hp = this.hero;
+      this.juice.sparks(hp.x, hp.y + 2.0, hp.z, 0xff6a2a, 1, 0.45);
+    }
     if (this.finale) {
       const p = dawnProgress(this.finale.t);
       this.fog.color.setHex(FOG_COLOR).lerp(this.fogTint.setHex(DAWN_FOG), p * 0.6);

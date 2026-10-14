@@ -33,6 +33,12 @@ export function buildBaseModel(layout) {
     const acc = sideAcc[w.side];
     part(acc, G.box(sx, BASE.wallH, sz), STONE, mat4(cx, BASE.wallH / 2, cz));
     part(acc, G.box(sx + 0.2, 0.5, sz + 0.2), STONE_DARK, mat4(cx, 0.25, cz));
+    // course bands: stone rows that stand proud of the face, so the wall reads as solid masonry
+    for (const y of [0.95, 2.35]) {
+      const band = sx > sz ? G.box(sx + 0.06, 0.09, sz + 0.12) : G.box(sx + 0.12, 0.09, sz + 0.06);
+      part(acc, band, STONE_DARK, mat4(cx, y, cz));
+      geos.push(band);
+    }
     // crenellations along the wall run
     const along = Math.max(sx, sz);
     const n = Math.max(1, Math.floor(along / 1.0));
@@ -151,6 +157,12 @@ export function buildBaseModel(layout) {
     }
     for (const y of [0.9, 2.1, 3.1]) {
       part(acc, G.box(horiz ? span : 0.12, 0.12, horiz ? 0.12 : span), IRON, mat4(0, y, 0));
+    }
+    // a solid oak door behind the bars, with iron straps: the sealed gate is a real barrier
+    const door = horiz ? G.box(span, BASE.wallH - 0.4, 0.16) : G.box(0.16, BASE.wallH - 0.4, span);
+    part(acc, door, WOOD_DARK, mat4(0, (BASE.wallH - 0.4) / 2, 0));
+    for (const y of [0.7, 1.9, 3.0]) {
+      part(acc, G.box(horiz ? span : 0.22, 0.14, horiz ? 0.22 : span), IRON, mat4(0, y, 0));
     }
     const mat = bitmapMaterial();
     mats.push(mat);

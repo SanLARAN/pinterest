@@ -26,7 +26,6 @@ export function createHeroModel() {
   part(body, G.ico(0.5, 1), C.skin, { y: u(1.3) });
   part(body, G.ico(0.57, 1), C.steel, { y: u(1.5), sy: 0.8 });
   part(body, G.box(0.62, 0.07, 0.5), C.gold, { y: u(1.44), z: 0.02 });
-  part(body, G.cone(0.1, 0.5, 5), C.plume, { y: u(1.95), z: -0.06, rx: -0.2 });
   part(body, G.ico(0.1, 0), C.gold, { y: u(1.72), z: 0.0 });
   part(body, G.ico(0.07, 0), C.glint, { y: u(1.98), z: 0.0 });
   for (const s of [-1, 1]) {
@@ -47,6 +46,34 @@ export function createHeroModel() {
   }
   const bodyMesh = new THREE.Mesh(body.build(), bodyMat);
   upper.add(bodyMesh);
+
+  // ---- crest (the plume): its own material and pivot, so it can burn red when the knight is hurt
+  const CREST_Y = u(1.8);
+  const crestAcc = new GeoAccumulator();
+  part(crestAcc, G.cone(0.1, 0.5, 5), C.plume, { y: u(1.95) - CREST_Y, z: -0.06, rx: -0.2 });
+  const crestMat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, emissive: 0xff2a14, emissiveIntensity: 0 });
+  const crestMesh = new THREE.Mesh(crestAcc.build(), crestMat);
+  const crest = new THREE.Group();
+  crest.position.set(0, CREST_Y, 0);
+  crest.add(crestMesh);
+  upper.add(crest);
+  let crestT = 0;
+  /** danger 0..1 (see sim/danger.js): the crest glows, flickers and sways harder as the knight nears death. */
+  const setDanger = (danger, dt) => {
+    crestT += dt;
+    if (danger <= 0.001) {
+      crestMat.emissiveIntensity = 0;
+      crestMat.color.setRGB(1, 1, 1);
+      crest.rotation.z = 0;
+      crest.scale.setScalar(1);
+      return;
+    }
+    const flicker = 0.75 + 0.25 * Math.sin(crestT * 11) + 0.12 * Math.sin(crestT * 23.7);
+    crestMat.emissiveIntensity = danger * (0.5 + 0.4 * flicker);
+    crestMat.color.setRGB(1, 1 - danger * 0.45, 1 - danger * 0.6);
+    crest.rotation.z = Math.sin(crestT * 7) * 0.07 * danger;
+    crest.scale.setScalar(1 + danger * 0.05 * flicker);
+  };
 
   // ---- cape ----------------------------------------------------------------
   const capeMat = new THREE.MeshLambertMaterial({ color: C.cape, side: THREE.DoubleSide });
@@ -118,6 +145,9 @@ export function createHeroModel() {
     armR,
     armL,
     mats,
+    crest,
+    crestMesh,
+    setDanger,
     height: 1.9,
   };
 }

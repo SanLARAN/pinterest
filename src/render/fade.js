@@ -50,7 +50,8 @@ export class Fader {
     _to.y = hero.y + 1;
     _to.z = hero.z;
     const hidden = amount > 0 && segmentHitsBox(_from, _to, this.box);
-    const target = hidden ? 1 - amount * 0.85 : 1;
+    // never fades below 40%: the stronghold stays solid even at full translucency
+    const target = hidden ? 1 - amount * 0.6 : 1;
     this.alpha = damp(this.alpha, target, 10, dt);
     const a = this.alpha;
     for (const m of this.materials) {

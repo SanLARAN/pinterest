@@ -17,6 +17,14 @@ const SKILL_NODES = {
   skill3: ['sk3', 'btnSkill3'],
 };
 
+// Inline SVG icons for the psi skills, drawn with currentColor so CSS can tint them.
+const SKILL_ICONS = {
+  burst: '<circle cx="12" cy="12" r="3.2" fill="currentColor"/><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-dasharray="3 2.5"/><path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>',
+  lance: '<path d="M3.5 20.5L15 9" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M13.2 4.2l6.6.2-.2 6.6-2.4-1.1-4.2 4.2-1.4-1.4 4.2-4.2z" fill="currentColor"/>',
+  pull: '<path d="M4 5c5 0 8 3 8 7s-3 7-8 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M20 12h-7.5M15.5 9l-3 3 3 3" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>',
+};
+const skillIcon = (id) => `<svg viewBox="0 0 24 24" aria-hidden="true">${SKILL_ICONS[PSI.skills[id].icon]}</svg>`;
+
 // Inline SVG badges for boons (emoji fonts are not guaranteed on every platform).
 const BOON_ICONS = {
   mind: '<circle cx="12" cy="12" r="8" fill="#fff" stroke="currentColor" stroke-width="1.6"/><path d="M12 6.5a5.5 5.5 0 1 0 4 9.3" fill="none" stroke="#8c5cf0" stroke-width="2.2" stroke-linecap="round"/><circle cx="12" cy="12" r="1.8" fill="#8c5cf0"/>',
@@ -97,6 +105,10 @@ export class UI {
     on('btnDash', 'pointerdown', (e) => { e.preventDefault(); this.a.onDashButton(); });
     for (const id of SKILL_IDS) {
       on(SKILL_NODES[id][1], 'pointerdown', (e) => { e.preventDefault(); this.a.onSkill(id); });
+      for (const node of SKILL_NODES[id]) {
+        const slot = $(node)?.querySelector('.sk-ico');
+        if (slot) slot.innerHTML = skillIcon(id);
+      }
     }
     // inventory bar: tap a slot to use it (play) or select it (shop)
     $('invBar').addEventListener('click', (e) => {
@@ -174,13 +186,18 @@ export class UI {
   showLevel(choices, onPick, level) {
     const wrap = $('cards');
     wrap.innerHTML = '';
-    $('levelSub').textContent = `Level ${level} reached. Choose a boon for your knight.`;
+    const skillPick = choices.length > 0 && choices[0].kind === 'skill';
+    $('levelSub').textContent = skillPick
+      ? `Level ${level} reached. Sharpen a psi skill. Every third level, each skill grows up to level 6.`
+      : `Level ${level} reached. Choose a boon for your knight.`;
     choices.forEach((u, i) => {
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'card';
       b.style.animationDelay = `${i * 0.07}s`;
-      b.innerHTML = `<span class="key">${i + 1}</span><span class="icon">${boonIcon(u.id)}</span><span class="name">${escapeHtml(u.name)}</span><span class="desc">${escapeHtml(u.desc)}</span>`;
+      const icon = u.kind === 'skill' ? skillIcon(u.id) : boonIcon(u.id);
+      const desc = u.kind === 'skill' ? `<b>Lv ${u.from} → ${u.to}</b> · ${escapeHtml(u.desc)}` : escapeHtml(u.desc);
+      b.innerHTML = `<span class="key">${i + 1}</span><span class="icon">${icon}</span><span class="name">${escapeHtml(u.name)}</span><span class="desc">${desc}</span>`;
       b.addEventListener('click', (e) => { e.stopPropagation(); onPick(i); });
       b.addEventListener('pointerdown', (e) => e.stopPropagation());
       wrap.appendChild(b);
@@ -291,11 +308,23 @@ export class UI {
     for (const id of SKILL_IDS) {
       const frac = psi.cooldownFrac(id);
       const state = psi.canCast(id) ? 'ready' : frac > 0 ? 'cd' : 'low';
+      const cost = String(psi.costOf(id));
+      const lv = `Lv ${psi.level(id)}`;
       for (const node of SKILL_NODES[id]) {
         const key = `state:${node}`;
         if (this.cache[key] !== state) {
           this.cache[key] = state;
           $(node).dataset.state = state;
+        }
+        if (this.cache[`cost:${node}`] !== cost) {
+          this.cache[`cost:${node}`] = cost;
+          const el = $(node).querySelector('[data-cost]');
+          if (el) el.textContent = cost;
+        }
+        if (this.cache[`lv:${node}`] !== lv) {
+          this.cache[`lv:${node}`] = lv;
+          const el = $(node).querySelector('[data-lv]');
+          if (el) el.textContent = lv;
         }
         this.setStyle(node, '--cd', frac.toFixed(3));
       }
