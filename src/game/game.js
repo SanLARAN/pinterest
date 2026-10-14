@@ -17,6 +17,9 @@ import { createRng, seedCode } from '../util/rng.js';
 import { buildWorld } from '../render/worldModel.js';
 import { buildMerchant } from '../render/merchantModel.js';
 import { buildBaseModel } from '../render/baseModel.js';
+import { renderEnemyPortrait } from '../render/portraits.js';
+import { catalog, normalizeAtlas, discover as atlasDiscover } from '../sim/atlas.js';
+import { CUTSCENE_SECONDS, FINALE_SECONDS, ALIVE_CAP, dawnProgress, spawnInterval, hpScaleAt, dmgScaleAt, sunBurn, finaleTypeAt } from '../sim/finale.js';
 import { bitmapUniforms, bandedSkyTexture } from '../render/bitmap.js';
 import { ShadowPool } from '../render/pools.js';
 import { clamp, damp, wrapAngle } from '../util/math.js';
@@ -27,7 +30,7 @@ import { Arrows } from './projectiles.js';
 import { Juice } from './juice.js';
 import { Input } from '../core/input.js';
 import { Sound } from '../core/audio.js';
-import { loadScores, saveScores, loadName, saveName, loadMuted, saveMuted, loadTranslucency, saveTranslucency } from '../core/storage.js';
+import { loadScores, saveScores, loadName, saveName, loadMuted, saveMuted, loadTranslucency, saveTranslucency, loadAtlasRaw, saveAtlasRaw } from '../core/storage.js';
 import { UI } from '../ui/ui.js';
 
 // the stall stands this far up the map from the keep, on the first reachable open cell
@@ -46,6 +49,7 @@ const THRONE_HP = 300; // the enemy throne: swings and psi wear it down once the
 const THRONE_R = 1.6; // its hit radius for swings, psi and lances
 const THRONE_WIN_DELAY = 3.2; // real seconds between the throne falling and the victory screen
 const VICTORY_BONUS = 2000;
+const DAWN_FOG = 0xe9a46a; // the fog warms toward this as dawn approaches
 const OVER_GUARD = 0.6; // ignore confirm/restart briefly so mashing attack doesn't skip the screen
 
 const ACCENT_COLOR = {
@@ -86,6 +90,7 @@ export class Game {
       onShopAct: (act, i) => this.shopAct(act, i),
       onShopLeave: () => this.closeShop(),
       onTranslucency: (v) => this.setTranslucency(v),
+      onAtlas: () => this.openAtlas(),
     });
     this.ui.setTouch(this.isTouch);
 
@@ -182,6 +187,12 @@ export class Game {
     this.won = false;
     this.winT = -1;
     this.translucency = loadTranslucency(); // 0..100, see render/fade.js
+    this.atlas = normalizeAtlas(loadAtlasRaw()); // discovered monsters, bosses and items
+    this.catalog = catalog();
+    this.portraits = new Map(); // "kind:id" -> PNG data URL, rendered on first view
+    this.cut = null; // the throne cutscene (flyover and cellar), see updateCutscene
+    this.finale = null; // the five minutes until dawn, see updateFinale
+    this.fogTint = new THREE.Color();
     this.fadeUnits = [];
     this.base = null;
     this.stallModel = null;
@@ -371,6 +382,11 @@ export class Game {
     this.winT = -1;
     this.passive = passiveTotals(this.inv.slots);
     this.base.setOpen(false);
+    this.base.setCellar(0);
+    this.cut = null;
+    this.finale = null;
+    this.fog.color.setHex(FOG_COLOR);
+    this.ui.setDawn(0);
     this.hero.reset(this.layout.start.x, this.layout.start.z);
     this.hero.model.root.visible = true;
     this.enemyCtx.hero = this.hero;
@@ -461,7 +477,14 @@ export class Game {
 
   /** What the objective card shows: the boss count, then the throne's health. */
   objectiveInfo() {
-    if (this.won) return { text: 'The throne lies in ruins', frac: 0, done: true };
+    if (this.won) return { text: 'Dawn breaks over Emberkeep', frac: 1, done: true };
+    if (this.cut) return { text: 'The throne falls…', frac: 1 };
+    if (this.finale) {
+      const left = Math.max(0, FINALE_SECONDS - this.finale.t);
+      const m = Math.floor(left / 60);
+      const s = Math.floor(left % 60);
+      return { text: `Hold until dawn · ${m}:${String(s).padStart(2, '0')}`, frac: 1 - dawnProgress(this.finale.t) };
+    }
     if (this.gatesOpen) {
       return { text: `Shatter the Hollow King's throne · ${Math.ceil(this.throneHp)} / ${THRONE_HP}`, frac: this.throneHp / THRONE_HP };
     }
@@ -628,6 +651,7 @@ export class Game {
       return;
     }
     let r = null;
+    const bought = act === 'buy' || act === 'trade' ? this.stock[i] : null;
     if (act === 'buy') r = buy(this.stock, i, this.inv, this.score.coins);
     else if (act === 'sell') r = sell(this.inv, this.shopSel, this.score.coins);
     else if (act === 'trade') r = trade(this.stock, i, this.inv, this.shopSel, this.score.coins);
@@ -635,6 +659,7 @@ export class Game {
     this.score.coins = r.gold;
     this.ui.toast(r.msg);
     if (r.ok) {
+      if (bought) this.discover('item', bought);
       this.sound.coin(4);
       this.juice.text(r.msg, 'coin', this.hero.x, this.hero.y + 2.4, this.hero.z);
     } else {
@@ -741,6 +766,8 @@ export class Game {
       }
       if (p.t <= 0) {
         this.pending.splice(i, 1);
+        if (p.type === 'boss') this.discover('boss', p.bossId ?? 'champion');
+        else this.discover('monster', p.type);
         this.enemies.spawn(p.type, p.x, p.z, p.hpScale, { bossId: p.bossId });
         const col = ACCENT_COLOR[p.type] ?? 0xffffff;
         const big = p.type === 'boss';
@@ -841,7 +868,7 @@ export class Game {
   // ---- combat ---------------------------------------------------------------------
   damageHero(dmg0, fx, fz) {
     const h = this.hero;
-    if (this.won) return false; // the throne has fallen: nothing can touch the hero now
+    if (this.won || this.cut) return false; // during the cutscene and after dawn nothing can touch the hero
     const dmg = dmg0 * this.dmgScale * this.passive.takenMul;
     if (!h.takeHit(dmg, fx, fz)) return false;
     this.hitstop = Math.max(this.hitstop, 0.06);
@@ -938,17 +965,14 @@ export class Game {
   throneFall() {
     const T = this.layout.base.throne;
     this.base.throneDown();
-    this.won = true;
-    this.winT = THRONE_WIN_DELAY;
-    this.score.score += VICTORY_BONUS;
+    this.cut = { t: 0, beat: 0 }; // real-time cutscene: flyover and cellar, see updateCutscene
+    this.acc = 0;
     this.juice.burst(T.x, 1.5, T.z, 0xb070ff, 90, 2.6);
     this.juice.burst(T.x, 1.0, T.z, 0xffe64a, 40, 2);
     this.juice.ring(T.x, 0.2, T.z, 9, 0xb070ff, 1.2, 1.6);
-    this.juice.text(`+${VICTORY_BONUS}`, 'big', T.x, 4.2, T.z);
     this.juice.addTrauma(1);
     this.hitstop = Math.max(this.hitstop, 0.2);
     this.sound.boss();
-    this.ui.banner('Throne shattered', 'Emberkeep is free!', 'The Hollow King falls at last.', THRONE_WIN_DELAY);
   }
 
   /** Melee and psi hits. `opts` (psi only) overrides knockback and marks the hit as psychic. */
@@ -1221,8 +1245,9 @@ export class Game {
     this.flow.setGoal(h.x, h.z);
     if (!h.dead) {
       this.resolveSwing();
-      if (!this.won) this.director.update(dt, this.waveEnv);
+      if (!this.won && !this.finale && !this.cut) this.director.update(dt, this.waveEnv);
     }
+    if (this.finale && !this.won) this.updateFinale(dt);
     if (this.won) {
       this.winT -= dt;
       if (this.winT <= 0) {
@@ -1283,12 +1308,130 @@ export class Game {
         this.throttle('packfull', 0.8, () => this.juice.text('Pack full', 'dim', x, y + 0.8, z));
         return false;
       }
+      this.discover('item', value);
       const it = ITEMS[value];
       this.juice.text(it.name, 'big', x, y + 0.9, z);
       this.juice.burst(x, y + 0.4, z, parseInt(it.color.slice(1), 16), 14, 1);
       this.sound.pick();
       this.ui.flashSlot(slot);
     }
+  }
+
+  // ---- atlas ---------------------------------------------------------------------
+  openAtlas() {
+    if (this.state !== 'menu') return;
+    this.ui.showAtlas({ atlas: this.atlas, catalog: this.catalog, getPortrait: (kind, id) => this.portrait(kind, id) });
+  }
+
+  /** Monsters and bosses are rendered once with the game's renderer; items use their icons. */
+  portrait(kind, id) {
+    if (kind === 'item') return null;
+    const key = `${kind}:${id}`;
+    if (!this.portraits.has(key)) {
+      const bd = kind === 'boss' ? BOSS_DEFS[id] : null;
+      const url = renderEnemyPortrait(this.renderer, kind === 'boss' ? 'boss' : id, bd ? { tint: bd.tint, accent: bd.accent } : {});
+      this.portraits.set(key, url);
+    }
+    return this.portraits.get(key);
+  }
+
+  /** Records a first encounter and tells the player. */
+  discover(kind, id) {
+    const next = atlasDiscover(this.atlas, kind, id);
+    if (next === this.atlas) return;
+    this.atlas = next;
+    saveAtlasRaw(next);
+    const entry = this.catalog[kind].find((e) => e.id === id);
+    if (entry) this.ui.toast(`Atlas: ${entry.name} recorded`);
+  }
+
+  // ---- finale: throne falls -> cellar opens -> hold until dawn -------------------
+  /** Real-time beats: the throne falls, the flyover arcs over the stronghold, the cellar hatches open. */
+  updateCutscene(realDt) {
+    const c = this.cut;
+    c.t += realDt;
+    if (c.beat === 0 && c.t >= 0.5) {
+      c.beat = 1;
+      this.ui.banner('The throne falls', 'Stone breaks and dust rolls out', 'The Hollow King’s seat cracks open. Something beneath it answers.', 3);
+    }
+    if (c.beat === 1 && c.t >= 3.2) {
+      c.beat = 2;
+      this.ui.banner('Beneath the throne', 'A cellar opens', 'Black stone stairs lead down into the dark, and the night will not end quietly.', 3.4);
+      this.juice.addTrauma(0.6);
+    }
+    const T = this.layout.base.throne;
+    const p = clamp((c.t - 3.2) / 1.4, 0, 1);
+    this.base.setCellar(p);
+    if (p > 0 && p < 1 && Math.random() < 0.3) this.juice.dust(T.x, T.z, 0, 0, 1.2);
+    if (c.t >= CUTSCENE_SECONDS) this.endCutscene();
+  }
+
+  /** Camera for the cutscene: hero -> throne on an arc (pulled back mid-flight) -> hero. */
+  cutCamera() {
+    const cam = this.camera;
+    const h = this.hero;
+    const T = this.layout.base.throne;
+    const t = this.cut.t;
+    const ease = (x) => x * x * (3 - 2 * x);
+    const k = ease(clamp((t - 0.6) / 2.6, 0, 1)) - ease(clamp((t - 4.6) / 1.4, 0, 1)); // 0 at hero, 1 at throne
+    const x = h.x + (T.x - h.x) * k;
+    const z = h.z + (T.z - h.z) * k;
+    const y = h.y + (this.layout.heightAt(T.x, T.z) - h.y) * k;
+    const arc = 1 + 1.6 * Math.sin(Math.PI * clamp(k, 0, 1));
+    const [ox, oy, oz] = CAMERA.offset;
+    const zoom = this.zoom * arc;
+    cam.position.set(x + ox * zoom, y + oy * zoom, z + oz * zoom);
+    cam.lookAt(x, y + 0.6, z);
+  }
+
+  endCutscene() {
+    this.cut = null;
+    this.acc = 0;
+    this.finale = { t: 0, spawnT: 1.2 };
+    this.camTarget.set(this.hero.x, this.hero.y, this.hero.z); // hand the camera back to the hero
+    this.ui.banner('Dawn is five minutes away', 'Hold the keep until sunrise', 'The night is full of foes. Each minute the sun climbs higher, and the creatures of the night begin to burn.', 4.2);
+    this.sound.waveStart();
+  }
+
+  /** The night: spawns speed up and toughen, and from halfway the sun burns foes away. */
+  updateFinale(dt) {
+    const f = this.finale;
+    f.t += dt;
+    const p = dawnProgress(f.t);
+    this.dmgScale = dmgScaleAt(p);
+    f.spawnT -= dt;
+    if (f.spawnT <= 0) {
+      f.spawnT = spawnInterval(p);
+      if (this.enemies.aliveCount + this.pending.length < ALIVE_CAP) {
+        this.queueSpawn(finaleTypeAt(p, this.rng.next()), hpScaleAt(p));
+      }
+    }
+    const burn = sunBurn(p) * dt;
+    if (burn > 0) {
+      for (const e of [...this.enemies.targets()]) {
+        e.hp -= burn;
+        if (e.hp <= 0) this.killEnemy(e);
+      }
+    }
+    if (f.t >= FINALE_SECONDS) this.dawn();
+  }
+
+  /** Sunrise: whatever still lives is gone and the run is won. */
+  dawn() {
+    this.finale = null;
+    this.pending = [];
+    for (const e of [...this.enemies.targets()]) this.killEnemy(e);
+    this.won = true;
+    this.winT = THRONE_WIN_DELAY;
+    this.score.score += VICTORY_BONUS;
+    const h = this.hero;
+    this.juice.burst(h.x, 1.2, h.z, 0xffd27a, 80, 2.4);
+    this.juice.ring(h.x, 0.1, h.z, 12, 0xffd27a, 1.2, 1.8);
+    this.juice.text(`+${VICTORY_BONUS}`, 'big', h.x, h.y + 2.6, h.z);
+    this.juice.addTrauma(1);
+    this.hitstop = Math.max(this.hitstop, 0.2);
+    this.sound.boss();
+    this.ui.banner('Dawn breaks', 'Emberkeep is free!', 'The sun clears the walls and the creatures of the night are gone.', THRONE_WIN_DELAY);
   }
 
   // ---- main loop ------------------------------------------------------------------
@@ -1361,6 +1504,10 @@ export class Game {
       cam.lookAt(0, 0, 0);
       return;
     }
+    if (this.cut) {
+      this.cutCamera();
+      return;
+    }
     const h = this.hero;
     const la = CAMERA.lookAhead;
     const tx = h.x + clamp(h.vx * 0.2, -la, la);
@@ -1411,7 +1558,7 @@ export class Game {
       if (this.hero.dead) this.deathReal += realDt;
       const scale = this.hitstop > 0 ? 0 : this.hero.dead ? DEATH_TIMESCALE : 1;
       this.acc = Math.min(this.acc + realDt * scale, FIXED_DT * MAX_STEPS_PER_FRAME);
-      while (this.acc >= FIXED_DT && this.state === 'playing') {
+      while (this.acc >= FIXED_DT && this.state === 'playing' && !this.cut) {
         this.step(FIXED_DT);
         this.acc -= FIXED_DT;
         steps++;
@@ -1425,6 +1572,12 @@ export class Game {
     if (steps > 0 || this.state !== 'playing') this.input.clearLatched();
     const simDt = steps * FIXED_DT;
 
+    if (this.cut && this.state === 'playing') this.updateCutscene(realDt);
+    if (this.finale) {
+      const p = dawnProgress(this.finale.t);
+      this.fog.color.setHex(FOG_COLOR).lerp(this.fogTint.setHex(DAWN_FOG), p * 0.6);
+      this.ui.setDawn(p);
+    }
     this.updateCamera(realDt);
     this.juice.update(simDt, realDt, this.camera);
     // building translucency: buildings between camera and hero fade out (setting 0..100)

@@ -34,6 +34,16 @@ export const loadName = () => get(STORAGE.name) || '';
 export const saveName = (name) => set(STORAGE.name, name);
 export const loadMuted = () => get(STORAGE.muted) === '1';
 export const saveMuted = (muted) => set(STORAGE.muted, muted ? '1' : '0');
+/** Atlas discoveries: { monster: [], boss: [], item: [] } of ids. */
+export function loadAtlasRaw() {
+  try {
+    return JSON.parse(get(STORAGE.atlas) || 'null');
+  } catch {
+    return null;
+  }
+}
+export const saveAtlasRaw = (atlas) => set(STORAGE.atlas, JSON.stringify(atlas));
+
 /** Building translucency, 0..100 (default 50). */
 export const loadTranslucency = () => {
   const v = parseInt(get(STORAGE.translucency), 10);

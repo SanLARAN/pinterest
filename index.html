@@ -14,6 +14,7 @@
       <div class="grade" aria-hidden="true"></div>
       <div id="vignette" class="vignette"></div>
       <div class="bitmap-frame" aria-hidden="true"></div>
+      <div id="dawn" class="dawn" aria-hidden="true"></div>
       <div id="popups" class="popups"></div>
 
       <div id="sticks" class="sticks">
@@ -105,6 +106,7 @@
               <button id="btnStart" class="btn btn-primary" type="button">Begin the Siege <kbd>Enter</kbd></button>
               <button id="btnMuteStart" class="btn btn-ghost" type="button">Sound: On</button>
               <button id="btnSettings" class="btn btn-ghost" type="button">Settings</button>
+              <button id="btnAtlas" class="btn btn-ghost" type="button">Atlas</button>
             </div>
             <ul class="howto">
               <li><b>Move</b> WASD / arrows<span class="touch-only"> &middot; left stick</span></li>
@@ -135,6 +137,26 @@
             <button id="btnMutePause" class="btn btn-ghost" type="button">Sound: On</button>
             <button id="btnSettingsPause" class="btn btn-ghost" type="button">Settings</button>
             <button id="btnQuit" class="btn btn-ghost" type="button">Back to title</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Atlas: a book of everything met so far -->
+      <section id="screenAtlas" class="screen hidden">
+        <div class="screen-panel atlas-book">
+          <h2 class="panel-title">Atlas</h2>
+          <p class="muted">Entries open the first time you meet them.</p>
+          <div class="atlas-tabs" role="tablist">
+            <button class="atlas-tab active" data-tab="monster" type="button">Monsters</button>
+            <button class="atlas-tab" data-tab="boss" type="button">Bosses</button>
+            <button class="atlas-tab" data-tab="item" type="button">Items</button>
+          </div>
+          <div class="atlas-body">
+            <div id="atlasList" class="atlas-list"></div>
+            <div id="atlasDetail" class="atlas-detail"></div>
+          </div>
+          <div class="stack">
+            <button id="btnAtlasBack" class="btn btn-primary" type="button">Close</button>
           </div>
         </div>
       </section>

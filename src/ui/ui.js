@@ -4,6 +4,9 @@ import { cleanName, DEFAULT_NAME } from '../sim/highscores.js';
 import { PSI, SKILL_IDS } from '../sim/psi.js';
 import { ITEMS, INV_SLOTS, sellPrice } from '../sim/items.js';
 import { loadTranslucency } from '../core/storage.js';
+import { isKnown } from '../sim/atlas.js';
+
+const SKILL_LABEL = { slam: 'Slam', charge: 'Charge', blink: 'Blink', quake: 'Quake', summon: 'Summon', volley: 'Volley', nova: 'Nova', lance: 'Lance' };
 
 const $ = (id) => document.getElementById(id);
 
@@ -66,6 +69,14 @@ export class UI {
     on('btnSettings', 'click', () => this.showSettings('start'));
     on('btnSettingsPause', 'click', () => this.showSettings('pause'));
     on('btnSettingsBack', 'click', () => this.hideSettings());
+    on('btnAtlas', 'click', () => this.a.onAtlas());
+    on('btnAtlasBack', 'click', () => this.hideAtlas());
+    for (const b of document.querySelectorAll('.atlas-tab')) {
+      b.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.setAtlasTab(b.dataset.tab);
+      });
+    }
     $('transSlider').addEventListener('input', (e) => {
       e.stopPropagation();
       const v = Number(e.target.value);
@@ -521,6 +532,74 @@ export class UI {
     if (this.cache[id] === text) return;
     this.cache[id] = text;
     $(id).textContent = text;
+  }
+
+  /** Atlas book. `data` = { atlas, catalog, getPortrait(kind, id) -> PNG data URL or null }. */
+  showAtlas(data) {
+    this.atlasData = data;
+    this.atlasSel = null;
+    this.atlasTab = this.atlasTab || 'monster';
+    this.hide('screenStart');
+    this.show('screenAtlas');
+    this.setAtlasTab(this.atlasTab);
+  }
+
+  hideAtlas() {
+    this.hide('screenAtlas');
+    this.show('screenStart');
+  }
+
+  setAtlasTab(tab) {
+    this.atlasTab = tab;
+    this.atlasSel = null;
+    for (const b of document.querySelectorAll('.atlas-tab')) b.classList.toggle('active', b.dataset.tab === tab);
+    this.renderAtlas();
+  }
+
+  renderAtlas() {
+    if (!this.atlasData) return;
+    const { atlas, catalog, getPortrait } = this.atlasData;
+    const entries = catalog[this.atlasTab];
+    const list = $('atlasList');
+    list.innerHTML = '';
+    let known = 0;
+    for (const e of entries) {
+      const ok = isKnown(atlas, e.kind, e.id);
+      if (ok) known++;
+      const card = document.createElement('button');
+      card.type = 'button';
+      card.className = `atlas-card${ok ? '' : ' locked'}${ok && this.atlasSel === e.id ? ' sel' : ''}`;
+      let thumb = '<span class="atlas-locked-mark">?</span>';
+      if (ok) {
+        thumb = e.kind === 'item' ? itemIcon(e.id) : `<img alt="" src="${getPortrait(e.kind, e.id) ?? ''}">`;
+      }
+      card.innerHTML = `<span class="atlas-thumb">${thumb}</span><span>${ok ? escapeHtml(e.name) : '???'}</span>`;
+      if (ok) {
+        card.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          this.atlasSel = e.id;
+          this.renderAtlas();
+        });
+      }
+      list.appendChild(card);
+    }
+    const det = $('atlasDetail');
+    const sel = entries.find((e) => e.id === this.atlasSel && isKnown(atlas, e.kind, e.id));
+    if (!sel) {
+      det.innerHTML = `<p class="muted">${known} of ${entries.length} discovered. Pick an entry to read about it.</p>`;
+      return;
+    }
+    const art = sel.kind === 'item' ? itemIcon(sel.id) : `<img alt="" src="${getPortrait(sel.kind, sel.id) ?? ''}">`;
+    let tags = '';
+    if (sel.kind !== 'item') tags += `<span class="atlas-tag">HP ${sel.hp}</span>`;
+    if (sel.skills) for (const s of sel.skills) tags += `<span class="atlas-tag">${escapeHtml(SKILL_LABEL[s] ?? s)}</span>`;
+    if (sel.passive) tags += '<span class="atlas-tag">Passive</span>';
+    det.innerHTML = `<div class="atlas-portrait">${art}</div><h3>${escapeHtml(sel.name)}</h3><div>${tags}</div><p>${escapeHtml(sel.desc)}</p>`;
+  }
+
+  /** Dawn wash, 0..1: grows through the finale. */
+  setDawn(p) {
+    this.setStyle('dawn', 'opacity', (Math.max(0, Math.min(1, p)) * 0.55).toFixed(3));
   }
 
   setStyle(id, prop, value) {

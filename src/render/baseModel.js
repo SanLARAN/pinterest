@@ -164,11 +164,37 @@ export function buildBaseModel(layout) {
     gates.push({ pivot, lift: 0 });
   }
 
+  // ---- cellar: a pit under the throne, closed by two stone hatches until the throne falls ----
+  const pitGeo = new THREE.BoxGeometry(2.4, 0.02, 2.4);
+  const pitMat = new THREE.MeshBasicMaterial({ color: 0x07040d });
+  const pit = new THREE.Mesh(pitGeo, pitMat);
+  pit.position.set(tx, 0.09, tz);
+  const glowGeo = new THREE.BoxGeometry(2.0, 0.02, 2.0);
+  const glowMat = new THREE.MeshBasicMaterial({
+    color: VIOLET, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending,
+  });
+  const glow = new THREE.Mesh(glowGeo, glowMat);
+  glow.position.set(tx, 0.12, tz);
+  const hatchMat = bitmapMaterial();
+  const hatchGeos = [0, 1].map(() => {
+    const acc = new GeoAccumulator();
+    part(acc, G.box(1.2, 0.22, 2.4), STONE_DARK, { x: 0, y: 0, z: 0 });
+    return acc.build();
+  });
+  const hatchL = new THREE.Mesh(hatchGeos[0], hatchMat);
+  const hatchR = new THREE.Mesh(hatchGeos[1], hatchMat);
+  hatchL.position.set(tx - 0.6, 0.2, tz);
+  hatchR.position.set(tx + 0.6, 0.2, tz);
+  group.add(pit, glow, hatchL, hatchR);
+  geos.push(pitGeo, glowGeo, ...hatchGeos);
+  mats.push(pitMat, glowMat, hatchMat);
+
   // ---- state ------------------------------------------------------------------------
   let open = 0; // 0 sealed .. 1 open (eased)
   let openTarget = 0;
   let flashT = 0;
   let downT = -1; // >= 0 while the throne is falling
+  let cellarP = 0; // 0 hatches closed .. 1 hatches slid aside
   const update = (t, dt) => {
     open += (openTarget - open) * (1 - Math.exp(-2.4 * dt));
     for (const g of gates) g.pivot.position.y = open * GATE_LIFT;
@@ -179,6 +205,11 @@ export function buildBaseModel(layout) {
     crystalMat.color.setHex(flashT > 0 ? 0xffffff : VIOLET);
     beam.material.opacity = 0.1 + 0.05 * Math.sin(t * 2.1);
     haloMat.opacity = 0.3 + 0.2 * pulse;
+    // the hatches slide apart and the violet light rises from the pit
+    const cp = cellarP;
+    hatchL.position.x = tx - 0.6 - cp * 1.3;
+    hatchR.position.x = tx + 0.6 + cp * 1.3;
+    glowMat.opacity = cp * (0.75 + 0.15 * Math.sin(t * 5));
     if (downT >= 0) {
       downT += dt;
       const k = Math.min(1, downT / 1.6);
@@ -204,6 +235,11 @@ export function buildBaseModel(layout) {
     throneDown() {
       downT = 0;
     },
+    /** 0..1: how far the cellar hatches have opened. */
+    setCellar(p) {
+      cellarP = Math.max(0, Math.min(1, p));
+    },
+    cellarAt: () => ({ x: tx, z: tz }),
     update,
     dispose() {
       for (const g of geos) g.dispose();
