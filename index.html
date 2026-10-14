@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#2b1d3a" />
+    <meta name="description" content="Hollowkeep: a chibi, low-poly, top-down castle roguelite. Hold the walls, gather embers, climb the leaderboard." />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8F%B0%3C/text%3E%3C/svg%3E" />
+    <title>Hollowkeep</title>
+  </head>
+  <body>
+    <div id="app" class="app">
+      <canvas id="game" class="game-canvas"></canvas>
+      <div id="vignette" class="vignette"></div>
+      <div id="popups" class="popups"></div>
+
+      <div id="sticks" class="sticks">
+        <div id="stickL" class="stick"><i></i></div>
+        <div id="stickR" class="stick"><i></i></div>
+      </div>
+
+      <!-- In-game HUD -->
+      <div id="hud" class="hud hidden">
+        <div class="hud-top">
+          <div class="hud-card vitals">
+            <div class="vital-row">
+              <span class="lv-badge" id="lv">LV 1</span>
+              <div class="bar hp">
+                <div class="fill" id="hpFill"></div>
+                <span class="bar-text" id="hpText">100 / 100</span>
+              </div>
+            </div>
+            <div class="bar xp"><div class="fill" id="xpFill"></div></div>
+          </div>
+          <div class="hud-card score-card">
+            <span class="label">Score</span>
+            <span class="value" id="score">0</span>
+            <span class="combo" id="combo"></span>
+          </div>
+          <div class="hud-actions no-game">
+            <button id="btnPause" class="icon-btn" type="button" aria-label="Pause">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1.2"/><rect x="14" y="5" width="4" height="14" rx="1.2"/></svg>
+            </button>
+            <button id="btnMuteHud" class="icon-btn" type="button" aria-label="Toggle sound">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z"/><path class="wave" d="M16 8.5a5 5 0 0 1 0 7M18.8 6a8.8 8.8 0 0 1 0 12" fill="none" stroke-width="2" stroke-linecap="round"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="hud-bottom">
+          <div class="hud-card chapter" id="chapter">Chapter 1</div>
+          <div class="dash-ind" id="dashInd" title="Dash">
+            <div id="dashRing" class="dash-ring"></div>
+            <span>DASH</span>
+          </div>
+        </div>
+        <div id="banner" class="banner hidden">
+          <div class="kicker" id="bannerKicker"></div>
+          <div class="title" id="bannerTitle"></div>
+          <div class="story" id="bannerStory"></div>
+        </div>
+        <pre id="debug" class="debug hidden"></pre>
+      </div>
+
+      <div id="touchUI" class="touch-ui hidden no-game">
+        <button id="btnDash" class="dash-btn" type="button">DASH</button>
+      </div>
+
+      <!-- Start screen -->
+      <section id="screenStart" class="screen">
+        <div class="screen-panel start-panel">
+          <div class="start-hero">
+            <h1 class="logo">Hollowkeep</h1>
+            <p class="tagline">a chibi castle roguelite</p>
+            <div class="parchment story-box">
+              <p><strong>Emberkeep has stood for a thousand years.</strong> Tonight the Hollow King's rift opened beneath its gate, and shadows are spilling into the courtyard.</p>
+              <p>You are <em>Sir Pip</em>, the last knight of the keep. Hold the walls, gather the embers, and see how long you can last.</p>
+            </div>
+            <div class="start-actions">
+              <button id="btnStart" class="btn btn-primary" type="button">Begin the Siege <kbd>Enter</kbd></button>
+              <button id="btnMuteStart" class="btn btn-ghost" type="button">Sound: On</button>
+            </div>
+            <ul class="howto">
+              <li><b>Move</b> WASD / arrows<span class="touch-only"> &middot; left stick</span></li>
+              <li><b>Swing</b> click / Space / J<span class="touch-only"> &middot; drag right stick or tap</span></li>
+              <li><b>Dash</b> Shift / right-click / K<span class="touch-only"> &middot; DASH button</span></li>
+              <li><b>Pause</b> Esc / P</li>
+            </ul>
+          </div>
+          <aside class="board-panel">
+            <h2>Hall of Heroes</h2>
+            <div id="boardStart" class="board"></div>
+          </aside>
+        </div>
+      </section>
+
+      <!-- Pause -->
+      <section id="screenPause" class="screen hidden">
+        <div class="screen-panel small-panel">
+          <h2 class="panel-title">Paused</h2>
+          <p class="muted">The rift waits for you.</p>
+          <div class="stack">
+            <button id="btnResume" class="btn btn-primary" type="button">Resume <kbd>Esc</kbd></button>
+            <button id="btnRestartPause" class="btn btn-gold" type="button">Restart <kbd>R</kbd></button>
+            <button id="btnMutePause" class="btn btn-ghost" type="button">Sound: On</button>
+            <button id="btnQuit" class="btn btn-ghost" type="button">Back to title</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Level up -->
+      <section id="screenLevel" class="screen hidden">
+        <div class="screen-panel level-panel">
+          <h2 class="panel-title">Level Up!</h2>
+          <p class="muted" id="levelSub">Choose a boon for your knight.</p>
+          <div id="cards" class="cards"></div>
+          <p class="muted tiny">Press 1, 2 or 3 &middot; or tap a card</p>
+        </div>
+      </section>
+
+      <!-- Game over -->
+      <section id="screenOver" class="screen hidden">
+        <div class="screen-panel over-panel">
+          <div class="over-main">
+            <h2 class="panel-title">Fallen</h2>
+            <p class="muted" id="overSub">The rift claims another knight.</p>
+            <div class="stats">
+              <div><span>Score</span><b id="overScore">0</b></div>
+              <div><span>Chapter</span><b id="overWave">1</b></div>
+              <div><span>Foes felled</span><b id="overKills">0</b></div>
+              <div><span>Best combo</span><b id="overCombo">0</b></div>
+              <div><span>Level</span><b id="overLevel">1</b></div>
+              <div><span>Realm</span><b id="overSeed">HK</b></div>
+            </div>
+            <div id="nameBox" class="name-box hidden">
+              <p class="new-best">New high score!</p>
+              <label for="nameInput">Carve your name in the hall:</label>
+              <div class="name-row">
+                <input id="nameInput" maxlength="12" autocomplete="off" spellcheck="false" placeholder="KNIGHT" />
+                <button id="btnSaveName" class="btn btn-gold btn-small" type="button">Save</button>
+              </div>
+            </div>
+            <div class="stack over-actions">
+              <button id="btnRetry" class="btn btn-primary" type="button">Try again <kbd>R</kbd></button>
+              <button id="btnOverTitle" class="btn btn-ghost" type="button">Title screen</button>
+            </div>
+          </div>
+          <aside class="board-panel">
+            <h2>Hall of Heroes</h2>
+            <div id="boardOver" class="board"></div>
+          </aside>
+        </div>
+      </section>
+
+      <div id="toast" class="toast hidden"></div>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
