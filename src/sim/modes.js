@@ -1,6 +1,6 @@
 // Game modes, heroes and the rules that depend on them. Pure, so it can be tested without a browser.
-import { BERSERKER_SKILLS } from './berserker.js';
-import { PSI } from './psi.js';
+import { BERSERKER_KIT } from './berserker.js';
+import { KNIGHT_KIT } from './psi.js';
 
 
 /** Story keeps the six-boss gate-and-throne campaign. Endless has no end and one life. */
@@ -52,9 +52,14 @@ export function modsFor(id) {
   return CHARACTERS.find((c) => c.id === id)?.mods ?? CHARACTERS[0].mods;
 }
 
-/** The ability definitions a hero's `skills` ids refer to. */
+/** The ability kit (definitions, level tables, summary) a hero's `skills` ids refer to. */
+export function kitFor(id) {
+  return id === 'berserker' ? BERSERKER_KIT : KNIGHT_KIT;
+}
+
+/** The ability definitions of a hero (name, key, icon, description). */
 export function skillDefsFor(id) {
-  return id === 'berserker' ? BERSERKER_SKILLS : PSI.skills;
+  return kitFor(id).skills;
 }
 
 export const DEFAULT_MODE = 'story';

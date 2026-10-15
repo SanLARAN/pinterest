@@ -2,7 +2,7 @@
 // he rides, and it trots off when the ride ends. The timeline is driven by the ability's
 // remaining time (see BerserkAbilities.elapsed), so the visuals can never outlast the ability.
 import { createSteedModel } from '../render/steedModel.js';
-import { STEED, BERSERKER_SKILLS } from '../sim/berserker.js';
+import { STEED } from '../sim/berserker.js';
 import { easeOutCubic } from '../util/math.js';
 
 const ARRIVE = 0.35; // seconds for the steed to trot in from the side
@@ -18,7 +18,6 @@ export class Steed {
     scene.add(this.root);
     this.phase = 'idle';
     this.gallop = 0;
-    this.total = BERSERKER_SKILLS.skill2.duration;
   }
 
   /** True only while the knight is galloping (the trample zone). */
@@ -27,16 +26,17 @@ export class Steed {
   }
 
   /**
-   * `t` is seconds since the summon, or null once the ability has ended.
-   * Sets the knight's ride state (riding, rideH, rideMul) before his own update runs.
+   * `t` is seconds since the summon, or null once the ride has ended. `s` is the steed's
+   * stats at the current level ({ duration, speed }). Sets the knight's ride state
+   * (riding, rideH, rideMul) before his own update runs.
    */
-  update(dt, hero, t) {
-    if (t === null) {
+  update(dt, hero, t, s) {
+    if (t === null || !s) {
       if (this.phase !== 'idle') this.stop(hero);
       return;
     }
     const mountEnd = ARRIVE + STEED.mountTime;
-    const dismountAt = this.total - STEED.dismountTime;
+    const dismountAt = s.duration - STEED.dismountTime;
     const fx = Math.sin(hero.facing);
     const fz = Math.cos(hero.facing);
     const toSide = { x: fz * SIDE, z: -fx * SIDE }; // to the knight's right
@@ -62,7 +62,7 @@ export class Steed {
       this.phase = 'ride';
       this.place(hero.x, hero.z, hero.y);
       hero.rideH = RIDE_H;
-      hero.rideMul = STEED.speedMul;
+      hero.rideMul = s.speed;
     } else {
       this.phase = 'dismount';
       const p = Math.min(1, (t - dismountAt) / STEED.dismountTime);

@@ -79,7 +79,9 @@ export class HeroPortrait {
   frame(now) {
     if (!this.running) return;
     requestAnimationFrame(this.frame);
-    this.t += Math.min(0.1, (now - this.last) / 1000);
+    const dt = Math.min(0.1, (now - this.last) / 1000);
+    this.t += dt;
+    this.model.hair?.update(dt, 0, 0, 0); // a breeze moves the hair even when the hero stands still
     this.last = now;
     // skip the GPU work while the title screen is showing something else
     if (this.canvas.offsetParent === null) return;

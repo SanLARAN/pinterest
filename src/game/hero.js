@@ -304,6 +304,7 @@ export class Hero {
     const r = M.root;
     r.position.set(this.x, this.y + this.rideH, this.z);
     r.rotation.y = this.facing;
+    M.hair?.update(dt, this.vx, this.vz, this.facing);
 
     // death: topple over facing direction
     if (this.dead) {

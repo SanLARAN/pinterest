@@ -1,6 +1,8 @@
 // Psi (psychic energy) abilities. Pure logic: no rendering, so it runs under node:test.
 // Each skill has six levels. Skills start at level 1; every third hero level the player
 // spends the level-up on a skill (see skillOffers / isSkillLevel), up to level 6.
+// The class takes a "kit" (the hero's skills, their level tables and summary text), so the
+// knight and the berserker share the same energy, cooldown and upgrade rules.
 export const PSI = {
   max: 100,
   start: 60,
@@ -45,9 +47,9 @@ export const SKILL_TABLES = {
 export const SKILL_IDS = Object.keys(PSI.skills);
 export const SKILL_UPGRADE_EVERY = 3;
 
-/** Numbers for one skill at one level (1..maxLevel). */
-export function skillStats(id, level) {
-  const t = SKILL_TABLES[id];
+/** Numbers for one skill at one level (1..maxLevel) from a level table. */
+export function statsFrom(tables, id, level) {
+  const t = tables[id];
   if (!t) return null;
   const i = Math.max(1, Math.min(PSI.maxLevel, level)) - 1;
   const out = {};
@@ -55,13 +57,29 @@ export function skillStats(id, level) {
   return out;
 }
 
-/** One-line summary of the numbers that matter for a skill at a level. */
-export function skillSummary(id, level) {
-  const s = skillStats(id, level);
-  if (!s) return '';
+const knightSummary = (id, s) => {
   if (id === 'skill1') return `${s.damage} dmg · ${s.radius} radius · ${s.cost} psi`;
   if (id === 'skill2') return `${s.damage} dmg · ${s.range} reach · ${s.cost} psi`;
   return `${s.stun}s hold · ${s.radius} radius · ${s.cost} psi`;
+};
+
+/** The knight's kit: psi skills with the tables above. */
+export const KNIGHT_KIT = {
+  ids: SKILL_IDS,
+  skills: PSI.skills,
+  tables: SKILL_TABLES,
+  summary: knightSummary,
+};
+
+/** Numbers for one knight skill at one level. */
+export function skillStats(id, level) {
+  return statsFrom(SKILL_TABLES, id, level);
+}
+
+/** One-line summary of the numbers that matter for a knight skill at a level. */
+export function skillSummary(id, level) {
+  const s = skillStats(id, level);
+  return s ? knightSummary(id, s) : '';
 }
 
 /** True on hero levels 3, 6, 9, ...: those level-ups are spent on psi skills. */
@@ -75,30 +93,40 @@ export function skillOffers(psi) {
     return {
       kind: 'skill',
       id,
-      name: PSI.skills[id].name,
+      name: psi.defs[id].name,
       from,
       to,
-      desc: skillSummary(id, to),
+      desc: psi.summaryAt(id, to),
     };
   });
 }
 
 export class Psi {
-  constructor() {
+  constructor(kit = KNIGHT_KIT) {
+    this.kit = kit;
     this.reset();
+  }
+
+  /** The hero's skill definitions (name, key, icon, description). */
+  get defs() {
+    return this.kit.skills;
   }
 
   reset() {
     this.energy = PSI.start;
-    this.cd = { skill1: 0, skill2: 0, skill3: 0 };
-    this.levels = { skill1: 1, skill2: 1, skill3: 1 };
+    this.cd = {};
+    this.levels = {};
+    for (const id of this.kit.ids) {
+      this.cd[id] = 0;
+      this.levels[id] = 1;
+    }
     this.cdMul = 1; // cooldown multiplier from passive items (quartz, hourglass), set by the game
   }
 
   /** `bonus` is extra regen per second from boons and items (hero.stats.psiRegen). */
   update(dt, bonus = 0) {
     this.energy = Math.min(PSI.max, this.energy + (PSI.regen + bonus) * dt);
-    for (const id of SKILL_IDS) this.cd[id] = Math.max(0, this.cd[id] - dt);
+    for (const id of this.kit.ids) this.cd[id] = Math.max(0, this.cd[id] - dt);
   }
 
   gain(n) {
@@ -109,9 +137,14 @@ export class Psi {
     return this.levels[id] ?? 0;
   }
 
+  /** Numbers for a skill at a given level. */
+  statsAt(id, level) {
+    return statsFrom(this.kit.tables, id, level);
+  }
+
   /** Current numbers for a skill (its level decides them). */
   stats(id) {
-    return skillStats(id, this.level(id));
+    return this.statsAt(id, this.level(id));
   }
 
   costOf(id) {
@@ -128,7 +161,7 @@ export class Psi {
   }
 
   upgradeOptions() {
-    return SKILL_IDS.filter((id) => this.canUpgrade(id));
+    return this.kit.ids.filter((id) => this.canUpgrade(id));
   }
 
   /** Raises a skill one level. Returns false if it is unknown or already at the cap. */
@@ -139,7 +172,7 @@ export class Psi {
   }
 
   canCast(id) {
-    if (!PSI.skills[id]) return false;
+    if (!this.kit.skills[id]) return false;
     return this.cd[id] <= 0 && this.energy >= this.costOf(id);
   }
 
@@ -151,26 +184,22 @@ export class Psi {
     return true;
   }
 
-  /** Same shape as BerserkAbilities, so the HUD and the stats panel can read either. */
-  get defs() {
-    return PSI.skills;
-  }
-
-  get noEnergy() {
-    return false;
-  }
-
   costLabel(id) {
     return String(this.costOf(id));
   }
 
   summary(id) {
-    return skillSummary(id, this.level(id));
+    return this.summaryAt(id, this.level(id));
+  }
+
+  summaryAt(id, level) {
+    const s = this.statsAt(id, level);
+    return s ? this.kit.summary(id, s) : '';
   }
 
   /** 0 = ready, 1 = just cast. */
   cooldownFrac(id) {
-    if (!PSI.skills[id]) return 0;
+    if (!this.kit.skills[id]) return 0;
     const cd = this.cooldownOf(id);
     return cd > 0 ? Math.min(1, this.cd[id] / cd) : 0;
   }

@@ -18,7 +18,7 @@ import { Inventory, ITEMS, SHOP_STOCK, buy, sell, trade, makeStock, chapterLoot,
 import { qualifies, addScore, cleanName } from '../sim/highscores.js';
 import { runSetup, MODES, CHARACTERS, DEFAULT_CHARACTER } from '../sim/modes.js';
 import { captureCheckpoint } from '../sim/checkpoint.js';
-import { BerserkAbilities, WHIRL, STEED, BERSERK } from '../sim/berserker.js';
+import { BerserkAbilities, STEED, BERSERK } from '../sim/berserker.js';
 import { createRng, seedCode } from '../util/rng.js';
 import { buildWorld } from '../render/worldModel.js';
 import { buildMerchant } from '../render/merchantModel.js';
@@ -596,11 +596,12 @@ export class Game {
     const s = h.stats;
     const psi = this.psi;
     return {
+      title: CHARACTERS.find((c) => c.id === this.runCharacter)?.name ?? 'Knight',
       character: [
         ['Level', String(h.level)],
         ['Experience', `${Math.floor(h.xp)} / ${h.xpNext}`],
         ['Health', `${Math.ceil(h.hp)} / ${s.maxHp}`],
-        ...(psi.noEnergy ? [] : [['Psi energy', `${Math.floor(psi.energy)} / ${PSI.max}`]]),
+        ['Psi energy', `${Math.floor(psi.energy)} / ${PSI.max}`],
         ['Sword damage', String(Math.round(s.damage))],
         ['Swing reach', s.reach.toFixed(2)],
         ['Swing arc', `${Math.round((s.arc * 180) / Math.PI)}°`],
@@ -613,7 +614,7 @@ export class Game {
       ],
       skills: SKILL_IDS.map((id) => ({
         name: psi.defs[id].name,
-        level: psi.noEnergy ? 'Lv 1 / 1' : `Lv ${psi.level(id)} / ${PSI.maxLevel}`,
+        level: `Lv ${psi.level(id)} / ${PSI.maxLevel}`,
         desc: psi.summary(id),
       })),
       run: [
@@ -1324,13 +1325,13 @@ export class Game {
 
   // ---- berserker abilities ----------------------------------------------------------
   berserkMul() {
-    return this.hero.berserk ? BERSERK.damageMul : 1;
+    return this.hero.berserk ? this.psi.stats('skill3').damageMul : 1;
   }
 
   berserkerSkill(id) {
     const h = this.hero;
     if (id === 'skill1') this.frostWhirl();
-    else if (id === 'skill2') this.steed.update(0, h, 0); // the steed trots in this frame
+    else if (id === 'skill2') this.steed.update(0, h, 0, this.psi.stats('skill2')); // the steed trots in this frame
     else if (id === 'skill3') {
       h.berserk = true;
       this.juice.burst(h.x, 1, h.z, 0xff4a4a, 26, 1.6);
@@ -1342,8 +1343,8 @@ export class Game {
   /** Q: a full sword spin around the hero. Frost damage and knockback to everything close by. */
   frostWhirl() {
     const h = this.hero;
-    const { radius, knock, damageMul } = WHIRL;
-    const damage = h.stats.damage * this.passive.damageMul * damageMul * this.berserkMul();
+    const { radius, knock, damage: base } = this.psi.stats('skill1');
+    const damage = base * this.passive.damageMul * this.berserkMul();
     this.juice.ring(h.x, 0.12, h.z, radius, FROST_CORE, 0.6, 1.4);
     this.juice.ring(h.x, 0.14, h.z, radius * 0.5, FROST_GLOW, 0.4, 1);
     this.juice.disk(h.x, 0.05, h.z, radius, FROST_DEEP, 0.4, 'burst', 0.5);
@@ -1366,9 +1367,9 @@ export class Game {
   updateBerserker(dt) {
     const h = this.hero;
     const dead = h.dead;
-    this.steed.update(dt, h, dead ? null : this.psi.elapsed('skill2'));
+    this.steed.update(dt, h, dead ? null : this.psi.elapsed('skill2'), this.psi.stats('skill2'));
     h.berserk = !dead && this.psi.elapsed('skill3') !== null;
-    if (h.berserk) h.hp = Math.max(BERSERK.floorHp, h.hp - BERSERK.drainPerSec * dt);
+    if (h.berserk) h.hp = Math.max(BERSERK.floorHp, h.hp - this.psi.stats('skill3').drain * dt);
     if (h.berserk) {
       this.ui.setVision(this.screenOf(h.x, h.y + 1, h.z));
     } else {
@@ -1388,7 +1389,8 @@ export class Game {
     const h = this.hero;
     const speed = Math.hypot(h.vx, h.vz);
     if (!this.steed.riding || speed < STEED.minSpeed) return;
-    const damage = (STEED.trampleBase + speed * STEED.trampleSpeed) * this.passive.damageMul * this.berserkMul();
+    const s = this.psi.stats('skill2');
+    const damage = (s.trample + speed * s.tramplePerSpeed) * this.passive.damageMul * this.berserkMul();
     for (const e of this.enemies.targets()) {
       const dx = e.x - h.x;
       const dz = e.z - h.z;

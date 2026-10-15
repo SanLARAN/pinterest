@@ -1147,25 +1147,21 @@ body.is-touch .skills { display: none; }
 /* ---------- TAB panel: knight sheet and world map ---------- */
 .stats-panel {
   position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
+  inset: 0;
   z-index: 30;
-  width: min(900px, 94vw);
-  max-height: 88vh;
-  overflow: auto;
+  box-sizing: border-box;
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-  padding: 16px 18px 12px;
-  color: var(--ink);
-  background: linear-gradient(180deg, var(--parch) 0%, var(--parch-2) 100%);
-  border: 3px solid var(--ink);
-  border-radius: 16px;
-  box-shadow: 0 6px 0 var(--ink), 0 0 0 4px rgba(239, 220, 174, .35);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); /* character on the left, map on the right */
+  align-content: start;
+  gap: 28px;
+  padding: 8vh 5vw;
+  overflow: auto;
+  color: #f4ead2;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, .85);
+  background: rgba(10, 6, 18, .4); /* a light dim over the game, no card behind the panel */
   pointer-events: none;
 }
-.stats-panel .panel-title.small { font-size: 22px; margin: 0 0 6px; text-align: left; }
+.stats-panel .panel-title.small { font-size: 22px; margin: 0 0 6px; text-align: left; color: #f4ead2; }
 .stats-col { min-width: 0; }
 .stats-sub { margin: 10px 0 4px; font: 700 14px var(--display); letter-spacing: .04em; }
 .stat-list {
@@ -1183,12 +1179,11 @@ body.is-touch .skills { display: none; }
   grid-template-columns: 1fr auto;
   gap: 0 8px;
   padding: 6px 8px;
-  border: 2px solid var(--ink);
-  border-radius: 10px;
-  background: rgba(255, 255, 255, .35);
+  border-left: 3px solid rgba(244, 234, 210, .6);
+  background: none;
 }
 .stat-skill b { font: 700 13px var(--display); }
-.stat-skill span { font: 800 12px var(--body); color: #6a3fd1; }
+.stat-skill span { font: 800 12px var(--body); color: #d9c2ff; }
 .stat-skill small { grid-column: 1 / -1; font: 600 12px var(--body); opacity: .85; }
 .stat-items { margin: 0; font: 600 13px/1.4 var(--body); }
 .map-col { display: flex; flex-direction: column; align-items: center; }
@@ -1257,3 +1252,6 @@ body.is-touch .skills { display: none; }
   z-index: 1;
   transition: opacity 0.15s ease;
 }
+
+/* TAB open: only the character and map panel shows, the rest of the HUD steps aside */
+.hud.stats-on > :not(.stats-panel) { visibility: hidden; }

@@ -2,8 +2,9 @@
 // Writes to the DOM only when a value changes, keeping the per-frame cost tiny.
 import { cleanName, DEFAULT_NAME } from '../sim/highscores.js';
 import { MODES, TABLE_LABELS, CHARACTERS } from '../sim/modes.js';
-import { PSI, SKILL_IDS, SKILL_TABLES } from '../sim/psi.js';
-import { skillDefsFor } from '../sim/modes.js';
+import { PSI, SKILL_IDS } from '../sim/psi.js';
+import { kitFor } from '../sim/modes.js';
+import { statsFrom } from '../sim/psi.js';
 import { HeroPortrait } from './heroPortrait.js';
 import { ITEMS, INV_SLOTS, sellPrice } from '../sim/items.js';
 import { loadTranslucency, loadCheckpoints } from '../core/storage.js';
@@ -221,11 +222,10 @@ export class UI {
     $('heroBlurb').textContent = hero.blurb;
     this.heroId = hero.id;
     const moves = hero.moves.map((m) => `<li><kbd>${m.key}</kbd><b>${m.name}</b><span>${m.desc}</span></li>`);
-    const defs = skillDefsFor(hero.id);
+    const kit = kitFor(hero.id);
     const skills = hero.skills.map((sid) => {
-      const s = defs[sid];
-      const t = SKILL_TABLES[sid];
-      const meta = s.meta ?? `${t.cost[0]} energy · ${t.cooldown[0]}s`;
+      const s = kit.skills[sid];
+      const meta = kit.summary(sid, statsFrom(kit.tables, sid, 1));
       return `<li><kbd>${s.key}</kbd><b>${s.name}</b><span>${s.desc}</span><em>${meta}</em></li>`;
     });
     $('abilityList').innerHTML = [...moves, ...skills].join('');
@@ -410,21 +410,14 @@ export class UI {
    */
   setPsi(psi) {
     if (!psi) return;
-    const noEnergy = !!psi.noEnergy;
-    if (this.cache.noEnergy !== noEnergy) {
-      this.cache.noEnergy = noEnergy;
-      $('psiBar').style.display = noEnergy ? 'none' : '';
-    }
-    if (!noEnergy) {
-      this.setStyle('psiFill', 'width', `${((psi.energy / PSI.max) * 100).toFixed(1)}%`);
-      this.setText('psiText', `${Math.floor(psi.energy)}`);
-    }
+    this.setStyle('psiFill', 'width', `${((psi.energy / PSI.max) * 100).toFixed(1)}%`);
+    this.setText('psiText', `${Math.floor(psi.energy)}`);
     const defs = psi.defs ?? PSI.skills;
     for (const id of SKILL_IDS) {
       const frac = psi.cooldownFrac(id);
       const state = psi.canCast(id) ? 'ready' : frac > 0 ? 'cd' : 'low';
       const cost = psi.costLabel(id);
-      const lv = noEnergy ? 'Lv 1' : `Lv ${psi.level(id)}`;
+      const lv = `Lv ${psi.level(id)}`;
       const name = defs[id].name;
       const icon = defs[id].icon;
       const short = defs[id].short ?? KNIGHT_SHORT[id];
@@ -788,6 +781,7 @@ export class UI {
     const el = $('statsPanel');
     if (el.classList.contains('hidden') === !open) return;
     el.classList.toggle('hidden', !open);
+    $('hud').classList.toggle('stats-on', open); // the panel is inside the HUD: hide the other HUD parts
   }
 
   setStats(s) {
@@ -795,6 +789,7 @@ export class UI {
     if (this.cache.stats === key) return;
     this.cache.stats = key;
     const rows = (list) => list.map(([k, v]) => `<dt>${escapeHtml(k)}</dt><dd>${escapeHtml(v)}</dd>`).join('');
+    $('statsTitle').textContent = s.title;
     $('statsCharacter').innerHTML = rows(s.character);
     $('statsRun').innerHTML = rows(s.run);
     $('statsSkills').innerHTML = s.skills

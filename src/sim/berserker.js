@@ -1,6 +1,8 @@
-// The berserker: a long-haired ash-grey knight with a massive frost blade.
-// His three abilities are not psi: they have no energy cost, and cooldown items do not touch them.
-// Pure logic (no rendering), so it runs under node:test.
+// The berserker: a long-haired ash-grey knight with a frost blade.
+// His three abilities cost psi energy and level up like the knight's (see psi.js). Only the
+// steed and berserk run on timers: a ride lasts `duration` seconds and the steed's cooldown
+// starts when the ride ends. Pure logic (no rendering), so it runs under node:test.
+import { Psi, statsFrom } from './psi.js';
 
 export const BERSERKER_SKILLS = {
   skill1: {
@@ -10,8 +12,6 @@ export const BERSERKER_SKILLS = {
     short: 'WHIRL',
     icon: 'whirl',
     desc: 'A full sword spin around you: heavy frost damage and knockback',
-    meta: '4s cooldown',
-    cooldown: 4,
   },
   skill2: {
     id: 'skill2',
@@ -19,10 +19,7 @@ export const BERSERKER_SKILLS = {
     name: 'Summon Steed',
     short: 'STEED',
     icon: 'steed',
-    desc: 'Leap onto a steed for 30 s. Much faster, tramples foes for damage that grows with speed. No attacks while riding. The cooldown starts only when the ride ends',
-    meta: '30s ride · 150s cooldown after',
-    duration: 30,
-    cooldown: 150,
+    desc: 'Leap onto a steed for a timed ride: faster than on foot, tramples foes for damage that grows with speed. No attacks while riding. The cooldown starts only when the ride ends',
   },
   skill3: {
     id: 'skill3',
@@ -30,21 +27,39 @@ export const BERSERKER_SKILLS = {
     name: 'Berserk',
     short: 'BERSERK',
     icon: 'berserk',
-    desc: 'For 7 s: more damage, but you lose HP every second. You cannot die while it lasts (1 HP minimum), and your sight shrinks',
-    meta: '7s · 35s cooldown',
-    duration: 7,
-    cooldown: 35,
+    desc: 'More damage, but you lose HP every second. You cannot die while it lasts (1 HP minimum), and your sight shrinks',
   },
 };
 
-/** Whirl: multiplier on the sword damage, radius and knockback. */
-export const WHIRL = { damageMul: 1.3, radius: 3.3, knock: 7 };
+// Per-level tables, index 0 is level 1. Level 1 matches the base numbers: 4 s whirl cooldown,
+// 30 s ride with a 150 s cooldown, 7 s berserk with a 35 s cooldown.
+export const BERSERKER_TABLES = {
+  skill1: { // Frost Whirl
+    cost: [30, 29, 28, 27, 26, 25],
+    cooldown: [4.0, 3.8, 3.6, 3.4, 3.2, 3.0],
+    damage: [28, 34, 41, 49, 57, 66],
+    radius: [3.3, 3.45, 3.6, 3.75, 3.9, 4.05],
+    knock: [7, 8, 9, 10, 11, 12],
+  },
+  skill2: { // Summon Steed
+    cost: [40, 38, 36, 34, 32, 30],
+    cooldown: [150, 150, 150, 150, 150, 150], // starts when the ride ends
+    duration: [30, 32, 34, 36, 38, 40],
+    speed: [1.4, 1.43, 1.46, 1.49, 1.52, 1.55], // multiplier on the knight's walking speed
+    trample: [6, 7, 8, 9, 10, 11], // base trample damage
+    tramplePerSpeed: [1.0, 1.1, 1.2, 1.3, 1.4, 1.5], // extra damage per unit of speed
+  },
+  skill3: { // Berserk
+    cost: [45, 43, 41, 39, 37, 35],
+    cooldown: [35, 35, 35, 35, 35, 35], // starts on cast
+    duration: [7, 7.5, 8, 8.5, 9, 9.5],
+    damageMul: [1.35, 1.4, 1.45, 1.5, 1.55, 1.6],
+    drain: [5, 4.6, 4.2, 3.8, 3.4, 3.0], // HP lost per second
+  },
+};
 
-/** Steed: speed multiplier, trample damage (base + speed * k), per-foe tick and reach. */
+/** Ride timing and the steed's fixed rules (its speed, damage and duration come from the level). */
 export const STEED = {
-  speedMul: 1.9,
-  trampleBase: 6,
-  trampleSpeed: 1.4,
   tickEvery: 0.4, // seconds between trample hits on the same foe
   knock: 5,
   reach: 1.25,
@@ -53,37 +68,46 @@ export const STEED = {
   dismountTime: 0.5, // seconds for the jump off at the end
 };
 
-/** Berserk: damage multiplier, HP lost per second, and the HP it never goes below. */
-export const BERSERK = { damageMul: 1.35, drainPerSec: 5, floorHp: 1 };
+/** Berserk never drops the hero below this many HP. */
+export const BERSERK = { floorHp: 1 };
 
-const IDS = ['skill1', 'skill2', 'skill3'];
+const summary = (id, s) => {
+  if (id === 'skill1') return `${s.damage} dmg · ${s.radius} radius · ${s.cost} psi`;
+  if (id === 'skill2') return `${s.duration}s ride · ${s.speed}x speed · ${s.cost} psi · ${s.cooldown}s cooldown after`;
+  return `${s.duration}s · +${Math.round((s.damageMul - 1) * 100)}% damage · -${s.drain} HP/s · ${s.cost} psi`;
+};
 
-export class BerserkAbilities {
+export const BERSERKER_KIT = {
+  ids: ['skill1', 'skill2', 'skill3'],
+  skills: BERSERKER_SKILLS,
+  tables: BERSERKER_TABLES,
+  summary,
+};
+
+const TIMED = ['skill2', 'skill3'];
+
+export class BerserkAbilities extends Psi {
   constructor() {
-    this.noEnergy = true; // the HUD hides the psi energy bar
-    this.defs = BERSERKER_SKILLS;
-    this.energy = 0;
-    this.cdMul = 1; // cooldown items do not apply to these abilities
-    this.reset();
+    super(BERSERKER_KIT);
   }
 
   reset() {
-    this.cd = { skill1: 0, skill2: 0, skill3: 0 };
+    super.reset();
     this.active = { skill2: 0, skill3: 0 }; // seconds left in the ride and in berserk
-    this.energy = 0;
+    this.total = { skill2: 0, skill3: 0 }; // their full length, for elapsed()
   }
 
-  /** Counts cooldowns and active times down. Returns the ids whose active time just ended. */
-  update(dt) {
+  /** Counts cooldowns and timers down. Returns the ids whose timer just ran out. */
+  update(dt, bonus = 0) {
+    super.update(dt, bonus);
     const ended = [];
-    for (const id of IDS) this.cd[id] = Math.max(0, this.cd[id] - dt);
-    for (const id of ['skill2', 'skill3']) {
+    for (const id of TIMED) {
       if (this.active[id] <= 0) continue;
       this.active[id] = Math.max(0, this.active[id] - dt);
       if (this.active[id] === 0) {
         ended.push(id);
         // the steed's cooldown starts only when the ride ends
-        if (id === 'skill2') this.cd.skill2 = BERSERKER_SKILLS.skill2.cooldown;
+        if (id === 'skill2') this.cd.skill2 = this.cooldownOf('skill2');
       }
     }
     return ended;
@@ -92,76 +116,37 @@ export class BerserkAbilities {
   /** Seconds since the ride or berserk started, or null if it is not active. */
   elapsed(id) {
     if (!(this.active[id] > 0)) return null;
-    return BERSERKER_SKILLS[id].duration - this.active[id];
-  }
-
-  gain() {
-    // no energy to gain: kills restore nothing here
-  }
-
-  level() {
-    return 1;
-  }
-
-  stats() {
-    return null;
-  }
-
-  costOf() {
-    return 0;
-  }
-
-  cooldownOf(id) {
-    return BERSERKER_SKILLS[id]?.cooldown ?? 0;
-  }
-
-  canUpgrade() {
-    return false;
-  }
-
-  upgradeOptions() {
-    return []; // psi upgrades do not apply to this hero
-  }
-
-  upgrade() {
-    return false;
+    return this.total[id] - this.active[id];
   }
 
   canCast(id) {
-    if (!BERSERKER_SKILLS[id]) return false;
-    if (this.cd[id] > 0) return false;
-    if (id in this.active && this.active[id] > 0) return false;
-    return true;
+    if (this.active[id] > 0) return false;
+    return super.canCast(id);
   }
 
-  /** Starts the ability. Returns false if it is not ready. */
+  /** Spends psi and starts the ability. Returns false if it is not ready. */
   cast(id) {
     if (!this.canCast(id)) return false;
-    if (id === 'skill1') this.cd.skill1 = BERSERKER_SKILLS.skill1.cooldown;
-    if (id === 'skill2') this.active.skill2 = BERSERKER_SKILLS.skill2.duration;
+    const s = this.stats(id);
+    this.energy -= s.cost;
+    if (id === 'skill1') this.cd.skill1 = this.cooldownOf('skill1');
+    if (id === 'skill2') this.active.skill2 = this.total.skill2 = s.duration;
     if (id === 'skill3') {
-      this.active.skill3 = BERSERKER_SKILLS.skill3.duration;
-      this.cd.skill3 = BERSERKER_SKILLS.skill3.cooldown;
+      this.active.skill3 = this.total.skill3 = s.duration;
+      this.cd.skill3 = this.cooldownOf('skill3');
     }
     return true;
   }
 
-  /** 0 = ready. While a ride or berserk is running the chip reads as fully spent. */
+  /** While a ride or berserk is running the chip reads as fully spent. */
   cooldownFrac(id) {
-    if (!BERSERKER_SKILLS[id]) return 0;
-    if (id in this.active && this.active[id] > 0) return 1;
-    const cd = BERSERKER_SKILLS[id].cooldown;
-    return cd > 0 ? Math.min(1, this.cd[id] / cd) : 0;
-  }
-
-  /** Short label for the chip: how long the ability lasts, or how long its cooldown is. */
-  costLabel(id) {
-    const s = BERSERKER_SKILLS[id];
-    if (!s) return '';
-    return s.duration ? `${s.duration}s` : `${s.cooldown}s`;
-  }
-
-  summary(id) {
-    return BERSERKER_SKILLS[id]?.meta ?? '';
+    if (this.active[id] > 0) return 1;
+    return super.cooldownFrac(id);
   }
 }
+
+/** Numbers at a level, for places that read the tables directly (e.g. the ability list). */
+export function berserkerStats(id, level) {
+  return statsFrom(BERSERKER_TABLES, id, level);
+}
+
