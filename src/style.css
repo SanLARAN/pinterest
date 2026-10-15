@@ -138,7 +138,7 @@ kbd {
 .stick.on { display: block; }
 
 /* ---------- HUD ---------- */
-.hud { position: absolute; inset: 0; pointer-events: none; }
+.hud { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
 .hud-top {
   position: absolute;
   top: max(12px, env(safe-area-inset-top));
@@ -1248,3 +1248,12 @@ body.is-touch .skills { display: none; }
 .ability-list span { grid-column: 3; opacity: 0.8; font-size: 12px; }
 .ability-list em { grid-column: 3; font-style: normal; font-size: 12px; color: var(--gold-d); }
 .muted.small { font-size: 13px; }
+
+/* Berserk: a dark vignette centred on the hero (the position is set from the script) */
+.vision {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  transition: opacity 0.15s ease;
+}

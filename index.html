@@ -11,6 +11,7 @@
   <body>
     <div id="app" class="app">
       <canvas id="game" class="game-canvas"></canvas>
+      <div id="vision" class="vision" style="display:none" aria-hidden="true"></div>
       <div class="grade" aria-hidden="true"></div>
       <div id="vignette" class="vignette"></div>
       <div class="bitmap-frame" aria-hidden="true"></div>
@@ -34,7 +35,7 @@
               </div>
             </div>
             <div class="bar xp"><div class="fill" id="xpFill"></div></div>
-            <div class="bar psi" title="Psi energy">
+            <div class="bar psi" id="psiBar" title="Psi energy">
               <div class="fill" id="psiFill"></div>
               <span class="bar-text" id="psiText">60</span>
             </div>

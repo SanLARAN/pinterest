@@ -1,6 +1,8 @@
 // The chibi knight: movement, dash, swing, stats and animation.
 import { HERO_BASE, xpForLevel } from '../config.js';
 import { createHeroModel } from '../render/heroModel.js';
+import { modsFor } from '../sim/modes.js';
+import { BERSERK } from '../sim/berserker.js';
 import { dangerLevel } from '../sim/danger.js';
 import { damp, clamp, lerp, angleLerp, easeOutCubic, easeOutBack, Spring } from '../util/math.js';
 import { resolveStatic, clampToArena } from '../sim/collision.js';
@@ -14,7 +16,9 @@ export function dirFromAngle(a) {
 
 export class Hero {
   constructor(scene) {
-    this.model = createHeroModel();
+    this.scene = scene;
+    this.characterId = 'knight';
+    this.model = createHeroModel(this.characterId);
     this.model.root.rotation.order = 'YXZ';
     scene.add(this.model.root);
     this.squash = new Spring(260, 16);
@@ -23,7 +27,22 @@ export class Hero {
     this.reset(0, 7.5);
   }
 
+  /**
+   * Swaps the body and sword for another hero. The sword numbers take effect at the next reset().
+   * Returns true if the model changed.
+   */
+  useCharacter(id) {
+    if (id === this.characterId) return false;
+    this.scene.remove(this.model.root);
+    this.characterId = id;
+    this.model = createHeroModel(id);
+    this.model.root.rotation.order = 'YXZ';
+    this.scene.add(this.model.root);
+    return true;
+  }
+
   reset(x, z) {
+    const mods = modsFor(this.characterId);
     this.radius = HERO_BASE.radius;
     this.x = x;
     this.z = z;
@@ -38,10 +57,10 @@ export class Hero {
       speed: HERO_BASE.speed,
       accel: HERO_BASE.accel,
       friction: HERO_BASE.friction,
-      damage: HERO_BASE.swingDamage,
+      damage: HERO_BASE.swingDamage * mods.damageMul,
       reach: HERO_BASE.swingReach,
       arc: HERO_BASE.swingArc,
-      swingCooldown: HERO_BASE.swingCooldown,
+      swingCooldown: HERO_BASE.swingCooldown * mods.swingCooldownMul,
       dashCooldown: HERO_BASE.dashCooldown,
       magnet: HERO_BASE.magnet,
       lifesteal: HERO_BASE.lifesteal,
@@ -58,9 +77,14 @@ export class Hero {
     this.dashT = 0;
     this.dashCd = 0;
     this.dashMul = 1; // passive items shorten the dash cooldown
+    this.swingTime = HERO_BASE.swingTime * mods.swingTimeMul; // the berserker's swing is slower
     this.swingT = SWING_OUT;
     this.swingDirA = 0;
     this.swingCd = 0;
+    this.riding = false; // on the steed: no swinging, faster movement
+    this.rideH = 0; // height of the body above the ground while seated
+    this.rideMul = 1; // speed multiplier while galloping
+    this.berserk = false; // berserk: the HP floor applies
     this.swingSet.clear();
     this.sweepFrom = 0;
     this.sweepTo = 0;
@@ -95,7 +119,7 @@ export class Hero {
   /** Current sword yaw relative to the attack direction, in [-arc/2, arc/2]. */
   swingTheta() {
     const arc = this.stats.arc;
-    const p = clamp(this.swingT / HERO_BASE.swingTime, 0, 1);
+    const p = clamp(this.swingT / this.swingTime, 0, 1);
     return -arc / 2 + arc * easeOutCubic(p);
   }
 
@@ -106,7 +130,7 @@ export class Hero {
   /** Returns true if the hit landed. */
   takeHit(dmg, fromX, fromZ) {
     if (this.dead || this.invT > 0) return false;
-    this.hp = Math.max(0, this.hp - dmg);
+    this.hp = Math.max(this.berserk ? BERSERK.floorHp : 0, this.hp - dmg);
     this.invT = HERO_BASE.hurtIframes;
     this.hurtBlink = true;
     let dx = this.x - fromX;
@@ -195,7 +219,7 @@ export class Hero {
     }
 
     // ---- swing -------------------------------------------------------------
-    if (!this.swinging && this.dashT <= 0 && this.swingCd <= 0 && (this.bufAtk > 0 || input.attackHeld)) {
+    if (!this.swinging && !this.riding && this.dashT <= 0 && this.swingCd <= 0 && (this.bufAtk > 0 || input.attackHeld)) {
       const aim = input.aimActive ? input.aimAngle : (moveAng ?? this.facing);
       this.swingDirA = aim;
       this.swingT = 0;
@@ -208,7 +232,7 @@ export class Hero {
     if (this.swinging) {
       const before = this.swingTheta();
       this.swingT += dt;
-      const p = this.swingT / HERO_BASE.swingTime;
+      const p = this.swingT / this.swingTime;
       const after = this.swingTheta();
       // the blade is only "live" during the middle of the arc
       if (p > 0.08 && p < 1) {
@@ -221,7 +245,7 @@ export class Hero {
 
     // ---- movement ----------------------------------------------------------
     if (this.dashT <= 0) {
-      const sp = this.stats.speed * (this.swinging ? HERO_BASE.swingSlowdown : 1);
+      const sp = this.stats.speed * (this.swinging ? HERO_BASE.swingSlowdown : 1) * this.rideMul;
       const k = moving ? this.stats.accel : this.stats.friction;
       this.vx = damp(this.vx, mv.x * sp, k, dt);
       this.vz = damp(this.vz, mv.z * sp, k, dt);
@@ -278,7 +302,7 @@ export class Hero {
   syncModel(dt, pop = 1) {
     const M = this.model;
     const r = M.root;
-    r.position.set(this.x, this.y, this.z);
+    r.position.set(this.x, this.y + this.rideH, this.z);
     r.rotation.y = this.facing;
 
     // death: topple over facing direction
@@ -308,7 +332,7 @@ export class Hero {
 
     // sword arm
     if (this.swinging) {
-      const p = clamp(this.swingT / HERO_BASE.swingTime, 0, 1);
+      const p = clamp(this.swingT / this.swingTime, 0, 1);
       const e = easeOutCubic(p);
       M.armR.rotation.y = this.swingTheta();
       M.armR.rotation.x = lerp(-0.95, -0.12, e);

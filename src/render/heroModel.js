@@ -6,8 +6,15 @@ import { COLORS } from './palette.js';
 
 const HIP = 0.42;
 const C = COLORS.hero;
+const ASH_LIGHT = 0xc4bfd0;
+const ASH_DARK = 0x8d8799;
 
-export function createHeroModel() {
+/**
+ * variant 'knight' is Sir Pip. variant 'berserker' swaps the helmet for long ash-grey hair,
+ * darkens the cape and gives him a massive frost-blue sword.
+ */
+export function createHeroModel(variant = 'knight') {
+  const berserker = variant === 'berserker';
   const root = new THREE.Group();
   const upper = new THREE.Group(); // leans / squashes around the hips
   upper.position.y = HIP;
@@ -24,7 +31,14 @@ export function createHeroModel() {
   part(body, G.cyl(0.38, 0.38, 0.1, 8), C.gold, { y: u(0.56) });
   // faceted head and helmet (low-poly), gem crest, plume
   part(body, G.ico(0.5, 1), C.skin, { y: u(1.3) });
-  part(body, G.ico(0.57, 1), C.steel, { y: u(1.5), sy: 0.8 });
+  if (berserker) {
+    // long ash-grey hair: a cap over the crown and locks falling behind the shoulders
+    part(body, G.ico(0.56, 1), ASH_LIGHT, { y: u(1.56), z: -0.1, sy: 0.7 });
+    part(body, G.box(0.5, 0.95, 0.2), ASH_DARK, { y: u(1.08), z: -0.32 });
+    for (const s of [-1, 1]) part(body, G.box(0.14, 0.7, 0.22), ASH_LIGHT, { x: s * 0.36, y: u(1.2), z: -0.12 });
+  } else {
+    part(body, G.ico(0.57, 1), C.steel, { y: u(1.5), sy: 0.8 });
+  }
   part(body, G.box(0.62, 0.07, 0.5), C.gold, { y: u(1.44), z: 0.02 });
   part(body, G.ico(0.1, 0), C.gold, { y: u(1.72), z: 0.0 });
   part(body, G.ico(0.07, 0), C.glint, { y: u(1.98), z: 0.0 });
@@ -76,7 +90,7 @@ export function createHeroModel() {
   };
 
   // ---- cape ----------------------------------------------------------------
-  const capeMat = new THREE.MeshLambertMaterial({ color: C.cape, side: THREE.DoubleSide });
+  const capeMat = new THREE.MeshLambertMaterial({ color: berserker ? 0x3f3558 : C.cape, side: THREE.DoubleSide });
   mats.push(capeMat);
   const capeGeo = new THREE.PlaneGeometry(0.66, 0.96, 3, 4);
   capeGeo.translate(0, -0.48, 0);
@@ -118,9 +132,21 @@ export function createHeroModel() {
   part(swordAcc, G.cyl(0.035, 0.035, 0.3, 5), C.leather, { z: 0.7, rx: Math.PI / 2 });
   part(swordAcc, G.sphere(0.06, 6, 4), C.gold, { z: 0.55 });
   part(swordAcc, G.box(0.36, 0.07, 0.08), C.gold, { z: 0.86 });
-  part(swordAcc, G.box(0.1, 0.025, 1.1), C.blade, { z: 1.5 });
-  part(swordAcc, G.cone(0.05, 0.22, 4), C.blade, { z: 2.15, rx: Math.PI / 2 });
-  part(swordAcc, G.box(0.02, 0.03, 0.9), C.bladeEdge, { x: 0.05, z: 1.5 });
+  if (berserker) {
+    // massive frost blade: a wide glowing edge with a heavy crossguard; it is kept out of the
+    // flashing material list so the frost glow is never overwritten by hit flashes
+    const frostMat = new THREE.MeshLambertMaterial({ color: 0x9fe6ff, emissive: 0x2a9cff, emissiveIntensity: 0.85 });
+    const frostAcc = new GeoAccumulator();
+    part(frostAcc, G.box(0.3, 0.08, 1.35), 0xbfefff, { z: 1.6 });
+    part(frostAcc, G.box(0.06, 0.1, 1.3), 0xe8fbff, { x: 0.13, z: 1.6 });
+    part(frostAcc, G.cone(0.15, 0.4, 4), 0xbfefff, { z: 2.5, rx: Math.PI / 2 });
+    armR.add(new THREE.Mesh(frostAcc.build(), frostMat));
+    part(swordAcc, G.box(0.7, 0.14, 0.12), C.gold, { z: 0.95 });
+  } else {
+    part(swordAcc, G.box(0.1, 0.025, 1.1), C.blade, { z: 1.5 });
+    part(swordAcc, G.cone(0.05, 0.22, 4), C.blade, { z: 2.15, rx: Math.PI / 2 });
+    part(swordAcc, G.box(0.02, 0.03, 0.9), C.bladeEdge, { x: 0.05, z: 1.5 });
+  }
   armR.add(new THREE.Mesh(swordAcc.build(), bodyMat));
 
   const armL = new THREE.Group();

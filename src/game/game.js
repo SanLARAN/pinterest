@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { FIXED_DT, MAX_STEPS_PER_FRAME, CAMERA, RENDER, WORLD } from '../config.js';
 import { buildLayout, HALF, SIZE, BASE, GATE_BOSSES } from '../sim/layout.js';
 import { FlowField } from '../sim/nav.js';
-import { Psi, PSI, SKILL_IDS, skillOffers, isSkillLevel, skillSummary } from '../sim/psi.js';
+import { Psi, PSI, SKILL_IDS, skillOffers, isSkillLevel } from '../sim/psi.js';
 import { dangerLevel } from '../sim/danger.js';
 import { removeStaticKind } from '../sim/collision.js';
 import { drawWorldMap } from '../ui/map.js';
@@ -18,6 +18,7 @@ import { Inventory, ITEMS, SHOP_STOCK, buy, sell, trade, makeStock, chapterLoot,
 import { qualifies, addScore, cleanName } from '../sim/highscores.js';
 import { runSetup, MODES, CHARACTERS, DEFAULT_CHARACTER } from '../sim/modes.js';
 import { captureCheckpoint } from '../sim/checkpoint.js';
+import { BerserkAbilities, WHIRL, STEED, BERSERK } from '../sim/berserker.js';
 import { createRng, seedCode } from '../util/rng.js';
 import { buildWorld } from '../render/worldModel.js';
 import { buildMerchant } from '../render/merchantModel.js';
@@ -29,6 +30,7 @@ import { bitmapUniforms, bandedSkyTexture } from '../render/bitmap.js';
 import { ShadowPool } from '../render/pools.js';
 import { clamp, damp, wrapAngle } from '../util/math.js';
 import { Hero } from './hero.js';
+import { Steed } from './steed.js';
 import { EnemyManager } from './enemies.js';
 import { Pickups } from './pickups.js';
 import { Arrows } from './projectiles.js';
@@ -47,6 +49,10 @@ const FOG_COLOR = 0x191330; // dark indigo haze
 const PSI_CORE = COLORS.psi.core;
 const PSI_GLOW = COLORS.psi.glow;
 const PSI_DEEP = COLORS.psi.deep;
+// the berserker's frost blade
+const FROST_CORE = 0x9fe6ff;
+const FROST_GLOW = 0xe6f9ff;
+const FROST_DEEP = 0x2c6fa8;
 const SLASH_FADE = 0.2;
 const DEATH_REAL_TIME = 1.8; // seconds of slow-motion before the game-over screen
 const CHECKPOINT_IFRAMES = 2; // seconds of invulnerability after rising at a checkpoint
@@ -82,6 +88,8 @@ export class Game {
     this.selectedMode = loadMode(); // chosen on the title screen; takes effect at the next run
     this.selectedCharacter = CHARACTERS.some((c) => c.id === loadCharacter()) ? loadCharacter() : DEFAULT_CHARACTER;
     this.runMode = 'story'; // mode of the run in progress
+    this.runCharacter = DEFAULT_CHARACTER; // hero of the run in progress (only endless can pick another)
+    this.trampled = new WeakMap(); // enemy -> simT of its last trample hit
     this.runCheckpoints = false; // checkpoints in the run in progress (story only)
     this.runTable = 'classic'; // high-score table of the run in progress
     this.checkpoint = null; // last boss snapshot in checkpoint mode
@@ -150,6 +158,7 @@ export class Game {
     this.heroShadows = new ShadowPool(this.scene, 2);
     this.hero = new Hero(this.scene);
     this.enableShadows(this.hero.model.root);
+    this.steed = new Steed(this.scene);
     this.enemies = new EnemyManager(this.scene, this.shadows);
     this.pickups = new Pickups(this.scene);
     this.arrows = new Arrows(this.scene);
@@ -388,8 +397,10 @@ export class Game {
     this.comboTick = 0;
     this.simT = 0;
     this.slash.visible = false;
+    this.psi = this.runCharacter === 'berserker' ? new BerserkAbilities() : new Psi();
     this.psi.reset();
     this.skillReq.clear();
+    this.ui.setVision(null);
     this.clearLances();
     this.inv.reset();
     this.stock = makeStock(this.rng, SHOP_STOCK);
@@ -410,8 +421,10 @@ export class Game {
     this.finale = null;
     this.fog.color.setHex(FOG_COLOR);
     this.ui.setDawn(0);
+    if (this.hero.useCharacter(this.runCharacter)) this.enableShadows(this.hero.model.root);
     this.hero.reset(this.layout.start.x, this.layout.start.z);
     this.hero.model.root.visible = true;
+    this.steed.stop(this.hero);
     this.enemyCtx.hero = this.hero;
     this.flow.goal = -1;
     this.flow.setGoal(this.hero.x, this.hero.z);
@@ -456,6 +469,7 @@ export class Game {
   adoptMode() {
     const s = runSetup(this.selectedMode, this.checkpointsOn);
     this.runMode = s.mode;
+    this.runCharacter = s.mode === 'endless' ? this.selectedCharacter : DEFAULT_CHARACTER;
     this.runCheckpoints = s.checkpoints;
     this.runTable = s.table;
     this.list = loadScores(s.table);
@@ -479,6 +493,7 @@ export class Game {
     if (!CHARACTERS.some((c) => c.id === id)) return;
     this.selectedCharacter = id;
     saveCharacter(id);
+    if (this.state === 'menu') this.refreshStart();
   }
 
   setCheckpoints(on) {
@@ -585,7 +600,7 @@ export class Game {
         ['Level', String(h.level)],
         ['Experience', `${Math.floor(h.xp)} / ${h.xpNext}`],
         ['Health', `${Math.ceil(h.hp)} / ${s.maxHp}`],
-        ['Psi energy', `${Math.floor(psi.energy)} / ${PSI.max}`],
+        ...(psi.noEnergy ? [] : [['Psi energy', `${Math.floor(psi.energy)} / ${PSI.max}`]]),
         ['Sword damage', String(Math.round(s.damage))],
         ['Swing reach', s.reach.toFixed(2)],
         ['Swing arc', `${Math.round((s.arc * 180) / Math.PI)}°`],
@@ -597,9 +612,9 @@ export class Game {
         ['Psi regen', `${(PSI.regen + s.psiRegen).toFixed(1)} / s`],
       ],
       skills: SKILL_IDS.map((id) => ({
-        name: PSI.skills[id].name,
-        level: `Lv ${psi.level(id)} / ${PSI.maxLevel}`,
-        desc: skillSummary(id, psi.level(id)),
+        name: psi.defs[id].name,
+        level: psi.noEnergy ? 'Lv 1 / 1' : `Lv ${psi.level(id)} / ${PSI.maxLevel}`,
+        desc: psi.summary(id),
       })),
       run: [
         ['Wave', String(this.director.wave)],
@@ -1046,12 +1061,14 @@ export class Game {
   heroDown() {
     const h = this.hero;
     h.die();
+    this.steed.stop(h);
     this.deathReal = 0;
     this.hitstop = Math.max(this.hitstop, 0.12);
     this.juice.addTrauma(1);
     this.juice.burst(h.x, 0.8, h.z, 0xffe0a0, 26, 1.6);
     this.juice.ring(h.x, 0.1, h.z, 3.2, 0xff5a4a, 0.8, 1.2);
-    this.ui.banner('Fallen', 'Sir Pip has fallen', 'The Hollow King laughs in the dark...', 1.8);
+    const name = CHARACTERS.find((c) => c.id === this.runCharacter)?.name ?? 'Sir Pip';
+    this.ui.banner('Fallen', `${name} has fallen`, 'The Hollow King laughs in the dark...', 1.8);
   }
 
   resolveSwing() {
@@ -1070,7 +1087,7 @@ export class Game {
       const halfW = d > e.radius ? Math.asin(Math.min(1, e.radius / d)) : Math.PI / 2;
       if (ang + halfW < lo || ang - halfW > hi) continue;
       h.swingSet.add(e.id);
-      this.hitEnemy(e, h.stats.damage * this.passive.damageMul, d > 1e-4 ? dx / d : 0, d > 1e-4 ? dz / d : 0);
+      this.hitEnemy(e, h.stats.damage * this.passive.damageMul * this.berserkMul(), d > 1e-4 ? dx / d : 0, d > 1e-4 ? dz / d : 0);
     }
     // the throne (once the gates are open) is a target too: one hit per swing
     if (this.gatesOpen && this.throneHp > 0 && !h.swingSet.has('throne')) {
@@ -1297,11 +1314,92 @@ export class Game {
       }
       return;
     }
-    if (id === 'skill1') this.psiBurst();
+    if (this.runCharacter === 'berserker') this.berserkerSkill(id);
+    else if (id === 'skill1') this.psiBurst();
     else if (id === 'skill2') this.psiLance();
     else if (id === 'skill3') this.psiPull();
     this.ui.flashSkill(id);
-    this.juice.text(PSI.skills[id].name, 'psi', h.x, h.y + 2.6, h.z);
+    this.juice.text(this.psi.defs[id].name, 'psi', h.x, h.y + 2.6, h.z);
+  }
+
+  // ---- berserker abilities ----------------------------------------------------------
+  berserkMul() {
+    return this.hero.berserk ? BERSERK.damageMul : 1;
+  }
+
+  berserkerSkill(id) {
+    const h = this.hero;
+    if (id === 'skill1') this.frostWhirl();
+    else if (id === 'skill2') this.steed.update(0, h, 0); // the steed trots in this frame
+    else if (id === 'skill3') {
+      h.berserk = true;
+      this.juice.burst(h.x, 1, h.z, 0xff4a4a, 26, 1.6);
+      this.juice.addTrauma(0.4);
+      this.hitstop = Math.max(this.hitstop, 0.05);
+    }
+  }
+
+  /** Q: a full sword spin around the hero. Frost damage and knockback to everything close by. */
+  frostWhirl() {
+    const h = this.hero;
+    const { radius, knock, damageMul } = WHIRL;
+    const damage = h.stats.damage * this.passive.damageMul * damageMul * this.berserkMul();
+    this.juice.ring(h.x, 0.12, h.z, radius, FROST_CORE, 0.6, 1.4);
+    this.juice.ring(h.x, 0.14, h.z, radius * 0.5, FROST_GLOW, 0.4, 1);
+    this.juice.disk(h.x, 0.05, h.z, radius, FROST_DEEP, 0.4, 'burst', 0.5);
+    this.juice.burst(h.x, 0.9, h.z, FROST_CORE, 26, 1.6);
+    this.juice.addTrauma(0.35);
+    this.hitstop = Math.max(this.hitstop, 0.05);
+    for (const e of this.enemies.targets()) {
+      const dx = e.x - h.x;
+      const dz = e.z - h.z;
+      const d = Math.hypot(dx, dz);
+      if (d - e.radius > radius) continue;
+      this.hitEnemy(e, damage, d > 1e-4 ? dx / d : 0, d > 1e-4 ? dz / d : 0, { knock });
+    }
+  }
+
+  /**
+   * Per frame, before the hero moves: the steed's timeline, the berserk drain and the vision cut.
+   * The steed's ride time is the ability's remaining time, so the visuals match the cooldown.
+   */
+  updateBerserker(dt) {
+    const h = this.hero;
+    const dead = h.dead;
+    this.steed.update(dt, h, dead ? null : this.psi.elapsed('skill2'));
+    h.berserk = !dead && this.psi.elapsed('skill3') !== null;
+    if (h.berserk) h.hp = Math.max(BERSERK.floorHp, h.hp - BERSERK.drainPerSec * dt);
+    if (h.berserk) {
+      this.ui.setVision(this.screenOf(h.x, h.y + 1, h.z));
+    } else {
+      this.ui.setVision(null);
+    }
+  }
+
+  /** Screen position of a world point, in CSS pixels. */
+  screenOf(x, y, z) {
+    const v = this._proj ?? (this._proj = new THREE.Vector3());
+    v.set(x, y, z).project(this.camera);
+    return { x: (v.x * 0.5 + 0.5) * window.innerWidth, y: (-v.y * 0.5 + 0.5) * window.innerHeight };
+  }
+
+  /** The steed tramples: damage grows with speed, each foe is hit at most once per tick. */
+  trample() {
+    const h = this.hero;
+    const speed = Math.hypot(h.vx, h.vz);
+    if (!this.steed.riding || speed < STEED.minSpeed) return;
+    const damage = (STEED.trampleBase + speed * STEED.trampleSpeed) * this.passive.damageMul * this.berserkMul();
+    for (const e of this.enemies.targets()) {
+      const dx = e.x - h.x;
+      const dz = e.z - h.z;
+      const d = Math.hypot(dx, dz);
+      if (d - e.radius > h.radius + STEED.reach) continue;
+      const last = this.trampled.get(e);
+      if (last !== undefined && this.simT - last < STEED.tickEvery) continue;
+      this.trampled.set(e, this.simT);
+      this.hitEnemy(e, damage, d > 1e-4 ? dx / d : 0, d > 1e-4 ? dz / d : 0, { knock: STEED.knock });
+      this.juice.sparks(e.x, e.y + 0.4, e.z, FROST_CORE, 6, 1);
+    }
   }
 
   /** Q: radial shockwave that damages and knocks back everything close around the hero. */
@@ -1435,10 +1533,12 @@ export class Game {
     h.dashMul = this.passive.dashMul;
     this.psi.cdMul = this.passive.cdMul;
     if (!h.dead && this.passive.regen > 0) h.heal(this.passive.regen * dt);
+    if (this.runCharacter === 'berserker') this.updateBerserker(dt);
     h.update(dt, this.input, this.layout, this.heroEv);
     this.flow.setGoal(h.x, h.z);
     if (!h.dead) {
       this.resolveSwing();
+      if (this.runCharacter === 'berserker') this.trample();
       if (!this.won && !this.finale && !this.cut) this.director.update(dt, this.waveEnv);
     }
     if (this.finale && !this.won) this.updateFinale(dt);

@@ -151,6 +151,23 @@ export class Psi {
     return true;
   }
 
+  /** Same shape as BerserkAbilities, so the HUD and the stats panel can read either. */
+  get defs() {
+    return PSI.skills;
+  }
+
+  get noEnergy() {
+    return false;
+  }
+
+  costLabel(id) {
+    return String(this.costOf(id));
+  }
+
+  summary(id) {
+    return skillSummary(id, this.level(id));
+  }
+
   /** 0 = ready, 1 = just cast. */
   cooldownFrac(id) {
     if (!PSI.skills[id]) return 0;

@@ -17,7 +17,8 @@ export class HeroPortrait {
     key.position.set(3, 6, 4);
     this.scene.add(key);
 
-    this.model = createHeroModel();
+    this.id = 'knight';
+    this.model = createHeroModel(this.id);
     this.model.root.rotation.order = 'YXZ';
     this.scene.add(this.model.root);
     this.armBase = this.model.armR.rotation.x;
@@ -32,6 +33,19 @@ export class HeroPortrait {
     this.running = false;
     this.last = 0;
     this.frame = this.frame.bind(this);
+    this.pose();
+    this.renderer.render(this.scene, this.camera);
+  }
+
+  /** Shows another hero's model (the title screen's picker). */
+  setCharacter(id) {
+    if (id === this.id) return;
+    this.scene.remove(this.model.root);
+    this.id = id;
+    this.model = createHeroModel(id);
+    this.model.root.rotation.order = 'YXZ';
+    this.scene.add(this.model.root);
+    this.armBase = this.model.armR.rotation.x;
     this.pose();
     this.renderer.render(this.scene, this.camera);
   }

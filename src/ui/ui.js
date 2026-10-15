@@ -3,6 +3,7 @@
 import { cleanName, DEFAULT_NAME } from '../sim/highscores.js';
 import { MODES, TABLE_LABELS, CHARACTERS } from '../sim/modes.js';
 import { PSI, SKILL_IDS, SKILL_TABLES } from '../sim/psi.js';
+import { skillDefsFor } from '../sim/modes.js';
 import { HeroPortrait } from './heroPortrait.js';
 import { ITEMS, INV_SLOTS, sellPrice } from '../sim/items.js';
 import { loadTranslucency, loadCheckpoints } from '../core/storage.js';
@@ -22,11 +23,17 @@ const SKILL_NODES = {
 
 // Inline SVG icons for the psi skills, drawn with currentColor so CSS can tint them.
 const SKILL_ICONS = {
+  whirl: '<path d="M12 3.5a8.5 8.5 0 1 1-8.2 6.3" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M20.5 12.5l-3.4-1.2 1.4-3.1zM5 3l4 3" fill="currentColor"/><path d="M12 9v6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>',
+  steed: '<path d="M4 15c2-1 3-1 4-3l2-3h4l2-2 3 1-1 3c-1 2-2 3-4 4v3h-2v-3H9v3H7v-4c-1 0-2-.4-3-1z" fill="currentColor"/><path d="M10 6l1-3M13 6l2-3" stroke="#7fd8ff" stroke-width="1.8" stroke-linecap="round"/>',
+  berserk: '<path d="M12 3c1.8 3.2 5 5.2 5 9.2A5 5 0 0 1 7 12.2C7 8.5 9.6 7.3 12 3z" fill="currentColor"/><path d="M12 11c.8 1.6 2.4 2.5 2.4 4.4a2.4 2.4 0 0 1-4.8 0c0-1.9 1.6-2.8 2.4-4.4z" fill="#ffe9a6"/>',
   burst: '<circle cx="12" cy="12" r="3.2" fill="currentColor"/><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-dasharray="3 2.5"/><path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>',
   lance: '<path d="M3.5 20.5L15 9" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M13.2 4.2l6.6.2-.2 6.6-2.4-1.1-4.2 4.2-1.4-1.4 4.2-4.2z" fill="currentColor"/>',
   pull: '<path d="M4 5c5 0 8 3 8 7s-3 7-8 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M20 12h-7.5M15.5 9l-3 3 3 3" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>',
 };
-const skillIcon = (id) => `<svg viewBox="0 0 24 24" aria-hidden="true">${SKILL_ICONS[PSI.skills[id].icon]}</svg>`;
+const skillIcon = (id, defs = PSI.skills) => `<svg viewBox="0 0 24 24" aria-hidden="true">${SKILL_ICONS[defs[id].icon]}</svg>`;
+
+// short labels for the touch buttons (the berserker's come from its own definitions)
+const KNIGHT_SHORT = { skill1: 'BURST', skill2: 'LANCE', skill3: 'PULL' };
 
 // Inline SVG badges for boons (emoji fonts are not guaranteed on every platform).
 const BOON_ICONS = {
@@ -212,11 +219,14 @@ export class UI {
     const hero = CHARACTERS.find((c) => c.id === id) ?? CHARACTERS[0];
     $('heroPicker').querySelectorAll('[data-character]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.character === hero.id)));
     $('heroBlurb').textContent = hero.blurb;
+    this.heroId = hero.id;
     const moves = hero.moves.map((m) => `<li><kbd>${m.key}</kbd><b>${m.name}</b><span>${m.desc}</span></li>`);
+    const defs = skillDefsFor(hero.id);
     const skills = hero.skills.map((sid) => {
-      const s = PSI.skills[sid];
+      const s = defs[sid];
       const t = SKILL_TABLES[sid];
-      return `<li><kbd>${s.key}</kbd><b>${s.name}</b><span>${s.desc}</span><em>${t.cost[0]} energy · ${t.cooldown[0]}s</em></li>`;
+      const meta = s.meta ?? `${t.cost[0]} energy · ${t.cooldown[0]}s`;
+      return `<li><kbd>${s.key}</kbd><b>${s.name}</b><span>${s.desc}</span><em>${meta}</em></li>`;
     });
     $('abilityList').innerHTML = [...moves, ...skills].join('');
   }
@@ -234,6 +244,7 @@ export class UI {
         this.portraitFailed = true; // no WebGL: the block still shows the abilities
       }
     }
+    this.portrait?.setCharacter(this.heroId ?? 'knight');
     this.portrait?.start();
   }
 
@@ -393,16 +404,47 @@ export class UI {
     this.setPsi(s.psi);
   }
 
-  /** Psi energy bar plus the three skill states (ready / cooling down / short on energy). */
+  /**
+   * Psi energy bar plus the three skill states (ready / cooling down / short on energy).
+   * `psi` is the hero's ability book: a Psi, or the berserker's BerserkAbilities (no energy bar).
+   */
   setPsi(psi) {
     if (!psi) return;
-    this.setStyle('psiFill', 'width', `${((psi.energy / PSI.max) * 100).toFixed(1)}%`);
-    this.setText('psiText', `${Math.floor(psi.energy)}`);
+    const noEnergy = !!psi.noEnergy;
+    if (this.cache.noEnergy !== noEnergy) {
+      this.cache.noEnergy = noEnergy;
+      $('psiBar').style.display = noEnergy ? 'none' : '';
+    }
+    if (!noEnergy) {
+      this.setStyle('psiFill', 'width', `${((psi.energy / PSI.max) * 100).toFixed(1)}%`);
+      this.setText('psiText', `${Math.floor(psi.energy)}`);
+    }
+    const defs = psi.defs ?? PSI.skills;
     for (const id of SKILL_IDS) {
       const frac = psi.cooldownFrac(id);
       const state = psi.canCast(id) ? 'ready' : frac > 0 ? 'cd' : 'low';
-      const cost = String(psi.costOf(id));
-      const lv = `Lv ${psi.level(id)}`;
+      const cost = psi.costLabel(id);
+      const lv = noEnergy ? 'Lv 1' : `Lv ${psi.level(id)}`;
+      const name = defs[id].name;
+      const icon = defs[id].icon;
+      const short = defs[id].short ?? KNIGHT_SHORT[id];
+      if (this.cache[`name:${id}`] !== name) {
+        this.cache[`name:${id}`] = name;
+        const chip = $(SKILL_NODES[id][0]);
+        const el = chip.querySelector('.sk-name');
+        if (el) el.textContent = name;
+        const btn = $(SKILL_NODES[id][1]);
+        btn.setAttribute('aria-label', name);
+        const b = btn.querySelector('b');
+        if (b) b.textContent = short;
+      }
+      if (this.cache[`icon:${id}`] !== icon) {
+        this.cache[`icon:${id}`] = icon;
+        for (const node of SKILL_NODES[id]) {
+          const slot = $(node)?.querySelector('.sk-ico');
+          if (slot) slot.innerHTML = skillIcon(id, defs);
+        }
+      }
       for (const node of SKILL_NODES[id]) {
         const key = `state:${node}`;
         if (this.cache[key] !== state) {
@@ -600,6 +642,28 @@ export class UI {
     const label = muted ? 'Sound: Off' : 'Sound: On';
     for (const id of ['btnMuteStart', 'btnMutePause']) $(id).textContent = label;
     $('btnMuteHud').style.opacity = muted ? '0.55' : '1';
+  }
+
+  /**
+   * Berserk: a dark vignette around the hero's screen position, so his sight shrinks.
+   * `p` is {x, y} in CSS pixels, or null to clear it.
+   */
+  setVision(p) {
+    const el = $('vision');
+    if (!el) return;
+    if (!p) {
+      if (this.cache.vision !== null) {
+        this.cache.vision = null;
+        el.style.display = 'none';
+      }
+      return;
+    }
+    const r = Math.round(Math.min(window.innerWidth, window.innerHeight) * 0.2);
+    const key = `${Math.round(p.x)},${Math.round(p.y)},${r}`;
+    if (this.cache.vision === key) return;
+    this.cache.vision = key;
+    el.style.display = 'block';
+    el.style.background = `radial-gradient(circle ${r}px at ${p.x.toFixed(0)}px ${p.y.toFixed(0)}px, rgba(4,2,10,0) 0, rgba(4,2,10,0.5) ${Math.round(r * 0.55)}px, rgba(4,2,10,0.97) ${Math.round(r * 1.25)}px)`;
   }
 
   flashSkill(id) {
