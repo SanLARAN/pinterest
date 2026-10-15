@@ -2,10 +2,6 @@
 export const MAX_SCORES = 10;
 export const DEFAULT_NAME = 'KNIGHT';
 
-/** Each mode keeps its own table. The key is the mode id; see core/storage.js. */
-export const MODE_LABELS = { classic: 'Classic', checkpoint: 'Checkpoints' };
-export const modeOf = (checkpoints) => (checkpoints ? 'checkpoint' : 'classic');
-
 export function cleanName(raw) {
   const s = String(raw ?? '')
     .replace(/[\u0000-\u001f\u007f<>]/g, '')

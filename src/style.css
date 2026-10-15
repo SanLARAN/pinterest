@@ -1229,4 +1229,12 @@ body.is-touch .skills { display: none; }
 .setting input[type="range"] { width: 100%; margin-top: 8px; accent-color: var(--gold-d); cursor: pointer; }
 .setting-toggle input[type="checkbox"] { margin-top: 8px; width: 20px; height: 20px; accent-color: var(--gold-d); cursor: pointer; }
 .board-mode { margin: 6px 0 2px; text-align: center; }
+.choice-group { margin: 10px 0 4px; }
+.choice-label { display: block; font: 700 12px var(--body); color: var(--ink); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+.choice-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.choice { flex: 1 1 150px; text-align: left; padding: 8px 12px; border-radius: 10px; border: 2px solid var(--gold-d); background: rgba(255, 255, 255, 0.55); color: var(--ink); cursor: pointer; font: inherit; }
+.choice b { display: block; font: 700 16px var(--body); }
+.choice small { display: block; opacity: 0.75; font-size: 12px; }
+.choice[aria-pressed="true"] { background: var(--gold-d); color: #fff; border-color: var(--gold-d); }
+.choice[aria-pressed="true"] small { opacity: 0.9; }
 .muted.small { font-size: 13px; }

@@ -15,7 +15,8 @@ import { drawUpgrades } from '../sim/upgrades.js';
 import { PICKUPS } from '../sim/defs.js';
 import { BOSS_DEFS } from '../sim/bosses.js';
 import { Inventory, ITEMS, SHOP_STOCK, buy, sell, trade, makeStock, chapterLoot, bossLoot, applyItem, passiveTotals } from '../sim/items.js';
-import { qualifies, addScore, cleanName, modeOf } from '../sim/highscores.js';
+import { qualifies, addScore, cleanName } from '../sim/highscores.js';
+import { runSetup, MODES, CHARACTERS, DEFAULT_CHARACTER } from '../sim/modes.js';
 import { captureCheckpoint } from '../sim/checkpoint.js';
 import { createRng, seedCode } from '../util/rng.js';
 import { buildWorld } from '../render/worldModel.js';
@@ -34,7 +35,7 @@ import { Arrows } from './projectiles.js';
 import { Juice } from './juice.js';
 import { Input } from '../core/input.js';
 import { Sound } from '../core/audio.js';
-import { loadScores, saveScores, loadCheckpoints, saveCheckpoints, loadName, saveName, loadMuted, saveMuted, loadTranslucency, saveTranslucency, loadAtlasRaw, saveAtlasRaw } from '../core/storage.js';
+import { loadScores, saveScores, loadCheckpoints, saveCheckpoints, loadMode, saveMode, loadCharacter, saveCharacter, loadName, saveName, loadMuted, saveMuted, loadTranslucency, saveTranslucency, loadAtlasRaw, saveAtlasRaw } from '../core/storage.js';
 import { UI } from '../ui/ui.js';
 
 // the stall stands this far up the map from the keep, on the first reachable open cell
@@ -78,9 +79,13 @@ export class Game {
     this.input.onPointerInGame = null;
 
     this.checkpointsOn = loadCheckpoints(); // the setting; takes effect at the next run
-    this.runCheckpoints = false; // the mode of the run in progress
+    this.selectedMode = loadMode(); // chosen on the title screen; takes effect at the next run
+    this.selectedCharacter = CHARACTERS.some((c) => c.id === loadCharacter()) ? loadCharacter() : DEFAULT_CHARACTER;
+    this.runMode = 'story'; // mode of the run in progress
+    this.runCheckpoints = false; // checkpoints in the run in progress (story only)
+    this.runTable = 'classic'; // high-score table of the run in progress
     this.checkpoint = null; // last boss snapshot in checkpoint mode
-    this.list = loadScores(modeOf(this.checkpointsOn));
+    this.list = loadScores(this.runTable);
     this.pendingEntry = null;
     this.snd = {};
 
@@ -99,6 +104,8 @@ export class Game {
       onShopLeave: () => this.closeShop(),
       onTranslucency: (v) => this.setTranslucency(v),
       onCheckpoints: (on) => this.setCheckpoints(on),
+      onMode: (mode) => this.setMode(mode),
+      onCharacter: (id) => this.setCharacter(id),
       onAtlas: () => this.openAtlas(),
       onStats: () => this.onAction('stats'),
     });
@@ -244,7 +251,7 @@ export class Game {
     this.seed = newSeed();
     this.buildWorld(this.seed);
     this.hero.model.root.visible = false;
-    this.ui.showStart(this.list, this.sound.muted, this.checkpointsOn);
+    this.ui.showStart(this.list, this.sound.muted, this.startView());
     this.bindUnlock();
     this.loop = (t) => {
       this.frame(t);
@@ -365,7 +372,7 @@ export class Game {
     if (rebuild) this.buildWorld(newSeed());
     this.checkpoint = cp;
     this.rng = createRng(this.seed ^ 0x9e3779b9);
-    this.director = new WaveDirector(this.rng);
+    this.director = new WaveDirector(this.rng, this.runMode === 'endless');
     if (cp) this.director.wave = cp.wave; // nextWave below starts the wave after the slain boss
     this.score = new ScoreKeeper();
     this.enemies.clear();
@@ -440,21 +447,45 @@ export class Game {
     this.ui.toast('Rising again at the last checkpoint');
   }
 
-  /** Switches to the table of the mode chosen in settings. Only called between runs. */
+  /** The rules a run would start with right now, shown on the title screen. */
+  startView() {
+    return runSetup(this.selectedMode, this.checkpointsOn);
+  }
+
+  /** Takes the mode and table for the next run. Only called between runs. */
   adoptMode() {
-    this.runCheckpoints = this.checkpointsOn;
-    this.list = loadScores(modeOf(this.runCheckpoints));
+    const s = runSetup(this.selectedMode, this.checkpointsOn);
+    this.runMode = s.mode;
+    this.runCheckpoints = s.checkpoints;
+    this.runTable = s.table;
+    this.list = loadScores(s.table);
+  }
+
+  /** Title screen: redraw the table for the newly chosen mode. */
+  refreshStart() {
+    const view = this.startView();
+    this.list = loadScores(view.table);
+    this.ui.refreshBoard(this.list, view);
+  }
+
+  setMode(mode) {
+    if (!MODES[mode]) return;
+    this.selectedMode = mode;
+    saveMode(mode);
+    if (this.state === 'menu') this.refreshStart();
+  }
+
+  setCharacter(id) {
+    if (!CHARACTERS.some((c) => c.id === id)) return;
+    this.selectedCharacter = id;
+    saveCharacter(id);
   }
 
   setCheckpoints(on) {
     this.checkpointsOn = !!on;
     saveCheckpoints(this.checkpointsOn);
-    if (this.state === 'menu') {
-      this.adoptMode();
-      this.ui.refreshBoard(this.list, this.checkpointsOn);
-    } else {
-      this.ui.toast('Checkpoint setting applies from the next run');
-    }
+    if (this.state === 'menu') this.refreshStart();
+    else this.ui.toast('Checkpoint setting applies from the next run');
   }
 
   beginRun() {
@@ -507,7 +538,7 @@ export class Game {
     this.ui.hideLevel();
     this.ui.hideBanner();
     this.sound.stopMusic();
-    this.ui.showStart(this.list, this.sound.muted, this.checkpointsOn);
+    this.ui.showStart(this.list, this.sound.muted, this.startView());
   }
 
   togglePause(forceResume = false) {
@@ -610,6 +641,10 @@ export class Game {
     }
     if (this.gatesOpen) {
       return { text: `Shatter the Hollow King's throne · ${Math.ceil(this.throneHp)} / ${THRONE_HP}`, frac: this.throneHp / THRONE_HP };
+    }
+    if (this.runMode === 'endless') {
+      const w = this.director.wave;
+      return { text: `Endless · wave ${w} · boss in ${5 - (w % 5)}`, frac: (w % 5) / 5 };
     }
     const n = Math.min(this.bossesSlain, GATE_BOSSES);
     return { text: `Slay bosses to open the gates · ${n} / ${GATE_BOSSES}`, frac: n / GATE_BOSSES };
@@ -807,7 +842,7 @@ export class Game {
     const entry = { ...this.pendingEntry, name: clean };
     const res = addScore(this.list, entry);
     this.list = res.list;
-    saveScores(this.list, modeOf(this.runCheckpoints));
+    saveScores(this.list, this.runTable);
     saveName(clean);
     this.pendingEntry = null;
     this.ui.afterSave(clean, res.rank, this.list);
@@ -844,7 +879,7 @@ export class Game {
       won: this.won,
       name: loadName(),
       list: this.list,
-      mode: modeOf(this.runCheckpoints),
+      table: this.runTable,
       highlight: -1,
     });
   }
@@ -1168,7 +1203,8 @@ export class Game {
       this.refreshShop();
       this.throttle('restock', 1, () => this.ui.toast('The merchant restocks his stall'));
       this.bossesSlain++;
-      if (this.bossesSlain >= GATE_BOSSES) this.openGates();
+      if (this.runMode === 'endless') this.ui.toast(`Boss slain · wave ${this.director.wave} · the rift deepens`);
+      else if (this.bossesSlain >= GATE_BOSSES) this.openGates();
       else this.ui.toast(`Bosses slain ${this.bossesSlain}/${GATE_BOSSES}: the gates stay sealed`);
       if (this.runCheckpoints) {
         const h = this.hero;

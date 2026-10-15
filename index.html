@@ -129,7 +129,21 @@
               <p><strong>Emberkeep has stood for a thousand years.</strong> Tonight the Hollow King's rift opened beneath its gate, and shadows are spilling into the courtyard.</p>
               <p>You are <em>Sir Pip</em>, the last knight of the keep. Hold the walls, gather the embers, and see how long you can last.</p>
             </div>
-            <div class="start-actions">
+            <div class="choice-group">
+              <span class="choice-label">Mode</span>
+              <div class="choice-row">
+                <button class="choice" type="button" data-mode="story" aria-pressed="true"><b>Story</b><small>Six bosses, then the throne</small></button>
+                <button class="choice" type="button" data-mode="endless" aria-pressed="false"><b>Endless</b><small>One life, no end</small></button>
+              </div>
+              <p id="modeBlurb" class="muted small"></p>
+            </div>
+            <div class="choice-group">
+              <span class="choice-label">Hero</span>
+              <div class="choice-row">
+                <button class="choice" type="button" data-character="knight" aria-pressed="true"><b>Sir Pip</b><small>The last knight</small></button>
+              </div>
+            </div>
+              <div class="start-actions">
               <button id="btnStart" class="btn btn-primary" type="button">Begin the Siege <kbd>Enter</kbd></button>
               <button id="btnMuteStart" class="btn btn-ghost" type="button">Sound: On</button>
               <button id="btnSettings" class="btn btn-ghost" type="button">Settings</button>
@@ -200,10 +214,11 @@
           </label>
           <p class="muted small">0% keeps every wall solid. 100% lets them fade almost away.</p>
           <label class="setting setting-toggle" for="cpToggle">
-            <span class="setting-row"><span>Checkpoint after each boss</span><b id="cpVal">Off</b></span>
+            <span class="setting-row"><span>Checkpoint after each boss (Story)</span><b id="cpVal">Off</b></span>
             <input id="cpToggle" type="checkbox" />
           </label>
           <p class="muted small">When the knight falls, they rise again at the last boss slain, with that run's gear. Checkpoint runs have their own high-score table.</p>
+          <p id="cpSettingNote" class="muted small"></p>
           <div class="stack">
             <button id="btnSettingsBack" class="btn btn-primary" type="button">Back <kbd>Esc</kbd></button>
           </div>

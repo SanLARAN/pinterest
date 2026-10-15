@@ -17,10 +17,15 @@ export function chapterFor(n) {
   return { title: `Rift Tide ${n}`, story: 'The rift breathes harder. More shapes pour from the cracks.' };
 }
 
-export function waveSpec(n) {
+/**
+ * Wave `n`. Story caps the spawn total at 90 so the campaign has a finite length.
+ * Endless lifts that cap: the spawn total keeps growing, and so do foe health and damage.
+ * Spawn pace and the alive cap stay bounded to keep the frame time steady.
+ */
+export function waveSpec(n, endless = false) {
   const isBoss = n % 5 === 0;
   // Harder than the first cut: more foes, faster spawns, tougher foes, harder hits.
-  const total = Math.min(90, 10 + n * 4);
+  const total = endless ? 10 + n * 4 : Math.min(90, 10 + n * 4);
   const pool = [{ item: 'slime', weight: 9 }];
   if (n >= 2) pool.push({ item: 'imp', weight: 5 + n * 0.6 });
   if (n >= 2) pool.push({ item: 'archer', weight: 2 + n * 0.5 });
@@ -41,8 +46,9 @@ export function waveSpec(n) {
 }
 
 export class WaveDirector {
-  constructor(rng) {
+  constructor(rng, endless = false) {
     this.rng = rng;
+    this.endless = endless;
     this.wave = 0;
     this.phase = 'idle';
     this.timer = 0;
@@ -55,7 +61,7 @@ export class WaveDirector {
   /** Begins the next wave (called once at run start and after each clear). */
   nextWave(env) {
     this.wave += 1;
-    this.spec = waveSpec(this.wave);
+    this.spec = waveSpec(this.wave, this.endless);
     this.spawned = 0;
     this.bossSpawned = false;
     this.phase = 'intro';

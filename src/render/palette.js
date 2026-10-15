@@ -28,10 +28,15 @@ export const COLORS = {
     stone: 0x6a6378,
     stoneDark: 0x48425a,
     roof: 0x6b2a3f,
-    trunk: 0x3d2a2a,
-    leaf: 0x2e6a5a,
-    leafDark: 0x1d4a44,
-    pine: 0x1b3d3a,
+    // trees and bushes are kept well apart from the teal grass: warm canopies, blue pines, pale bark
+    trunk: 0x8a5a3a,
+    leaf: 0xd9a23e, // amber canopy
+    leafRust: 0xc4623a, // rust canopy
+    leafHi: 0xf2cc6a, // sunlit canopy highlight
+    leafDark: 0x7d8a3a, // olive bush
+    pine: 0x2f5f94,
+    pineMid: 0x3f78ad,
+    pineHi: 0x6aa6d6,
     flower: 0xb06bff,
     flowerY: 0x7ff0e0,
     iron: 0x2b2736,

@@ -108,12 +108,12 @@ function addTree(acc, p, y) {
   const m = propMatrix(p, y);
   addLocal(acc, G.cyl(0.13, 0.18, 1.0, 6), W.trunk, m, { y: 0.5 });
   if (p.v < 2) {
-    addLocal(acc, G.ico(0.72, 0), p.v === 0 ? W.leaf : 0x72bd5b, m, { y: 1.45 });
-    addLocal(acc, G.ico(0.46, 0), W.leafDark, m, { y: 2.05, x: 0.22, z: -0.1 });
+    addLocal(acc, G.ico(0.72, 0), p.v === 0 ? W.leaf : W.leafRust, m, { y: 1.45 });
+    addLocal(acc, G.ico(0.46, 0), W.leafHi, m, { y: 2.05, x: 0.22, z: -0.1 });
   } else {
     addLocal(acc, G.cone(0.78, 1.3, 6), W.pine, m, { y: 1.45 });
-    addLocal(acc, G.cone(0.56, 1.1, 6), 0x2f8c52, m, { y: 2.2 });
-    addLocal(acc, G.cone(0.34, 0.8, 6), 0x3a9a5c, m, { y: 2.8 });
+    addLocal(acc, G.cone(0.56, 1.1, 6), W.pineMid, m, { y: 2.2 });
+    addLocal(acc, G.cone(0.34, 0.8, 6), W.pineHi, m, { y: 2.8 });
   }
 }
 

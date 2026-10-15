@@ -1,6 +1,7 @@
 // DOM controller: start / pause / level-up / game-over screens and the in-game HUD.
 // Writes to the DOM only when a value changes, keeping the per-frame cost tiny.
-import { cleanName, DEFAULT_NAME, MODE_LABELS } from '../sim/highscores.js';
+import { cleanName, DEFAULT_NAME } from '../sim/highscores.js';
+import { MODES, TABLE_LABELS } from '../sim/modes.js';
 import { PSI, SKILL_IDS } from '../sim/psi.js';
 import { ITEMS, INV_SLOTS, sellPrice } from '../sim/items.js';
 import { loadTranslucency, loadCheckpoints } from '../core/storage.js';
@@ -100,6 +101,14 @@ export class UI {
       this.setCheckpointLabel(e.target.checked);
       this.a.onCheckpoints(e.target.checked);
     });
+    document.querySelectorAll('[data-mode]').forEach((b) => b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.a.onMode(b.dataset.mode);
+    }));
+    document.querySelectorAll('[data-character]').forEach((b) => b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.a.onCharacter(b.dataset.character);
+    }));
     on('btnStart', 'click', () => this.a.onStart());
     on('btnMuteStart', 'click', () => this.a.onToggleMute());
     on('btnMutePause', 'click', () => this.a.onToggleMute());
@@ -151,8 +160,9 @@ export class UI {
   }
 
   // ---- screens --------------------------------------------------------------
-  showStart(list, muted, checkpoints = loadCheckpoints()) {
-    this.refreshBoard(list, checkpoints);
+  /** `view` is runSetup(): the mode, checkpoint flag and table the next run will use. */
+  showStart(list, muted, view) {
+    this.refreshBoard(list, view);
     this.setMuted(muted);
     this.show('screenStart');
     this.hide('screenPause');
@@ -162,10 +172,20 @@ export class UI {
     this.hide('hud');
   }
 
-  /** Redraws the title table for a mode and labels which table it is. */
-  refreshBoard(list, checkpoints = loadCheckpoints()) {
+  /** Redraws the title table for the chosen mode and labels which table it is. */
+  refreshBoard(list, view) {
     this.renderBoard($('boardStart'), list);
-    $('boardModeStart').textContent = `Table: ${MODE_LABELS[checkpoints ? 'checkpoint' : 'classic']}`;
+    $('boardModeStart').textContent = `Table · ${TABLE_LABELS[view.table] ?? TABLE_LABELS.classic}`;
+    this.setChoices(view.mode);
+  }
+
+  /** Highlights the chosen mode and shows its one-line rule. */
+  setChoices(mode) {
+    document.querySelectorAll('[data-mode]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === mode)));
+    const blurb = $('modeBlurb');
+    if (blurb) blurb.textContent = MODES[mode]?.blurb ?? MODES.story.blurb;
+    const cp = $('cpSettingNote');
+    if (cp) cp.textContent = mode === 'endless' ? 'Endless has one life, so checkpoints are off in that mode.' : '';
   }
 
   setCheckpointLabel(on) {
@@ -239,7 +259,7 @@ export class UI {
     $('overLevel').textContent = String(d.level);
     $('overSeed').textContent = d.seedCode;
     $('overTitle').textContent = d.won ? 'Victory' : 'Fallen';
-    $('boardModeOver').textContent = `Table: ${MODE_LABELS[d.mode] ?? MODE_LABELS.classic}`;
+    $('boardModeOver').textContent = `Table · ${TABLE_LABELS[d.table] ?? TABLE_LABELS.classic}`;
     $('overSub').textContent = d.won
       ? (d.qualifies ? 'The throne is shattered and your name is carved in the hall.' : 'The throne is shattered. Emberkeep is free.')
       : d.qualifies

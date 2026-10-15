@@ -52,6 +52,9 @@ export const STORAGE = {
   scores: 'hollowkeep.highscores.v1', // classic mode table (kept under its original key)
   scoresCheckpoint: 'hollowkeep.highscores.checkpoint.v1', // table for runs with checkpoints
   checkpoints: 'hollowkeep.checkpoints.v1', // '1' = checkpoint after each boss, default off
+  scoresEndless: 'hollowkeep.highscores.endless.v1', // endless mode table
+  mode: 'hollowkeep.mode.v1', // last chosen mode on the title screen
+  character: 'hollowkeep.character.v1', // last chosen hero
   muted: 'hollowkeep.muted.v1',
   name: 'hollowkeep.name.v1',
   translucency: 'hollowkeep.translucency.v1',

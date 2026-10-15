@@ -18,7 +18,7 @@ function set(key, value) {
   }
 }
 
-const SCORE_KEYS = { classic: STORAGE.scores, checkpoint: STORAGE.scoresCheckpoint };
+const SCORE_KEYS = { classic: STORAGE.scores, checkpoint: STORAGE.scoresCheckpoint, endless: STORAGE.scoresEndless };
 
 /** High-score table for a mode ('classic' | 'checkpoint'). Unknown modes fall back to classic. */
 export function loadScores(mode = 'classic') {
@@ -36,6 +36,13 @@ export function saveScores(list, mode = 'classic') {
 /** Checkpoint after each boss. Off unless the player turns it on. */
 export const loadCheckpoints = () => get(STORAGE.checkpoints) === '1';
 export const saveCheckpoints = (on) => set(STORAGE.checkpoints, on ? '1' : '0');
+
+/** Last chosen mode ('story' | 'endless'). Unknown values fall back to story. */
+export const loadMode = () => (get(STORAGE.mode) === 'endless' ? 'endless' : 'story');
+export const saveMode = (mode) => set(STORAGE.mode, mode === 'endless' ? 'endless' : 'story');
+/** Last chosen hero id. Unknown values fall back to the first hero. */
+export const loadCharacter = () => get(STORAGE.character) || 'knight';
+export const saveCharacter = (id) => set(STORAGE.character, String(id));
 
 export const loadName = () => get(STORAGE.name) || '';
 export const saveName = (name) => set(STORAGE.name, name);

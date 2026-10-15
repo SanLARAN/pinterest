@@ -40,3 +40,29 @@ test('storage: checkpoints setting defaults to off and round-trips', () => {
   storage.saveCheckpoints(false);
   assert.equal(storage.loadCheckpoints(), false);
 });
+
+test('storage: endless has its own key, separate from both story tables', () => {
+  mem.clear();
+  storage.saveScores([entry(3000)], 'endless');
+  assert.equal(mem.get(STORAGE.scoresEndless), JSON.stringify([entry(3000)]));
+  assert.equal(mem.has(STORAGE.scores), false);
+  assert.equal(mem.has(STORAGE.scoresCheckpoint), false);
+  assert.equal(storage.loadScores('endless')[0].score, 3000);
+  assert.equal(storage.loadScores('classic').length, 0);
+});
+
+test('storage: mode defaults to story and round-trips, unknown values fall back', () => {
+  mem.clear();
+  assert.equal(storage.loadMode(), 'story');
+  storage.saveMode('endless');
+  assert.equal(storage.loadMode(), 'endless');
+  mem.set(STORAGE.mode, 'garbage');
+  assert.equal(storage.loadMode(), 'story');
+});
+
+test('storage: hero defaults to knight and round-trips', () => {
+  mem.clear();
+  assert.equal(storage.loadCharacter(), 'knight');
+  storage.saveCharacter('knight');
+  assert.equal(storage.loadCharacter(), 'knight');
+});
