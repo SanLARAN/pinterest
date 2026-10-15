@@ -125,7 +125,21 @@ export class UI {
     on('btnStart', 'click', () => this.a.onStart());
     on('btnMuteStart', 'click', () => this.a.onToggleMute());
     on('btnMutePause', 'click', () => this.a.onToggleMute());
-    on('btnMuteHud', 'click', () => this.a.onToggleMute());
+    on('btnMuteHud', 'click', () => {
+      this.countSoundClick();
+      this.a.onToggleMute();
+    });
+    on('btnAdmin', 'click', () => this.a.onAdminOpen());
+    on('btnAdminBack', 'click', () => {
+      this.hide('screenAdmin');
+      this.show('screenPause');
+    });
+    $('screenAdmin').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-admin]');
+      if (!b) return;
+      e.stopPropagation();
+      this.a.onAdminAction(b.dataset.admin);
+    });
     on('btnPause', 'click', () => this.a.onPause());
     on('btnResume', 'click', () => this.a.onResume());
     on('btnRestartPause', 'click', () => this.a.onRestart());
@@ -279,12 +293,36 @@ export class UI {
 
   showPause(muted) {
     this.setMuted(muted);
+    this.hide('screenAdmin');
     this.show('screenPause');
   }
 
   hidePause() {
     this.hide('screenPause');
     this.hide('screenSettings');
+    this.hide('screenAdmin');
+  }
+
+  /** Five presses of the HUD sound button within four seconds unlock the admin button in the pause menu. */
+  countSoundClick() {
+    const now = performance.now();
+    this.soundClicks = (this.soundClicks ?? []).filter((t) => now - t < 4000);
+    this.soundClicks.push(now);
+    if (this.soundClicks.length >= 5 && !this.adminUnlocked) {
+      this.adminUnlocked = true;
+      this.soundClicks = [];
+      $('btnAdmin').classList.remove('hidden');
+    }
+  }
+
+  showAdmin(status) {
+    this.hide('screenPause');
+    this.setAdminStatus(status);
+    this.show('screenAdmin');
+  }
+
+  setAdminStatus(text) {
+    $('adminStatus').textContent = text;
   }
 
   showLevel(choices, onPick, level) {

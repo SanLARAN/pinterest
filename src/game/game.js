@@ -89,6 +89,7 @@ export class Game {
     this.selectedCharacter = CHARACTERS.some((c) => c.id === loadCharacter()) ? loadCharacter() : DEFAULT_CHARACTER;
     this.runMode = 'story'; // mode of the run in progress
     this.runCharacter = DEFAULT_CHARACTER; // hero of the run in progress (only endless can pick another)
+    this.adminGod = false; // admin panel: the hero cannot be hurt
     this.trampled = new WeakMap(); // enemy -> simT of its last trample hit
     this.runCheckpoints = false; // checkpoints in the run in progress (story only)
     this.runTable = 'classic'; // high-score table of the run in progress
@@ -102,6 +103,8 @@ export class Game {
       onToggleMute: () => this.toggleMute(),
       onPause: () => this.togglePause(),
       onResume: () => this.togglePause(true),
+      onAdminOpen: () => this.ui.showAdmin(this.adminStatusText()),
+      onAdminAction: (name) => this.adminAction(name),
       onRestart: () => this.restart(),
       onQuit: () => this.toTitle(),
       onSaveName: (name) => this.saveEntry(name),
@@ -554,6 +557,27 @@ export class Game {
     this.ui.hideBanner();
     this.sound.stopMusic();
     this.ui.showStart(this.list, this.sound.muted, this.startView());
+  }
+
+  /** Admin panel actions. Only reachable from the pause menu. */
+  adminAction(name) {
+    const h = this.hero;
+    if (name === 'god') this.adminGod = !this.adminGod;
+    else if (name === 'heal') h.hp = h.stats.maxHp;
+    else if (name === 'xp') {
+      if (h.addXp(h.xpNext - h.xp)) this.pendingLevels++;
+    } else if (name === 'psi') {
+      this.psi.energy = PSI.max;
+      for (const id of Object.keys(this.psi.cd)) this.psi.cd[id] = 0;
+    } else if (name === 'skills') {
+      for (const id of SKILL_IDS) while (this.psi.upgrade(id));
+    } else if (name === 'coins') this.score.coins += 100;
+    this.ui.setAdminStatus(this.adminStatusText());
+  }
+
+  adminStatusText() {
+    const h = this.hero;
+    return `God mode: ${this.adminGod ? 'on' : 'off'} · HP ${Math.ceil(h.hp)} / ${h.stats.maxHp} · Level ${h.level} · Psi ${Math.floor(this.psi.energy)} / ${PSI.max}`;
   }
 
   togglePause(forceResume = false) {
@@ -1047,6 +1071,7 @@ export class Game {
   damageHero(dmg0, fx, fz) {
     const h = this.hero;
     if (this.won || this.cut) return false; // during the cutscene and after dawn nothing can touch the hero
+    if (this.adminGod) return false; // admin god mode
     const dmg = dmg0 * this.dmgScale * this.passive.takenMul;
     if (!h.takeHit(dmg, fx, fz)) return false;
     this.hitstop = Math.max(this.hitstop, 0.06);
@@ -1536,6 +1561,7 @@ export class Game {
     this.psi.cdMul = this.passive.cdMul;
     if (!h.dead && this.passive.regen > 0) h.heal(this.passive.regen * dt);
     if (this.runCharacter === 'berserker') this.updateBerserker(dt);
+    if (this.adminGod && !h.dead) h.invT = Math.max(h.invT, 0.5); // admin god mode: every hit is blocked
     h.update(dt, this.input, this.layout, this.heroEv);
     this.flow.setGoal(h.x, h.z);
     if (!h.dead) {

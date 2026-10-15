@@ -184,7 +184,25 @@
             <button id="btnRestartPause" class="btn btn-gold" type="button">Restart <kbd>R</kbd></button>
             <button id="btnMutePause" class="btn btn-ghost" type="button">Sound: On</button>
             <button id="btnSettingsPause" class="btn btn-ghost" type="button">Settings</button>
+            <button id="btnAdmin" class="btn btn-ghost hidden" type="button">Admin panel</button>
             <button id="btnQuit" class="btn btn-ghost" type="button">Back to title</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Admin panel: opened from the pause menu after five quick presses of the sound button -->
+      <section id="screenAdmin" class="screen hidden" aria-label="Admin panel">
+        <div class="screen-panel small-panel">
+          <h2 class="panel-title">Admin</h2>
+          <p id="adminStatus" class="muted small"></p>
+          <div class="stack">
+            <button class="btn btn-ghost" type="button" data-admin="god">God mode</button>
+            <button class="btn btn-ghost" type="button" data-admin="heal">Heal to full</button>
+            <button class="btn btn-ghost" type="button" data-admin="xp">+1 level</button>
+            <button class="btn btn-ghost" type="button" data-admin="psi">Full psi, reset cooldowns</button>
+            <button class="btn btn-ghost" type="button" data-admin="skills">Max out all psi skills</button>
+            <button class="btn btn-ghost" type="button" data-admin="coins">+100 coins</button>
+            <button id="btnAdminBack" class="btn btn-primary" type="button">Back</button>
           </div>
         </div>
       </section>
