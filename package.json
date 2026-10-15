@@ -1,0 +1,20 @@
+{
+  "name": "hush-echolocation-horror",
+  "private": true,
+  "version": "1.0.0",
+  "description": "ТИШЕ / HUSH — low-poly echolocation horror. Survive 30 minutes in a pitch-black forest using your microphone as sonar. Don't scream.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0"
+  },
+  "dependencies": {
+    "@fontsource/jetbrains-mono": "^5.3.0",
+    "@fontsource/rubik-wet-paint": "^5.3.0",
+    "three": "^0.186.1"
+  },
+  "devDependencies": {
+    "vite": "^8.3.4"
+  }
+}
