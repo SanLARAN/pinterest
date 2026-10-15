@@ -94,6 +94,7 @@ export function skillOffers(psi) {
       kind: 'skill',
       id,
       name: psi.defs[id].name,
+      icon: psi.defs[id].icon, // the hero's own icon (the berserker's differ from the knight's)
       from,
       to,
       desc: psi.summaryAt(id, to),

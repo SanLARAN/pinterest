@@ -31,7 +31,8 @@ const SKILL_ICONS = {
   lance: '<path d="M3.5 20.5L15 9" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M13.2 4.2l6.6.2-.2 6.6-2.4-1.1-4.2 4.2-1.4-1.4 4.2-4.2z" fill="currentColor"/>',
   pull: '<path d="M4 5c5 0 8 3 8 7s-3 7-8 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M20 12h-7.5M15.5 9l-3 3 3 3" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>',
 };
-const skillIcon = (id, defs = PSI.skills) => `<svg viewBox="0 0 24 24" aria-hidden="true">${SKILL_ICONS[defs[id].icon]}</svg>`;
+const skillIconFor = (icon) => `<svg viewBox="0 0 24 24" aria-hidden="true">${SKILL_ICONS[icon]}</svg>`;
+const skillIcon = (id, defs = PSI.skills) => skillIconFor(defs[id].icon);
 
 // short labels for the touch buttons (the berserker's come from its own definitions)
 const KNIGHT_SHORT = { skill1: 'BURST', skill2: 'LANCE', skill3: 'PULL' };
@@ -298,7 +299,7 @@ export class UI {
       b.type = 'button';
       b.className = 'card';
       b.style.animationDelay = `${i * 0.07}s`;
-      const icon = u.kind === 'skill' ? skillIcon(u.id) : boonIcon(u.id);
+      const icon = u.kind === 'skill' ? skillIconFor(u.icon) : boonIcon(u.id);
       const desc = u.kind === 'skill' ? `<b>Lv ${u.from} → ${u.to}</b> · ${escapeHtml(u.desc)}` : escapeHtml(u.desc);
       b.innerHTML = `<span class="key">${i + 1}</span><span class="icon">${icon}</span><span class="name">${escapeHtml(u.name)}</span><span class="desc">${desc}</span>`;
       b.addEventListener('click', (e) => { e.stopPropagation(); onPick(i); });

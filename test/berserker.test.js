@@ -233,3 +233,10 @@ test('berserker hero: the berserker has hair and no shield; the knight has no ha
   h.model.hair.update(0.1, 3, 0, 0); // running forward: must not throw
   h.model.hair.update(0.1, 0, 3, 0); // sideways
 });
+
+test('berserker: the level-up offers carry the berserker\'s own icons, not the knight\'s', () => {
+  const offers = skillOffers(new BerserkAbilities());
+  assert.deepEqual(offers.map((o) => o.icon), ['whirl', 'steed', 'berserk']);
+  const knight = skillOffers(new Psi());
+  assert.deepEqual(knight.map((o) => o.icon), ['burst', 'lance', 'pull']);
+});
