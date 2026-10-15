@@ -83,6 +83,7 @@ export class Game {
     this.perf = { acc: 0, n: 0, slow: 0 };
     this.debugAuto = /[?&]autopilot/.test(location.search);
     this.toTitle(true);
+    this.precompile();
     this.last = performance.now();
     this.loop = this.loop.bind(this);
     requestAnimationFrame(this.loop);
@@ -166,11 +167,14 @@ export class Game {
     if (this.propShadows !== undefined) this.world.setPropShadows(this.propShadows);
     this.trackName = def.name;
     this.trackIndex = index;
+    // checkpoint time is fair across track lengths: +1s per 135m of road
+    this.cpTime = Math.round((this.track.length / CFG.CP_PER_LAP / CFG.CP_METERS_PER_SEC) * 10) / 10;
     this.hud.setTrack(this.track);
     if (!first) {
       this.clearEffects();
       this.setupGrid();
       this.setAttract();
+      this.precompile();
     }
   }
 
@@ -220,6 +224,17 @@ export class Game {
     for (const g of this.goons) { g.reset(); g.setActive(false); }
   }
 
+  /** Compile every shader up front so the first explosion doesn't hitch. */
+  precompile() {
+    const hidden = [];
+    this.scene.traverse((o) => { if (!o.visible) { hidden.push(o); o.visible = true; } });
+    try {
+      this.renderer.compile(this.scene, this.camera);
+      this.renderer.compile(this.post.scene, this.post.cam);
+    } catch (e) { /* compile is an optimisation only */ }
+    for (const o of hidden) o.visible = false;
+  }
+
   clearEffects() {
     for (const k in this.fxs) this.fxs[k].clear();
     this.weapons.clear();
@@ -238,7 +253,8 @@ export class Game {
   applyQuality(q) {
     this.qualityName = q;
     const dpr = window.devicePixelRatio || 1;
-    this.pixelRatio = q === 'high' ? Math.min(dpr, 2) : q === 'medium' ? Math.min(dpr, 1.5) : Math.min(dpr, 1);
+    this.prBase = q === 'high' ? Math.min(dpr, 2) : q === 'medium' ? Math.min(dpr, 1.5) : Math.min(dpr, 1);
+    this.pxBudget = q === 'high' ? 3.7e6 : q === 'medium' ? 2.2e6 : 1.3e6;
     const shadows = q !== 'low';
     if (this.renderer.shadowMap.enabled !== shadows) {
       this.renderer.shadowMap.enabled = shadows;
@@ -256,7 +272,6 @@ export class Game {
     this.post.enabled = q !== 'low';
     this.post.setSamples(q === 'high' ? 4 : 2);
     document.body.classList.toggle('q-low', q === 'low');
-    this.renderer.setPixelRatio(this.pixelRatio);
     this.resize();
     if (this.ui) this.ui.refreshSettings();
   }
@@ -264,6 +279,9 @@ export class Game {
   resize() {
     const w = window.innerWidth, h = window.innerHeight;
     this.width = w; this.height = h;
+    // cap the number of rendered pixels (4K / high-DPI screens)
+    const want = Math.max(0.6, Math.min(this.prBase || 1, Math.sqrt((this.pxBudget || 3.7e6) / (w * h))));
+    if (this.renderer.getPixelRatio() !== want) this.renderer.setPixelRatio(want);
     this.renderer.setSize(w, h, false);
     this.camera.aspect = w / h;
     this.chase.setAspect(w / h);
@@ -463,7 +481,7 @@ export class Game {
       }
       const gas = this.input.state.throttle > 0 && (!this.input.touchMode || this.input.anyPress || this.input.t.stickId !== null);
       if (this.input.touchMode) {
-        if (this.input.anyPress && this.countdown < 0.55) this.startPress = this.countdown;
+        if (this.input.anyPress && this.countdown < 0.65) this.startPress = this.countdown;
       } else if (gas) {
         if (this.startPress === null) this.startPress = this.countdown;
       } else this.startPress = null;
@@ -490,7 +508,7 @@ export class Game {
     const aiRacing = st === 'race';
     for (const c of this.rivals) {
       if (st === 'countdown') { c.input.throttle = 0; c.input.brake = 0; c.input.steer = 0; c.input.boost = false; continue; }
-      const o = c.ai.update(dt, aiRacing && this.raceTime > 4);
+      const o = c.ai.update(dt, aiRacing, aiRacing && this.raceTime > 4);
       Object.assign(c.input, o);
     }
     for (const g of this.goons) {
@@ -538,6 +556,14 @@ export class Game {
     this.world.update(dt);
     if (this.boomLight.intensity > 0) this.boomLight.intensity = Math.max(0, this.boomLight.intensity - dt * 120);
 
+    // nitro kick-in punch
+    if (P.boosting && !this.wasBoosting && (st === 'race')) {
+      this.audio.boost();
+      this.fx.addTrauma(0.12);
+      this.fx.aberrate(0.25);
+    }
+    this.wasBoosting = P.boosting;
+
     // audio
     const audible = st === 'race' || st === 'countdown' || st === 'finished';
     this.audio.updateCar(P, audible);
@@ -554,7 +580,7 @@ export class Game {
     this.audio.countdown(true);
     this.fx.addTrauma(0.2);
     const sp = this.startPress;
-    if (sp !== null && sp <= 0.55 && sp >= 0) {
+    if (sp !== null && sp <= 0.65 && sp >= 0) {
       this.perfect = true;
       this.player.freeBoost = 1.4;
       this.hud.message('PERFECT START!', ['NITRO BURST'], 'go', 1.2);
@@ -587,17 +613,17 @@ export class Game {
       const j = this.cpCount;
       this.cpCount++;
       if (j >= CFG.LAPS * CFG.CP_PER_LAP) { this.finishRace(); return; }
-      this.addTime(CFG.CP_TIME);
-      this.stats.timeGained += CFG.CP_TIME;
+      this.addTime(this.cpTime);
+      this.stats.timeGained += this.cpTime;
       this.addScore(50);
       this.world.pulseGate(j % CFG.CP_PER_LAP);
       if (j % CFG.CP_PER_LAP === 0) {
         const lap = j / CFG.CP_PER_LAP + 1;
         const final = lap === CFG.LAPS;
-        this.hud.message(final ? 'FINAL LAP' : `LAP ${lap}/${CFG.LAPS}`, [`+${CFG.CP_TIME}s`], 'lap', 1.6);
+        this.hud.message(final ? 'FINAL LAP' : `LAP ${lap}/${CFG.LAPS}`, [`+${this.cpTime}s`], 'lap', 1.6);
         this.audio.lap(final);
       } else {
-        this.hud.popup(P.pos.x, P.pos.y + 3, P.pos.z, `CHECKPOINT +${CFG.CP_TIME}s`, 'cp');
+        this.hud.popup(P.pos.x, P.pos.y + 3, P.pos.z, `CHECKPOINT +${this.cpTime}s`, 'cp');
         this.audio.checkpoint();
       }
     }
@@ -665,7 +691,7 @@ export class Game {
     let alive = 0;
     for (const g of this.goons) if (g.active && !g.dead) alive++;
     const want = Math.min(CFG.MAX_GOONS, 3 + Math.floor(this.raceTime / 22));
-    const desperate = this.timeLeft < 4.5;
+    const desperate = this.timeLeft < 6;
     if (alive < want || (desperate && alive < CFG.MAX_GOONS)) this.spawnGoon(desperate);
     this.spawnT = desperate ? 0.9 : rand(1.4, 2.6);
   }
@@ -849,6 +875,8 @@ export class Game {
     this.state = 'results';
     this.audio.setMusicMode(0);
     this.hud.show(false);
+    document.body.classList.remove('racing');
+    this.input.resetTouch();
     this.ui.showResults({
       title: finished ? (this.won ? 'YOU WON THE RIDE!' : `FINISHED P${this.finishPos}`) : "TIME'S UP",
       cls: finished ? (this.won ? 'win' : 'fin') : 'dead',
@@ -907,6 +935,7 @@ export class Game {
     P.kills++;
     // juice
     this.fx.hitStop(isRival ? 0.075 : 0.045);
+    if (isRival || this.combo >= 4) this.fx.slowmo(0.5, isRival ? 0.28 : 0.18);
     this.fx.addTrauma(isRival ? 0.45 : 0.3);
     this.fx.doFlash(isRival ? 0.22 : 0.12, 1, 0.85, 0.7);
     this.fx.aberrate(0.6);

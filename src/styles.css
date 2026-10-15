@@ -322,6 +322,8 @@ kbd { display: inline-block; font-family: var(--ui); font-size: 11px; padding: 2
 #fatal { position: fixed; inset: 0; z-index: 30; display: flex; align-items: center; justify-content: center; padding: 30px; text-align: center; background: var(--ink); font-size: 16px; line-height: 1.6; }
 
 /* ========================================================= responsive */
+.title-left, .title-right { display: flex; flex-direction: column; align-items: center; }
+
 @media (max-width: 760px), (max-height: 520px) {
   .timer { font-size: 64px; }
   .pos-wrap { font-size: 46px; }
@@ -335,14 +337,47 @@ kbd { display: inline-block; font-family: var(--ui); font-size: 11px; padding: 2
   .center-msg.dead .cm-main, .center-msg.win .cm-main { font-size: 64px; }
   .center-msg.kill .cm-main { font-size: 50px; }
   .center-msg .cm-sub { font-size: 17px; }
-  .howto, .controls { grid-template-columns: 1fr; }
-  .res-grid { grid-template-columns: 1fr; }
   .scr-title { font-size: 40px; }
   #minimap { width: 110px; height: 110px; }
   .gauge .bar { width: 120px; }
 }
+@media (max-width: 760px) {
+  .howto, .controls { grid-template-columns: 1fr; }
+  .res-grid { grid-template-columns: 1fr; }
+}
+@media (max-height: 520px) and (orientation: landscape) {
+  .screen[data-screen='title'].active { flex-direction: row; justify-content: center; align-items: center; gap: 4vw; max-width: none; }
+  .title-left .tagline { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 13px; }
+  .title-left .tagline i { display: none; }
+  .title-right .menu { width: min(380px, 46vw); }
+  .rule p { font-size: 12px; }
+  .big-num { font-size: 30px; min-width: 70px; }
+  .howto { gap: 6px 14px; margin-bottom: 8px; }
+  .controls { font-size: 11px; gap: 4px 14px; }
+  .scr-title { font-size: 32px; margin-bottom: 8px; }
+  .screen[data-screen='pause'], .screen[data-screen='results'], .screen[data-screen='scores'], .screen[data-screen='howto'], .screen[data-screen='settings'] { padding: 12px 18px 14px; }
+  .res-title { font-size: 40px; }
+  .res-sub { margin: 2px 0 8px; }
+  .rs-row { padding: 3px 8px; }
+  .rs-total b { font-size: 30px; }
+  .table li { padding: 3px 8px; }
+  .menu.horizontal { margin-top: 8px; }
+  .settings .btn.row { padding: 5px 14px; font-size: 15px; }
+  .res-title { font-size: 34px; }
+  .rs-row { font-size: 11px; }
+  .rs-row b { font-size: 14px; }
+  .rs-total { margin-top: 4px; padding: 4px 10px; }
+  .rs-total b { font-size: 26px; }
+  .entry { padding: 4px; margin-bottom: 6px; }
+  .slot b { font-size: 28px; width: 36px; }
+  .tb { padding: 0 8px; font-size: 13px; }
+  .entry-hint { display: none; }
+  .table.small li:nth-child(n+6):not(.me) { display: none; }
+  .menu.horizontal .btn.big { font-size: 22px; padding: 6px 18px; }
+  .menu.horizontal .btn { font-size: 17px; padding: 6px 14px; }
+}
 @media (max-height: 520px) {
-  .logo-noise { font-size: 60px; } .logo-rally { font-size: 72px; }
+  .logo-noise { font-size: 56px; } .logo-rally { font-size: 66px; }
   .tagline { margin: 8px 0; }
   .menu { gap: 5px; }
   .btn { font-size: 17px; padding: 6px 14px; }

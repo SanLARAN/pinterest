@@ -10,9 +10,9 @@ export const CFG = {
   START_TIME: 10,
   MAX_TIME: 20,
   CP_PER_LAP: 6,
-  CP_TIME: 2,
+  CP_METERS_PER_SEC: 135, // checkpoint time = gap between gates / this
   KILL_TIME_RIVAL: 3.5,
-  KILL_TIME_GOON: 1.5,
+  KILL_TIME_GOON: 1.75,
   COMBO_WINDOW: 3.6,
   COMBO_MAX: 10,
 

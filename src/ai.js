@@ -34,11 +34,12 @@ export class RivalAI {
     this.startDelay = Math.random() * 0.35;
   }
 
-  update(dt, racing) {
+  /** racing: a race is on (rubber band, start delay). combat: allowed to attack. */
+  update(dt, racing, combat = racing) {
     const c = this.car, g = this.game, T = g.track, out = this.out;
     out.fire = false; out.boost = false;
     if (c.dead) { out.throttle = 0; out.brake = 0; out.steer = 0; return out; }
-    if (this.startDelay > 0 && racing) { this.startDelay -= dt; out.throttle = 0; return out; }
+    if (this.startDelay > 0 && racing) { this.startDelay -= dt; out.throttle = 0; out.brake = 0; out.steer = 0; return out; }
     const P = g.player;
     const spd = c.fwdSpeed;
     const s = c.q.s;
@@ -90,7 +91,7 @@ export class RivalAI {
     const pdx = P.pos.x - c.pos.x, pdz = P.pos.z - c.pos.z;
     const pd = Math.hypot(pdx, pdz);
     const pAhead = pdx * fx + pdz * fz;
-    if (racing && this.canFire && !P.dead && g.state === 'race') {
+    if (combat && this.canFire && !P.dead && g.state === 'race') {
       this.attackCd -= dt;
       if (this.attackT <= 0 && this.attackCd <= 0 && pd < 26 && pAhead > -4 && Math.random() < this.aggro * dt * 1.6) {
         this.attackT = 1.0 + Math.random() * 1.3;
@@ -142,7 +143,7 @@ export class RivalAI {
     }
 
     // ---- shooting: player in front, within the cone
-    if (racing && this.canFire && g.state === 'race' && !P.dead && !c.isPlayer) {
+    if (combat && this.canFire && g.state === 'race' && !P.dead && !c.isPlayer) {
       this.fireCd -= dt;
       if (this.burst > 0) {
         this.burstT -= dt;

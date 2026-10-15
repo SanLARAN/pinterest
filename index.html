@@ -75,11 +75,14 @@
   <!-- =========================== SCREENS =========================== -->
   <div id="screens">
     <section class="screen" data-screen="title">
+      <div class="title-left">
       <div class="logo">
         <div class="logo-noise" data-text="NOISE">NOISE</div>
         <div class="logo-rally" data-text="RALLY">RALLY</div>
       </div>
       <div class="tagline"><span>10 SECONDS TO LIVE</span><i>·</i><span>KILL TO DRIVE</span><i>·</i><span>WIN THE RIDE</span></div>
+      </div>
+      <div class="title-right">
       <nav class="menu">
         <button data-action="start" class="btn big">START RACE</button>
         <button data-action="track" data-cycle="1" class="btn row"><span>TRACK</span><b><em class="arr">◀</em> <span id="t-track">SUNSET MESA</span> <em class="arr">▶</em></b></button>
@@ -90,14 +93,15 @@
       <div class="best">BEST <b id="t-best">0</b></div>
       <div class="hint keys-only">WASD / ARROWS DRIVE · SPACE FIRE · SHIFT NITRO · BRAKE + STEER = DRIFT · R RESTART</div>
       <div class="hint touch-only">LEFT THUMB STEER · AUTO-GAS · RIGHT THUMB FIRE / NITRO / DRIFT</div>
+      </div>
     </section>
 
     <section class="screen" data-screen="howto">
       <h2 class="scr-title">HOW TO PLAY</h2>
       <div class="howto">
         <div class="rule"><b class="big-num">10</b><p>Your clock starts at <em>10 seconds</em> and never stops. Hit zero and you're scrap.</p></div>
-        <div class="rule"><b class="big-num pink">KILL</b><p><em>Wreck rival drivers</em> for +3.5s, <em>raider buggies</em> for +1.5s — more while your combo runs. Shoot them, ram them, blow up barrels under them.</p></div>
-        <div class="rule"><b class="big-num cyan">+2</b><p>Every <em>neon checkpoint</em> gives +2s. Getting shot or rammed costs time. The clock maxes out at 20.</p></div>
+        <div class="rule"><b class="big-num pink">KILL</b><p><em>Wreck rival drivers</em> for +3.5s, <em>raider buggies</em> for +1.75s — more while your combo runs. Shoot them, ram them, blow up barrels under them.</p></div>
+        <div class="rule"><b class="big-num cyan">GATE</b><p>Every <em>neon checkpoint</em> gives about +2s. Getting shot or rammed costs time. The clock maxes out at 20.</p></div>
         <div class="rule"><b class="big-num yellow">P1</b><p>Finish <em>3 laps</em> in first place to <em>WIN THE RIDE</em>. Chain kills for combo multipliers. x5 = OVERDRIVE.</p></div>
       </div>
       <div class="controls">
