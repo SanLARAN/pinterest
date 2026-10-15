@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#1a0f26" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="description" content="NOISE RALLY — a low-poly combat rally. 10 seconds to live. Kill to drive. Win the ride." />
+  <title>NOISE RALLY — 10 seconds to live</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%231a0f26'/%3E%3Cpath d='M14 46 L28 14 H50 L36 46 Z' fill='%23ff2e88'/%3E%3Cpath d='M22 40 L31 20 H44 L35 40 Z' fill='%2329f3ff'/%3E%3C/svg%3E" />
+</head>
+<body>
+  <canvas id="game"></canvas>
+  <div id="low-flash"></div>
+
+  <!-- world-space overlays -->
+  <div id="tags" class="hidden"></div>
+  <div id="popups"></div>
+
+  <!-- ============================== HUD ============================== -->
+  <div id="hud" class="hidden">
+    <div class="hud-tl">
+      <div id="h-pos-wrap" class="pos-wrap"><span class="pos-p">P</span><span id="h-pos">8</span><span class="pos-of">/8</span></div>
+      <div class="lap-row"><span class="lbl">LAP</span> <b id="h-lap">1/3</b> <span id="h-laptime" class="laptime">0:00.0</span></div>
+    </div>
+
+    <div class="hud-tc">
+      <div id="h-timer-wrap" class="timer-wrap">
+        <div class="timer-lbl">TIME TO LIVE</div>
+        <div id="h-timer" class="timer"><span id="h-sec">10</span><span class="timer-ms">.<span id="h-ms">00</span></span></div>
+        <div id="h-delta" class="timer-delta"></div>
+      </div>
+      <div id="h-wrong" class="wrong">⟲ WRONG WAY</div>
+    </div>
+
+    <div class="hud-tr">
+      <div class="score-lbl">SCORE</div>
+      <div id="h-score" class="score">0</div>
+      <div id="h-combo-wrap" class="combo-wrap">
+        <div class="combo"><span class="combo-x">x</span><span id="h-combo">1</span></div>
+        <div id="h-combo-name" class="combo-name"></div>
+        <div class="combo-bar"><i id="h-combo-bar"></i></div>
+      </div>
+      <div id="h-feed" class="feed"></div>
+    </div>
+
+    <canvas id="minimap" width="150" height="150"></canvas>
+
+    <div class="hud-bc">
+      <div class="speedo"><b id="h-speed">0</b><span>KM/H</span></div>
+      <div class="gauges">
+        <div id="h-boost-wrap" class="gauge boost"><span>NITRO</span><div class="bar"><i id="h-boost"></i></div></div>
+        <div id="h-heat-wrap" class="gauge heat"><span>GUN</span><div class="bar"><i id="h-heat"></i></div></div>
+      </div>
+      <div id="h-od" class="od">OVERDRIVE</div>
+    </div>
+
+    <div id="h-center" class="center-msg"></div>
+    <div id="h-reticle"><div id="h-hitmarker"></div></div>
+    <div id="h-fps" class="fps hidden"></div>
+    <button id="btn-pause" class="pause-btn" aria-label="Pause">II</button>
+  </div>
+
+  <!-- ============================ TOUCH ============================ -->
+  <div id="touch">
+    <div id="stick-zone"></div>
+    <div id="stick-base"><div id="stick-knob"></div></div>
+    <div class="stick-hint">◀ STEER ▶</div>
+    <button id="btn-drift" class="tbtn drift">DRIFT<small>BRAKE</small></button>
+    <button id="btn-boost" class="tbtn boost">NITRO</button>
+    <button id="btn-fire" class="tbtn fire">FIRE</button>
+  </div>
+
+  <!-- =========================== SCREENS =========================== -->
+  <div id="screens">
+    <section class="screen" data-screen="title">
+      <div class="logo">
+        <div class="logo-noise" data-text="NOISE">NOISE</div>
+        <div class="logo-rally" data-text="RALLY">RALLY</div>
+      </div>
+      <div class="tagline"><span>10 SECONDS TO LIVE</span><i>·</i><span>KILL TO DRIVE</span><i>·</i><span>WIN THE RIDE</span></div>
+      <nav class="menu">
+        <button data-action="start" class="btn big">START RACE</button>
+        <button data-action="track" data-cycle="1" class="btn row"><span>TRACK</span><b><em class="arr">◀</em> <span id="t-track">SUNSET MESA</span> <em class="arr">▶</em></b></button>
+        <button data-action="scores" class="btn">HIGH SCORES</button>
+        <button data-action="howto" class="btn">HOW TO PLAY</button>
+        <button data-action="settings" class="btn">SETTINGS</button>
+      </nav>
+      <div class="best">BEST <b id="t-best">0</b></div>
+      <div class="hint keys-only">WASD / ARROWS DRIVE · SPACE FIRE · SHIFT NITRO · BRAKE + STEER = DRIFT · R RESTART</div>
+      <div class="hint touch-only">LEFT THUMB STEER · AUTO-GAS · RIGHT THUMB FIRE / NITRO / DRIFT</div>
+    </section>
+
+    <section class="screen" data-screen="howto">
+      <h2 class="scr-title">HOW TO PLAY</h2>
+      <div class="howto">
+        <div class="rule"><b class="big-num">10</b><p>Your clock starts at <em>10 seconds</em> and never stops. Hit zero and you're scrap.</p></div>
+        <div class="rule"><b class="big-num pink">KILL</b><p><em>Wreck rival drivers</em> for +3.5s, <em>raider buggies</em> for +1.5s — more while your combo runs. Shoot them, ram them, blow up barrels under them.</p></div>
+        <div class="rule"><b class="big-num cyan">+2</b><p>Every <em>neon checkpoint</em> gives +2s. Getting shot or rammed costs time. The clock maxes out at 20.</p></div>
+        <div class="rule"><b class="big-num yellow">P1</b><p>Finish <em>3 laps</em> in first place to <em>WIN THE RIDE</em>. Chain kills for combo multipliers. x5 = OVERDRIVE.</p></div>
+      </div>
+      <div class="controls">
+        <div><kbd>W</kbd><kbd>↑</kbd> GAS</div>
+        <div><kbd>A</kbd><kbd>D</kbd> STEER</div>
+        <div><kbd>S</kbd><kbd>↓</kbd> BRAKE · + STEER = DRIFT</div>
+        <div><kbd>SPACE</kbd><kbd>J</kbd><kbd>CLICK</kbd> FIRE</div>
+        <div><kbd>SHIFT</kbd><kbd>K</kbd> NITRO</div>
+        <div><kbd>ESC</kbd> PAUSE · <kbd>R</kbd> RESTART · <kbd>M</kbd> MUSIC · <kbd>C</kbd> CAMERA</div>
+      </div>
+      <p class="tip">PRO TIP: hold gas just as the countdown hits <em>1</em> for a PERFECT START. Ramming while on nitro = instant wreck &amp; no damage.</p>
+      <nav class="menu"><button data-action="back" class="btn">BACK</button></nav>
+    </section>
+
+    <section class="screen" data-screen="scores">
+      <h2 class="scr-title">HIGH SCORES</h2>
+      <ol id="s-table" class="table"></ol>
+      <nav class="menu"><button data-action="back" class="btn">BACK</button></nav>
+    </section>
+
+    <section class="screen" data-screen="settings">
+      <h2 class="scr-title">SETTINGS</h2>
+      <nav class="menu settings">
+        <button data-action="vol" data-cycle="1" class="btn row"><span>VOLUME</span><b id="o-vol"></b></button>
+        <button data-action="music" data-cycle="1" class="btn row"><span>MUSIC</span><b id="o-music"></b></button>
+        <button data-action="shake" data-cycle="1" class="btn row"><span>SCREEN SHAKE</span><b id="o-shake"></b></button>
+        <button data-action="quality" data-cycle="1" class="btn row"><span>QUALITY</span><b id="o-quality"></b></button>
+        <button data-action="autofire" data-cycle="1" class="btn row"><span>AUTO-FIRE</span><b id="o-autofire"></b></button>
+        <button data-action="cam" data-cycle="1" class="btn row"><span>CAMERA</span><b id="o-cam"></b></button>
+        <button data-action="fps" data-cycle="1" class="btn row"><span>FPS COUNTER</span><b id="o-fps"></b></button>
+        <button data-action="fullscreen" class="btn row"><span>FULLSCREEN</span><b>TOGGLE</b></button>
+        <button data-action="back" class="btn">BACK</button>
+      </nav>
+    </section>
+
+    <section class="screen" data-screen="pause">
+      <h2 class="scr-title glitchy" data-text="PAUSED">PAUSED</h2>
+      <nav class="menu">
+        <button data-action="resume" class="btn big">RESUME</button>
+        <button data-action="retry" class="btn">RESTART <small>[R]</small></button>
+        <button data-action="settings" class="btn">SETTINGS</button>
+        <button data-action="menu" class="btn">QUIT TO MENU</button>
+      </nav>
+    </section>
+
+    <section class="screen" data-screen="results">
+      <div id="r-title" class="res-title">TIME'S UP</div>
+      <div id="r-sub" class="res-sub"></div>
+      <div class="res-grid">
+        <div id="r-stats" class="res-stats"></div>
+        <div class="res-right">
+          <div id="r-entry" class="entry hidden">
+            <div id="r-newbest" class="newbest hidden">★ NEW BEST ★</div>
+            <div class="entry-lbl">HIGH SCORE! YOUR TAG</div>
+            <div class="tag-edit">
+              <div class="slot"><button data-action="tag-up" data-slot="0" data-nonav class="tb">▲</button><b id="tag-0">A</b><button data-action="tag-down" data-slot="0" data-nonav class="tb">▼</button></div>
+              <div class="slot"><button data-action="tag-up" data-slot="1" data-nonav class="tb">▲</button><b id="tag-1">C</b><button data-action="tag-down" data-slot="1" data-nonav class="tb">▼</button></div>
+              <div class="slot"><button data-action="tag-up" data-slot="2" data-nonav class="tb">▲</button><b id="tag-2">E</b><button data-action="tag-down" data-slot="2" data-nonav class="tb">▼</button></div>
+              <button data-action="tag-save" data-nonav class="btn save">OK</button>
+            </div>
+            <div class="entry-hint keys-only">TYPE LETTERS · ENTER TO SAVE</div>
+          </div>
+          <ol id="r-table" class="table small"></ol>
+        </div>
+      </div>
+      <nav class="menu horizontal">
+        <button data-action="retry" class="btn big">RETRY <small>[R]</small></button>
+        <button data-action="menu" class="btn">MENU <small>[ESC]</small></button>
+      </nav>
+    </section>
+  </div>
+
+  <div id="boot">
+    <div class="boot-logo">NOISE RALLY</div>
+    <div class="boot-sub">GENERATING DESERT…</div>
+  </div>
+  <div id="fatal" class="hidden"></div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
