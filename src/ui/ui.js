@@ -1,8 +1,9 @@
 // DOM controller: start / pause / level-up / game-over screens and the in-game HUD.
 // Writes to the DOM only when a value changes, keeping the per-frame cost tiny.
 import { cleanName, DEFAULT_NAME } from '../sim/highscores.js';
-import { MODES, TABLE_LABELS } from '../sim/modes.js';
-import { PSI, SKILL_IDS } from '../sim/psi.js';
+import { MODES, TABLE_LABELS, CHARACTERS } from '../sim/modes.js';
+import { PSI, SKILL_IDS, SKILL_TABLES } from '../sim/psi.js';
+import { HeroPortrait } from './heroPortrait.js';
 import { ITEMS, INV_SLOTS, sellPrice } from '../sim/items.js';
 import { loadTranslucency, loadCheckpoints } from '../core/storage.js';
 import { isKnown } from '../sim/atlas.js';
@@ -105,10 +106,13 @@ export class UI {
       e.stopPropagation();
       this.a.onMode(b.dataset.mode);
     }));
-    document.querySelectorAll('[data-character]').forEach((b) => b.addEventListener('click', (e) => {
+    $('heroPicker').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-character]');
+      if (!b) return;
       e.stopPropagation();
       this.a.onCharacter(b.dataset.character);
-    }));
+    });
+    this.renderHeroPicker();
     on('btnStart', 'click', () => this.a.onStart());
     on('btnMuteStart', 'click', () => this.a.onToggleMute());
     on('btnMutePause', 'click', () => this.a.onToggleMute());
@@ -176,16 +180,61 @@ export class UI {
   refreshBoard(list, view) {
     this.renderBoard($('boardStart'), list);
     $('boardModeStart').textContent = `Table · ${TABLE_LABELS[view.table] ?? TABLE_LABELS.classic}`;
-    this.setChoices(view.mode);
+    this.setChoices(view);
   }
 
-  /** Highlights the chosen mode and shows its one-line rule. */
-  setChoices(mode) {
+  /** Highlights the chosen mode and hero, shows the mode rule, and shows the hero block in endless only. */
+  setChoices(view) {
+    const mode = view.mode;
     document.querySelectorAll('[data-mode]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === mode)));
     const blurb = $('modeBlurb');
     if (blurb) blurb.textContent = MODES[mode]?.blurb ?? MODES.story.blurb;
     const cp = $('cpSettingNote');
     if (cp) cp.textContent = mode === 'endless' ? 'Endless has one life, so checkpoints are off in that mode.' : '';
+    const endless = mode === 'endless';
+    $('heroGroup').classList.toggle('hidden', !endless);
+    if (endless) {
+      this.renderHero(view.character);
+      this.heroPortraitOn(true);
+    } else {
+      this.heroPortraitOn(false);
+    }
+  }
+
+  /** Hero picker: one button per hero. Only one hero exists for now. */
+  renderHeroPicker() {
+    $('heroPicker').innerHTML = CHARACTERS.map((c) =>
+      `<button class="choice" type="button" data-character="${c.id}"><b>${c.name}</b><small>${c.blurb}</small></button>`).join('');
+  }
+
+  /** Hero details for the selected hero: picker state, blurb and the ability list. */
+  renderHero(id) {
+    const hero = CHARACTERS.find((c) => c.id === id) ?? CHARACTERS[0];
+    $('heroPicker').querySelectorAll('[data-character]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.character === hero.id)));
+    $('heroBlurb').textContent = hero.blurb;
+    const moves = hero.moves.map((m) => `<li><kbd>${m.key}</kbd><b>${m.name}</b><span>${m.desc}</span></li>`);
+    const skills = hero.skills.map((sid) => {
+      const s = PSI.skills[sid];
+      const t = SKILL_TABLES[sid];
+      return `<li><kbd>${s.key}</kbd><b>${s.name}</b><span>${s.desc}</span><em>${t.cost[0]} energy · ${t.cooldown[0]}s</em></li>`;
+    });
+    $('abilityList').innerHTML = [...moves, ...skills].join('');
+  }
+
+  /** The animated portrait runs only while the hero block is on the title screen. */
+  heroPortraitOn(on) {
+    if (!on) {
+      this.portrait?.stop();
+      return;
+    }
+    if (!this.portrait && !this.portraitFailed) {
+      try {
+        this.portrait = new HeroPortrait($('heroPortrait'));
+      } catch {
+        this.portraitFailed = true; // no WebGL: the block still shows the abilities
+      }
+    }
+    this.portrait?.start();
   }
 
   setCheckpointLabel(on) {
@@ -193,6 +242,7 @@ export class UI {
   }
 
   hideStart() {
+    this.portrait?.stop();
     this.hide('screenStart');
     this.hide('screenSettings');
   }

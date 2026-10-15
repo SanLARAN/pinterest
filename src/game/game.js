@@ -449,7 +449,7 @@ export class Game {
 
   /** The rules a run would start with right now, shown on the title screen. */
   startView() {
-    return runSetup(this.selectedMode, this.checkpointsOn);
+    return { ...runSetup(this.selectedMode, this.checkpointsOn), character: this.selectedCharacter };
   }
 
   /** Takes the mode and table for the next run. Only called between runs. */

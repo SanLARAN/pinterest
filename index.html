@@ -137,10 +137,15 @@
               </div>
               <p id="modeBlurb" class="muted small"></p>
             </div>
-            <div class="choice-group">
+            <div class="choice-group" id="heroGroup">
               <span class="choice-label">Hero</span>
-              <div class="choice-row">
-                <button class="choice" type="button" data-character="knight" aria-pressed="true"><b>Sir Pip</b><small>The last knight</small></button>
+              <div class="hero-block">
+                <canvas id="heroPortrait" class="hero-portrait" width="160" height="160" role="img" aria-label="Animated portrait of the selected hero"></canvas>
+                <div class="hero-info">
+                  <div class="choice-row" id="heroPicker"></div>
+                  <p id="heroBlurb" class="muted small"></p>
+                  <ul id="abilityList" class="ability-list"></ul>
+                </div>
               </div>
             </div>
               <div class="start-actions">

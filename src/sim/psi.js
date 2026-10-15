@@ -9,9 +9,9 @@ export const PSI = {
   maxLevel: 6,
   lanceSpeed: 26,
   skills: {
-    skill1: { id: 'skill1', key: 'Q', name: 'Psi Burst', icon: 'burst' },
-    skill2: { id: 'skill2', key: 'E', name: 'Mind Lance', icon: 'lance' },
-    skill3: { id: 'skill3', key: 'C', name: 'Telekinetic Pull', icon: 'pull' },
+    skill1: { id: 'skill1', key: 'Q', name: 'Psi Burst', icon: 'burst', desc: 'Shockwave around you: damages, knocks back and stuns' },
+    skill2: { id: 'skill2', key: 'E', name: 'Mind Lance', icon: 'lance', desc: 'Piercing bolt along your aim' },
+    skill3: { id: 'skill3', key: 'C', name: 'Telekinetic Pull', icon: 'pull', desc: 'Drags foes in and holds them in place' },
   },
 };
 

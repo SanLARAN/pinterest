@@ -1237,4 +1237,14 @@ body.is-touch .skills { display: none; }
 .choice small { display: block; opacity: 0.75; font-size: 12px; }
 .choice[aria-pressed="true"] { background: var(--gold-d); color: #fff; border-color: var(--gold-d); }
 .choice[aria-pressed="true"] small { opacity: 0.9; }
+.hero-block { display: flex; gap: 12px; align-items: flex-start; }
+.hero-portrait { width: 160px; height: 160px; flex: 0 0 160px; border-radius: 12px; background: rgba(255, 255, 255, 0.4); border: 2px solid var(--gold-d); }
+.hero-info { flex: 1 1 auto; min-width: 0; }
+.hero-info .choice-row { margin-bottom: 4px; }
+.ability-list { list-style: none; margin: 6px 0 0; padding: 0; font: 14px var(--body); color: var(--ink); }
+.ability-list li { display: grid; grid-template-columns: auto auto 1fr; gap: 2px 8px; align-items: baseline; padding: 4px 0; border-bottom: 1px dashed rgba(0, 0, 0, 0.12); }
+.ability-list kbd { font-size: 11px; }
+.ability-list b { font-weight: 700; }
+.ability-list span { grid-column: 3; opacity: 0.8; font-size: 12px; }
+.ability-list em { grid-column: 3; font-style: normal; font-size: 12px; color: var(--gold-d); }
 .muted.small { font-size: 13px; }

@@ -14,9 +14,21 @@ export const MODES = {
   },
 };
 
-/** Heroes. Only one for now; the picker is already in place for more. */
+/**
+ * Heroes. Only one for now; the picker is already in place for more.
+ * `moves` are the hero's own actions; `skills` lists the psi skills (see sim/psi.js PSI.skills).
+ */
 export const CHARACTERS = [
-  { id: 'knight', name: 'Sir Pip', blurb: 'The last knight of Emberkeep.' },
+  {
+    id: 'knight',
+    name: 'Sir Pip',
+    blurb: 'The last knight of Emberkeep.',
+    moves: [
+      { key: 'Click', name: 'Swing', desc: 'Sword strike, your basic attack' },
+      { key: 'Shift', name: 'Dash', desc: 'Quick dash with a brief window of invulnerability' },
+    ],
+    skills: ['skill1', 'skill2', 'skill3'],
+  },
 ];
 
 export const DEFAULT_MODE = 'story';
