@@ -103,6 +103,23 @@ say(unknownCalls.size === 0, 'every component call in main.js is defined', [...u
   say(missingFx.length === 0, 'makeComposer returns a real EffectComposer', missingFx.join(', '));
 }
 say(badChunks.length === 0, `all ${chunkRefs} three.js shader chunks exist`, [...new Set(badChunks)].join(', '));
+{
+  // every audible AudioEngine method must sit on a mixer bus, or its slider does nothing
+  const au = readFileSync(join(root, 'src', 'audio', 'audio.js'), 'utf8');
+  const m = au.match(/export const BUS_OF = \{([\s\S]*?)\};/);
+  const keys = m ? [...m[1].matchAll(/(\w+)\s*:/g)].map((x) => x[1]) : [];
+  const starts = [...au.matchAll(/^  ([a-zA-Z_]\w*)\s*\(/gm)];
+  const names = starts.map((x) => x[1]);
+  const low = new Set(['tone', 'noiseHit', 'out', 'spatial', 'env', 'noise', 'makeNoise', 'makeBrown', 'makeIR', 'buildAmbience']);
+  const audible = [];
+  for (let i = 0; i < starts.length; i++) {
+    const body = au.slice(starts[i].index, i + 1 < starts.length ? starts[i + 1].index : au.length);
+    if (/\bthis\.(tone|noiseHit|out|spatial)\(/.test(body)) audible.push(starts[i][1]);
+  }
+  const unrouted = audible.filter((n) => !low.has(n) && !keys.includes(n));
+  say(unrouted.length === 0, `all ${audible.length} audible audio methods sit on a mixer bus`, unrouted.join(', '));
+  say(keys.every((k) => names.includes(k)), 'every BUS_OF entry is a real method', keys.filter((k) => !names.includes(k)).join(', '));
+}
 say(staleBuild.length === 0, 'docs/ build is present and current', staleBuild.join(' | '));
 console.log(`  markup-only ids (styled by CSS, never touched by JS): ${unused.length ? unused.join(', ') : 'none'}`);
 say(unused.every((id) => /^(app|fx)$/.test(id)), 'no markup is dead weight', unused.join(', '));
