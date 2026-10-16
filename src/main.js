@@ -31,6 +31,7 @@ import { Coop, myName } from './net/coop.js';
 import { cleanCode } from './net/net.js';
 import { Lobby } from './ui/lobby.js';
 import { Mates } from './ui/mates.js';
+import { VoiceMix, VoiceList } from './ui/voicemix.js';
 
 setLang(settings.lang);
 
@@ -80,6 +81,8 @@ const input = new Input(canvas);
 input.bindTouchUI($('touch'));
 const coop = new Coop({ audio, mic });
 const mates = new Mates($('mates'));
+const voiceMix = new VoiceMix(audio); // your volume for each friend's voice
+const pauseVoices = new VoiceList($('pauseVoiceRows'), voiceMix, audio);
 let game = null;
 let runOnline = false; // the current / last run is a co-op night
 
@@ -181,7 +184,7 @@ const menus = new Menus({
 
 // ---------------- co-op ----------------
 const lobby = new Lobby({
-  coop, mic, audio,
+  coop, mic, audio, mix: voiceMix,
   onMicToggle: () => toggleMic(),
   uiSound: (k) => {
     if (!audio.ready) return;
@@ -406,7 +409,14 @@ function pause() {
   $('pauseStats').innerHTML = night
     ? `${fmtTime(game.time)} · ${t('generators')} ${game.objectives.count}/5<br>${t('score')} ${fmtScore(game.score)} ×${game.mult.toFixed(1)}`
     : `${t('morningBig')}`;
+  renderPauseVoices();
   menus.only('pause');
+}
+
+// co-op pause: a volume slider for each friend (the night goes on meanwhile)
+function renderPauseVoices() {
+  const list = game && game.online ? [...game.remotes.values()].sort((a, b) => a.slot - b.slot).map((r) => ({ id: r.id, name: r.name, color: r.color, dead: !r.alive })) : [];
+  $('pauseVoices').classList.toggle('show', pauseVoices.render(list) > 0);
 }
 
 function resume() {
@@ -587,6 +597,14 @@ function step(now, render) {
       shared.uCam.value.copy(camera.position);
       game.hudUpdate(rawDt);
       if (runOnline) mates.update(game, camera, input.peekHeld || hud.clock < hud.peekUntil);
+      if (state === 'paused' && runOnline) {
+        pauseVoices.tick();
+        perf.voicesT = (perf.voicesT || 0) + rawDt;
+        if (perf.voicesT > 0.25) {
+          perf.voicesT = 0;
+          renderPauseVoices(); // someone died or dropped while you were in the menu
+        }
+      }
       // pointer-lock hint (or drag-to-look hint when the browser/iframe refuses pointer lock)
       let lockMsg = '';
       if (!input.touch && (game.state === 'play' || game.state === 'morning') && !input.locked) {

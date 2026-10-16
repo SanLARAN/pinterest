@@ -115,29 +115,18 @@ export class Input {
         this.requestLock(true);
         return;
       }
+      // LMB makes no sound — the echo is SPACE (or the ECHO button) only, so a habitual click can't give
+      // you away. It just picks the next friend to watch after you die.
       if (e.button === 0) {
-        if (this.locked) {
-          this.pingHeld = true;
-          this.emit('pingDown');
-        } else {
-          this.mouseDrag = { down: true, x: e.clientX, y: e.clientY, moved: 0, t: performance.now() };
-        }
+        if (this.locked) this.emit('primary');
+        else this.mouseDrag = { down: true, x: e.clientX, y: e.clientY, moved: 0, t: performance.now() };
       } else if (e.button === 2) this.emit('throw');
     });
     window.addEventListener('mouseup', (e) => {
-      if (e.button !== 0) return;
-      if (this.locked && this.pingHeld && !this.keys.has('Space')) {
-        this.pingHeld = false;
-        this.emit('pingUp');
-      }
-      if (this.mouseDrag.down) {
-        const md = this.mouseDrag;
-        md.down = false;
-        if (md.moved < 6 && performance.now() - md.t < 300 && this.gameActive) {
-          this.emit('pingDown');
-          this.emit('pingUp');
-        }
-      }
+      if (e.button !== 0 || !this.mouseDrag.down) return;
+      const md = this.mouseDrag;
+      md.down = false;
+      if (md.moved < 6 && performance.now() - md.t < 300 && this.gameActive) this.emit('primary');
     });
     window.addEventListener('mousemove', (e) => {
       if (this.locked) {

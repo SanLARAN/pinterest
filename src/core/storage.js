@@ -16,6 +16,7 @@ const DEFAULTS = {
   radar: false, // minimal HUD by default; the radar is an opt-in assist
   name: '',
   tutorialDone: false,
+  voiceVol: {}, // co-op: your volume for each friend, by name (only the ones you changed)
 };
 
 function read(key, fallback) {

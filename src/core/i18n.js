@@ -141,15 +141,15 @@ const STR = {
     howtoBody: `
 <p><b>Утро. Лагерь, гудит генератор, поют птицы.</b> А потом свет гаснет разом — и ты в огромном тёмном лесу, где ничего не видно. Любой звук — эхолокатор: волна расходится от тебя и на секунды проявляет деревья, камни… и <span class="red">их</span>.</p>
 <p><b>Цель — запустить пять генераторов.</b> У каждого лежит тело того, кто пытался раньше: обыщи его (удерживай E) — там деталь и записка, где искать следующий. Генератор, о котором ты знаешь, пищит рацией — иди на звук. Починка шумит: стук, искры, рёв мотора при запуске. Запустил — уходи. Вокруг работающего генератора горит лампа: в её свете видно тварей.</p>
-<p><b>Микрофон:</b> щёлкни языком, хлопни, скажи «эй». Громче звук — дальше видно. Но <span class="red">они слышат так же далеко</span>. Крик (кольцо вокруг точки стало красным) — мгновенная охота. <b>Без микрофона:</b> ПРОБЕЛ / ЛКМ — щелчок, удерживай — громче.</p>
+<p><b>Микрофон:</b> щёлкни языком, хлопни, скажи «эй». Громче звук — дальше видно. Но <span class="red">они слышат так же далеко</span>. Крик (кольцо вокруг точки стало красным) — мгновенная охота. <b>Без микрофона:</b> ПРОБЕЛ — щелчок, удерживай — громче.</p>
 <p><b>Слушатели и Ползуны</b> идут туда, где был звук. Пискнул — уходи. Камень (ПКМ / F) уводит их в сторону. Позже приходят двое других, по одному на лес: <b>Наблюдатель</b> глух, но двигается, только пока на него не падает свет, — свети на него; лампы он обходит. <b>Ревун</b> почти не слышит, но иногда набирает воздух и воет: всё, что движется в этой волне, он видит. Услышал вдох — замри.</p>
 <p><b>Интерфейса почти нет.</b> Кольцо вокруг точки — твоя громкость. Tab — время, генераторы и текущая задача. Полоска сверху заполняется с каждым генератором. Через 30 минут лес просыпается окончательно.</p>
 <p><b>Очки:</b> время × множитель опасности, найденные тела, генераторы, осколки, проходы впритык, отрывы. За победу — бонус, и тем больше, чем быстрее.</p>
-<p><b>С друзьями:</b> «С ДРУЗЬЯМИ» → «СОЗДАТЬ» и отправь ссылку (или код) — до 4 игроков в одном лесу. Голоса слышно с той стороны, где стоит друг, и тише издалека; <span class="red">монстры слышат их так же</span>. Эхо друзей тоже освещает лес. Погибший смотрит глазами живых, и живые его не слышат.</p>
+<p><b>С друзьями:</b> «С ДРУЗЬЯМИ» → «СОЗДАТЬ» и отправь ссылку (или код) — до 4 игроков в одном лесу. Голоса слышно с той стороны, где стоит друг, и тише издалека; <span class="red">монстры слышат их так же</span>. Эхо друзей тоже освещает лес. Погибший смотрит глазами живых, и живые его не слышат. Громкость каждого друга — ползунок в лобби и в паузе.</p>
 <table class="keys">
 <tr><td>WASD · стрелки</td><td>движение и поворот</td></tr>
 <tr><td>Мышь</td><td>обзор (клик — захват курсора)</td></tr>
-<tr><td>ПРОБЕЛ / ЛКМ</td><td>эхо: тап — щелчок, удерживай — громко</td></tr>
+<tr><td>ПРОБЕЛ</td><td>эхо: тап — щелчок, удерживай — громко</td></tr>
 <tr><td>E (удерживать)</td><td>обыскать тело · чинить генератор</td></tr>
 <tr><td>ПКМ / F</td><td>бросить камень</td></tr>
 <tr><td>Shift / C</td><td>бег / красться</td></tr>
@@ -211,6 +211,11 @@ const STR = {
     mateStarted: '{name} запустил генератор',
     spectating: 'ты мёртв · глазами: <b>{name}</b>',
     spectNext: 'ПРОБЕЛ / клик — следующий',
+    voicesHead: 'ГОЛОСА',
+    voiceVolume: 'громкость голоса',
+    voiceMute: 'заглушить',
+    voiceUnmute: 'вернуть звук',
+    voiceMuted: 'выкл',
     spectNextTouch: 'тап — следующий',
     spectAllDead: 'ты мёртв',
     teamAlive: 'в живых {n} из {m}',
@@ -359,15 +364,15 @@ const STR = {
     howtoBody: `
 <p><b>Morning. A camp, a humming generator, birdsong.</b> Then the light dies all at once — and you are in a vast dark forest where you cannot see. Every sound is sonar: a wave spreads out from you and for a few seconds reveals trees, rocks… and <span class="red">them</span>.</p>
 <p><b>The goal: start five generators.</b> By each one lies the body of someone who tried before you: search it (hold E) for the part and a note about where the next one is. A generator you know about beeps on its radio — follow the sound. Repairs are noisy: clanks, sparks, the engine roaring to life. Got it running? Leave. A running generator lights a lamp, and in its light you can see them.</p>
-<p><b>Microphone:</b> click your tongue, clap, say “hey”. Louder sound — you see further. But <span class="red">they hear just as far</span>. A scream (the ring around the dot turns red) means an instant hunt. <b>No mic:</b> SPACE / LMB — a click, hold for louder.</p>
+<p><b>Microphone:</b> click your tongue, clap, say “hey”. Louder sound — you see further. But <span class="red">they hear just as far</span>. A scream (the ring around the dot turns red) means an instant hunt. <b>No mic:</b> SPACE — a click, hold for louder.</p>
 <p><b>Listeners and Crawlers</b> walk to where the sound was. Made a noise? Move. A stone (RMB / F) lures them away. Later two others arrive, one of each per forest: <b>the Watcher</b> is deaf but moves only while no light is on it — keep it lit; it won't enter a lamp. <b>The Howler</b> barely hears, but now and then it fills its chest and howls: whatever moves inside that wave, it sees. Hear the breath — freeze.</p>
 <p><b>There is almost no interface.</b> The ring around the dot is your loudness. Tab shows time, generators and the current task. The hairline at the top fills with each generator. After 30 minutes the forest wakes up for good.</p>
 <p><b>Score:</b> time × danger multiplier, bodies found, generators, shards, close calls, escapes. Winning gives a bonus — bigger the faster you are.</p>
-<p><b>With friends:</b> WITH FRIENDS → CREATE and send the link (or code) — up to 4 players in one forest. Voices come from where your friends stand and fade with distance; <span class="red">the monsters hear them just as well</span>. Their echoes light the forest too. The dead watch through the eyes of the living — and the living can't hear them.</p>
+<p><b>With friends:</b> WITH FRIENDS → CREATE and send the link (or code) — up to 4 players in one forest. Voices come from where your friends stand and fade with distance; <span class="red">the monsters hear them just as well</span>. Their echoes light the forest too. The dead watch through the eyes of the living — and the living can't hear them. Each friend's volume has its own slider in the lobby and the pause menu.</p>
 <table class="keys">
 <tr><td>WASD · arrows</td><td>move &amp; turn</td></tr>
 <tr><td>Mouse</td><td>look (click to lock cursor)</td></tr>
-<tr><td>SPACE / LMB</td><td>echo: tap = click, hold = loud</td></tr>
+<tr><td>SPACE</td><td>echo: tap = click, hold = loud</td></tr>
 <tr><td>E (hold)</td><td>search a body · repair a generator</td></tr>
 <tr><td>RMB / F</td><td>throw stone</td></tr>
 <tr><td>Shift / C</td><td>run / sneak</td></tr>
@@ -429,6 +434,11 @@ const STR = {
     mateStarted: '{name} started a generator',
     spectating: "you're dead · watching: <b>{name}</b>",
     spectNext: 'SPACE / click — next',
+    voicesHead: 'VOICES',
+    voiceVolume: 'voice volume',
+    voiceMute: 'mute',
+    voiceUnmute: 'unmute',
+    voiceMuted: 'off',
     spectNextTouch: 'tap — next',
     spectAllDead: "you're dead",
     teamAlive: '{n} of {m} alive',

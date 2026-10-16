@@ -1409,7 +1409,7 @@ export class Game {
   updateDead(dt, raw) {
     if (this.localDeath === true) this.updateDying(dt);
     else if (this.spectate) {
-      for (const e of raw.events) if (e === 'pingDown' || e === 'throw' || e === 'skip') this.nextSpectate();
+      for (const e of raw.events) if (e === 'pingDown' || e === 'primary' || e === 'throw' || e === 'skip') this.nextSpectate();
       if (!this.spectate.target || !this.spectate.target.alive) this.nextSpectate();
     }
     this.mic.update(dt, this.audio.outputDb()); // keeps the meter honest; the dead make no noise

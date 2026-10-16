@@ -68,6 +68,23 @@ function distCurve(amount) {
   return c;
 }
 
+// co-op voices (see voiceAttach). Levels are dBFS of the levelled voice before the limiter; tuned so a friend
+// at arm's length sits clearly above the night's ambience in the speech band (tests: /tmp/harness/voicelevel.mjs)
+const VOICE = {
+  target: -21, // where the auto-level puts a friend's speech (into the limiter)
+  start: -30, // what we assume about a mic we haven't heard yet (between a laptop mic and a headset)
+  minDb: -10, // auto-level range
+  maxDb: 20,
+  gate: -58, // below this nobody is talking
+  hissCeil: -46, // never lift someone's room noise above this
+  limThreshold: -10, // per-voice limiter: speech peaks touch it, screams get held
+  limMakeup: 4.1, // Chrome's DynamicsCompressor adds makeup gain on its own (measured for these settings)
+  post: 4.5, // after the limiter: up to the level we want (≈ -16 LUFS at the output in the lobby)
+  ref: 3, // proximity: full level within 3 m, then a gentle inverse falloff
+  roll: 0.9,
+};
+const dbGain = (db) => Math.pow(10, db / 20);
+
 export class AudioEngine {
   constructor() {
     this.ctx = null;
@@ -78,6 +95,9 @@ export class AudioEngine {
     this._outBuf = null;
     this.offline = false; // true when rendering into an OfflineAudioContext (sound tests)
     this.voices = new Map(); // co-op: friends' microphones
+    this.voiceGains = new Map(); // co-op: your volume for each friend (linear gain), kept across reconnects
+    this.voiceMemo = new Map(); // co-op: what the auto-level learned about each friend's mic (a new stream picks it up)
+    this._agcTimer = 0;
   }
 
   get ready() {
@@ -160,7 +180,7 @@ export class AudioEngine {
     // co-op voices: muffled by a hit like everything else, but never paused (the world doesn't stop online),
     // and fed to the mic's self-gate so a friend in your speakers doesn't count as you making noise
     this.voiceBus = ctx.createGain();
-    this.voiceBus.gain.value = 1.15;
+    this.voiceBus.gain.value = 1;
     this.voiceBus.connect(this.stunLP);
     this.voiceBus.connect(this.gateAnalyser);
 
@@ -512,6 +532,13 @@ export class AudioEngine {
   }
 
   // ---------- co-op voices: a friend's microphone, placed where they stand ----------
+  // Friends' mics arrive raw — no browser auto-gain, because the mic is also everyone's echolocator — so a
+  // laptop mic can be 20 dB quieter than a headset. Each voice is levelled to the same loudness (well above
+  // the night's ambience), a limiter keeps a scream from flattening the whole mix, then your volume for that
+  // friend, then proximity.
+  //   src → hp → lp ─┬→ agc → lim → trim → user → g ─┬→ dry ───────→ voiceBus   (lobby)
+  //                  └→ level (meter + agc input)    ├→ wet → pn ──→ voiceBus   (forest)
+  //                                                  └→ rv ────────→ reverb
   voiceAttach(id, stream) {
     this.init();
     if (!this.ctx) return;
@@ -530,17 +557,29 @@ export class AudioEngine {
       console.warn('[voice] no audio track yet', e);
       return;
     }
-    const hp = this._filter('highpass', 110, 0.7);
-    const lp = this._filter('lowpass', 7200, 0.7);
+    const hp = this._filter('highpass', 100, 0.7);
+    const lp = this._filter('lowpass', 7500, 0.7);
     const level = ctx.createAnalyser();
-    level.fftSize = 256;
+    level.fftSize = 2048;
+    const memo = this.voiceMemo.get(id);
+    const speech = memo ? memo.speech : VOICE.start;
+    const agcDb = memo ? memo.agcDb : VOICE.target - VOICE.start;
+    const agc = this._gain(dbGain(agcDb));
+    const lim = ctx.createDynamicsCompressor();
+    lim.threshold.value = VOICE.limThreshold;
+    lim.knee.value = 6;
+    lim.ratio.value = 8;
+    lim.attack.value = 0.003;
+    lim.release.value = 0.25;
+    const trim = this._gain(dbGain(VOICE.post - VOICE.limMakeup)); // (minus the makeup the compressor adds on its own)
+    const user = this._gain(this.voiceGains.has(id) ? this.voiceGains.get(id) : 1);
     const g = this._gain(1); // mute / proximity fade
     const dry = this._gain(1); // lobby: straight into your ears
     const wet = this._gain(0); // in the forest: from where they are
     const rv = this._gain(0); // ...with a little of the forest around it
-    const pn = this._panner(0, 0, 0, 2.2, 1.15);
+    const pn = this._panner(0, 0, 0, VOICE.ref, VOICE.roll);
     pn.maxDistance = 90;
-    src.connect(hp).connect(lp).connect(g);
+    src.connect(hp).connect(lp).connect(agc).connect(lim).connect(trim).connect(user).connect(g);
     lp.connect(level);
     g.connect(dry);
     g.connect(wet);
@@ -548,7 +587,55 @@ export class AudioEngine {
     dry.connect(this.voiceBus);
     wet.connect(pn).connect(this.voiceBus);
     rv.connect(this.revSend);
-    this.voices.set(id, { el, src, hp, lp, g, dry, wet, rv, pn, level, buf: new Float32Array(256), spatial: false });
+    this.voices.set(id, {
+      el, src, hp, lp, agc, lim, trim, user, g, dry, wet, rv, pn, level, buf: new Float32Array(level.fftSize), spatial: false,
+      speech, floor: memo ? memo.floor : -62, agcDb, db: -100,
+      hist: new Float32Array(50), hn: 0, hi: 0, sorted: new Float32Array(50),
+    });
+    if (!this._agcTimer) this._agcTimer = setInterval(() => this._voiceAgc(), 100);
+  }
+
+  // auto-level: follow how loud this friend talks (fast up, slow down, only while they're clearly talking)
+  // and steer the gain toward the target — but never lift their background hiss above VOICE.hissCeil
+  _voiceAgc() {
+    if (!this.voices.size || !this.ctx) {
+      clearInterval(this._agcTimer);
+      this._agcTimer = 0;
+      return;
+    }
+    const t = this.now;
+    for (const v of this.voices.values()) {
+      v.level.getFloatTimeDomainData(v.buf);
+      let s = 0;
+      for (let i = 0; i < v.buf.length; i++) s += v.buf[i] * v.buf[i];
+      const db = 10 * Math.log10(s / v.buf.length + 1e-12);
+      v.db = db;
+      // the room behind them: a low percentile of the last 5 s (digital silence — muted, not started — doesn't count)
+      if (db > -90) {
+        v.hist[v.hi] = db;
+        v.hi = (v.hi + 1) % v.hist.length;
+        v.hn = Math.min(v.hist.length, v.hn + 1);
+        const srt = v.sorted.subarray(0, v.hn);
+        srt.set(v.hist.subarray(0, v.hn));
+        srt.sort();
+        v.floor = srt[Math.floor(v.hn * 0.08)];
+      }
+      if (db > VOICE.gate && db > v.floor + 9) v.speech += (db - v.speech) * (db > v.speech ? 0.22 : 0.035);
+      let want = VOICE.target - v.speech;
+      want = Math.min(want, VOICE.hissCeil - v.floor);
+      want = Math.max(VOICE.minDb, Math.min(VOICE.maxDb, want));
+      if (Math.abs(want - v.agcDb) > 0.2) {
+        v.agcDb = want;
+        v.agc.gain.setTargetAtTime(dbGain(want), t, 0.25);
+      }
+    }
+  }
+
+  // your volume for one friend (linear gain; 0 = muted). Remembered even before their voice connects.
+  voiceVolume(id, gain) {
+    this.voiceGains.set(id, gain);
+    const v = this.voices.get(id);
+    if (v) v.user.gain.setTargetAtTime(gain, this.now, 0.04);
   }
 
   voiceSpatial(id, on) {
@@ -584,16 +671,21 @@ export class AudioEngine {
     v.level.getFloatTimeDomainData(v.buf);
     let s = 0;
     for (let i = 0; i < v.buf.length; i++) s += v.buf[i] * v.buf[i];
-    const db = 20 * Math.log10(Math.sqrt(s / v.buf.length) + 1e-9);
-    return Math.max(0, Math.min(1, (db + 55) / 40));
+    // as you hear them: after the auto-level and your volume for them
+    const u = v.user.gain.value;
+    if (u < 0.001) return 0;
+    const db = 10 * Math.log10(s / v.buf.length + 1e-12) + v.agcDb + 20 * Math.log10(u);
+    return Math.max(0, Math.min(1, (db + 50) / 34));
   }
 
   voiceDetach(id) {
     const v = this.voices.get(id);
     if (!v) return;
     this.voices.delete(id);
+    this.voiceMemo.set(id, { speech: v.speech, agcDb: v.agcDb, floor: v.floor });
     try {
       v.src.disconnect();
+      v.lp.disconnect();
       v.g.disconnect();
       v.pn.disconnect();
       v.rv.disconnect();

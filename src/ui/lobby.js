@@ -11,10 +11,12 @@ const MIC_ON = '<svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11"
 const MIC_OFF = '<svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M4 4l16 16"/></svg>';
 
 export class Lobby {
-  constructor({ coop, mic, audio, onMicToggle, uiSound }) {
+  constructor({ coop, mic, audio, mix, onMicToggle, uiSound }) {
     this.coop = coop;
     this.mic = mic;
     this.audio = audio;
+    this.mix = mix; // per-friend voice volume
+    this.rows = new Map(); // roster rows, keyed: p:<id> seated · e:<slot> free seat · w:<id> connecting
     this.onMicToggle = onMicToggle;
     this.uiSound = uiSound;
     this.el = $('coopPanel');
@@ -164,37 +166,80 @@ export class Lobby {
     start.disabled = !c.isHost || c.status === 'joining';
   }
 
+  // rows are kept and updated in place (a slider being dragged must survive the ping refreshes)
   _renderList() {
     const c = this.coop;
     const seated = c.players();
-    const rows = [];
+    const want = [];
     for (let s = 0; s < MAX_PLAYERS; s++) {
       const p = seated.find((q) => q.slot === s);
-      if (!p) {
-        rows.push(`<div class="row empty"><i class="dot"></i><span class="n">${esc(t('coopFree'))}</span><span></span><span class="p"></span></div>`);
-        continue;
-      }
-      const tags = [];
-      if (p.self) tags.push(t('coopYou'));
-      if (p.host) tags.push(t('coopHost'));
-      const rtt = p.self ? null : c.rtt(p.id);
-      rows.push(
-        `<div class="row" data-id="${esc(p.id)}"><i class="dot" style="--c:${PLAYER_COLORS[s]}"></i>` +
-          `<span class="n">${esc(p.name)}${tags.map((x) => `<em>${esc(x)}</em>`).join('')}</span>` +
-          `<span class="mic ${p.mic ? 'on' : 'off'}">${p.mic ? MIC_ON : MIC_OFF}</span>` +
-          `<span class="p">${rtt != null ? `${rtt} ${esc(t('ms'))}` : ''}</span></div>`,
-      );
+      want.push(p ? { key: `p:${p.id}`, p, s } : { key: `e:${s}`, s });
     }
     // in the room but not seated yet (connecting to the host)
-    for (const p of c.everyone()) {
-      if (p.slot >= 0) continue;
-      rows.push(`<div class="row wait"><i class="dot"></i><span class="n">${esc(p.name || '…')}${p.self ? `<em>${esc(t('coopYou'))}</em>` : ''}</span><span></span><span class="p">…</span></div>`);
-    }
-    const html = rows.join('');
+    for (const p of c.everyone()) if (p.slot < 0) want.push({ key: `w:${p.id}`, p, wait: true });
     const list = $('coopList');
-    if (list._html !== html) {
-      list._html = html;
-      list.innerHTML = html;
+    const keys = new Set(want.map((w) => w.key));
+    for (const [k, el] of this.rows) {
+      if (!keys.has(k)) {
+        el.remove();
+        this.rows.delete(k);
+      }
+    }
+    let prev = null;
+    for (const w of want) {
+      let el = this.rows.get(w.key);
+      if (!el) {
+        el = document.createElement('div');
+        el.innerHTML = '<i class="dot"></i><span class="n"></span><span class="mic"></span><span class="p"></span>';
+        if (w.p && !w.wait) el.dataset.id = w.p.id;
+        this.rows.set(w.key, el);
+      }
+      this._fillRow(el, w);
+      const at = prev ? prev.nextSibling : list.firstChild;
+      if (at !== el) list.insertBefore(el, at);
+      prev = el;
+    }
+  }
+
+  _fillRow(el, w) {
+    const [dot, n, mic, ping] = el.children;
+    const set = (node, html) => {
+      if (node._html !== html) {
+        node._html = html;
+        node.innerHTML = html;
+      }
+    };
+    const p = w.p;
+    if (!p) {
+      el.className = 'row empty';
+      set(n, esc(t('coopFree')));
+      return;
+    }
+    if (w.wait) {
+      el.className = 'row wait';
+      set(n, `${esc(p.name || '…')}${p.self ? `<em>${esc(t('coopYou'))}</em>` : ''}`);
+      set(ping, '…');
+      return;
+    }
+    el.className = `row${p.self ? ' self' : ' mate'}${p.mic ? '' : ' nomic'}`;
+    dot.style.setProperty('--c', PLAYER_COLORS[w.s]);
+    const tags = [];
+    if (p.self) tags.push(t('coopYou'));
+    if (p.host) tags.push(t('coopHost'));
+    set(n, `${esc(p.name)}${tags.map((x) => `<em>${esc(x)}</em>`).join('')}`);
+    mic.className = `mic ${p.mic ? 'on' : 'off'}`;
+    set(mic, p.mic ? MIC_ON : MIC_OFF);
+    const rtt = p.self ? null : this.coop.rtt(p.id);
+    set(ping, rtt != null ? `${rtt} ${esc(t('ms'))}` : '');
+    // a friend: how loud you hear them
+    if (!p.self && this.mix) {
+      this.mix.bind(p.id, p.name);
+      if (!el._vol) {
+        el._vol = this.mix.control(p.id);
+        el.appendChild(el._vol);
+      }
+      el._vol.style.setProperty('--c', PLAYER_COLORS[w.s]);
+      this.mix.sync(el._vol);
     }
   }
 

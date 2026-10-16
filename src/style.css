@@ -531,3 +531,70 @@ body.coop-over .team-table { display: flex; }
   #coopPanel .btn { padding: 8px 14px; }
   .coop-msg .dim { margin-top: 1px; }
 }
+
+/* ---------------- co-op: your volume for each friend ---------------- */
+.vol { display: flex; align-items: center; gap: 6px; min-width: 0; --fill: 50%; }
+.vol-mute {
+  flex: 0 0 auto; width: 26px; height: 24px; padding: 0; display: inline-flex; align-items: center; justify-content: center;
+  background: none; border: 0; border-radius: 2px; cursor: pointer; color: var(--ash); opacity: 0.75; transition: opacity 0.2s, color 0.2s;
+}
+.vol-mute:hover, .vol-mute:focus-visible { opacity: 1; color: var(--bone); outline: none; }
+.vol-mute svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.vol.muted .vol-mute { color: var(--red); opacity: 1; }
+.vol-range {
+  flex: 1 1 auto; min-width: 64px; height: 24px; margin: 0; padding: 0; background: transparent; cursor: pointer;
+  -webkit-appearance: none; appearance: none; touch-action: none;
+}
+.vol-range:focus { outline: none; }
+.vol-range::-webkit-slider-runnable-track {
+  height: 2px; border-radius: 2px;
+  background: linear-gradient(90deg, var(--c, var(--bone)) var(--fill), rgba(167, 180, 182, 0.18) var(--fill));
+}
+.vol-range::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none; width: 12px; height: 12px; margin-top: -5px; border: 0; border-radius: 50%;
+  background: var(--c, var(--bone)); box-shadow: 0 0 8px var(--c, transparent); transition: transform 0.12s;
+}
+.vol-range:hover::-webkit-slider-thumb, .vol-range:active::-webkit-slider-thumb { transform: scale(1.25); }
+.vol-range:focus-visible::-webkit-slider-thumb { outline: 1px solid var(--bone); outline-offset: 2px; }
+.vol-range::-moz-range-track { height: 2px; border: 0; border-radius: 2px; background: rgba(167, 180, 182, 0.18); }
+.vol-range::-moz-range-progress { height: 2px; border-radius: 2px; background: var(--c, var(--bone)); }
+.vol-range::-moz-range-thumb { width: 12px; height: 12px; border: 0; border-radius: 50%; background: var(--c, var(--bone)); box-shadow: 0 0 8px var(--c, transparent); }
+.vol-v { flex: 0 0 auto; min-width: 36px; text-align: right; font-size: 10px; letter-spacing: 0.04em; color: var(--ash-dim); font-variant-numeric: tabular-nums; }
+.vol.muted .vol-range { opacity: 0.4; }
+.vol.muted .vol-v { color: var(--red-dim); text-transform: uppercase; letter-spacing: 0.14em; }
+body.touch .vol-range { height: 32px; }
+body.touch .vol-range::-webkit-slider-thumb { width: 18px; height: 18px; margin-top: -8px; }
+body.touch .vol-range::-moz-range-thumb { width: 18px; height: 18px; }
+body.touch .vol-mute { width: 34px; height: 32px; }
+
+/* lobby: the slider sits under a friend's name */
+#coopList .row.mate { row-gap: 0; padding-bottom: 4px; }
+#coopList .row .vol { grid-column: 2 / -1; }
+#coopList .row.nomic .vol { opacity: 0.5; }
+
+/* pause (co-op): everyone's voice in one place */
+.voice-list { display: none; flex-direction: column; margin-top: 6px; padding-top: 10px; border-top: 1px solid rgba(167, 180, 182, 0.1); text-align: left; }
+body.coop .voice-list.show { display: flex; }
+.voice-list .vh { font-size: 10px; letter-spacing: 0.32em; text-indent: 0.32em; color: var(--ash-dim); text-align: center; margin-bottom: 2px; }
+.voice-list .vrow { display: grid; grid-template-columns: 10px minmax(0, 1fr) minmax(150px, 1.6fr); gap: 10px; align-items: center; padding: 2px; font-size: 12px; }
+.voice-list .vrow .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--c); box-shadow: 0 0 calc(3px + var(--lv, 0) * 14px) var(--c); transition: box-shadow 0.08s; }
+.voice-list .vrow .n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--bone); }
+.voice-list .vrow .n em { font-style: normal; font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ash-dim); margin-left: 6px; }
+.voice-list .vrow.dead .n { color: var(--ash-dim); }
+.voice-list .vrow.dead .dot { background: #4a4f50; box-shadow: none; }
+@media (max-height: 520px) {
+  /* short screens (phones on their side): the slider moves onto the name's line */
+  #coopList .row { grid-template-columns: 14px minmax(0, 1fr) minmax(120px, 1.25fr) auto 40px; column-gap: 8px; }
+  #coopList .row .vol { grid-column: 3; grid-row: 1; }
+  #coopList .row .mic { grid-column: 4; }
+  #coopList .row .p { grid-column: 5; min-width: 40px; }
+  #coopList .row:not(.mate) .n { grid-column: 2 / 4; }
+  #coopList .row.mate { padding-bottom: 5px; }
+  .vol-v { min-width: 30px; }
+  body.touch .vol-range { height: 26px; }
+  body.touch .vol-mute { width: 30px; height: 26px; }
+  #pause .center-panel { gap: 7px; }
+  #pause .mini-stats { margin-bottom: 4px; }
+  .voice-list { margin-top: 2px; padding-top: 6px; }
+  .voice-list .vrow { padding: 0 2px; }
+}
