@@ -43,8 +43,12 @@ jobs:
         with:
           path: docs
 
+  # The github-pages environment on this repo currently allows deployment from one
+  # specific branch only, so deploying from a feature branch can never succeed.
+  # Build (and test) on every push, publish from main or on a manual dispatch.
   deploy:
     needs: build
+    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
