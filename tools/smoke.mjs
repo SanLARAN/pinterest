@@ -551,25 +551,37 @@ log('\n== SOAK ==');
   const g = new Game({ seed: 1234, nightLength: 1800, headless: true, host: true });
   g.reset({ seed: 1234, nightLength: 1800 });
   const dt = 1 / 60;
-  let steps = 0;
-  const t0 = Date.now();
-  let maxStep = 0;
-  while (steps < 60 * 60 * 8 && g.phase !== 'over') {
+  const drive = (steps) => {
     g.local.nerve = 3; g.local.iframe = 99;
     g.local.inputs.az = Math.sin(steps / 90) > 0 ? 1 : 0;
     g.local.inputs.ax = Math.cos(steps / 140);
     g.local.tYaw += 0.01;
     if (steps % 150 === 0) g.ping(g.local, 0.3 + (steps % 600) / 900);
+  };
+  // let V8 finish compiling before timing anything, or we measure the JIT, not the sim
+  for (let i = 0; i < 1200 && g.phase !== 'over'; i++) { drive(i); g.update(dt); }
+  const times = [];
+  let steps = 0;
+  const t0 = Date.now();
+  while (steps < 60 * 60 * 8 && g.phase !== 'over') {
+    drive(steps);
     const s = process.hrtime.bigint();
     g.update(dt);
-    const e = Number(process.hrtime.bigint() - s) / 1e6;
-    if (e > maxStep) maxStep = e;
+    times.push(Number(process.hrtime.bigint() - s) / 1e6);
     steps++;
   }
   const wall = Date.now() - t0;
-  log(`  ${steps} steps / ${(wall / 1000).toFixed(1)}s wall = ${(steps / (wall / 1000)).toFixed(0)}x realtime, max step ${maxStep.toFixed(2)}ms`);
+  const sorted = Float64Array.from(times).sort();
+  const pct = (q) => sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * q))];
+  const mean = times.reduce((a, b) => a + b, 0) / times.length;
+  log(`  ${steps} steps / ${(wall / 1000).toFixed(1)}s wall = ${(steps / (wall / 1000)).toFixed(0)}x realtime`);
+  log(`  step cost: mean ${mean.toFixed(3)}ms  p50 ${pct(0.5).toFixed(3)}ms  p99 ${pct(0.99).toFixed(2)}ms  p99.9 ${pct(0.999).toFixed(2)}ms  max ${sorted[sorted.length - 1].toFixed(2)}ms`);
   check('8 min of sim in <20s wall', wall < 20000, wall + 'ms');
-  check('no single step over 25ms', maxStep < 25, maxStep.toFixed(2) + 'ms');
+  // a frame is 16.7ms; the sim must stay a rounding error inside it.
+  // Percentiles, not the raw max: a GC pause on a shared CI runner is not a regression.
+  check('typical step is far inside a 60fps frame', pct(0.5) < 1.0, pct(0.5).toFixed(3) + 'ms p50');
+  check('p99 step stays under a millisecond-ish', pct(0.99) < 3.0, pct(0.99).toFixed(2) + 'ms p99');
+  check('p99.9 step leaves room for the render', pct(0.999) < 10.0, pct(0.999).toFixed(2) + 'ms p99.9');
   check('monsters capped', g.monsters.length <= 8, String(g.monsters.length));
   check('waves capped', g.waves.length <= 8, String(g.waves.length));
   check('no NaN in player', Number.isFinite(g.local.x) && Number.isFinite(g.local.z) && Number.isFinite(g.local.y));

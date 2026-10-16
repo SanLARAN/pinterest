@@ -44,6 +44,25 @@ for (const f of files) {
   }
 }
 
+// API surface: every component method main.js calls must be defined somewhere in src/
+// (a typo here only explodes at runtime in a real browser)
+const defined = new Set();
+for (const f of files) {
+  const s = readFileSync(f, 'utf8');
+  for (const m of s.matchAll(/^[ \t]{2}(?:static\s+|async\s+|get\s+|set\s+)?([A-Za-z_$][\w$]*)\s*\(/gm)) defined.add(m[1]);
+  for (const m of s.matchAll(/^export\s+(?:async\s+)?function\s+([A-Za-z_$][\w$]*)/gm)) defined.add(m[1]);
+  for (const m of s.matchAll(/^[ \t]{2}([A-Za-z_$][\w$]*)\s*=[^=]/gm)) defined.add(m[1]);   // arrow-fn class fields
+}
+// components we own. `composer` is deliberately absent: makeComposer() hands back a
+// three.js EffectComposer, whose setSize/setPixelRatio/render belong to three, not to us.
+const COMPONENTS = new Set(['scene', 'particles', 'rig', 'mviews', 'hud', 'screens', 'audio', 'mic', 'input', 'coop', 'game', 'auras', 'points', 'i18n', 'perf', 'world', 'fxEl', 'app']);
+const srcMain = readFileSync(join(root, 'src', 'main.js'), 'utf8');
+const unknownCalls = new Set();
+for (const m of srcMain.matchAll(/this\.([A-Za-z_$][\w$]*)\.([A-Za-z_$][\w$]*)\s*\(/g)) {
+  if (!COMPONENTS.has(m[1])) continue;
+  if (!defined.has(m[2])) unknownCalls.add(`this.${m[1]}.${m[2]}()`);
+}
+
 // shader integrity: every three.js chunk we #include must actually exist
 const THREE = await import('three');
 const chunks = THREE.ShaderChunk || {};
@@ -76,6 +95,13 @@ console.log('\n== UI WIRING ==');
 console.log(`  ${ids.size} ids in index.html, ${wanted.size} referenced from src/, ${files.length} modules`);
 say(missing.length === 0, 'every id the code asks for exists', missing.join(', '));
 say(badKeys.length === 0, 'every i18n key is defined in RU and EN', [...new Set(badKeys)].join(', '));
+say(unknownCalls.size === 0, 'every component call in main.js is defined', [...unknownCalls].join(', '));
+{
+  const fx = readFileSync(join(root, 'src', 'render', 'fx.js'), 'utf8');
+  const needs = ['setSize', 'setPixelRatio', 'render'];
+  const missingFx = needs.filter((m) => !new RegExp('composer\\.' + m + '|\\.' + m + '\\(').test(fx) && !fx.includes('new EffectComposer'));
+  say(missingFx.length === 0, 'makeComposer returns a real EffectComposer', missingFx.join(', '));
+}
 say(badChunks.length === 0, `all ${chunkRefs} three.js shader chunks exist`, [...new Set(badChunks)].join(', '));
 say(staleBuild.length === 0, 'docs/ build is present and current', staleBuild.join(' | '));
 console.log(`  markup-only ids (styled by CSS, never touched by JS): ${unused.length ? unused.join(', ') : 'none'}`);
