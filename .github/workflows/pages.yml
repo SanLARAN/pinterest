@@ -1,10 +1,11 @@
 # GitHub Pages for the game: https://sanlaran.github.io/pinterest/
 #
 # Two ways Pages can be set up (Settings → Pages → Build and deployment → Source):
-#  • "Deploy from a branch" (current): Pages serves this branch as-is. The root index.html redirects
-#    to ./play/, a prebuilt copy committed with the sources (`npm run build:pages`). This workflow
-#    checks that ./play/ matches the sources, so a stale copy can't slip through.
-#  • "GitHub Actions": this workflow builds dist/ and deploys it itself; ./play/ is then unused.
+#  • "GitHub Actions" (current): this workflow builds dist/ and deploys it itself — the game is at the
+#    site root. The prebuilt ./play/ rides along at /play/, so links from the other mode keep working.
+#  • "Deploy from a branch": Pages serves this branch as-is. The root index.html redirects to ./play/,
+#    a prebuilt copy committed with the sources (`npm run build:pages`).
+# Either way this workflow checks that ./play/ matches the sources, so a stale copy can't slip through.
 name: Pages (HUSH)
 
 on:
@@ -51,6 +52,9 @@ jobs:
           mode=$(gh api "repos/${{ github.repository }}/pages" --jq .build_type 2>/dev/null || echo none)
           echo "Pages build_type: $mode"
           echo "build_type=$mode" >> "$GITHUB_OUTPUT"
+      - name: Old /play/ links keep working
+        if: steps.mode.outputs.build_type == 'workflow'
+        run: cp -r play dist/play
       - if: steps.mode.outputs.build_type == 'workflow'
         uses: actions/configure-pages@v6
       - if: steps.mode.outputs.build_type == 'workflow'

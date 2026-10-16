@@ -1,8 +1,8 @@
 import { defineConfig } from 'vite';
 
-// GitHub Pages serves this branch as-is ("deploy from a branch"), so the root index.html — the dev
-// entry — carries a tiny redirect to the prebuilt game in ./play/. Built pages must not redirect
-// (they ARE the game), so the snippet is stripped from every build.
+// When GitHub Pages serves this branch as-is ("deploy from a branch"), the root index.html — the dev
+// entry — redirects to the prebuilt game in ./play/. Built pages must not redirect (they ARE the
+// game), so the snippet is stripped from every build.
 const stripPagesRedirect = {
   name: 'strip-pages-redirect',
   transformIndexHtml: {
