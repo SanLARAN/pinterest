@@ -44,6 +44,19 @@ for (const f of files) {
   }
 }
 
+// shader integrity: every three.js chunk we #include must actually exist
+const THREE = await import('three');
+const chunks = THREE.ShaderChunk || {};
+const badChunks = [];
+let chunkRefs = 0;
+for (const f of files) {
+  const s = readFileSync(f, 'utf8');
+  for (const m of s.matchAll(/#include\s*<([\w]+)>/g)) {
+    chunkRefs++;
+    if (!(m[1] in chunks)) badChunks.push(m[1] + ' (' + f.split('/').pop() + ')');
+  }
+}
+
 // build freshness: every asset referenced by docs/index.html must exist
 const docsIdx = join(root, 'docs', 'index.html');
 let staleBuild = [];
@@ -63,6 +76,7 @@ console.log('\n== UI WIRING ==');
 console.log(`  ${ids.size} ids in index.html, ${wanted.size} referenced from src/, ${files.length} modules`);
 say(missing.length === 0, 'every id the code asks for exists', missing.join(', '));
 say(badKeys.length === 0, 'every i18n key is defined in RU and EN', [...new Set(badKeys)].join(', '));
+say(badChunks.length === 0, `all ${chunkRefs} three.js shader chunks exist`, [...new Set(badChunks)].join(', '));
 say(staleBuild.length === 0, 'docs/ build is present and current', staleBuild.join(' | '));
 console.log(`  markup-only ids (styled by CSS, never touched by JS): ${unused.length ? unused.join(', ') : 'none'}`);
 say(unused.every((id) => /^(app|fx)$/.test(id)), 'no markup is dead weight', unused.join(', '));

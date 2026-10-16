@@ -213,17 +213,26 @@ tools/smoke.mjs     headless-тесты симуляции + tools/bot.mjs (бо
 
 ## Публикация на GitHub Pages
 
-Репозиторий публикует собранный билд из `docs/`. Есть два пути:
+Билд лежит в `docs/` и коммитится в репозиторий, поэтому опубликовать игру можно двумя
+путями. Сейчас в настройках репозитория Pages указывает на ветку, которой больше нет
+(`arena/2a2936ce-pinterest`), — её нужно один раз переключить руками (API для этого
+требует право `pages:write`, которого нет у токена бота).
 
-**A. GitHub Actions (рекомендуется).** `.github/workflows/deploy.yml` прогоняет
-`npm run smoke`, собирает билд и деплоит `docs/` через `actions/deploy-pages`.
-Нужно один раз включить: **Settings → Pages → Build and deployment → Source:
-`GitHub Actions`**. Дальше каждый пуш в `main` деплоит сам.
+**Вариант A — самый быстрый (3 клика, CI не нужен).**
+Settings → Pages → *Build and deployment* → Source: **Deploy from a branch** →
+Branch: **`main`**, папка **`/docs`** → Save.
+Через минуту игра живёт на <https://sanlaran.github.io/pinterest/>. В `docs/` есть
+`.nojekyll`, так что GitHub ничего не пересобирает и не правит.
 
-**B. Legacy‑сборка.** Если источник оставить «Deploy from a branch», укажи ветку `main`
-и папку `/docs` — собранный билд уже лежит в репозитории, сборка на стороне Pages не нужна.
+**Вариант B — автодеплой через Actions.**
+1. Settings → Pages → Source: **GitHub Actions**.
+2. Settings → Environments → `github-pages` → *Deployment branches*: сейчас там разрешена
+   только ветка `arena/2a2936ce-pinterest`. Поставь **All branches** (или добавь `main`).
+3. Дальше каждый пуш прогоняет `npm test` (88 проверок симуляции + сверка разметки),
+   собирает билд и деплоит `docs/`. Статус: <https://github.com/SanLARAN/pinterest/actions>
 
-Адрес после публикации: <https://sanlaran.github.io/pinterest/>
+Оба варианта дают один и тот же результат; A не зависит от CI, B сам проверяет игру перед
+публикацией. После мержа в `main` работает и то и другое.
 
 ### Обязательные ограничения браузера
 
