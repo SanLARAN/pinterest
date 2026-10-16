@@ -45,6 +45,9 @@ export class Input {
     this.moveOrigin = null;
     this.lookPointer = null;
     this.knobL = document.getElementById('tKnobL');
+    this.knobR = document.getElementById('tKnobR');
+    this.stickR = document.getElementById('tStickR');
+    this.lookOrigin = null;
     this.stickL = document.getElementById('tStickL');
     this.bind();
   }
@@ -116,8 +119,8 @@ export class Input {
     btn('btnCrouch', () => { this.s.breath = !this.s.breath; }, null);
     btn('btnShout', () => { this.s.pressed.shout = true; this.s.shout = true; }, () => { this.s.shout = false; });
     btn('btnPause', () => { this.s.pressed.pause = true; }, null);
-    const sr = document.getElementById('tStickR');
-    if (sr) sr.style.display = 'none';
+    // the right stick floats to wherever the thumb lands, so look input is visible
+    if (this.stickR) { this.stickR.style.pointerEvents = 'none'; this.stickR.style.opacity = '0'; }
   }
 
   clearButtons() {
@@ -184,6 +187,19 @@ export class Input {
       try { el.setPointerCapture(e.pointerId); } catch (err) {}
     } else if (role === 'look') {
       this.lookPointer = { id: e.pointerId, x: e.clientX, y: e.clientY };
+      if (this.stickR) {
+        const w = this.stickR.offsetWidth || 160;
+        this.lookOrigin = { x: e.clientX, y: e.clientY, r: w * 0.36 };
+        this.stickR.style.left = (e.clientX - w / 2) + 'px';
+        this.stickR.style.top = (e.clientY - w / 2) + 'px';
+        this.stickR.style.right = 'auto';
+        this.stickR.style.bottom = 'auto';
+        this.stickR.style.opacity = '0.8';
+        if (this.knobR) {
+          this.knobR.style.transition = 'none';
+          this.knobR.style.left = '50%'; this.knobR.style.top = '50%';
+        }
+      }
       try { el.setPointerCapture(e.pointerId); } catch (err) {}
     }
   }
@@ -205,6 +221,14 @@ export class Input {
       this.lookPointer.x = e.clientX; this.lookPointer.y = e.clientY;
       this.s.lookDX += dx * this.sens * 1.6;
       this.s.lookDY += dy * this.sens * 1.6;
+      if (this.knobR && this.lookOrigin) {
+        const o = this.lookOrigin;
+        let nx = (e.clientX - o.x) / o.r, ny = (e.clientY - o.y) / o.r;
+        const m = Math.hypot(nx, ny);
+        if (m > 1) { nx /= m; ny /= m; }
+        this.knobR.style.left = `calc(50% + ${(nx * o.r).toFixed(1)}px)`;
+        this.knobR.style.top = `calc(50% + ${(ny * o.r).toFixed(1)}px)`;
+      }
     }
   }
   touchUp(e, role, el) {
@@ -219,6 +243,9 @@ export class Input {
       }
     } else if (role === 'look' && this.lookPointer && this.lookPointer.id === e.pointerId) {
       this.lookPointer = null;
+      this.lookOrigin = null;
+      if (this.stickR) this.stickR.style.opacity = '0';
+      if (this.knobR) { this.knobR.style.transition = ''; this.knobR.style.left = '50%'; this.knobR.style.top = '50%'; }
     }
   }
 

@@ -28,10 +28,11 @@ jobs:
       - name: Install
         run: npm ci
 
-      # The whole simulation is pure and Node-importable, so CI plays the game
-      # headlessly (a bot repairs all 5 generators) before we publish anything.
-      - name: Simulation smoke test
-        run: npm run smoke
+      # The simulation is pure and Node-importable, so CI plays the game headlessly
+      # (a bot loots every body and repairs all 5 generators) and verifies the UI wiring
+      # and build freshness before we publish anything.
+      - name: Tests
+        run: npm test
 
       - name: Build
         run: npm run build
