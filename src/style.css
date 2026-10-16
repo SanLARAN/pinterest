@@ -331,3 +331,61 @@ kbd{font-family:var(--mono);font-size:.78em;border:1px solid var(--line);border-
   .keys li:nth-child(n+8){display:none}
   .hs{max-height:16vh}
 }
+
+/* ============================================================
+   SETTINGS — slim terminal sliders for the audio mix
+   ============================================================ */
+.slider{display:grid;grid-template-columns:1fr auto;gap:1px 8px;align-items:center;margin:8px 0 2px}
+.slider label{grid-column:1;font-size:.74em;letter-spacing:.14em;color:var(--phos-dim);text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.slider b{grid-column:2;font-size:.74em;color:var(--phos);font-variant-numeric:tabular-nums;min-width:5ch;text-align:right}
+.slider input[type=range]{grid-column:1/-1;-webkit-appearance:none;appearance:none;width:100%;height:16px;background:transparent;cursor:pointer;margin:0;padding:0}
+.slider input[type=range]::-webkit-slider-runnable-track{height:3px;background:linear-gradient(90deg,var(--phos-deep),var(--line-hot));border:0}
+.slider input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:11px;height:11px;margin-top:-4px;background:var(--phos);border:0;border-radius:0;box-shadow:0 0 9px rgba(125,255,216,.85)}
+.slider input[type=range]::-moz-range-track{height:3px;background:linear-gradient(90deg,var(--phos-deep),var(--line-hot));border:0}
+.slider input[type=range]::-moz-range-thumb{width:11px;height:11px;border:0;border-radius:0;background:var(--phos);box-shadow:0 0 9px rgba(125,255,216,.85)}
+.slider input[type=range]:active::-webkit-slider-thumb{background:#fff}
+.slider input[type=range]:focus-visible{outline:1px solid var(--line-hot);outline-offset:4px}
+.slider.off label{color:rgba(125,255,216,.28)}
+
+/* ============================================================
+   HUD DENSITY — the less interface, the more forest.
+   'min' keeps only what the game cannot be played without;
+   'none' keeps only what keeps you alive.
+   ============================================================ */
+#hud{transition:opacity .8s ease}
+#hud.faded{opacity:.14}
+#hud.faded .hud-top-right{opacity:.6}
+#hud.faded .micbox{opacity:.55}
+
+#hud.min .clock,
+#hud.min .nt-label,
+#hud.min .nt-bar,
+#hud.min .hud-compass,
+#hud.min .meter,
+#hud.min .stamina-label,
+#hud.min .score,
+#hud.min .pingcd,
+#hud.min .silence,
+#hud.min .reticle,
+#hud.min .hud-hint{display:none}
+
+#hud.none .hud-top-left,
+#hud.none .hud-compass,
+#hud.none .meter,
+#hud.none .stamina-label,
+#hud.none .score,
+#hud.none .gens,
+#hud.none .pingcd,
+#hud.none .silence,
+#hud.none .reticle,
+#hud.none .hud-hint,
+#hud.none .objective,
+#hud.none .radar-tag,
+#hud.none .mic-title,
+#hud.none .mic-hint{display:none}
+#hud.none .hud-top-right{opacity:.78}
+#hud.none .micbox{opacity:.62}
+#hud.none .nerve{opacity:.8}
+
+/* one quiet line of explanation under a settings block */
+.sub{font-size:.72em;color:var(--phos-dim);letter-spacing:.08em;margin:3px 0 7px;line-height:1.5}

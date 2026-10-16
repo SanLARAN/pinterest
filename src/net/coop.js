@@ -138,7 +138,7 @@ export class Coop extends Emitter {
     switch (msg.t) {
       case 'hello': this.emit('hello', msg, from); break;
       case 'state': this.emit('state', msg.s, msg.e, from); break;
-      case 'input': this.emit('input', msg.i, msg.p, from); break;
+      case 'input': this.emit('input', msg.i, msg.p, msg.e || 0, from); break;
       case 'ev': this.emit('ev', msg.i, msg.e, from); break;
       case 'bye': this.emit('peerLeft', from); break;
       default: this.emit('msg', msg, from);
@@ -146,8 +146,9 @@ export class Coop extends Emitter {
   }
 
   // ---------------- sending ----------------
-  sendHello(info) {
-    this.broadcast({ t: 'hello', ...info }, this.mode === 'guest' ? 'host' : null);
+  /** `onlyTo` matters: a hello carries that one guest's id, so it must not be broadcast. */
+  sendHello(info, onlyTo = null) {
+    this.broadcast({ t: 'hello', ...info }, this.mode === 'guest' ? 'host' : onlyTo);
   }
   /** Host -> guests: snapshot + discrete events since the last tick. */
   sendState(snapshot, events) {

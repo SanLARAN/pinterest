@@ -7,9 +7,9 @@
 <meta name="description" content="ЭХО-30 — 3D эхолокационный хоррор: огромный тёмный лес, микрофон вместо фонаря, 5 генераторов и твари, которые слышат твой крик." />
 <title>ЭХО-30 // ECHO-30 — sonar horror</title>
 <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
-  <script type="module" crossorigin src="./assets/index-CBkVekQn.js"></script>
+  <script type="module" crossorigin src="./assets/index-BypSpd8Y.js"></script>
   <link rel="modulepreload" crossorigin href="./assets/three-C3uWwXVM.js">
-  <link rel="stylesheet" crossorigin href="./assets/index-Ct5CWdLI.css">
+  <link rel="stylesheet" crossorigin href="./assets/index-BJbm8O5A.css">
 </head>
 <body>
 <div id="app">
@@ -140,6 +140,29 @@
               <button class="btn ghost sm" id="btnCalib" data-i18n="calibrate">КАЛИБРОВКА</button>
               <div class="calib-bar"><i id="calibBar"></i><u id="calibMark1"></u><u id="calibMark2"></u></div>
             </div>
+            <div class="slider"><label for="micSens" data-i18n="mic_sens">Чувствительность микрофона</label>
+              <input type="range" id="micSens" min="0.3" max="3" step="0.05" value="1" /><b id="micSensV">1.00×</b></div>
+            <div class="panel-h" data-i18n="snd">ЗВУК</div>
+            <div class="slider"><label for="sndMaster" data-i18n="snd_master">Общая громкость</label>
+              <input type="range" id="sndMaster" min="0" max="1" step="0.01" value="0.85" /><b id="sndMasterV">85%</b></div>
+            <div class="slider"><label for="sndAmb" data-i18n="snd_amb">Лес: ветер, дрон</label>
+              <input type="range" id="sndAmb" min="0" max="1.5" step="0.01" value="0.9" /><b id="sndAmbV">90%</b></div>
+            <div class="slider"><label for="sndMon" data-i18n="snd_mon">Твари и страх</label>
+              <input type="range" id="sndMon" min="0" max="1.5" step="0.01" value="1" /><b id="sndMonV">100%</b></div>
+            <div class="slider"><label for="sndSfx" data-i18n="snd_sfx">Эхо и действия</label>
+              <input type="range" id="sndSfx" min="0" max="1.5" step="0.01" value="1" /><b id="sndSfxV">100%</b></div>
+            <div class="slider"><label for="sndUi" data-i18n="snd_ui">Меню</label>
+              <input type="range" id="sndUi" min="0" max="1.5" step="0.01" value="0.8" /><b id="sndUiV">80%</b></div>
+            <div class="panel-h" data-i18n="hud_label">ИНТЕРФЕЙС</div>
+            <div class="segs" id="segHud">
+              <button data-v="full" data-i18n="hud_full">ПОЛНЫЙ</button>
+              <button class="on" data-v="min" data-i18n="hud_min">МИНИМУМ</button>
+              <button data-v="none" data-i18n="hud_none">НИЧЕГО</button>
+            </div>
+            <div class="sub" data-i18n="hud_hint_min">Остались сонар, нервы и микрофон</div>
+            <div class="row toggles">
+              <label class="chk"><input type="checkbox" id="chkFade" checked /><span data-i18n="hud_fade">Гасить в тишине</span></label>
+            </div>
             <div class="panel-h" data-i18n="graphics">ГРАФИКА</div>
             <div class="segs" id="segQ">
               <button data-v="low" data-i18n="q_low">НИЗК.</button>
@@ -180,6 +203,8 @@
               <li><kbd>E</kbd><span data-i18n="k_use">чинить / обыскать труп</span></li>
               <li><kbd>TAB</kbd><span data-i18n="k_map">цели и записки</span></li>
               <li><kbd>ESC</kbd><span data-i18n="k_pause">пауза</span></li>
+              <li><kbd>H</kbd><span data-i18n="k_hud">интерфейс: минимум → ничего → полный</span></li>
+              <li><kbd>M</kbd><span data-i18n="k_mute">звук вкл/выкл</span></li>
               <li class="micline"><kbd>🎙</kbd><span data-i18n="k_mic">голос: тихий щелчок языком = эхо. Не кричи.</span></li>
             </ul>
           </div>

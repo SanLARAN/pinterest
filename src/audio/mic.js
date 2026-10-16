@@ -16,6 +16,7 @@ export class MicInput {
     this.smooth = 0;
     this.peak = 0;
     this.floor = 0.012;
+    this.sensMul = 1;        // 0.3..3, set from the menu
     this.voiceTh = 0.055;
     this.screamTh = 0.26;
     this.norm = 0;
@@ -111,7 +112,11 @@ export class MicInput {
       }
     }
 
-    this.norm = clamp(this.smooth / (this.screamTh * 1.15), 0, 1.25);
+    // player-set sensitivity scales the thresholds, never the raw signal
+    // (the adaptive floor and the calibration write the raw values)
+    const k = 1 / clamp(this.sensMul || 1, 0.3, 3);
+    const voiceTh = this.voiceTh * k, screamTh = this.screamTh * k;
+    this.norm = clamp(this.smooth / (screamTh * 1.15), 0, 1.25);
 
     // calibration capture
     if (this.calib) {
@@ -133,14 +138,14 @@ export class MicInput {
 
     // ---- onset / voiced detection ----
     this.refractory = Math.max(0, this.refractory - dt);
-    const voiced = this.smooth > this.voiceTh;
+    const voiced = this.smooth > voiceTh;
     if (voiced) {
       this.voicedT += dt;
       // a sharp transient (tongue click) fires immediately
       const transient = this.smooth - this.prev > 0.018;
       if (this.refractory <= 0 && (transient || this.voicedT > 0.42)) {
         this.onset = true;
-        this.onsetStrength = clamp((this.smooth - this.voiceTh) / Math.max(this.screamTh - this.voiceTh, 1e-4), 0.12, 1);
+        this.onsetStrength = clamp((this.smooth - voiceTh) / Math.max(screamTh - voiceTh, 1e-4), 0.12, 1);
         this.refractory = 0.44;
         this.voicedT = 0;
       }
@@ -150,11 +155,11 @@ export class MicInput {
     this.prev = damp(this.prev ?? 0, this.smooth, voiced ? 4 : 20, dt);
 
     // ---- scream detection (debounced) ----
-    if (this.smooth > this.screamTh || this.peak > this.screamTh * 1.18) {
+    if (this.smooth > screamTh || this.peak > screamTh * 1.18) {
       this.screamHold += dt;
       if (this.screamHold > 0.07 && !this.screaming) {
         this.screaming = true;
-        this.screamLevel = clamp(this.smooth / this.screamTh, 0.8, 2);
+        this.screamLevel = clamp(this.smooth / screamTh, 0.8, 2);
       }
     } else {
       this.screamHold = Math.max(0, this.screamHold - dt * 2);

@@ -17,6 +17,16 @@ export const DEFAULT_CFG = {
   scares: true,
   sens: 1.0,
   volume: 0.85,
+  muted: false,
+  // audio mix (0..1 per bus) — amb = forest, mon = creatures + dread, sfx = you, ui = menus
+  volAmb: 0.9,
+  volMon: 1.0,
+  volSfx: 1.0,
+  volUi: 0.8,
+  micSens: 1.0,
+  // 'full' | 'min' | 'none' — less interface means more forest
+  hud: 'min',
+  hudFade: true,
   name: '',
   voiceChat: false,
 };

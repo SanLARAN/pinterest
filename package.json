@@ -9,8 +9,9 @@
     "serve": "node tools/serve.mjs",
     "check": "node tools/checkui.mjs",
     "smoke": "node tools/smoke.mjs",
-    "test": "node tools/checkui.mjs && node tools/smoke.mjs",
-    "deploy": "vite build"
+    "test": "node tools/checkui.mjs && node tools/cooptest.mjs && node tools/smoke.mjs",
+    "deploy": "vite build",
+    "cooptest": "node tools/cooptest.mjs"
   },
   "repository": {
     "type": "git",

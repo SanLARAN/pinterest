@@ -5,6 +5,22 @@
 // ============================================================
 import { clamp, lerp, TAU } from '../core/util.js';
 
+/**
+ * Which volume bus each sound belongs to. Four buses the player can mix:
+ *   amb — wind, air, drone, insects, birds, thunder (the forest itself)
+ *   mon — creature voices plus the dread layer they trigger (heart, stings, scares)
+ *   sfx — your own body and hands: pings, echoes, steps, repairs, items, hurt
+ *   ui  — menus
+ */
+export const BUS_OF = {
+  bird: 'amb', creak: 'amb', thunder: 'amb',
+  monsterSound: 'mon', weeperWail: 'mon', sting: 'mon', scare: 'mon', jumpscare: 'mon', heartbeat: 'mon',
+  ping: 'sfx', echoReturn: 'sfx', footstep: 'sfx', bump: 'sfx', repair: 'sfx', spark: 'sfx',
+  fusePickup: 'sfx', noteRead: 'sfx', generatorDone: 'sfx', hurt: 'sfx', playerScream: 'sfx', dawn: 'sfx',
+  ui: 'ui',
+};
+export const BUS_NAMES = ['amb', 'mon', 'sfx', 'ui'];
+
 export class AudioEngine {
   constructor() {
     this.ok = false;
@@ -16,7 +32,32 @@ export class AudioEngine {
     this._lastStep = 0;
     this._hb = 0;
     this.enabled = true;
+    this.muted = false;
+    this._bus = 'sfx';
+    this.busVol = { amb: 0.9, mon: 1, sfx: 1, ui: 0.8 };
+    this.buses = null;
+    // route every public sound method through its bus (save/restore so nesting is safe)
+    for (const name of Object.keys(BUS_OF)) {
+      const orig = AudioEngine.prototype[name];
+      if (typeof orig !== 'function') continue;
+      const bus = BUS_OF[name];
+      this[name] = function (...a) {
+        const prev = this._bus;
+        this._bus = bus;
+        try { return orig.apply(this, a); } finally { this._bus = prev; }
+      };
+    }
   }
+
+  /** The gain node the sound currently being built should land on. */
+  busNode() { return (this.buses && this.buses[this._bus]) || this.master; }
+
+  setBus(name, v) {
+    this.busVol[name] = clamp(v, 0, 1.5);
+    const node = name === 'amb' ? this.ambGain : this.buses && this.buses[name];
+    if (node) node.gain.setTargetAtTime(this.busVol[name], this.t, 0.04);
+  }
+  setBuses(obj) { for (const k of BUS_NAMES) if (obj && obj[k] !== undefined) this.setBus(k, obj[k]); }
 
   async init() {
     if (this.ok) return true;
@@ -37,6 +78,15 @@ export class AudioEngine {
       this.limiter.release.value = 0.18;
       this.master.connect(this.limiter);
       this.limiter.connect(c.destination);
+
+      // per-bus gains (ambience gets its own node in buildAmbience)
+      this.buses = {};
+      for (const k of ['sfx', 'mon', 'ui']) {
+        const g = c.createGain();
+        g.gain.value = this.busVol[k];
+        g.connect(this.master);
+        this.buses[k] = g;
+      }
 
       // reverb bus (procedural impulse response — a dark forest slap)
       this.revSend = c.createGain();
@@ -110,7 +160,7 @@ export class AudioEngine {
     node.connect(g);
     let tail = g;
     if (Math.abs(pan) > 0.001) { const p = c.createStereoPanner(); p.pan.value = clamp(pan, -1, 1); g.connect(p); tail = p; }
-    tail.connect(this.master);
+    tail.connect(this.busNode());
     if (rev > 0) { const r = c.createGain(); r.gain.value = rev; tail.connect(r); r.connect(this.revSend); }
     return g;
   }
@@ -169,7 +219,7 @@ export class AudioEngine {
     pan.pan.value = clamp(opts.pan || 0, -1, 1);
     node.connect(pan);
     const mg = c.createGain(); mg.gain.value = opts.vol ?? 1;
-    pan.connect(mg); mg.connect(this.master);
+    pan.connect(mg); mg.connect(this.busNode());
     if (opts.rev) { const r = c.createGain(); r.gain.value = opts.rev; mg.connect(r); r.connect(this.revSend); }
     o.start(t); o.stop(t + dur + (opts.attack || 0.006) + 0.08);
     return o;
@@ -189,7 +239,7 @@ export class AudioEngine {
     const pan = c.createStereoPanner(); pan.pan.value = clamp(opts.pan || 0, -1, 1);
     g.connect(pan);
     const mg = c.createGain(); mg.gain.value = opts.vol ?? 1;
-    pan.connect(mg); mg.connect(this.master);
+    pan.connect(mg); mg.connect(this.busNode());
     if (opts.rev) { const r = c.createGain(); r.gain.value = opts.rev; mg.connect(r); r.connect(this.revSend); }
     s.start(t); s.stop(t + dur + 0.1);
   }
@@ -197,7 +247,8 @@ export class AudioEngine {
   // -------------------------------------------------------------- ambience
   buildAmbience() {
     const c = this.ctx;
-    this.ambGain = c.createGain(); this.ambGain.gain.value = 1; this.ambGain.connect(this.master);
+    this.ambGain = c.createGain(); this.ambGain.gain.value = this.busVol.amb; this.ambGain.connect(this.master);
+    if (this.buses) this.buses.amb = this.ambGain;
 
     // wind
     const wind = c.createBufferSource(); wind.buffer = this.brownBuf; wind.loop = true;
@@ -446,7 +497,7 @@ export class AudioEngine {
       const s = this.noise(1);
       const f = c.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 1500; f.Q.value = 3;
       const g = c.createGain(); g.gain.value = 0;
-      s.connect(f); f.connect(g); g.connect(this.master);
+      s.connect(f); f.connect(g); g.connect(this.busNode());
       const r = c.createGain(); r.gain.value = 0.4; g.connect(r); r.connect(this.revSend);
       s.start();
       this._repairNode = { s, g, f };
@@ -548,11 +599,12 @@ export class AudioEngine {
     this.tone(720, 1.1, 'sawtooth', 0.14, { to: 240, sweepT: 1.0, rev: 1.4, attack: 0.01, filter: { type: 'bandpass', f0: 1200, f1: 600, q: 3 } });
     // sub drop then silence
     this.tone(60, 2.0, 'sine', 0.4, { to: 24, sweepT: 1.8, rev: 0.6, delay: 0.1 });
+    const v = this.muted ? 0 : this.vol;
     this.master.gain.cancelScheduledValues(t);
-    this.master.gain.setValueAtTime(this.vol, t);
-    this.master.gain.linearRampToValueAtTime(this.vol * 1.25, t + 0.02);
-    this.master.gain.linearRampToValueAtTime(this.vol * 0.0001, t + 2.1);
-    this.master.gain.setTargetAtTime(this.vol * 0.5, t + 2.4, 0.4);
+    this.master.gain.setValueAtTime(v, t);
+    this.master.gain.linearRampToValueAtTime(Math.max(v * 1.25, 0.0001), t + 0.02);
+    this.master.gain.linearRampToValueAtTime(v * 0.0001 + 1e-6, t + 2.1);
+    this.master.gain.setTargetAtTime(Math.max(v * 0.5, 1e-6), t + 2.4, 0.4);
   }
 
   dawn() {
@@ -580,7 +632,11 @@ export class AudioEngine {
 
   setVolume(v) {
     this.vol = clamp(v, 0, 1);
-    if (this.master) this.master.gain.setTargetAtTime(this.vol, this.t, 0.05);
+    if (this.master) this.master.gain.setTargetAtTime(this.muted ? 0 : this.vol, this.t, 0.05);
+  }
+  setMuted(on) {
+    this.muted = !!on;
+    if (this.master) this.master.gain.setTargetAtTime(this.muted ? 0 : this.vol, this.t, 0.06);
   }
   suspend() { if (this.ctx && this.ctx.state === 'running') this.ctx.suspend(); }
   resume() { if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume(); }

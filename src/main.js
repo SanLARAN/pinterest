@@ -102,6 +102,7 @@ class App {
     };
     this.hud = new HUD(this.game, this.i18n);
     this.hud.setTouch(this.input.detectTouch());
+    this.applyHudCfg();
     this.bindGameEvents();
     this.bindUI();
 
@@ -153,6 +154,20 @@ class App {
     if (p) { p.x = this.game.world.start.x; p.z = this.game.world.start.z; p.y = this.game.world.heightAt(p.x, p.z); }
   }
 
+  /** Master + four buses + mic sensitivity, all persisted in cfg. */
+  applyAudioCfg() {
+    const c = this.cfg;
+    this.audio.muted = !!c.muted;
+    this.audio.enabled = !c.muted;
+    this.audio.setVolume(c.volume ?? 0.85);
+    this.audio.setBuses({ amb: c.volAmb, mon: c.volMon, sfx: c.volSfx, ui: c.volUi });
+    this.mic.sensMul = clamp(c.micSens ?? 1, 0.3, 3);
+  }
+  applyHudCfg() {
+    this.hud.setMode(this.cfg.hud || 'min');
+    this.hud.setFade(this.cfg.hudFade !== false);
+  }
+
   // ------------------------------------------------------------------ UI wiring
   applyCfgToUI() {
     const c = this.cfg;
@@ -163,10 +178,17 @@ class App {
     seg('segNight', c.nightLength);
     seg('segMic', c.mic);
     seg('segQ', c.quality);
+    seg('segHud', c.hud || 'min');
     $('chkShake').checked = !!c.shake;
     $('chkScares').checked = !!c.scares;
     $('chkVoice').checked = !!c.voiceChat;
+    if ($('chkFade')) $('chkFade').checked = c.hudFade !== false;
     if ($('hsName') && c.name) $('hsName').value = c.name;
+    const put = (id, v) => { const e = $(id); if (e) e.value = v; };
+    put('sndMaster', c.volume ?? 0.85);
+    put('sndAmb', c.volAmb); put('sndMon', c.volMon); put('sndSfx', c.volSfx); put('sndUi', c.volUi);
+    put('micSens', c.micSens);
+    this.renderSliderValues();
   }
 
   bindUI() {
@@ -187,6 +209,27 @@ class App {
       else { this.mic.disable(); this.setMicHint(); }
     });
     seg('segQ', (v) => { this.cfg.quality = v; saveCfg(this.cfg); this.applyQuality(); });
+    seg('segHud', (v) => { this.cfg.hud = v; saveCfg(this.cfg); this.applyHudCfg(); this.audio.ui('click'); });
+    click('chkFade', () => { this.cfg.hudFade = $('chkFade').checked; saveCfg(this.cfg); this.applyHudCfg(); });
+
+    // live audio mix: dragging a slider is heard immediately
+    const slider = (id, key, apply) => {
+      const e = $(id); if (!e) return;
+      const on = () => {
+        this.cfg[key] = parseFloat(e.value);
+        this.renderSliderValues();
+        apply(this.cfg[key]);
+        saveCfg(this.cfg);
+      };
+      e.addEventListener('input', on);
+      e.addEventListener('change', () => this.audio.ui('hover'));
+    };
+    slider('sndMaster', 'volume', (v) => this.audio.setVolume(v));
+    slider('sndAmb', 'volAmb', (v) => this.audio.setBus('amb', v));
+    slider('sndMon', 'volMon', (v) => this.audio.setBus('mon', v));
+    slider('sndSfx', 'volSfx', (v) => this.audio.setBus('sfx', v));
+    slider('sndUi', 'volUi', (v) => this.audio.setBus('ui', v));
+    slider('micSens', 'micSens', (v) => { this.mic.sensMul = clamp(v, 0.3, 3); });
     click('chkShake', () => { this.cfg.shake = $('chkShake').checked; saveCfg(this.cfg); });
     click('chkScares', () => { this.cfg.scares = $('chkScares').checked; this.game.scaresEnabled = this.cfg.scares; saveCfg(this.cfg); });
     click('chkVoice', () => {
@@ -278,10 +321,11 @@ class App {
       this.idToPeer.set(id, peerId);
       this.toast(this.i18n.lang === 'en' ? 'a partner entered the forest' : 'напарник вошёл в лес', 'good');
       this.audio.ui('win');
+      // addressed to the newcomer only — an earlier guest must not adopt this id
       c.sendHello({
-        t: 'hello', yourId: id, seed: this.game.seed, nightLength: this.game.nightLen, lang: this.cfg.lang,
+        yourId: id, seed: this.game.seed, nightLength: this.game.nightLen, lang: this.cfg.lang,
         cfg: { nightLength: this.game.nightLen, scares: this.cfg.scares },
-      });
+      }, peerId);
       if (this.state === 'playing') {
         this.pushNet({ k: 'start', seed: this.game.seed, nightLength: this.game.nightLen, id });
       }
@@ -297,19 +341,26 @@ class App {
       this.toast(this.i18n.lang === 'en' ? 'the host left the forest' : 'хост вышел из леса', 'bad');
       this.remoteHost = false;
       this.game.isHost = true;
+      // we are on our own now: drop the phantoms and take over the simulation
+      for (const pl of [...this.game.players]) if (pl.remote) this.game.removePlayer(pl.id);
+      this.peerMap.clear(); this.idToPeer.clear();
       $('btnStart').disabled = false;
+      $('btnStart').textContent = this.i18n.t('start');
       this.updateCoopBadge();
     });
-    c.on('input', (id, p, from) => {
+    c.on('input', (id, p, events, from) => {
       if (this.coop.mode !== 'host') return;
       let pl = this.game.players.find((x) => x.id === id);
-      if (!pl) pl = this.game.addPlayer(id, p.nm || 'P' + (id + 1));
+      if (!pl) { pl = this.game.addPlayer(id, p.nm || 'P' + (id + 1)); this.idToPeer.set(id, from); this.peerMap.set(from, id); }
       pl.remote = true;
       pl.name = p.nm || pl.name;
       pl._target = p;
       pl.nerve = p.n; pl.fuses = p.f; pl.score = p.sc || pl.score;
       if (!pl.alive && p.a) pl.alive = true;
-      if (p.e) for (const ev of p.e) this.applyNetEvent(ev, pl);
+      // the guest's own actions ride along with its transform — without them a guest
+      // could scream, ping and repair and the host's forest would never hear a thing
+      const evs = events && events.length ? events : (p.e || null);
+      if (evs) for (const ev of evs) this.applyNetEvent(ev, pl);
     });
     c.on('ev', (id, ev, from) => {
       if (this.coop.mode === 'host') {
@@ -737,7 +788,7 @@ class App {
   async ensureAudio() {
     if (!this.audio.ok) await this.audio.init();
     this.audio.resume();
-    this.audio.setVolume(this.cfg.volume ?? 0.85);
+    this.applyAudioCfg();
     return this.audio.ok;
   }
 
@@ -987,6 +1038,7 @@ class App {
       if (pressed.skip && g.phase === 'day') { g.phaseT = DAY_LEN; }
       if (pressed.shout || s.shout) { this.doShout(1); s.shout = false; }
       if (pressed.mute) this.toggleMute();
+      if (pressed.hud) this.cycleHud();
       // ping: tap = instant light pulse, hold = charged pulses
       if (pressed.ping || (s.ping && !this.pingHeld)) { this.pingHeld = true; this.pingHold = 0; this.tryPing(0.3); }
       if (!s.ping && !this.input.keys.ping) { this.pingHeld = false; this.pingHold = 0; }
@@ -1131,11 +1183,37 @@ class App {
     this.rig.smooth.copy(cam.position);
   }
 
-  toggleMute() {
-    this.audio.enabled = !this.audio.enabled;
-    this.cfg.volume = this.audio.enabled ? 0.85 : 0;
-    this.audio.setVolume(this.cfg.volume);
+  /** H cycles how much interface stands between the player and the forest. */
+  cycleHud() {
+    const order = ['min', 'none', 'full'];
+    const i = order.indexOf(this.cfg.hud || 'min');
+    this.cfg.hud = order[(i + 1) % order.length];
     saveCfg(this.cfg);
+    this.applyHudCfg();
+    this.applyCfgToUI();
+    const names = { full: 'hud_full', min: 'hud_min', none: 'hud_none' };
+    this.audio.ui('click');
+    this.toast(`${this.i18n.t('hud_label')}: ${this.i18n.t(names[this.cfg.hud])}`, '', 2.2);
+  }
+
+  /** Writes the numeric readout next to each slider. */
+  renderSliderValues() {
+    const c = this.cfg;
+    const pct = (id, v) => { const e = $(id); if (e) e.textContent = Math.round(clamp(v, 0, 1.5) * 100) + '%'; };
+    pct('sndMasterV', c.volume ?? 0.85);
+    pct('sndAmbV', c.volAmb); pct('sndMonV', c.volMon); pct('sndSfxV', c.volSfx); pct('sndUiV', c.volUi);
+    const m = $('micSensV'); if (m) m.textContent = (c.micSens ?? 1).toFixed(2) + '×';
+    for (const id of ['sndMaster', 'sndAmb', 'sndMon', 'sndSfx', 'sndUi']) {
+      const e = $(id); if (e) e.parentElement.classList.toggle('off', parseFloat(e.value) <= 0.001);
+    }
+  }
+
+  toggleMute() {
+    this.cfg.muted = !this.cfg.muted;
+    this.audio.enabled = !this.cfg.muted;
+    this.audio.setMuted(this.cfg.muted);
+    saveCfg(this.cfg);
+    this.renderSliderValues();
     this.toast(this.audio.enabled ? (this.i18n.lang === 'en' ? 'sound on' : 'звук включён') : (this.i18n.lang === 'en' ? 'sound off — brave' : 'звук выключен — храбро'), '', 2);
   }
 

@@ -35,6 +35,47 @@ export class HUD {
     this.dangerT = 0;
     this.hintT = 0;
     this.interactBar = null;
+    this.mode = 'min';        // 'full' | 'min' | 'none'
+    this.fade = true;         // sink the interface away while nothing happens
+    this.idleT = 0;
+    this.toastT = 0;
+  }
+
+  /** How much interface the player wants between them and the forest. */
+  setMode(mode) {
+    this.mode = mode === 'full' || mode === 'none' ? mode : 'min';
+    const h = this.el.hud;
+    if (!h) return;
+    h.classList.toggle('min', this.mode === 'min');
+    h.classList.toggle('none', this.mode === 'none');
+    h.classList.remove('faded');
+    this.idleT = 0;
+    // the compass is only for the full interface (inline style beats the CSS rules)
+    if (this.el.compass) this.el.compass.style.display = this.mode === 'full' && this.cctx ? 'block' : 'none';
+  }
+  setFade(on) {
+    this.fade = !!on;
+    if (!this.fade && this.el.hud) this.el.hud.classList.remove('faded');
+  }
+
+  /**
+   * Immersion: after a few seconds of nothing happening the whole interface sinks
+   * to a ghost of itself. Any input, any ping, any threat brings it straight back.
+   */
+  updateFade(dt, player, g) {
+    if (!this.fade || !this.el.hud) return;
+    let active = player.speed > 0.35 || player.pingCd > 0 || !!player.holding || !!player.breath;
+    active = active || player.panting > 0.45 || player.heart > 0.3;
+    active = active || !!g.interact || this.toastT > 0 || this.hintT > 0 || this.dangerT > 0;
+    if (!active) {
+      for (const m of g.monsters) {
+        if (!m.alive || m.state === 'flee' || m.state === 'spawn') continue;
+        if (dist2(player.x, player.z, m.x, m.z) < 46) { active = true; break; }
+      }
+    }
+    this.idleT = active ? 0 : this.idleT + dt;
+    const want = this.idleT > 5.5;
+    if (want !== this._faded) { this._faded = want; this.el.hud.classList.toggle('faded', want); }
   }
 
   setupRadar() {
@@ -54,7 +95,7 @@ export class HUD {
     c.style.width = '620px'; c.style.height = '34px';
     c.style.maxWidth = '60vw';
     host.appendChild(c);
-    host.style.display = 'block';
+    host.style.display = this.mode === 'full' ? 'block' : 'none';
     this.cctx = c.getContext('2d');
     this.cctx.scale(this.dpr, this.dpr);
     this.csize = { w: 620, h: 34 };
@@ -79,6 +120,7 @@ export class HUD {
   }
 
   toast(text, kind = '', dur = 3) {
+    this.toastT = Math.max(this.toastT, dur);
     const d = document.createElement('div');
     d.className = 'toast ' + kind;
     d.textContent = text;
@@ -170,6 +212,8 @@ export class HUD {
   update(dt, player, mic, opts = {}) {
     const g = this.game, e = this.el, t = this.i18n;
     const L = this.last;
+    this.toastT = Math.max(0, this.toastT - dt);
+    this.updateFade(dt, player, g);
 
     // clock & phase
     const clockMin = 6 * 60 + 12 + (g.phase === 'day' ? g.phaseT : g.phase === 'dusk' ? 62 + g.phaseT : 0);

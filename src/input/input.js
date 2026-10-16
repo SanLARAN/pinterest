@@ -24,7 +24,7 @@ const KEYMAP = {
   KeyQ: 'breath',
   Space: 'ping', KeyX: 'shout', KeyE: 'use', KeyF: 'use',
   Escape: 'pause', Tab: 'notes', KeyR: 'restart', KeyP: 'pause',
-  Enter: 'confirm', KeyN: 'skip', KeyM: 'mute',
+  Enter: 'confirm', KeyN: 'skip', KeyM: 'mute', KeyH: 'hud',
   Digit1: 'slot1', Digit2: 'slot2',
 };
 
