@@ -445,66 +445,7 @@ function animHowler(m, dt, t) {
 // the atlas animates its portraits with the very same code (a stand-in `m`: rig, state, stateT, speedCur, phase, seed, headYaw...)
 export const ANIMS = { listener: animListener, crawler: animCrawler, watcher: animWatcher, howler: animHowler };
 
-// ---------------- Survivor: a teammate (co-op). seen only as a cold afterimage, like everything else ----------------
-export function buildSurvivor() {
-  const R = makeRig('survivor');
-  R.root.rotation.order = 'YXZ'; // turn first, then (when dead) tip over
-  const N = (name, parent, x, y, z) => node(R, name, parent, x, y, z);
-  const hips = N('hips', null, 0, 0.94, 0);
-  part(R, hips, (b) => { b.place(0, -0.06, 0); b.box(0.32, 0.16, 0.2, KIND.WOOD); });
-  const chest = N('chest', hips, 0, 0.06, 0);
-  part(R, chest, (b) => {
-    b.identity();
-    b.taper(0.34, 0.2, 0.42, 0.24, 0.56, KIND.WOOD);
-    b.place(0, 0.3, -0.17); b.box(0.3, 0.38, 0.14, KIND.METAL); // backpack
-    b.place(-0.16, 0.52, -0.13, 0, 0, -Math.PI / 2); b.cylinder(6, 0.055, 0.055, 0.32, KIND.METAL, { ringEdges: false }); // bedroll
-  });
-  const head = N('head', chest, 0, 0.66, 0.02);
-  part(R, head, (b) => {
-    b.identity();
-    b.octa(0.115, 0.15, KIND.FLESH);
-    b.place(0, 0.02, -0.02, -0.25, 0, 0); b.cone(7, 0.17, 0.32, KIND.WOOD); // hood
-  });
-  for (const s of [-1, 1]) {
-    const sh = N(s < 0 ? 'shL' : 'shR', chest, s * 0.24, 0.5, 0);
-    part(R, sh, (b) => { b.identity(); b.limb([0, 0, 0], [s * 0.04, -0.3, 0.02], 0.055, 0.045, KIND.WOOD, 4); });
-    const el = N(s < 0 ? 'elL' : 'elR', sh, s * 0.04, -0.3, 0.02);
-    part(R, el, (b) => { b.identity(); b.limb([0, 0, 0], [0, -0.28, 0.06], 0.045, 0.035, KIND.FLESH, 4); });
-    const th = N(s < 0 ? 'thL' : 'thR', hips, s * 0.1, -0.08, 0);
-    part(R, th, (b) => { b.identity(); b.limb([0, 0, 0], [0, -0.42, 0.02], 0.075, 0.06, KIND.WOOD, 4); });
-    const kn = N(s < 0 ? 'knL' : 'knR', th, 0, -0.42, 0.02);
-    part(R, kn, (b) => { b.identity(); b.limb([0, 0, 0], [0, -0.42, -0.02], 0.06, 0.045, KIND.WOOD, 4); b.place(0, -0.44, 0.05); b.box(0.1, 0.07, 0.24, KIND.ROCK); });
-  }
-  return R;
-}
-
-// walk cycle + crouch + lying dead
-export function poseSurvivor(rig, phase, speed, crouch, dead) {
-  const n = rig.nodes;
-  if (dead) {
-    rig.root.rotation.x = -Math.PI / 2;
-    n.hips.position.y = 0.2;
-    n.head.rotation.set(0, 0, 0.6);
-    n.shL.rotation.set(-2.6, 0, -0.3); n.shR.rotation.set(-0.4, 0, 0.5);
-    n.thL.rotation.set(0.2, 0, 0); n.thR.rotation.set(-0.15, 0, 0);
-    n.knL.rotation.x = 0.4; n.knR.rotation.x = 0.1;
-    return;
-  }
-  rig.root.rotation.x = 0;
-  const amp = clamp(speed / 3.2, 0, 1.4);
-  const s = Math.sin(phase);
-  n.hips.position.y = crouch ? 0.62 : 0.94 - Math.abs(Math.cos(phase)) * 0.03 * amp;
-  n.chest.rotation.x = crouch ? 0.55 : 0.08 * amp;
-  n.head.rotation.set(crouch ? -0.35 : 0, 0, 0);
-  n.thL.rotation.x = s * 0.55 * amp - (crouch ? 1.1 : 0);
-  n.thR.rotation.x = -s * 0.55 * amp - (crouch ? 1.1 : 0);
-  n.knL.rotation.x = Math.max(0, -s) * 0.7 * amp + (crouch ? 1.6 : 0);
-  n.knR.rotation.x = Math.max(0, s) * 0.7 * amp + (crouch ? 1.6 : 0);
-  n.shL.rotation.set(-s * 0.45 * amp, 0, -0.06);
-  n.shR.rotation.set(s * 0.45 * amp, 0, 0.06);
-  n.elL.rotation.x = -0.25 - amp * 0.2;
-  n.elR.rotation.x = -0.25 - amp * 0.2;
-}
+// (the survivor — a teammate in co-op, you in the wardrobe — lives in survivor.js)
 
 // ---------------- AI ----------------
 // A monster runs in one of two modes:

@@ -12,7 +12,7 @@ function esc(s) {
 export class Menus {
   constructor(handlers) {
     this.h = handlers; // { onPlay, onResume, onRestart, onMenu, onMicToggle, onSettingsChanged, onAtlas, uiSound }
-    this.screens = ['menu', 'pause', 'over', 'settingsPanel', 'howPanel', 'scoresPanel', 'coopPanel', 'atlasPanel', 'boot'];
+    this.screens = ['menu', 'pause', 'over', 'settingsPanel', 'howPanel', 'scoresPanel', 'coopPanel', 'atlasPanel', 'wardrobePanel', 'boot'];
     this.settingsReturn = null;
     this.highlight = -1;
     this._bind();

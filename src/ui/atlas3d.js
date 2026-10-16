@@ -50,7 +50,7 @@ void main() {
   float camD = length(toCam);
   vec3 V = toCam / camD;
   if (dot(N, toCam) < 0.0) N = -N;
-  int k = int(vKind);
+  int k = int(vKind + 0.5); // (an interpolated constant can land a hair under the integer)
   bool beam = k > 11;
   if (beam) k = 11;
   vec3 base = KC[k];

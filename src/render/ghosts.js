@@ -49,7 +49,7 @@ export class Ghosts {
     return best || this.list[0];
   }
 
-  // model: { parts: [{ arr:{pos,dat,count}, node }], root, key }
+  // model: { parts: [{ arr:{pos,dat,count}, node }], root, key, dyes? }
   spawn(model, time, opts = {}) {
     const g = this._take(time);
     model.root.updateMatrixWorld(true);
@@ -93,6 +93,11 @@ export class Ghosts {
     u.uFull.value = opts.full ?? 0;
     u.uBody.value = opts.body ?? 0.85;
     u.uJitter.value = opts.jitter ?? 1;
+    // a teammate's outfit colours (model.dyes); dyeK < 1 washes them out (the dead)
+    if (model.dyes) {
+      for (let i = 0; i < 4; i++) u.uDye.value[i].copy(model.dyes[i]);
+      u.uDyeK.value = opts.dyeK ?? 1;
+    } else u.uDyeK.value = 0;
     g.mesh.visible = true;
     return g;
   }

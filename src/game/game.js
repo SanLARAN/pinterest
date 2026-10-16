@@ -1231,7 +1231,7 @@ export class Game {
       const lit = watching ? 0 : day ? 1 : this.objectives.lampAt(r.x, r.z);
       if (lit > 0.06) {
         const str = day ? 0.62 : Math.min(0.8, 0.22 + lit * 1.2);
-        if (!r.liveGhost) r.liveGhost = this.ghosts.spawn(r.rig, this.time, { sticky: true, strength: str, full: day ? 0.7 : 0.3, color: r.alive ? r.hex : 0x8a9396, jitter: 0.25 });
+        if (!r.liveGhost) r.liveGhost = this.ghosts.spawn(r.rig, this.time, { sticky: true, strength: str, full: day ? 0.7 : 0.3, color: r.alive ? r.hex : 0x8a9396, jitter: 0.25, dyeK: r.alive ? 1 : 0.3 });
         else {
           this.ghosts.refresh(r.liveGhost, r.rig);
           r.liveGhost.strength = str;
@@ -1523,7 +1523,7 @@ export class Game {
         const d = Math.hypot(r.x - s.x, r.y + 1.0 - s.y, r.z - s.z);
         if (d > s.prevR && d <= s.curR && d <= s.radius && d > 0.8) {
           const fall = 1 - smoothstep(s.radius * 0.42, s.radius, d);
-          this.ghosts.spawn(r.rig, this.time, { strength: clamp(s.strength * (0.55 + 0.6 * fall), 0.45, 1.4), color: r.alive ? r.hex : 0x7c8588, life: 2.6, decay: 0.9, jitter: 0.4 });
+          this.ghosts.spawn(r.rig, this.time, { strength: clamp(s.strength * (0.55 + 0.6 * fall), 0.45, 1.4), color: r.alive ? r.hex : 0x7c8588, life: 2.6, decay: 0.9, jitter: 0.4, dyeK: r.alive ? 1 : 0.3 });
           r.revealT = this.time;
           this.radar.blip(r.x, r.z, 'mate');
         }

@@ -7,8 +7,8 @@
     <meta name="description" content="ТИШЕ — low-poly эхолокационный хоррор. Ты слеп в огромном лесу: твой микрофон — эхолокатор. Запусти пять генераторов и не закричи." />
     <title>ТИШЕ — эхолокационный хоррор</title>
     <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
-  <script type="module" crossorigin src="./assets/index-BPEe1_CK.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-Dc9zXXxK.css">
+  <script type="module" crossorigin src="./assets/index-BGeHfF9Q.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-CRrKMUsK.css">
 </head>
   <body>
     <canvas id="gl" tabindex="-1"></canvas>
@@ -99,6 +99,11 @@
             <div id="micTest"><div class="bar"><div id="micTestFill"></div><div id="micTestTrig"></div></div><span data-i18n="micTest"></span></div>
             <div id="micWarn"></div>
           </div>
+          <!-- your survivor: click it for the wardrobe -->
+          <button id="btnWardrobe" class="fig" type="button" aria-label="wardrobe">
+            <span class="fig-stage" id="figStage"></span>
+            <span class="fig-cap"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7.2a1.9 1.9 0 1 0-1.9-1.9"/><path d="M12 7.2v1.3L3.2 15a1.3 1.3 0 0 0 .8 2.4h16a1.3 1.3 0 0 0 .8-2.4L12 8.5"/></svg><span></span></span>
+          </button>
         </div>
         <div class="menu-foot">
           <div class="hp"><svg viewBox="0 0 24 24"><path d="M4 15v-3a8 8 0 0 1 16 0v3"/><rect x="3" y="14" width="4" height="7" rx="1.5"/><rect x="17" y="14" width="4" height="7" rx="1.5"/></svg><span data-i18n="headphones"></span></div>
@@ -238,6 +243,39 @@
           </section>
           <section class="page page-r" id="atlasRight"></section>
           <div class="leaf" id="atlasLeaf"><div class="leaf-face leaf-front"></div><div class="leaf-face leaf-back"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- the wardrobe: what you wear out there (and how your friends see you) -->
+    <div id="wardrobePanel" class="screen modal" role="dialog" aria-modal="true" aria-hidden="true" aria-label="wardrobe">
+      <div class="wr" tabindex="-1">
+        <div class="wr-stage plate" id="wrStage">
+          <div class="plate-fx"></div>
+          <i class="pc tl"></i><i class="pc tr"></i><i class="pc bl"></i><i class="pc br"></i>
+          <div class="wr-tag" id="wrTag"></div>
+          <div class="plate-hint wr-hint" id="wrHint"></div>
+          <div class="plate-stamp wr-set" id="wrSet"></div>
+        </div>
+        <div class="wr-side">
+          <div class="wr-head">
+            <h2 class="wr-title" id="wrTitle"></h2>
+            <button class="book-close" id="wrClose" aria-label="close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></svg></button>
+          </div>
+          <div class="wr-sub" id="wrSub"></div>
+          <nav class="wr-slots" id="wrSlots" role="tablist"></nav>
+          <div class="wr-items" id="wrItems" role="listbox"></div>
+          <div class="wr-info" id="wrInfo"></div>
+          <div class="wr-paint">
+            <div class="wr-parts" id="wrParts"></div>
+            <div class="wr-swatches" id="wrSwatches"></div>
+          </div>
+          <div class="wr-actions">
+            <button class="chip wr-act" id="wrRandom"></button>
+            <button class="chip wr-act" id="wrReset"></button>
+          </div>
+          <div class="wr-note" id="wrNote"></div>
+          <button class="btn primary wr-done" id="wrDone"></button>
         </div>
       </div>
     </div>

@@ -2020,6 +2020,34 @@ export class AudioEngine {
     this._env(mix, t, 0.015, 0.6, 0.3, 0.05);
   }
 
+  // ---------- the wardrobe ----------
+  // a wire hanger on the rail, cloth, a hat being settled, a drop of dye, the stage's own echo
+  wardrobe(kind) {
+    if (!this.ready) return;
+    const t = this.now;
+    const out = this.ui;
+    if (kind === 'open' || kind === 'close') {
+      const up = kind === 'open';
+      this._tone(t, { type: 'triangle', f: up ? 1250 : 980, fEnd: up ? 900 : 760, a: 0.001, d: 0.09, gain: 0.07, dest: out });
+      this._tone(t + 0.035, { type: 'triangle', f: up ? 1830 : 1460, a: 0.001, d: 0.07, gain: 0.035, dest: out });
+      this._noiseBurst(t + 0.02, { buf: this.pink, type: 'bandpass', f: 1800, q: 0.7, a: 0.05, d: 0.28, gain: 0.16, dest: out, fEnd: 900 });
+    } else if (kind === 'hat') {
+      this._noiseBurst(t, { buf: this.pink, type: 'bandpass', f: 2400, q: 0.9, a: 0.015, d: 0.12, gain: 0.18, dest: out, fEnd: 1200 });
+      this._noiseBurst(t + 0.14, { buf: this.pink, type: 'lowpass', f: 900, q: 0.7, a: 0.004, d: 0.07, gain: 0.22, dest: out });
+    } else if (kind === 'cloth') {
+      for (let i = 0; i < 3; i++) {
+        this._noiseBurst(t + i * 0.09 + Math.random() * 0.03, { buf: this.pink, type: 'bandpass', f: 1400 + Math.random() * 1400, q: 0.8, a: 0.03, d: 0.14, gain: 0.14, dest: out, fEnd: 700 });
+      }
+    } else if (kind === 'dye') {
+      const f = 520 + Math.random() * 120;
+      this._tone(t, { type: 'sine', f, fEnd: f * 2.5, a: 0.002, d: 0.09, gain: 0.08, dest: out });
+      this._tone(t + 0.05, { type: 'sine', f: 1500, fEnd: 2100, a: 0.002, d: 0.05, gain: 0.03, dest: out });
+    } else if (kind === 'tap') {
+      this._tone(t, { type: 'sine', f: 2300, fEnd: 1500, a: 0.001, d: 0.05, gain: 0.06, dest: out });
+      this._tone(t + 0.16, { type: 'sine', f: 1500, fEnd: 1100, a: 0.001, d: 0.08, gain: 0.025, dest: out });
+    }
+  }
+
   // ---------- UI ----------
   uiHover() {
     if (!this.ready) return;

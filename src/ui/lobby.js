@@ -4,6 +4,7 @@ import { settings, saveSettings } from '../core/storage.js';
 import { PLAYER_COLORS } from '../game/remote.js';
 import { cleanCode, MAX_PLAYERS } from '../net/net.js';
 import { cleanName } from '../net/coop.js';
+import { wt, item } from '../game/outfit.js';
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -11,8 +12,9 @@ const MIC_ON = '<svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11"
 const MIC_OFF = '<svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M4 4l16 16"/></svg>';
 
 export class Lobby {
-  constructor({ coop, mic, audio, mix, onMicToggle, uiSound }) {
+  constructor({ coop, mic, audio, mix, onMicToggle, uiSound, onWardrobe = null }) {
     this.coop = coop;
+    this.onWardrobe = onWardrobe; // your own outfit line opens the wardrobe
     this.mic = mic;
     this.audio = audio;
     this.mix = mix; // per-friend voice volume
@@ -55,6 +57,12 @@ export class Lobby {
       el.addEventListener('mouseenter', () => this.uiSound && this.uiSound('hover'));
     };
     click('btnCreate', () => this._go(() => this.coop.create()));
+    $('coopList').addEventListener('click', (e) => {
+      if (!e.target.closest('[data-wardrobe]') || !this.onWardrobe) return;
+      e.preventDefault();
+      if (this.uiSound) this.uiSound('click');
+      this.onWardrobe();
+    });
     $('coopJoinForm').addEventListener('submit', (e) => {
       e.preventDefault();
       if (this.uiSound) this.uiSound('click');
@@ -226,7 +234,7 @@ export class Lobby {
     const tags = [];
     if (p.self) tags.push(t('coopYou'));
     if (p.host) tags.push(t('coopHost'));
-    set(n, `${esc(p.name)}${tags.map((x) => `<em>${esc(x)}</em>`).join('')}`);
+    set(n, `${esc(p.name)}${tags.map((x) => `<em>${esc(x)}</em>`).join('')}${this._fitLine(p)}`);
     mic.className = `mic ${p.mic ? 'on' : 'off'}`;
     set(mic, p.mic ? MIC_ON : MIC_OFF);
     const rtt = p.self ? null : this.coop.rtt(p.id);
@@ -241,6 +249,17 @@ export class Lobby {
       el._vol.style.setProperty('--c', PLAYER_COLORS[w.s]);
       this.mix.sync(el._vol);
     }
+  }
+
+  // what they wear (yours: a button into the wardrobe)
+  _fitLine(p) {
+    const f = p.fit;
+    if (!f || !item(f.head) || !item(f.body)) return '';
+    const T = wt();
+    const inner = `<i style="--c:${f.hc[0]}"></i>${esc(T.items[f.head].name)}<b>·</b><i style="--c:${f.bc[0]}"></i>${esc(T.items[f.body].name)}`;
+    return p.self && this.onWardrobe
+      ? `<button class="fit" data-wardrobe title="${esc(T.title)}">${inner}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7.2a1.9 1.9 0 1 0-1.9-1.9"/><path d="M12 7.2v1.3L3.2 15a1.3 1.3 0 0 0 .8 2.4h16a1.3 1.3 0 0 0 .8-2.4L12 8.5"/></svg></button>`
+      : `<small class="fit">${inner}</small>`;
   }
 
   _renderStatus() {

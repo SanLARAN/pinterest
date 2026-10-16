@@ -33,6 +33,7 @@ import { Lobby } from './ui/lobby.js';
 import { Mates } from './ui/mates.js';
 import { VoiceMix, VoiceList } from './ui/voicemix.js';
 import { Atlas } from './ui/atlas.js';
+import { Wardrobe } from './ui/wardrobe.js';
 
 setLang(settings.lang);
 
@@ -86,6 +87,20 @@ const voiceMix = new VoiceMix(audio); // your volume for each friend's voice
 const pauseVoices = new VoiceList($('pauseVoiceRows'), voiceMix, audio);
 // the atlas (main menu): a field journal with live 3D plates. its own little canvas; the forest isn't drawn while it's open
 const atlas = new Atlas({ audio, world, onClose: () => $('btnAtlas').focus({ preventScroll: true }) });
+// the wardrobe (main menu): your survivor stands by the buttons; click it to dress it. friends in your room
+// hear about it as soon as you walk out
+const wardrobe = new Wardrobe({
+  audio, coop, name: () => myName(),
+  onClose: () => {
+    const back = lobby.isOpen() ? document.querySelector('#coopList button.fit') : $('btnWardrobe');
+    if (back) back.focus({ preventScroll: true });
+  },
+  onChange: () => {
+    if (coop.active) coop.announce();
+  },
+});
+// a modal over the menu hides the figure: don't draw it then
+const MENU_COVERS = ['settingsPanel', 'howPanel', 'scoresPanel', 'coopPanel'];
 let game = null;
 let runOnline = false; // the current / last run is a co-op night
 
@@ -177,6 +192,7 @@ const menus = new Menus({
     if (key === 'lang' || key === undefined) {
       hud.cache = {};
       atlas.applyI18n();
+      wardrobe.applyI18n();
       updateMicUI();
       lobby.render();
       $('lockHint').textContent = input.lockFailed ? t('dragToLook') : t('clickToLook');
@@ -193,6 +209,9 @@ const menus = new Menus({
 const lobby = new Lobby({
   coop, mic, audio, mix: voiceMix,
   onMicToggle: () => toggleMic(),
+  onWardrobe: () => {
+    if (state === 'menu') wardrobe.open(); // (over the lobby: you stay in the room)
+  },
   uiSound: (k) => {
     if (!audio.ready) return;
     if (k === 'hover') audio.uiHover();
@@ -274,6 +293,7 @@ function attractPulse(loud, white = true) {
     radius: CFG.revealRadius(loud), strength: 0.85 + loud * 0.5, decay: 0.42, color: white ? [0.84, 0.92, 1.0] : [1, 0.2, 0.15], kind: 'player',
   });
   attract.lastPing = menuTime;
+  wardrobe.ping(); // the same echo sweeps over your survivor by the buttons
 }
 
 // between the pings, the thing in the trees looks at you
@@ -307,10 +327,12 @@ function updateAttract(dt) {
     const ev = mic.update(dt, audio.outputDb());
     if (ev.pulse > 0 && state === 'menu') {
       if (atlas.isOpen()) atlas.ping();
+      else if (wardrobe.isOpen()) wardrobe.ping();
       else {
         attractPulse(Math.max(0.35, ev.pulse));
         attract.nextPing = menuTime + 3;
       }
+      if (ev.pulse > 0.85) wardrobe.startle(); // you yelled: it flinches
     }
     const trigPos = mic.screamDb > mic.floor ? (mic.trig - mic.floor) / (mic.screamDb - mic.floor) : 0.3;
     menus.micTest(mic.meter, Math.min(0.9, Math.max(0.05, trigPos)));
@@ -354,6 +376,7 @@ function startRun(opts = {}) {
   if (!online && coop.active) coop.leave(); // a solo night: you leave the room
   if (runOnline && game.online) game.teardownOnline();
   atlas.close(); // a co-op host can start the night while you're reading
+  wardrobe.close(); // ...or trying on a hat
   audio.init();
   audio.setVolume(settings.volume);
   menus.only(null);
@@ -549,6 +572,7 @@ function handleEvents(events) {
     switch (e) {
       case 'pause':
         if (atlas.isOpen()) atlas.close();
+        else if (wardrobe.isOpen()) wardrobe.close();
         else if (lobby.isOpen()) lobby.close();
         else if (menus.isOpen('settingsPanel')) menus.closeSettings();
         else if (menus.isOpen('howPanel')) menus.show('howPanel', false);
@@ -564,7 +588,7 @@ function handleEvents(events) {
         if (state === 'over' || (state === 'paused' && !runOnline)) restartRun();
         break;
       case 'confirm':
-        if (atlas.isOpen() || menus.isOpen('settingsPanel') || menus.isOpen('howPanel') || menus.isOpen('scoresPanel') || lobby.isOpen()) break;
+        if (atlas.isOpen() || wardrobe.isOpen() || menus.isOpen('settingsPanel') || menus.isOpen('howPanel') || menus.isOpen('scoresPanel') || lobby.isOpen()) break;
         if (state === 'over') restartRun();
         else if (state === 'menu') startRun();
         else if (state === 'paused') resume();
@@ -602,7 +626,8 @@ function step(now, render) {
   if (!(rawDt > 0)) rawDt = 1 / 60;
   if (rawDt > 0.1) rawDt = 0.1;
   const atlasOpen = atlas.isOpen();
-  if (!atlasOpen) perfTick(rawDt);
+  const wardrobeOpen = !atlasOpen && wardrobe.isOpen();
+  if (!atlasOpen && !wardrobeOpen) perfTick(rawDt);
 
   const look = input.poll();
   const events = input.consume();
@@ -666,12 +691,17 @@ function step(now, render) {
     atlas.frame(rawDt);
     return;
   }
+  if (wardrobeOpen) {
+    wardrobe.frame(rawDt);
+    return;
+  }
 
   sky.position.copy(camera.position);
   motes.material.uniforms.uPix.value = 9 * (post.h / 900);
   post.u.uTime.value = now / 1000;
   renderer.info.reset();
   post.render(scene, camera);
+  if (state === 'menu' && !MENU_COVERS.some((id) => menus.isOpen(id))) wardrobe.menuFrame(rawDt);
 }
 
 // ---------------- boot ----------------
@@ -690,6 +720,7 @@ function boot() {
     game = new Game({ scene, camera, world, pulses, ghosts, eyes, particles, audio, mic, input, hud, radar, post });
     game.onEnd = onEnd;
     setupAttract();
+    wardrobe.init(); // your survivor by the menu buttons (its own small canvas)
     // warm up shaders so the first ping doesn't hitch
     renderer.compile(scene, camera);
     if (DEBUG.fps) {
@@ -697,7 +728,7 @@ function boot() {
       perf.fpsEl.style.cssText = 'position:fixed;right:8px;top:64px;z-index:99;font:11px JetBrains Mono,monospace;color:#8ef0ff;opacity:.8;pointer-events:none';
       document.body.appendChild(perf.fpsEl);
     }
-    window.__hush = { world, game, shared, pulses, ghosts, eyes, renderer, perf, mic, audio, input, hud, post, coop, lobby, atlas, debug: DEBUG, startRun, pause, resume, toMenu, get state() { return state; } };
+    window.__hush = { world, game, shared, pulses, ghosts, eyes, renderer, perf, mic, audio, input, hud, post, coop, lobby, atlas, wardrobe, debug: DEBUG, startRun, pause, resume, toMenu, get state() { return state; } };
     state = 'menu';
     menuTime = 0;
     post.u.uFade.value = 0;

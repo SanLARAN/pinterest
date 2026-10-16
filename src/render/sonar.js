@@ -157,7 +157,7 @@ void main() {
   vec3 toCam = uCam - vWorld;
   float camD = length(toCam);
   if (dot(Nrm, toCam) < 0.0) Nrm = -Nrm;
-  int k = int(vKind);
+  int k = int(vKind + 0.5); // (an interpolated constant can land a hair under the integer)
   vec3 base = KC[k];
 
   float ring;
@@ -261,6 +261,8 @@ uniform float uAlpha;
 uniform float uFlash;
 uniform float uFull;
 uniform float uBody;
+uniform vec3 uDye[4]; // a teammate's clothes: headwear main / accent, outfit main / accent
+uniform float uDyeK;
 varying vec3 vWorld;
 varying vec3 vBary;
 varying float vKind;
@@ -271,15 +273,28 @@ void main() {
   float camD = length(toCam);
   float facing = abs(dot(Nrm, toCam / camD));
   float edge = edgeFactor(vBary, 1.1);
-  int k = int(vKind);
+  int k = int(vKind + 0.5); // (an interpolated constant can land a hair under the integer)
   vec3 c = uColor;
   if (k == 8) c = mix(uColor, vec3(0.85, 0.74, 0.7), 0.35); // bone reads paler
+  // what they wear shows in the fill (fully in daylight / lamplight); the wire keeps most of their colour,
+  // so you still tell your friends apart — and from the things with red outlines
+  vec3 fillC = c;
+  float fillK = 1.0;
+  bool glow = false;
+  if (k >= 13 && k <= 18) {
+    vec3 dye = k == 13 ? uDye[0] : (k == 14 || k == 17) ? uDye[1] : k == 15 ? uDye[2] : uDye[3];
+    fillC = mix(c, dye, uDyeK);
+    c = mix(c, dye, uDyeK * 0.35);
+    fillK = 1.0 + 0.7 * uDyeK;
+    glow = k >= 17;
+  }
   // stuttering, not smooth: it flickers like a bad signal
   float fl = 0.72 + 0.28 * step(0.35, fract(sin(floor(uTime * 24.0) * 12.9898 + floor(vWorld.y * 4.0) * 78.233) * 43758.5453));
   float dist = exp(-camD * 0.011);
-  vec3 col = c * (edge * 2.3 + 0.05 + 0.2 * facing * facing + uFull * (0.32 + 0.45 * facing));
+  vec3 col = c * edge * 2.3 + fillC * fillK * (0.05 + 0.2 * facing * facing + uFull * (0.32 + 0.45 * facing));
   float a = clamp(uAlpha * uBody * (1.0 - edge * 0.65), 0.0, 0.93);
   if (k == 9) { col = vec3(3.6, 2.7, 2.3); a = 0.0; } // eyes burn
+  if (glow) { col = mix(col, fillC * 2.6 + 0.3, uDyeK); a *= 1.0 - 0.7 * uDyeK; } // a carved grin, lenses: a light of its own
   col *= uAlpha * fl * dist;
   col += uFlash * c * edge * 2.2 * dist;
   gl_FragColor = vec4(col, a);
@@ -297,6 +312,8 @@ export function createGhostMaterial(color) {
       uFull: { value: 0 },
       uBody: { value: 0.85 },
       uJitter: { value: 1 },
+      uDye: { value: [new THREE.Color(1, 1, 1), new THREE.Color(1, 1, 1), new THREE.Color(1, 1, 1), new THREE.Color(1, 1, 1)] },
+      uDyeK: { value: 0 },
     },
     vertexShader: GHOST_VERT,
     fragmentShader: GHOST_FRAG,

@@ -148,6 +148,18 @@ try {
   check("B's volume slider for the host silences it", chain.slider && chain.off != null && chain.off < -90, JSON.stringify(chain));
   facts.push(`voice bus ${chain.on} dBFS (auto-level ${chain.agc > 0 ? '+' : ''}${chain.agc} dB) · slider 0% → ${chain.off} dBFS`);
 
+  // the wardrobe: B dresses up in the lobby (through the real panel); the host must see it on the roster...
+  const fitB = await B.page.evaluate(() => {
+    const w = window.__hush.wardrobe;
+    w.open(); w.wear('pumpkin'); w.setSlot('body'); w.paint('#2f4f8f'); w.close();
+    return JSON.stringify(window.__hush.coop.me().fit);
+  });
+  const seenFit = await until(() => A.page.evaluate(() => {
+    const p = window.__hush.coop.players().find((q) => !q.self);
+    return p && p.fit && p.fit.head === 'pumpkin' && p.fit.bc[0] === '#2f4f8f' ? JSON.stringify(p.fit) : null;
+  }), 15000);
+  check("B's outfit reaches the host", !!seenFit, seenFit || fitB);
+
   await A.page.evaluate(() => window.__hush.coop.startRun());
   const both = await until(async () => {
     const a = await A.page.evaluate(() => `${window.__hush.state}/${window.__hush.game.state}/${window.__hush.game.role}`);
@@ -155,6 +167,10 @@ try {
     return a === 'playing/morning/host' && b === 'playing/morning/client' ? `${a} ${b}` : null;
   }, 20000);
   check('host starts the night for both', !!both, both || '');
+  // ...and on B's body in the night
+  const rigKey = await A.page.evaluate(() => { const r = [...window.__hush.game.remotes.values()][0]; return r ? r.rig.key : null; });
+  check("the host's teammate wears B's outfit", rigKey === 'survivor:pumpkin+jacket', rigKey || 'no teammate');
+  facts.push(`outfit ${seenFit && rigKey === 'survivor:pumpkin+jacket' ? 'synced' : 'NOT synced'}`);
   await A.page.evaluate(() => window.__hush.input.keys.add('KeyW'));
   await sleep(2000);
   await A.page.evaluate(() => window.__hush.input.keys.delete('KeyW'));

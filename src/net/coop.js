@@ -6,6 +6,7 @@
 import { Net, PROTOCOL, MAX_PLAYERS, makeCode, cleanCode } from './net.js';
 import { settings, saveSettings } from '../core/storage.js';
 import { t } from '../core/i18n.js';
+import { myFit, cleanFit } from '../game/outfit.js';
 
 const LOBBY_TYPES = new Set(['hi', 'roster', 'full', 'start', 'bye', 'nm', 'lobby']);
 
@@ -30,7 +31,7 @@ export class Coop {
     this.isHost = false;
     this.code = null;
     this.hostId = null;
-    this.roster = new Map(); // id -> { id, name, slot, host, mic, inRun, self }
+    this.roster = new Map(); // id -> { id, name, slot, host, mic, inRun, self, fit }
     this.phase = 'lobby'; // lobby | game  (as the host sees it)
     this.status = 'idle'; // idle | joining | waiting | searching | ready | full | version | hostLost | error
     this.joinedAt = 0;
@@ -107,7 +108,7 @@ export class Coop {
       throw e;
     }
     if (this.code !== code) return;
-    this.roster.set(this.selfId, { id: this.selfId, name: myName(), slot: host ? 0 : -1, host, mic: this.mic.state === 'on', inRun: false, self: true });
+    this.roster.set(this.selfId, { id: this.selfId, name: myName(), slot: host ? 0 : -1, host, mic: this.mic.state === 'on', inRun: false, self: true, fit: myFit() });
     if (host) this.hostId = this.selfId;
     this.status = host ? 'waiting' : 'searching';
     this.syncVoice();
@@ -153,7 +154,7 @@ export class Coop {
 
   // ---------------- handshake ----------------
   _hello() {
-    return { v: PROTOCOL, name: myName(), host: this.isHost, mic: this.mic.state === 'on' };
+    return { v: PROTOCOL, name: myName(), host: this.isHost, mic: this.mic.state === 'on', fit: myFit() };
   }
 
   _onPeerJoin(pid) {
@@ -193,6 +194,7 @@ export class Coop {
         if (r && d) {
           r.name = cleanName(d.name);
           r.mic = !!d.mic;
+          if (d.fit) r.fit = cleanFit(d.fit);
           if (this.isHost) this._broadcastRoster();
           this.emit('change');
         }
@@ -215,6 +217,7 @@ export class Coop {
     r.name = cleanName(d.name);
     r.host = !!d.host;
     r.mic = !!d.mic;
+    r.fit = cleanFit(d.fit); // what they wear (an older client sends nothing: the standard kit)
     if (d.host && !this.isHost) {
       this.hostId = pid;
       if (this.status === 'searching') this.status = 'ready';
@@ -238,7 +241,7 @@ export class Coop {
 
   _broadcastRoster() {
     if (!this.isHost) return;
-    const list = this.players().map((p) => ({ id: p.id, name: p.name, slot: p.slot, host: !!p.host, mic: !!p.mic, inRun: !!p.inRun }));
+    const list = this.players().map((p) => ({ id: p.id, name: p.name, slot: p.slot, host: !!p.host, mic: !!p.mic, inRun: !!p.inRun, fit: p.fit }));
     this.net.send('roster', { host: this.selfId, phase: this.phase, list });
   }
 
@@ -257,6 +260,7 @@ export class Coop {
       if (!r.self) r.name = cleanName(e.name);
       r.host = !!e.host;
       if (!r.self) r.mic = !!e.mic;
+      if (!r.self && e.fit) r.fit = cleanFit(e.fit);
       r.inRun = !!e.inRun;
     }
     // people the host doesn't seat (yet) still show up, unseated
@@ -282,13 +286,14 @@ export class Coop {
     this.emit('change');
   }
 
-  // name or mic changed: tell everyone
+  // name, mic or clothes changed: tell everyone
   announce() {
     const me = this.me();
     if (!me) return;
     me.name = myName();
     me.mic = this.mic.state === 'on';
-    this.net.send('nm', { name: me.name, mic: me.mic });
+    me.fit = myFit();
+    this.net.send('nm', { name: me.name, mic: me.mic, fit: me.fit });
     if (this.isHost) this._broadcastRoster();
     this.emit('change');
   }
@@ -300,7 +305,7 @@ export class Coop {
     const list = this.players();
     for (const p of list) p.inRun = true;
     this.phase = 'game';
-    const msg = { seed: (Math.random() * 2 ** 31) >>> 0, players: list.map((p) => ({ id: p.id, name: p.name, slot: p.slot })) };
+    const msg = { seed: (Math.random() * 2 ** 31) >>> 0, players: list.map((p) => ({ id: p.id, name: p.name, slot: p.slot, fit: p.self ? myFit() : p.fit })) };
     this.net.send('start', msg);
     this._broadcastRoster();
     this._onStart(msg);
@@ -315,7 +320,9 @@ export class Coop {
       if (r) {
         r.inRun = true;
         r.slot = p.slot;
-      }
+        // everyone's clothes: the host's word, or what they told us themselves (an older host sends none)
+        p.fit = cleanFit(p.fit || r.fit);
+      } else p.fit = cleanFit(p.fit);
     }
     this.queue = [];
     this.inRun = true;

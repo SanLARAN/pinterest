@@ -3,7 +3,8 @@
 // hear; and the 3D position their voice comes from.
 import { CFG } from '../core/config.js';
 import { clamp, lerp, angleDiff } from '../core/rng.js';
-import { buildSurvivor, poseSurvivor } from './monsters.js';
+import { buildSurvivor, poseSurvivor } from './survivor.js';
+import { cleanFit } from './outfit.js';
 
 export const PLAYER_COLORS = ['#8ef0ff', '#a6ff9e', '#d2a8ff', '#ffe08a'];
 export const PLAYER_HEX = [0x8ef0ff, 0xa6ff9e, 0xd2a8ff, 0xffe08a];
@@ -44,7 +45,8 @@ export class RemotePlayer {
     this.gens = 0;
     this.cause = null;
     this.buf = [];
-    this.rig = buildSurvivor();
+    this.fit = cleanFit(info.fit); // what they wear (their wardrobe): shows in their afterimages
+    this.rig = buildSurvivor(this.fit);
     this.phase = 0;
     this.stepAcc = 0;
     this.lastStep = 0;
