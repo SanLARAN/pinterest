@@ -110,6 +110,44 @@ try {
   check('voice B → A', va > 0.05, va.toFixed(3));
   facts.push(`voice ${vb.toFixed(2)}/${va.toFixed(2)}`);
 
+  // the voice chain on B: the host's voice comes out of the auto-level at a healthy level, and B's own
+  // lobby slider for the host (the real UI control) silences it
+  const chain = await B.page.evaluate(async () => {
+    const h = window.__hush, a = h.audio, id = h.coop.hostId, v = a.voices.get(id);
+    const an = a.ctx.createAnalyser();
+    an.fftSize = 2048;
+    a.voiceBus.connect(an);
+    const buf = new Float32Array(an.fftSize);
+    const loudest = async (ms) => {
+      let mx = -120;
+      const end = performance.now() + ms;
+      while (performance.now() < end) {
+        an.getFloatTimeDomainData(buf);
+        let s = 0;
+        for (const x of buf) s += x * x;
+        mx = Math.max(mx, 10 * Math.log10(s / buf.length + 1e-12));
+        await new Promise((r) => setTimeout(r, 20));
+      }
+      return +mx.toFixed(1);
+    };
+    const on = await loudest(2500);
+    const range = document.querySelector(`#coopList .row[data-id="${id}"] .vol-range`);
+    let off = null;
+    if (range) {
+      range.value = 0;
+      range.dispatchEvent(new Event('input'));
+      await new Promise((r) => setTimeout(r, 400));
+      off = await loudest(2500);
+      range.value = 100;
+      range.dispatchEvent(new Event('input'));
+    }
+    a.voiceBus.disconnect(an);
+    return { on, off, slider: !!range, agc: v && v.agcDb != null ? +v.agcDb.toFixed(1) : null };
+  });
+  check('host voice auto-levelled on B', chain.agc != null && chain.on > -40, JSON.stringify(chain));
+  check("B's volume slider for the host silences it", chain.slider && chain.off != null && chain.off < -90, JSON.stringify(chain));
+  facts.push(`voice bus ${chain.on} dBFS (auto-level ${chain.agc > 0 ? '+' : ''}${chain.agc} dB) · slider 0% → ${chain.off} dBFS`);
+
   await A.page.evaluate(() => window.__hush.coop.startRun());
   const both = await until(async () => {
     const a = await A.page.evaluate(() => `${window.__hush.state}/${window.__hush.game.state}/${window.__hush.game.role}`);
