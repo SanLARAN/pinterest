@@ -132,6 +132,7 @@ export class Dread {
       if (!g.world.col.free(x, z, 0.6)) continue;
       const y = g.world.terrain.height(x, z);
       g.shade.place(x, y, z, Math.atan2(p.x - x, p.z - z));
+      g.stats.seen.shade = 1;
       g.ghosts.spawn(g.shade.rig, g.time, { strength: rng.float(0.26, 0.4), life: 1.3, decay: 1.4, color: 0xb81c14, jitter: 1.6, body: 0.5 });
       // the forest goes quiet around it; sometimes you hear it breathe out
       g.audio.duck(0.12, 0.35, 1.6, 2.4);

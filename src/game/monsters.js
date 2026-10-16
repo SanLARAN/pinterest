@@ -442,6 +442,9 @@ function animHowler(m, dt, t) {
   n.kneeR.rotation.x = Math.max(0, -s) * 0.6 * amp;
 }
 
+// the atlas animates its portraits with the very same code (a stand-in `m`: rig, state, stateT, speedCur, phase, seed, headYaw...)
+export const ANIMS = { listener: animListener, crawler: animCrawler, watcher: animWatcher, howler: animHowler };
+
 // ---------------- Survivor: a teammate (co-op). seen only as a cold afterimage, like everything else ----------------
 export function buildSurvivor() {
   const R = makeRig('survivor');

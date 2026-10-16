@@ -30,7 +30,7 @@ const _e = new THREE.Euler();
 const _p = new THREE.Vector3();
 const _s = new THREE.Vector3();
 
-function placer(b, x, y, z, yaw) {
+export function placer(b, x, y, z, yaw) {
   _e.set(0, yaw, 0, 'YXZ');
   const base = new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromEuler(_e), new THREE.Vector3(1, 1, 1));
   return (lx, ly, lz, rx = 0, ry = 0, rz = 0, sx = 1, sy = sx, sz = sx) => {
@@ -40,6 +40,46 @@ function placer(b, x, y, z, yaw) {
     _m.multiplyMatrices(base, _l);
     b.setMatrix(_m);
   };
+}
+
+// the body: on its front, one arm reaching for the generator it never got to. P = placer, r = RNG.
+// returns how far the arm reaches (the tool bag lies by that hand). Shared with the atlas portraits.
+export function buildCorpse(b, P, r) {
+  P(0.15, 0.012, 0.15, 0, r.float(0, 6), 0, 1, 1, 1.3);
+  b.cylinder(7, 0.85, 0.8, 0.012, KIND.FLESH, { ringEdges: false }); // what soaked into the ground
+  const tilt = r.float(-0.35, 0.35);
+  P(0, 0.13, 0, 0, 0, tilt);
+  b.box(0.44, 0.21, 0.64, KIND.WOOD); // jacket
+  P(0, 0.2, -0.05, 0, 0, tilt);
+  b.box(0.3, 0.04, 0.4, KIND.BONE); // the note, pinned to the back where you can't miss it
+  P(r.float(-0.06, 0.06), 0.12, 0.46, r.float(-0.3, 0.3), r.float(-0.8, 0.8), 0);
+  b.rock(0.12, () => r.next(), KIND.FLESH, 0.18, 0.95);
+  P(0, 0, 0);
+  const reach = r.float(0.75, 0.95);
+  b.limb([0.21, 0.13, 0.26], [0.32, 0.07, 0.26 + reach * 0.5], 0.05, 0.04, KIND.WOOD, 4);
+  b.limb([0.32, 0.07, 0.26 + reach * 0.5], [0.3, 0.05, 0.26 + reach], 0.04, 0.03, KIND.FLESH, 4);
+  const bend = r.float(-0.4, 0.2);
+  b.limb([-0.21, 0.13, 0.24], [-0.48, 0.07, 0.02 + bend], 0.05, 0.04, KIND.WOOD, 4);
+  b.limb([-0.48, 0.07, 0.02 + bend], [-0.4, 0.05, -0.32 + bend], 0.04, 0.03, KIND.FLESH, 4);
+  const kick = r.float(-0.25, 0.25);
+  b.limb([0.1, 0.11, -0.3], [0.17 + kick, 0.09, -0.78], 0.065, 0.05, KIND.WOOD, 4);
+  b.limb([0.17 + kick, 0.09, -0.78], [0.2 + kick * 1.5, 0.07, -1.18], 0.05, 0.04, KIND.WOOD, 4);
+  b.limb([-0.1, 0.11, -0.3], [-0.24, 0.09, -0.75], 0.065, 0.05, KIND.WOOD, 4);
+  b.limb([-0.24, 0.09, -0.75], [-0.18, 0.07, -1.16], 0.05, 0.04, KIND.WOOD, 4);
+  // a dead flashlight
+  P(-0.75, 0.04, 0.45, Math.PI / 2, r.float(0, 6), 0);
+  b.cylinder(6, 0.03, 0.04, 0.24, KIND.METAL);
+  return reach;
+}
+
+// every body has a tool bag by its hand; which part is in it changes from night to night
+export function buildToolBag(b, P, i, hx, hz) {
+  const A = KIND.SHARD;
+  P(hx, 0, hz, 0, 0.4 + i, 0);
+  b.box(0.3, 0.3, 0.16, A, { bottom: true }); // a canvas tool bag
+  P(hx, 0.3, hz, 0, 0.4 + i, 0);
+  b.limb([-0.1, 0, 0], [0, 0.12, 0], 0.012, 0.012, A, 3);
+  b.limb([0, 0.12, 0], [0.1, 0, 0], 0.012, 0.012, A, 3);
 }
 
 let _glowTex = null;
@@ -151,33 +191,9 @@ export class Objectives {
     const c = site.corpse;
     const y = world.terrain.height(c.x, c.z);
     const r = new RNG(c.seed);
-    // the body: on its front, one arm reaching for the generator it never got to
     b.reset();
     const P = placer(b, c.x, y, c.z, c.yaw);
-    P(0.15, 0.012, 0.15, 0, r.float(0, 6), 0, 1, 1, 1.3);
-    b.cylinder(7, 0.85, 0.8, 0.012, KIND.FLESH, { ringEdges: false }); // what soaked into the ground
-    const tilt = r.float(-0.35, 0.35);
-    P(0, 0.13, 0, 0, 0, tilt);
-    b.box(0.44, 0.21, 0.64, KIND.WOOD); // jacket
-    P(0, 0.2, -0.05, 0, 0, tilt);
-    b.box(0.3, 0.04, 0.4, KIND.BONE); // the note, pinned to the back where you can't miss it
-    P(r.float(-0.06, 0.06), 0.12, 0.46, r.float(-0.3, 0.3), r.float(-0.8, 0.8), 0);
-    b.rock(0.12, () => r.next(), KIND.FLESH, 0.18, 0.95);
-    P(0, 0, 0);
-    const reach = r.float(0.75, 0.95);
-    b.limb([0.21, 0.13, 0.26], [0.32, 0.07, 0.26 + reach * 0.5], 0.05, 0.04, KIND.WOOD, 4);
-    b.limb([0.32, 0.07, 0.26 + reach * 0.5], [0.3, 0.05, 0.26 + reach], 0.04, 0.03, KIND.FLESH, 4);
-    const bend = r.float(-0.4, 0.2);
-    b.limb([-0.21, 0.13, 0.24], [-0.48, 0.07, 0.02 + bend], 0.05, 0.04, KIND.WOOD, 4);
-    b.limb([-0.48, 0.07, 0.02 + bend], [-0.4, 0.05, -0.32 + bend], 0.04, 0.03, KIND.FLESH, 4);
-    const kick = r.float(-0.25, 0.25);
-    b.limb([0.1, 0.11, -0.3], [0.17 + kick, 0.09, -0.78], 0.065, 0.05, KIND.WOOD, 4);
-    b.limb([0.17 + kick, 0.09, -0.78], [0.2 + kick * 1.5, 0.07, -1.18], 0.05, 0.04, KIND.WOOD, 4);
-    b.limb([-0.1, 0.11, -0.3], [-0.24, 0.09, -0.75], 0.065, 0.05, KIND.WOOD, 4);
-    b.limb([-0.24, 0.09, -0.75], [-0.18, 0.07, -1.16], 0.05, 0.04, KIND.WOOD, 4);
-    // a dead flashlight
-    P(-0.75, 0.04, 0.45, Math.PI / 2, r.float(0, 6), 0);
-    b.cylinder(6, 0.03, 0.04, 0.24, KIND.METAL);
+    const reach = buildCorpse(b, P, r);
     const mesh = new THREE.Mesh(b.toGeometry(), this.g.world.material);
     mesh.matrixAutoUpdate = false;
     this.g.scene.add(mesh);
@@ -186,22 +202,12 @@ export class Objectives {
     b.reset();
     const hx = 0.62, hz = 0.5 + reach * 0.4;
     const Q = placer(b, c.x, y, c.z, c.yaw);
-    this._buildItem(b, Q, i, hx, hz);
+    buildToolBag(b, Q, i, hx, hz);
     const item = new THREE.Mesh(b.toGeometry(), this.g.world.material);
     item.matrixAutoUpdate = false;
     this.g.scene.add(item);
     // world position of the body's centre (for distances / sounds)
     return { site, x: c.x, z: c.z, y, mesh, item, k: -1, searched: false, revealed: false, flies: null };
-  }
-
-  // every body has a tool bag by its hand; which part is in it changes from night to night
-  _buildItem(b, P, i, hx, hz) {
-    const A = KIND.SHARD;
-    P(hx, 0, hz, 0, 0.4 + i, 0);
-    b.box(0.3, 0.3, 0.16, A, { bottom: true }); // a canvas tool bag
-    P(hx, 0.3, hz, 0, 0.4 + i, 0);
-    b.limb([-0.1, 0, 0], [0, 0.12, 0], 0.012, 0.012, A, 3);
-    b.limb([0, 0.12, 0], [0.1, 0, 0], 0.012, 0.012, A, 3);
   }
 
   _buildGlow(scene, site) {

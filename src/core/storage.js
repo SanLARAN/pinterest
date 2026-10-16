@@ -69,3 +69,55 @@ export function bestScore() {
   const l = getScores();
   return l.length ? l[0].score : 0;
 }
+
+// ---------------- the atlas: what you have lived through, night after night ----------------
+const ATLAS_KEY = 'hush.atlas.v1';
+function freshAtlas() {
+  return {
+    nights: 0, wins: 0, best: 0, // best = longest night survived (s)
+    seen: {}, // creature -> nights it showed itself to you
+    kills: {}, // cause -> times it got you ('scream' too)
+    gens: 0, bodies: 0, shards: 0, stones: 0,
+    parts: [0, 0, 0, 0, 0], // generator #k started (fuel, plug, fuses, belt, battery)
+    sites: {}, // site id -> generators started there
+    read: {}, // atlas entries you've opened
+    fresh: true, // a red dot by the menu link: there's something new to read
+  };
+}
+function loadAtlas() {
+  const a = freshAtlas();
+  const raw = read(ATLAS_KEY, null);
+  if (!raw || typeof raw !== 'object') return a;
+  for (const k of Object.keys(a)) {
+    const v = raw[k];
+    if (v == null || typeof v !== typeof a[k] || Array.isArray(v) !== Array.isArray(a[k])) continue;
+    a[k] = Array.isArray(a[k]) ? a[k].map((d, i) => (Number.isFinite(v[i]) ? v[i] : d)) : v;
+  }
+  return a;
+}
+export const atlasLog = loadAtlas();
+export function saveAtlas() {
+  write(ATLAS_KEY, atlasLog);
+}
+
+// one night is over. stats = game.stats (+ seen/shades), res = { won, cause }, started = [{ k, site }] of running generators
+export function recordNight(stats, res, started = []) {
+  const a = atlasLog;
+  a.nights++;
+  if (res.won) a.wins++;
+  a.best = Math.max(a.best, Math.round(stats.time || 0));
+  for (const type of Object.keys(stats.seen || {})) {
+    if (!a.seen[type] && !a.read[type]) a.fresh = true; // a first meeting: the atlas has a page for it
+    a.seen[type] = (a.seen[type] | 0) + 1;
+  }
+  if (!res.won && res.cause && !res.hostLost) a.kills[res.cause] = (a.kills[res.cause] | 0) + 1;
+  a.bodies += stats.bodies | 0;
+  a.shards += stats.shards | 0;
+  a.stones += stats.thrown | 0;
+  for (const g of started) {
+    a.gens++;
+    if (g.k >= 0 && g.k < 5) a.parts[g.k]++;
+    if (g.site) a.sites[g.site] = (a.sites[g.site] | 0) + 1;
+  }
+  saveAtlas();
+}

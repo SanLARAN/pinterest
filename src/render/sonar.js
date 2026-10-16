@@ -88,12 +88,31 @@ float hash13(vec3 p3) {
 }
 `;
 
-const EDGE_GLSL = /* glsl */ `
+export const EDGE_GLSL = /* glsl */ `
 float edgeFactor(vec3 b, float w) {
   vec3 d = fwidth(b);
   vec3 a = smoothstep(d * max(w - 0.6, 0.0), d * (w + 0.6), b);
   return 1.0 - min(min(a.x, a.y), a.z);
 }
+`;
+
+// night palette per material kind (shared with the atlas portraits)
+export const KIND_COLORS_GLSL = /* glsl */ `
+// cold, ashen palette: the forest is grey bone and frost, only flesh is red
+const vec3 KC[12] = vec3[12](
+  vec3(0.27, 0.31, 0.33),  // ground
+  vec3(0.60, 0.66, 0.68),  // bark
+  vec3(0.44, 0.55, 0.54),  // leaf
+  vec3(0.54, 0.59, 0.65),  // rock
+  vec3(0.76, 0.68, 0.60),  // wood
+  vec3(0.70, 0.76, 0.82),  // metal
+  vec3(0.92, 0.32, 0.26),  // effigy
+  vec3(1.00, 0.14, 0.09),  // flesh
+  vec3(0.90, 0.84, 0.78),  // bone
+  vec3(1.00, 1.00, 1.00),  // eye
+  vec3(0.34, 0.46, 0.54),  // water
+  vec3(1.00, 0.70, 0.25)   // shard
+);
 `;
 
 const WORLD_VERT = /* glsl */ `
@@ -117,22 +136,7 @@ varying vec3 vWorld;
 varying vec3 vBary;
 varying float vKind;
 
-// cold, ashen palette: the forest is grey bone and frost, only flesh is red
-const vec3 KC[12] = vec3[12](
-  vec3(0.27, 0.31, 0.33),  // ground
-  vec3(0.60, 0.66, 0.68),  // bark
-  vec3(0.44, 0.55, 0.54),  // leaf
-  vec3(0.54, 0.59, 0.65),  // rock
-  vec3(0.76, 0.68, 0.60),  // wood
-  vec3(0.70, 0.76, 0.82),  // metal
-  vec3(0.92, 0.32, 0.26),  // effigy
-  vec3(1.00, 0.14, 0.09),  // flesh
-  vec3(0.90, 0.84, 0.78),  // bone
-  vec3(1.00, 1.00, 1.00),  // eye
-  vec3(0.34, 0.46, 0.54),  // water
-  vec3(1.00, 0.70, 0.25)   // shard
-);
-// daylight palette: what the forest looks like when you can actually see it
+${KIND_COLORS_GLSL}// daylight palette: what the forest looks like when you can actually see it
 const vec3 DC[12] = vec3[12](
   vec3(0.34, 0.38, 0.22),  // ground: moss and needles
   vec3(0.42, 0.33, 0.25),  // bark

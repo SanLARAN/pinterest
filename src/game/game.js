@@ -166,7 +166,7 @@ export class Game {
     this.time = 0;
     this.score = 0;
     this.mult = 1;
-    this.stats = { shards: 0, close: 0, escapes: 0, loudest: 0, hunts: 0, gens: 0, bodies: 0 };
+    this.stats = { shards: 0, close: 0, escapes: 0, loudest: 0, hunts: 0, gens: 0, bodies: 0, thrown: 0, seen: {} }; // seen: creatures that showed themselves (the atlas)
     this.state = 'morning';
     this.grace = true;
     this.fx = this._fxDefaults();
@@ -547,6 +547,7 @@ export class Game {
       return;
     }
     p.stones--;
+    this.stats.thrown++;
     const cp = Math.cos(p.pitch);
     const dx = -Math.sin(p.yaw) * cp, dz = -Math.cos(p.yaw) * cp, dy = Math.sin(p.pitch);
     const e = this.eyePos();
@@ -946,6 +947,7 @@ export class Game {
   }
 
   beginDeath(m, cause) {
+    this.stats.seen[m.type] = 1;
     this.deathT = 0;
     this.killer = m;
     this.killType = m.type;
@@ -1121,6 +1123,7 @@ export class Game {
     this.shade.place(a.x, a.y, a.z, Math.atan2(p.x - a.x, p.z - a.z));
     const reduced = settings.scares === 'reduced';
     this.pulses.emit(p.x, p.y + 1.3, p.z, this.time, { radius: 9, strength: 0.75, decay: 2.2, color: [1, 0.85, 0.82], kind: 'scare' });
+    this.stats.seen.shade = 1;
     this.ghosts.spawn(this.shade.rig, this.time, { strength: reduced ? 0.9 : 1.6, life: 0.6, decay: 3.5, color: 0xff3a2a, full: 0.7 });
     this.audio.sting(reduced ? 0.6 : 1);
     this.addTrauma(0.55);
@@ -1149,6 +1152,7 @@ export class Game {
           const y = this.world.terrain.height(x, z);
           this.shade.place(x, y, z, Math.atan2(-f.z * side, f.x * side));
           this.shade.rig.root.rotation.x = 0.25;
+          this.stats.seen.shade = 1;
           this.ghosts.spawn(this.shade.rig, this.time, { strength: 1.1, life: 0.9, decay: 2.5, color: 0xff3a2a });
           this.shade.rig.root.rotation.x = 0;
           if (i === 0) this.pulses.emit(p.x, p.y + 1.3, p.z, this.time, { radius: 16, strength: 0.45, decay: 1.6, color: [1, 0.85, 0.82], kind: 'scare' });
@@ -1170,6 +1174,7 @@ export class Game {
     this.pulses.emit(x, y + 1.0, z, this.time, { radius: 9, strength: 0.9, decay: 0.9, color: [0.85, 0.9, 1], kind: 'scare' });
     if (this.rng.chance(0.45)) {
       this.shade.place(x, y, z, Math.atan2(p.x - x, p.z - z));
+      this.stats.seen.shade = 1;
       this.ghosts.spawn(this.shade.rig, this.time, { strength: 1.0, life: 1.6, decay: 1.4, color: 0xff3a2a });
     }
     this.radar.blip(x, z, 'unknown');
@@ -1197,6 +1202,7 @@ export class Game {
       fn: () => {
         this.pulses.emit(x, y + 1.5, z, this.time, { radius: 8, strength: 0.6, decay: 1.2, color: RED, kind: 'scare' });
         this.shade.place(x, y, z, Math.atan2(p.x - x, p.z - z));
+        this.stats.seen.shade = 1;
         this.ghosts.spawn(this.shade.rig, this.time, { strength: 1.1, life: 2.0, decay: 1.0, color: 0xff3a2a });
       },
     });
@@ -1461,7 +1467,10 @@ export class Game {
     const lit = m.state === 'lurk' ? 0 : this.objectives.lampAt(m.x, m.z);
     if (lit > 0.06) {
       const str = Math.min(0.85, 0.22 + lit * 1.3);
-      if (!m.lampGhost) m.lampGhost = this.ghosts.spawn(m.rig, this.time, { sticky: true, strength: str, full: 0.25, color: m.ghostColor, jitter: 0.6 });
+      if (!m.lampGhost) {
+        m.lampGhost = this.ghosts.spawn(m.rig, this.time, { sticky: true, strength: str, full: 0.25, color: m.ghostColor, jitter: 0.6 });
+        this.stats.seen[m.type] = 1;
+      }
       else {
         this.ghosts.refresh(m.lampGhost, m.rig);
         m.lampGhost.strength = str;
@@ -1482,6 +1491,7 @@ export class Game {
           const str = clamp(s.strength * (0.65 + 0.7 * fall), 0.6, 1.8);
           this.ghosts.spawn(m.rig, this.time, { strength: str, color: m.ghostColor, life: 2.9, decay: 0.85 });
           m.lastGhostT = this.time;
+          this.stats.seen[m.type] = 1;
           if (m.type === 'watcher' && !m.revealed) {
             m.revealed = true;
             if (this.time - (this.lastWatcherSting ?? -99) > 40 && this.player.alive) {

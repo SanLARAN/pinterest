@@ -87,6 +87,8 @@
           <nav class="menu-links">
             <button class="link" id="btnHow"><span data-i18n="howto"></span></button>
             <i>·</i>
+            <button class="link atlas-link" id="btnAtlas"><svg class="book-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6.5C10 5 7 4.6 4 5v13c3-.4 6 0 8 1.5 2-1.5 5-1.9 8-1.5V5c-3-.4-6 0-8 1.5zM12 6.5v13"/></svg><span data-i18n="atlas"></span></button>
+            <i>·</i>
             <button class="link" id="btnScores"><span data-i18n="scores"></span></button>
             <i>·</i>
             <button class="link" id="btnSettings"><span data-i18n="settings"></span></button>
@@ -214,6 +216,31 @@
         <h2 data-i18n="howto"></h2>
         <div id="howBody"></div>
         <button class="btn primary" id="btnHowBack"><span data-i18n="back"></span></button>
+      </div>
+    </div>
+
+    <!-- the atlas: a field journal from the backpack at the camp -->
+    <div id="atlasPanel" class="screen modal" role="dialog" aria-modal="true" aria-hidden="true" aria-label="atlas">
+      <div class="book" tabindex="-1">
+        <div class="book-top">
+          <nav class="book-tabs" id="atlasTabs"></nav>
+          <button class="book-close" id="atlasClose" aria-label="close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></svg></button>
+        </div>
+        <div class="spread">
+          <section class="page page-l" id="atlasLeft">
+            <div class="plate" id="atlasPlate">
+              <div class="plate-fx"></div>
+              <i class="pc tl"></i><i class="pc tr"></i><i class="pc bl"></i><i class="pc br"></i>
+              <div class="plate-hint" id="atlasHint"></div>
+              <div class="plate-ruler" id="atlasRuler"><i></i><span></span></div>
+              <div class="plate-stamp" id="atlasStamp"></div>
+            </div>
+            <div class="plate-cap" id="atlasCap"></div>
+            <div class="page-foot l"><span class="pno" id="atlasPnoL"></span></div>
+          </section>
+          <section class="page page-r" id="atlasRight"></section>
+          <div class="leaf" id="atlasLeaf"><div class="leaf-face leaf-front"></div><div class="leaf-face leaf-back"></div></div>
+        </div>
       </div>
     </div>
 

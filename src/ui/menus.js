@@ -11,8 +11,8 @@ function esc(s) {
 
 export class Menus {
   constructor(handlers) {
-    this.h = handlers; // { onPlay, onResume, onRestart, onMenu, onMicToggle, onSettingsChanged, uiSound }
-    this.screens = ['menu', 'pause', 'over', 'settingsPanel', 'howPanel', 'scoresPanel', 'coopPanel', 'boot'];
+    this.h = handlers; // { onPlay, onResume, onRestart, onMenu, onMicToggle, onSettingsChanged, onAtlas, uiSound }
+    this.screens = ['menu', 'pause', 'over', 'settingsPanel', 'howPanel', 'scoresPanel', 'coopPanel', 'atlasPanel', 'boot'];
     this.settingsReturn = null;
     this.highlight = -1;
     this._bind();
@@ -60,6 +60,7 @@ export class Menus {
     click('btnLobby', () => this.h.onLobby && this.h.onLobby());
     click('btnHow', () => this.show('howPanel'));
     click('btnHowBack', () => this.show('howPanel', false));
+    click('btnAtlas', () => this.h.onAtlas && this.h.onAtlas());
     click('btnScores', () => {
       this.renderScores();
       this.show('scoresPanel');

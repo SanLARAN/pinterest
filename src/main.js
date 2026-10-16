@@ -9,7 +9,7 @@ import './style.css';
 
 import * as THREE from 'three';
 import { CFG } from './core/config.js';
-import { settings, saveSettings, submitScore } from './core/storage.js';
+import { settings, saveSettings, submitScore, recordNight } from './core/storage.js';
 import { setLang, t } from './core/i18n.js';
 import { World } from './world/world.js';
 import { shared, createWorldMaterial, createMotes, createSky } from './render/sonar.js';
@@ -32,6 +32,7 @@ import { cleanCode } from './net/net.js';
 import { Lobby } from './ui/lobby.js';
 import { Mates } from './ui/mates.js';
 import { VoiceMix, VoiceList } from './ui/voicemix.js';
+import { Atlas } from './ui/atlas.js';
 
 setLang(settings.lang);
 
@@ -83,6 +84,8 @@ const coop = new Coop({ audio, mic });
 const mates = new Mates($('mates'));
 const voiceMix = new VoiceMix(audio); // your volume for each friend's voice
 const pauseVoices = new VoiceList($('pauseVoiceRows'), voiceMix, audio);
+// the atlas (main menu): a field journal with live 3D plates. its own little canvas; the forest isn't drawn while it's open
+const atlas = new Atlas({ audio, world, onClose: () => $('btnAtlas').focus({ preventScroll: true }) });
 let game = null;
 let runOnline = false; // the current / last run is a co-op night
 
@@ -153,6 +156,9 @@ const menus = new Menus({
   onRestart: () => restartRun(),
   onMenu: () => toMenu(),
   onCoop: () => lobby.open(),
+  onAtlas: () => {
+    if (state === 'menu') atlas.open();
+  },
   onLobby: () => toMenu(true),
   onMicToggle: () => toggleMic(),
   onSettingsChanged: (key) => {
@@ -170,6 +176,7 @@ const menus = new Menus({
     if (key === 'radar') applyRadar();
     if (key === 'lang' || key === undefined) {
       hud.cache = {};
+      atlas.applyI18n();
       updateMicUI();
       lobby.render();
       $('lockHint').textContent = input.lockFailed ? t('dragToLook') : t('clickToLook');
@@ -299,8 +306,11 @@ function updateAttract(dt) {
   if (mic.state === 'on') {
     const ev = mic.update(dt, audio.outputDb());
     if (ev.pulse > 0 && state === 'menu') {
-      attractPulse(Math.max(0.35, ev.pulse));
-      attract.nextPing = menuTime + 3;
+      if (atlas.isOpen()) atlas.ping();
+      else {
+        attractPulse(Math.max(0.35, ev.pulse));
+        attract.nextPing = menuTime + 3;
+      }
     }
     const trigPos = mic.screamDb > mic.floor ? (mic.trig - mic.floor) / (mic.screamDb - mic.floor) : 0.3;
     menus.micTest(mic.meter, Math.min(0.9, Math.max(0.05, trigPos)));
@@ -343,6 +353,7 @@ function startRun(opts = {}) {
   if (!online && state === 'over' && performance.now() - overAt < 450) return;
   if (!online && coop.active) coop.leave(); // a solo night: you leave the room
   if (runOnline && game.online) game.teardownOnline();
+  atlas.close(); // a co-op host can start the night while you're reading
   audio.init();
   audio.setVolume(settings.volume);
   menus.only(null);
@@ -434,6 +445,16 @@ function resume() {
 // keepRoom: co-op "to the lobby" — stay in the room with your friends
 function toMenu(keepRoom = false) {
   const wasOnline = runOnline;
+  // walking away from a night still leaves it in the atlas (what you met, what you started)
+  if (game && (state === 'playing' || state === 'paused') && (game.state === 'play' || game.state === 'dying')) {
+    try {
+      const started = game.objectives.gens.filter((g) => g.running).map((g) => ({ k: g.k, site: g.site && g.site.id }));
+      recordNight({ ...game.stats, time: game.time }, { won: false, cause: game.player && !game.player.alive ? game.cause : null }, started);
+      atlas.refreshBadge();
+    } catch (e) {
+      console.warn('[atlas] could not record the night', e);
+    }
+  }
   if (game) {
     for (const m of game.monsters) m.dispose();
     game.monsters = [];
@@ -491,6 +512,13 @@ function onEnd(res) {
     loudestDb: -100,
   };
   const team = online ? teamSummary() : null;
+  try {
+    const started = game.objectives.gens.filter((g) => g.running).map((g) => ({ k: g.k, site: g.site && g.site.id }));
+    recordNight(stats, res, started);
+    atlas.refreshBadge();
+  } catch (e) {
+    console.warn('[atlas] could not record the night', e);
+  }
   const { rank, list } = submitScore({ name: settings.name || '???', score: game.score, time: stats.time, won: res.won, shards: stats.shards, gens: stats.gens, coop: online ? Math.max(team.length, game.teamSize || 1) : 0 });
   menus.showOver(res, stats, rank, list, team);
   menus.renderScores();
@@ -520,7 +548,8 @@ function handleEvents(events) {
   for (const e of events) {
     switch (e) {
       case 'pause':
-        if (lobby.isOpen()) lobby.close();
+        if (atlas.isOpen()) atlas.close();
+        else if (lobby.isOpen()) lobby.close();
         else if (menus.isOpen('settingsPanel')) menus.closeSettings();
         else if (menus.isOpen('howPanel')) menus.show('howPanel', false);
         else if (menus.isOpen('scoresPanel')) menus.show('scoresPanel', false);
@@ -535,7 +564,7 @@ function handleEvents(events) {
         if (state === 'over' || (state === 'paused' && !runOnline)) restartRun();
         break;
       case 'confirm':
-        if (menus.isOpen('settingsPanel') || menus.isOpen('howPanel') || menus.isOpen('scoresPanel') || lobby.isOpen()) break;
+        if (atlas.isOpen() || menus.isOpen('settingsPanel') || menus.isOpen('howPanel') || menus.isOpen('scoresPanel') || lobby.isOpen()) break;
         if (state === 'over') restartRun();
         else if (state === 'menu') startRun();
         else if (state === 'paused') resume();
@@ -572,7 +601,8 @@ function step(now, render) {
   lastFrame = now;
   if (!(rawDt > 0)) rawDt = 1 / 60;
   if (rawDt > 0.1) rawDt = 0.1;
-  perfTick(rawDt);
+  const atlasOpen = atlas.isOpen();
+  if (!atlasOpen) perfTick(rawDt);
 
   const look = input.poll();
   const events = input.consume();
@@ -632,6 +662,10 @@ function step(now, render) {
   }
   if (state !== 'playing') document.body.classList.remove('needlock');
   if (!render) return;
+  if (atlasOpen) {
+    atlas.frame(rawDt);
+    return;
+  }
 
   sky.position.copy(camera.position);
   motes.material.uniforms.uPix.value = 9 * (post.h / 900);
@@ -663,7 +697,7 @@ function boot() {
       perf.fpsEl.style.cssText = 'position:fixed;right:8px;top:64px;z-index:99;font:11px JetBrains Mono,monospace;color:#8ef0ff;opacity:.8;pointer-events:none';
       document.body.appendChild(perf.fpsEl);
     }
-    window.__hush = { world, game, shared, pulses, ghosts, eyes, renderer, perf, mic, audio, input, hud, post, coop, lobby, debug: DEBUG, startRun, pause, resume, toMenu, get state() { return state; } };
+    window.__hush = { world, game, shared, pulses, ghosts, eyes, renderer, perf, mic, audio, input, hud, post, coop, lobby, atlas, debug: DEBUG, startRun, pause, resume, toMenu, get state() { return state; } };
     state = 'menu';
     menuTime = 0;
     post.u.uFade.value = 0;
