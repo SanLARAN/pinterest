@@ -14,6 +14,7 @@ const t0 = Date.now();
 const log = (...a) => console.log(`[${((Date.now() - t0) / 1000).toFixed(1)}s]`, ...a);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let ok = true;
+const facts = []; // a one-line summary, also posted as a GitHub annotation
 const check = (name, cond, extra = '') => {
   log(cond ? 'PASS' : 'FAIL', name, extra);
   if (!cond) ok = false;
@@ -80,12 +81,16 @@ try {
   }, JOIN_TIMEOUT);
   log('B relays', JSON.stringify(await relays(B.page)));
   check(`found each other through public signalling (${NET || 'nostr + torrent'})`, !!seated, seated ? `${((Date.now() - tJoin) / 1000).toFixed(1)} s after B opened the link` : 'timeout');
+  facts.push(seated ? `joined in ${((Date.now() - tJoin) / 1000).toFixed(1)} s` : 'no join');
+  const ra = await relays(A.page), rb = await relays(B.page);
+  facts.push(`relays A nostr ${ra.nostr.open}/${ra.nostr.total} torrent ${ra.torrent.open}/${ra.torrent.total}; B nostr ${rb.nostr.open}/${rb.nostr.total} torrent ${rb.torrent.open}/${rb.torrent.total}`);
   if (!seated) throw new Error('no connection');
 
   const rtt = await until(() => B.page.evaluate(() => window.__hush.coop.rtt(window.__hush.coop.hostId)), 15000);
   log('ping', rtt, 'ms');
   const links = await B.page.evaluate(() => { const n = window.__hush.coop.net; return [...n.peers.values()].map((p) => [...p.links].map((i) => n.links[i].name).join('+')); });
   log('B is linked to the host via', links.join(', '));
+  facts.push(`ping ${rtt} ms via ${links.join(',')}`);
 
   const level = (P, who) => P.evaluate(async (who) => {
     const h = window.__hush;
@@ -103,6 +108,7 @@ try {
   }
   check('voice A → B', vb > 0.05, vb.toFixed(3));
   check('voice B → A', va > 0.05, va.toFixed(3));
+  facts.push(`voice ${vb.toFixed(2)}/${va.toFixed(2)}`);
 
   await A.page.evaluate(() => window.__hush.coop.startRun());
   const both = await until(async () => {
@@ -126,5 +132,6 @@ try {
   if (A) await A.browser.close().catch(() => {});
   if (B) await B.browser.close().catch(() => {});
   log(ok ? 'ALL PASS' : 'SOME FAILED');
+  if (process.env.GITHUB_ACTIONS) console.log(`::notice title=online smoke (${NET || 'nostr+torrent'}) ${ok ? 'PASS' : 'FAIL'}::${facts.join(' · ') || 'no facts'}`);
   process.exit(ok ? 0 : 1);
 }
