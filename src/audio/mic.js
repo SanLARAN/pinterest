@@ -233,9 +233,11 @@ export class Mic {
     const ctx = e.ctx;
     const t = e.now;
     const buf = this.snippets[Math.floor(Math.random() * this.snippets.length)];
+    const rate = 0.72 + Math.random() * 0.1;
+    // your voice, dragged slower and sinking in pitch...
     const s = ctx.createBufferSource();
     s.buffer = buf;
-    s.playbackRate.value = 0.74 + Math.random() * 0.1;
+    s.playbackRate.value = rate;
     s.detune.setValueAtTime(0, t);
     s.detune.linearRampToValueAtTime(-250, t + buf.duration * 1.3);
     const lp = ctx.createBiquadFilter();
@@ -249,10 +251,30 @@ export class Mic {
     s.connect(lp).connect(sh).connect(g).connect(pn);
     pn.connect(e.sfx);
     const rv = ctx.createGain();
-    rv.gain.value = 0.6;
+    rv.gain.value = 0.7;
     g.connect(rv);
     rv.connect(e.revSend);
     s.start(t);
+    // ...with a second, wrong throat underneath: lower still, ring-modulated, a hair late
+    const s2 = ctx.createBufferSource();
+    s2.buffer = buf;
+    s2.playbackRate.value = rate * 0.8;
+    s2.detune.setValueAtTime(0, t);
+    s2.detune.linearRampToValueAtTime(-400, t + buf.duration * 1.6);
+    const rm = ctx.createGain();
+    rm.gain.value = 0;
+    const mo = ctx.createOscillator();
+    mo.frequency.value = 38 + Math.random() * 12;
+    mo.connect(rm.gain);
+    const lp2 = ctx.createBiquadFilter();
+    lp2.type = 'lowpass';
+    lp2.frequency.value = 1500;
+    const g2 = ctx.createGain();
+    g2.gain.value = gain * 0.55;
+    s2.connect(rm).connect(lp2).connect(g2).connect(pn);
+    s2.start(t + 0.035);
+    mo.start(t);
+    mo.stop(t + 0.1 + buf.duration * 1.8);
     // keep the self-gate from treating our own playback as player noise
     this.selfUntil = performance.now() + buf.duration * 1500 + 300;
     return true;

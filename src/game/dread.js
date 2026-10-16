@@ -85,6 +85,15 @@ export class Dread {
       this.glintMonster(m, I, st === 'hunt' ? 0.3 : 0.45 + rng.float(0, 0.3), st !== 'hunt' && rng.chance(0.4));
     }
 
+    // ---- sniffing: something searching close by smells the air for you ----
+    for (const m of g.monsters) {
+      if ((m.state !== 'search' && m.state !== 'investigate') || m.playerDist > 8) continue;
+      m.sniffT = (m.sniffT ?? rng.float(0.6, 2)) - dt;
+      if (m.sniffT > 0) continue;
+      m.sniffT = rng.float(3.5, 6.5);
+      g.audio.sniff(m.x, m.y + (m.type === 'crawler' ? 0.7 : 2.1), m.z, 0.42 + 0.25 * (1 - m.playerDist / 8));
+    }
+
     // ---- hallucinations (only once you know what is out there, never mid-chase) ----
     const dark = g.time - (g.lastPulseT ?? -9) > 2.4;
     if (g.firstPingT >= 0 && g.time > 45 && !hunted && g.state === 'play') {
@@ -123,6 +132,9 @@ export class Dread {
       const y = g.world.terrain.height(x, z);
       g.shade.place(x, y, z, Math.atan2(p.x - x, p.z - z));
       g.ghosts.spawn(g.shade.rig, g.time, { strength: rng.float(0.26, 0.4), life: 1.3, decay: 1.4, color: 0xb81c14, jitter: 1.6, body: 0.5 });
+      // the forest goes quiet around it; sometimes you hear it breathe out
+      g.audio.duck(0.12, 0.35, 1.6, 2.4);
+      if (rng.chance(0.4)) g.audio.exhale(x, y + 1.8, z, 0.22);
       if (rng.chance(0.5)) {
         const e = g.shade.rig.nodes.head;
         g.shade.rig.root.updateMatrixWorld(true);
@@ -138,6 +150,7 @@ export class Dread {
     const g = this.g;
     const p = g.player;
     const rng = g.rng;
+    if (count > 1) g.audio.duck(0.1, 0.5, 2.2, 2.6); // many of them: everything else goes silent
     for (let i = 0; i < count; i++) {
       const a = p.yaw + rng.float(-0.75, 0.75);
       const d = rng.float(13, 32);

@@ -316,6 +316,7 @@ function startRun() {
   post.u.uFade.value = 1;
   if (!input.touch) input.requestLock();
   audio.startAmbience();
+  audio.resetFx(); // never start a run muffled, silent, or with the last death still ringing
   audio.setAmbience(0.9, 0);
   audio.setPaused(false);
   if (settings.micEnabled && !DEBUG.nomic && (mic.state === 'off')) {
@@ -358,6 +359,7 @@ function toMenu() {
   particles.clear();
   input.exitLock();
   audio.setPaused(false);
+  audio.resetFx();
   audio.setAmbience(0, 0);
   hud.show(false);
   hud.setIntro(null);
@@ -516,6 +518,7 @@ function boot() {
     menus.only('menu');
     updateMicUI();
     if (DEBUG.autostart) startRun();
+    if (params.has('sfx')) import('./ui/sfxtest.js').then((m) => m.mountSfxPanel(audio));
   }, 60);
 }
 boot();

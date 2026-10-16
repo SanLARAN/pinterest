@@ -454,7 +454,11 @@ export class Game {
     let kind = this.rng.pick(opts);
     if (this.scareCount === 0) kind = 'snap';
     this.scareCount++;
-    this['scare_' + kind]();
+    // the forest holds its breath first (sometimes something inhales behind you), then the hit
+    const reduced = settings.scares === 'reduced';
+    const lead = kind === 'whisper' ? 1.4 : this.rng.float(0.75, 1.15);
+    this.audio.preScare(lead, kind === 'whisper' ? 'silence' : null, reduced ? 0.6 : 1);
+    this.timeline.push({ at: this.time + lead, fn: () => { if (this.state === 'play') this['scare_' + kind](); } });
   }
 
   _ahead(d, lateral = 0) {
@@ -482,9 +486,15 @@ export class Game {
     const p = this.player;
     const side = this.rng.sign();
     const d = this.rng.float(9, 13);
+    {
+      // you hear it coming before you see it: the sound sweeps the whole path at ~18 m/s
+      const f = p.forward();
+      const at = (lat) => [p.x + f.x * d - f.z * lat, p.y + 0.4, p.z + f.z * d + f.x * lat];
+      this.audio.runnerPass(...at(-9.5 * side), ...at(9.5 * side), 1.05);
+    }
     for (let i = 0; i < 5; i++) {
       this.timeline.push({
-        at: this.time + i * 0.14,
+        at: this.time + 0.25 + i * 0.14,
         fn: () => {
           const f = p.forward();
           const lat = side * (-5 + i * 2.5);
@@ -493,7 +503,6 @@ export class Game {
           this.shade.place(x, y, z, Math.atan2(-f.z * side, f.x * side));
           this.shade.rig.root.rotation.x = 0.25;
           this.ghosts.spawn(this.shade.rig, this.time, { strength: 1.1, life: 0.9, decay: 2.5, color: 0xff3a2a });
-          this.audio.heavyStep(x, y + 0.2, z, 0.5);
           this.shade.rig.root.rotation.x = 0;
           if (i === 0) this.pulses.emit(p.x, p.y + 1.3, p.z, this.time, { radius: 16, strength: 0.45, decay: 1.6, color: [1, 0.85, 0.82], kind: 'scare' });
         },
@@ -510,7 +519,7 @@ export class Game {
     const d = -this.rng.float(5, 8);
     const x = p.x + f.x * d - f.z * lat, z = p.z + f.z * d + f.x * lat;
     const y = this.world.terrain.height(x, z);
-    this.audio.branchSnap(x, y + 1.2, z, 1);
+    this.audio.branchSnap(x, y + 1.2, z, 1.7, true); // ...then one slow step, and a breath
     this.pulses.emit(x, y + 1.0, z, this.time, { radius: 9, strength: 0.9, decay: 0.9, color: [0.85, 0.9, 1], kind: 'scare' });
     if (this.rng.chance(0.45)) {
       this.shade.place(x, y, z, Math.atan2(p.x - x, p.z - z));
@@ -521,9 +530,11 @@ export class Game {
   }
 
   scare_whisper() {
+    // right behind your head, a little to one side. it knows the name of the game.
     const p = this.player;
     const f = p.forward();
-    this.audio.whisper(p.x - f.x * 0.8, p.y + p.eyeCur, p.z - f.z * 0.8, 1.7);
+    const side = this.rng.sign() * 0.3;
+    this.audio.whisper(p.x - f.x * 0.55 - f.z * side, p.y + p.eyeCur, p.z - f.z * 0.55 + f.x * side);
     this.fx.glitch = 0.3;
   }
 
@@ -662,7 +673,7 @@ export class Game {
     // ---- danger / atmosphere ----
     const dread = this.firstPingT < 0 ? 0.16 : 0; // a slow heartbeat in the dark before your first sound
     fx.danger = damp(fx.danger, Math.max(nearest, dread), 3, dt);
-    this.audio.update(fx.danger);
+    this.audio.update(fx.danger, this.time / CFG.RUN_SECONDS);
     this.audio.setAmbience(0.9, fx.danger);
 
     // dawn approaching
@@ -696,6 +707,7 @@ export class Game {
         this.hud.popup(`+${Math.round(pts)} ${t('aClose')}`, 'red');
         this.fx.slowT = 0.7;
         this.audio.heartbeat(0.9);
+        this.audio.sniff(m.x, m.y + (m.type === 'crawler' ? 0.7 : 2.1), m.z, 0.55);
         this.addTrauma(0.12);
       }
     }
