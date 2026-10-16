@@ -1,5 +1,6 @@
-// Echo afterimages: when a sound wave reaches a monster we bake its current pose into a static,
-// glowing snapshot that fades out. You never see monsters move — only where they WERE.
+// Echo afterimages: when a sound wave reaches a monster we bake its current pose into a static
+// snapshot — a black silhouette outlined in red — that fades out. You never see monsters move,
+// only where they WERE.
 import * as THREE from 'three';
 import { createGhostMaterial } from './sonar.js';
 
@@ -90,6 +91,8 @@ export class Ghosts {
     const u = g.mesh.material.uniforms;
     u.uColor.value.set(opts.color ?? 0xff2a20);
     u.uFull.value = opts.full ?? 0;
+    u.uBody.value = opts.body ?? 0.85;
+    u.uJitter.value = opts.jitter ?? 1;
     g.mesh.visible = true;
     return g;
   }

@@ -12,6 +12,7 @@ export const shared = {
   uPC: { value: Array.from({ length: N }, () => new THREE.Vector4(1, 1, 1, 0)) }, // rgb tint
   uCam: { value: new THREE.Vector3() },
   uDawn: { value: 0 },
+  uFear: { value: 0 }, // 0..1 — when something hunts you, the forest bleeds red
   uSun: { value: new THREE.Vector3(0.5, 0.35, -0.8).normalize() },
 };
 
@@ -23,6 +24,7 @@ uniform vec4 uPB[MAXP];
 uniform vec4 uPC[MAXP];
 uniform vec3 uCam;
 uniform float uDawn;
+uniform float uFear;
 uniform vec3 uSun;
 
 // accumulate sonar light at point P (N = facing normal, may be zero for points)
@@ -41,12 +43,15 @@ vec3 sonarLight(vec3 P, vec3 Nrm, out float ringOut) {
     float r = age * B.x;
     float front = r - d;
     if (front < -1.8) continue;
-    float fall = 1.0 - smoothstep(B.y * 0.42, B.y, d);
-    float lit = front > 0.0 ? exp(-(front / B.x) * B.w) : 0.0;
-    float ring = exp(-front * front * 0.8) * (1.0 - smoothstep(B.y - 4.0, B.y + 0.5, r));
+    // steep falloff: the far edge of a ping is only a rumour of shapes
+    float fall = 1.0 - smoothstep(B.y * 0.28, B.y, d);
+    // light: a quick flash that sinks fast, then a long dim afterimage
+    float since = max(front, 0.0) / B.x;
+    float lit = front > 0.0 ? 0.6 * exp(-since * B.w * 2.0) + 0.4 * exp(-since * B.w * 0.55) : 0.0;
+    float ring = exp(-front * front * 1.15) * (1.0 - smoothstep(B.y - 4.0, B.y + 0.5, r));
     float facing = abs(dot(Nrm, dv / max(d, 0.001)));
     float s = B.z * fall;
-    acc += uPC[i].rgb * s * (lit * (0.45 + 0.55 * facing) + ring * 1.7);
+    acc += uPC[i].rgb * s * (lit * (0.3 + 0.7 * facing) + ring * 1.45);
     ringSum += ring * s;
   }
   ringOut = ringSum;
@@ -89,18 +94,19 @@ varying vec3 vWorld;
 varying vec3 vBary;
 varying float vKind;
 
+// cold, ashen palette: the forest is grey bone and frost, only flesh is red
 const vec3 KC[12] = vec3[12](
-  vec3(0.30, 0.56, 0.66),  // ground
-  vec3(0.70, 0.90, 1.00),  // bark
-  vec3(0.42, 0.95, 0.86),  // leaf
-  vec3(0.58, 0.74, 1.00),  // rock
-  vec3(1.00, 0.88, 0.72),  // wood
-  vec3(0.82, 0.92, 1.00),  // metal
-  vec3(1.00, 0.42, 0.38),  // effigy
-  vec3(1.00, 0.20, 0.15),  // flesh
-  vec3(1.00, 0.90, 0.85),  // bone
+  vec3(0.27, 0.31, 0.33),  // ground
+  vec3(0.60, 0.66, 0.68),  // bark
+  vec3(0.44, 0.55, 0.54),  // leaf
+  vec3(0.54, 0.59, 0.65),  // rock
+  vec3(0.76, 0.68, 0.60),  // wood
+  vec3(0.70, 0.76, 0.82),  // metal
+  vec3(0.92, 0.32, 0.26),  // effigy
+  vec3(1.00, 0.14, 0.09),  // flesh
+  vec3(0.90, 0.84, 0.78),  // bone
   vec3(1.00, 1.00, 1.00),  // eye
-  vec3(0.45, 0.78, 1.00),  // water
+  vec3(0.34, 0.46, 0.54),  // water
   vec3(1.00, 0.70, 0.25)   // shard
 );
 
@@ -115,27 +121,38 @@ void main() {
   float ring;
   vec3 L = sonarLight(vWorld, Nrm, ring);
 
-  float edge = edgeFactor(vBary, k == 0 ? 0.9 : 1.15);
-  float distEdge = 1.0 - smoothstep(28.0, 115.0, camD) * 0.75;
+  float edge = edgeFactor(vBary, k == 0 ? 0.75 : 1.0);
+  float distEdge = 1.0 - smoothstep(14.0, 90.0, camD) * 0.82;
   float grazing = smoothstep(0.02, 0.25, abs(dot(Nrm, toCam / camD)));
-  edge *= distEdge * mix(0.35, 1.0, grazing);
+  edge *= distEdge * mix(0.3, 1.0, grazing);
+  // scanned, not drawn: lines break into grainy dashes
+  float dash = hash13(floor(vWorld * 9.0));
+  edge *= 0.4 + 0.6 * smoothstep(0.12, 0.62, dash);
+  if (k == 0) edge *= 0.6; // the ground grid stays a whisper
 
-  // stipple: gives faces a grainy point-cloud texture
+  // point-cloud faces: mostly black with sparse specks (averaged out in the distance)
   float st = hash13(floor(vWorld * 16.0));
-  float face = (k == 0 ? 0.10 : 0.16) * (0.6 + 0.8 * st);
+  float speck = mix(smoothstep(0.80, 0.97, st), 0.11, smoothstep(9.0, 38.0, camD));
+  float face = (k == 0 ? 0.03 : 0.045) + speck * (k == 0 ? 0.2 : 0.3);
   if (k == 10) {
-    face = 0.22 + 0.18 * sin(vWorld.x * 1.7 + uTime * 1.3) * sin(vWorld.z * 1.3 - uTime * 0.9);
+    face = 0.1 + 0.08 * sin(vWorld.x * 1.7 + uTime * 1.3) * sin(vWorld.z * 1.3 - uTime * 0.9);
   }
-  float edgeGain = (k == 5 ? 1.55 : 1.15);
+  float edgeGain = (k == 5 ? 1.75 : 1.4);
 
   vec3 col = base * L * (face + edge * edgeGain);
-  col += vec3(0.9, 0.98, 1.0) * ring * edge * 0.55;
+  col += vec3(0.78, 0.85, 0.9) * ring * edge * 0.42;
   // rare sparkles on the wavefront
-  float sp = step(0.992, hash13(floor(vWorld * 11.0) + floor(uTime * 14.0)));
-  col += base * sp * ring * 1.5;
+  float sp = step(0.993, hash13(floor(vWorld * 11.0) + floor(uTime * 14.0)));
+  col += base * sp * ring * 1.1;
 
-  // depth fade
-  col *= exp(-camD * 0.009);
+  // the dark eats distance
+  col *= exp(-camD * 0.015);
+
+  // fear: when something is hunting you the forest bleeds
+  if (uFear > 0.001) {
+    float lum = dot(col, vec3(0.35, 0.5, 0.15));
+    col = mix(col, vec3(lum * 1.55, lum * 0.16, lum * 0.12), uFear * 0.65);
+  }
 
   // dawn: the forest becomes visible
   if (uDawn > 0.0) {
@@ -163,6 +180,33 @@ export function createWorldMaterial() {
 }
 
 // ---------------- monster afterimages ("echo ghosts") ----------------
+// A ghost is a dark silhouette that blots out whatever the sonar lit behind it, outlined in
+// blood-red wire, with burning eyes. Premultiplied blending: rgb adds light, alpha darkens.
+// The vertices shiver and the silhouette tears in horizontal slices — it is never quite still.
+const GHOST_VERT = /* glsl */ `
+attribute vec4 data;
+uniform float uTime;
+uniform float uJitter;
+varying vec3 vWorld;
+varying vec3 vBary;
+varying float vKind;
+float gh(float n) { return fract(sin(n) * 43758.5453); }
+void main() {
+  vec4 wp = modelMatrix * vec4(position, 1.0);
+  float tq = floor(uTime * 16.0);
+  float vh = dot(floor(position * 37.0), vec3(1.0, 57.0, 113.0));
+  wp.xyz += (vec3(gh(vh + tq), gh(vh + tq + 19.1), gh(vh + tq + 41.7)) - 0.5) * 0.04 * uJitter;
+  vWorld = wp.xyz;
+  vBary = data.xyz;
+  vKind = floor(data.w * 255.0 + 0.5);
+  vec4 mv = viewMatrix * wp;
+  float band = floor(wp.y * 5.0);
+  float tear = step(0.88, gh(band * 7.31 + tq * 1.37));
+  mv.x += tear * (gh(band + tq * 0.71) - 0.5) * 0.45 * uJitter;
+  gl_Position = projectionMatrix * mv;
+}
+`;
+
 const GHOST_FRAG = /* glsl */ `
 uniform float uTime;
 uniform vec3 uCam;
@@ -170,6 +214,7 @@ uniform vec3 uColor;
 uniform float uAlpha;
 uniform float uFlash;
 uniform float uFull;
+uniform float uBody;
 varying vec3 vWorld;
 varying vec3 vBary;
 varying float vKind;
@@ -179,17 +224,19 @@ void main() {
   vec3 toCam = uCam - vWorld;
   float camD = length(toCam);
   float facing = abs(dot(Nrm, toCam / camD));
-  float edge = edgeFactor(vBary, 1.25);
+  float edge = edgeFactor(vBary, 1.1);
   int k = int(vKind);
   vec3 c = uColor;
-  if (k == 8) c = mix(uColor, vec3(1.0, 0.85, 0.8), 0.55); // bone parts read whiter
-  vec3 col = c * (edge * 2.6 + 0.26 + 0.5 * facing + uFull * (0.35 + 0.4 * facing));
-  if (k == 9) col = vec3(3.2, 2.8, 2.6); // eyes burn
-  float fl = 0.82 + 0.18 * sin(uTime * 53.0 + vWorld.y * 17.0);
-  col *= uAlpha * fl;
-  col += uFlash * c * edge * 2.5;
-  col *= exp(-camD * 0.007);
-  gl_FragColor = vec4(col, 1.0);
+  if (k == 8) c = mix(uColor, vec3(0.85, 0.74, 0.7), 0.35); // bone reads paler
+  // stuttering, not smooth: it flickers like a bad signal
+  float fl = 0.72 + 0.28 * step(0.35, fract(sin(floor(uTime * 24.0) * 12.9898 + floor(vWorld.y * 4.0) * 78.233) * 43758.5453));
+  float dist = exp(-camD * 0.011);
+  vec3 col = c * (edge * 2.3 + 0.05 + 0.2 * facing * facing + uFull * (0.32 + 0.45 * facing));
+  float a = clamp(uAlpha * uBody * (1.0 - edge * 0.65), 0.0, 0.93);
+  if (k == 9) { col = vec3(3.6, 2.7, 2.3); a = 0.0; } // eyes burn
+  col *= uAlpha * fl * dist;
+  col += uFlash * c * edge * 2.2 * dist;
+  gl_FragColor = vec4(col, a);
 }
 `;
 
@@ -202,11 +249,18 @@ export function createGhostMaterial(color) {
       uAlpha: { value: 0 },
       uFlash: { value: 0 },
       uFull: { value: 0 },
+      uBody: { value: 0.85 },
+      uJitter: { value: 1 },
     },
-    vertexShader: WORLD_VERT,
+    vertexShader: GHOST_VERT,
     fragmentShader: GHOST_FRAG,
     transparent: true,
-    blending: THREE.AdditiveBlending,
+    blending: THREE.CustomBlending,
+    blendEquation: THREE.AddEquation,
+    blendSrc: THREE.OneFactor,
+    blendDst: THREE.OneMinusSrcAlphaFactor,
+    blendSrcAlpha: THREE.OneFactor,
+    blendDstAlpha: THREE.OneMinusSrcAlphaFactor,
     depthWrite: false,
     extensions: { derivatives: true },
   });
@@ -227,7 +281,7 @@ void main() {
   vec3 wp = uCam + mod(p - uCam + halfB, vec3(uBox, 12.0, uBox)) - halfB;
   float ring;
   vec3 L = sonarLight(wp, vec3(0.0), ring);
-  vCol = (L * 0.55 + ring * vec3(0.8, 0.95, 1.0) * 0.6) * (0.5 + aSeed.w);
+  vCol = (L * 0.3 + ring * vec3(0.7, 0.76, 0.8) * 0.38) * (0.3 + aSeed.w);
   vec4 mv = viewMatrix * vec4(wp, 1.0);
   gl_Position = projectionMatrix * mv;
   gl_PointSize = clamp(uPix * (1.0 + aSeed.w) / max(-mv.z, 0.5), 1.0, 6.0);

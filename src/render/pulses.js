@@ -66,7 +66,7 @@ export class Pulses {
     s.prevR = 0;
     s.curR = 0;
     s.id = this.nextId++;
-    s.life = s.radius / s.speed + 6 / s.decay;
+    s.life = s.radius / s.speed + 6.5 / s.decay;
     this._write(i);
     return s;
   }
@@ -98,7 +98,9 @@ export class Pulses {
     if (d > s.radius) return 0;
     const front = (time - s.t0) * s.speed - d;
     if (front < 0) return 0;
-    const fall = 1 - Math.min(1, Math.max(0, (d - s.radius * 0.42) / (s.radius * 0.58)));
-    return s.strength * fall * Math.exp(-(front / s.speed) * s.decay);
+    const x = Math.min(1, Math.max(0, (d - s.radius * 0.28) / (s.radius * 0.72)));
+    const fall = 1 - x * x * (3 - 2 * x);
+    const since = front / s.speed;
+    return s.strength * fall * (0.6 * Math.exp(-since * s.decay * 2.0) + 0.4 * Math.exp(-since * s.decay * 0.55));
   }
 }

@@ -12,7 +12,7 @@ function esc(s) {
 export class Menus {
   constructor(handlers) {
     this.h = handlers; // { onPlay, onResume, onRestart, onMenu, onMicToggle, onSettingsChanged, uiSound }
-    this.screens = ['menu', 'pause', 'over', 'settingsPanel', 'howPanel', 'boot'];
+    this.screens = ['menu', 'pause', 'over', 'settingsPanel', 'howPanel', 'scoresPanel', 'boot'];
     this.settingsReturn = null;
     this.highlight = -1;
     this._bind();
@@ -58,6 +58,11 @@ export class Menus {
     click('btnPlay', () => this.h.onPlay());
     click('btnHow', () => this.show('howPanel'));
     click('btnHowBack', () => this.show('howPanel', false));
+    click('btnScores', () => {
+      this.renderScores();
+      this.show('scoresPanel');
+    });
+    click('btnScoresBack', () => this.show('scoresPanel', false));
     click('btnSettings', () => this.openSettings('menu'));
     click('btnSettingsP', () => this.openSettings('pause'));
     click('btnSettingsBack', () => this.closeSettings());
@@ -119,6 +124,7 @@ export class Menus {
     bindCheck('sInvert', 'invertY');
     bindCheck('sMic', 'micEnabled');
     bindCheck('sEcho', 'voiceEcho');
+    bindCheck('sRadar', 'radar');
     bindSelect('sScares', 'scares');
     bindSelect('sQuality', 'quality');
     bindSelect('sLang', 'lang');
@@ -136,6 +142,7 @@ export class Menus {
     $('sInvert').checked = settings.invertY;
     $('sMic').checked = settings.micEnabled;
     $('sEcho').checked = settings.voiceEcho;
+    $('sRadar').checked = !!settings.radar;
     $('sScares').value = settings.scares;
     $('sQuality').value = settings.quality;
     $('sLang').value = getLang();
@@ -152,6 +159,11 @@ export class Menus {
 
   renderScores(highlightRank = -1, target = 'scoreTable') {
     const list = getScores();
+    if (target === 'scoreTable') {
+      const best = list[0];
+      const bl = $('bestLine');
+      if (bl) bl.innerHTML = best ? `${esc(t('best'))} <b>${fmtScore(best.score)}</b> · ${fmtTime(best.time)}${best.won ? ' ☀' : ''}` : '';
+    }
     const el = $(target);
     if (!el) return;
     if (!list.length) {
@@ -204,7 +216,6 @@ export class Menus {
     $('newRecord').classList.toggle('show', rank === 0 && stats.score > 0);
     const loud = `${Math.round((stats.loudest / 0.78) * 100)}%`;
     $('overStats').innerHTML = [
-      [fmtTime(stats.time), t('survived')],
       [stats.shards, t('shardsGot')],
       [stats.close, t('closeCalls')],
       [stats.escapes, t('escapes')],

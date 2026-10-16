@@ -8,18 +8,21 @@ import { Monster, ShadeRig } from './monsters.js';
 import { Player } from './player.js';
 import { Shards } from './shards.js';
 import { Stones } from './stones.js';
+import { Dread } from './dread.js';
 import { CAP } from '../world/world.js';
 import { shared } from '../render/sonar.js';
 import { Pulses } from '../render/pulses.js';
 
 const RED = [1.0, 0.13, 0.08];
+const SONAR = [0.84, 0.92, 1.0]; // cold, colourless light
 const STONE = [0.85, 0.95, 1.0];
 const _v = new THREE.Vector3();
 
 export class Game {
   constructor(deps) {
-    Object.assign(this, deps); // scene, camera, world, pulses, ghosts, particles, audio, mic, input, hud, radar, post
+    Object.assign(this, deps); // scene, camera, world, pulses, ghosts, eyes, particles, audio, mic, input, hud, radar, post
     this.player = new Player(this.world);
+    this.dread = new Dread(this, this.eyes);
     this.shards = new Shards(this.scene);
     this.stones = new Stones();
     this.shade = new ShadeRig();
@@ -72,11 +75,14 @@ export class Game {
     this.nextScare = 80 + this.rng.float(0, 35);
     this.scareCount = 0;
     this.firstPingT = -1;
+    this.lastPulseT = -9;
     this.intro = { t: 0, phase: 0, autoSnap: false, revealDone: false, itHearsT: -1 };
     this.tut = { step: 0, t: 0, done: settings.tutorialDone };
     this.lastMultStep = 1;
     this.dawnWarned = false;
     shared.uDawn.value = 0;
+    shared.uFear.value = 0;
+    this.dread.reset();
 
     // the first thing you'll ever see: something standing in the trees, facing you
     const p = this.player;
@@ -166,7 +172,8 @@ export class Game {
       this.onFirstPing();
     }
     const strength = 0.8 + loud * 0.7;
-    const s = this.pulses.emit(e.x, e.y - 0.25, e.z, this.time, { radius: R, strength, decay: 0.38 + (1 - loud) * 0.22, color: [1, 1, 1], kind: 'player' });
+    this.lastPulseT = this.time;
+    const s = this.pulses.emit(e.x, e.y - 0.25, e.z, this.time, { radius: R, strength, decay: 0.38 + (1 - loud) * 0.22, color: SONAR, kind: 'player' });
     this.echoTicks(s, loud);
     this.fx.shockT = 0;
     this.fx.shockAmp = 0.35 + loud * 0.75;
@@ -174,7 +181,7 @@ export class Game {
     this.fx.fovKick = Math.max(this.fx.fovKick, 1.5 + loud * 5);
     this.hud.pulseCross();
     this.audio.sonarSweep(loud, loud > 0.45);
-    this.particles.burst(e.x, e.y - 0.4, e.z, 10 + Math.round(loud * 26), { color: [0.45, 0.85, 1.0], speed: 6 + loud * 12, life: 0.55, size: 0.07, gravity: 0, drag: 2.2, dir: { x: 0, y: 0, z: 0 }, cone: 1, spread: 0.5 });
+    this.particles.burst(e.x, e.y - 0.4, e.z, 10 + Math.round(loud * 26), { color: [0.5, 0.6, 0.66], speed: 6 + loud * 12, life: 0.55, size: 0.06, gravity: 0, drag: 2.2, dir: { x: 0, y: 0, z: 0 }, cone: 1, spread: 0.5 });
     return s;
   }
 
@@ -235,6 +242,7 @@ export class Game {
     const p = this.player;
     if (p.stones <= 0) {
       this.hud.popup(t('aNoStones'), 'dim');
+      this.hud.flashStones();
       return;
     }
     p.stones--;
@@ -339,7 +347,7 @@ export class Game {
     this.fx.glitch = 1;
     this.hud.setHint(null);
     this.hud.setIntro(null);
-    this.hud.charge(-1);
+    this.hud.peekUntil = 0;
     for (const q of this.monsters) if (q !== m && q.breath) { q.breath.stop(); q.breath = null; }
     this.jsGhost = null;
     this.jsYaw = Math.atan2(-(m.x - this.player.x), -(m.z - this.player.z));
@@ -578,12 +586,9 @@ export class Game {
       else if (e === 'throw') this.throwStone();
     }
     if (this.charge.active) {
-      this.charge.t += dt;
-      const lvl = clamp((this.charge.t - 0.18) / 0.95, 0, 1);
-      const loudNow = this.charge.t < 0.18 ? 0.24 : lerp(0.32, 1.0, lvl);
-      this.hud.charge(this.charge.t < 0.18 ? 0.05 : lvl, loudNow >= CFG.SCREAM);
+      this.charge.t += dt; // the loudness ring around the dot shows how loud this will be
       if (this.charge.t > 2.4) this.pingRelease(); // don't hold forever
-    } else this.hud.charge(-1);
+    }
     this.pingCD -= dt;
 
     // ---- player ----
@@ -649,6 +654,7 @@ export class Game {
       if (!this.monsters.some((m) => m.state === 'hunt')) this.scare();
     }
     this.updateIntro(dt);
+    this.dread.update(dt);
 
     // ---- scoring ----
     this.score += dt * CFG.SCORE.perSecond * this.mult;
@@ -705,6 +711,7 @@ export class Game {
           const fall = 1 - smoothstep(s.radius * 0.42, s.radius, d);
           const str = clamp(s.strength * (0.65 + 0.7 * fall), 0.6, 1.8);
           this.ghosts.spawn(m.rig, this.time, { strength: str, color: 0xff2a20, life: 2.9, decay: 0.85 });
+          m.lastGhostT = this.time;
           this.radar.blip(m.x, m.z, 'monster', m.state === 'hunt');
           if (s.kind !== 'monster') this.audio.monsterReturn(0, m.x, m.y + 2, m.z, 0.25 + str * 0.3);
           if (m.intro && !this.intro.revealDone && s.kind === 'player') {
@@ -726,6 +733,7 @@ export class Game {
     if (this.mult !== this.lastMultStep) {
       this.lastMultStep = this.mult;
       this.hud.flashAlert(`${t('aWake')} ×${this.mult.toFixed(1)}`, 'warn', 2.2);
+      this.hud.peek(4);
       this.audio.sting(0.35);
     }
     const prog = this.time / CFG.RUN_SECONDS;
@@ -785,7 +793,7 @@ export class Game {
       hud.setHint(touch ? t('tutStoneTouch') : t('tutStone'));
       if (tut.t > 8) { tut.step = 3; tut.t = 0; }
     } else if (tut.step === 3) {
-      hud.setHint(t('tutShards'));
+      hud.setHint(touch ? t('tutShardsTouch') : t('tutShards'));
       if (tut.t > 7) { tut.step = 4; tut.t = 0; }
     } else if (tut.step === 4) {
       hud.setHint(`<span class="red">${t('tutScream')}</span>`);
@@ -819,9 +827,11 @@ export class Game {
     const n = this.noiseGen;
     const tt = realT * 26;
     const nx = n.noise(tt, 1.3), ny = n.noise(tt, 7.1), nr = n.noise(tt, 13.7), px = n.noise(tt, 21.4), py = n.noise(tt, 31.9);
-    const yaw = p.yaw + sh * 0.07 * nx;
-    const pitch = p.pitch + sh * 0.06 * ny;
-    const roll = p.roll + sh * 0.09 * nr;
+    // a held breath: the view is never perfectly still, and shakes more when it's close
+    const br = 0.0035 + fx.danger * 0.0045 + (p.exhausted ? 0.006 : 0);
+    const yaw = p.yaw + sh * 0.07 * nx + Math.sin(realT * 0.43) * br * 0.5;
+    const pitch = p.pitch + sh * 0.06 * ny + Math.sin(realT * 1.05) * br;
+    const roll = p.roll + sh * 0.09 * nr + Math.sin(realT * 0.61 + 1.3) * br * 0.7;
     camera.rotation.set(pitch, yaw, roll, 'YXZ');
     const cy = Math.cos(p.yaw), sy = Math.sin(p.yaw);
     camera.position.set(p.x + cy * sh * 0.08 * px, p.y + p.eyeCur + p.bobY + sh * 0.06 * py, p.z - sy * sh * 0.08 * px);
@@ -839,21 +849,27 @@ export class Game {
     u.uRed.value = fx.red;
     u.uWhite.value = fx.white;
     u.uDanger.value = fx.danger;
-    u.uGrain.value = 0.045 + fx.danger * 0.05 + fx.glitch * 0.1;
+    u.uGrain.value = 0.06 + fx.danger * 0.05 + fx.glitch * 0.1;
     u.uShockR.value = fx.shockT * 0.9;
     u.uShockAmp.value = fx.shockAmp * Math.max(0, 1 - fx.shockT * 1.3);
     u.uFade.value = fx.fade;
     u.uWarm.value = shared.uDawn.value;
+    u.uAsh.value = 0.62 * (1 - Math.min(1, shared.uDawn.value * 1.4));
+    const live = this.state === 'play' || this.state === 'dying';
+    u.uFlicker.value = this.state === 'play' ? this.dread.flicker : 0;
+    shared.uFear.value = live ? smoothstep(0.5, 1.0, fx.danger) : 0;
   }
 
   hudUpdate(dt) {
     const p = this.player;
-    this.hud.update(this);
+    this.hud.update(this, dt, this.input.peekHeld);
     const chargeLvl = this.charge.active ? (this.charge.t < 0.18 ? 0.24 : lerp(0.32, 1, clamp((this.charge.t - 0.18) / 0.95, 0, 1))) : 0;
-    this.hud.meterUpdate(this.mic, chargeLvl * 1.0, this.mic.state === 'on');
-    const loud = Math.max(this.mic.loud, this.stepNoise, chargeLvl);
-    const scream = this.mic.screamHeld > 0.1 || chargeLvl >= CFG.SCREAM;
-    this.radar.draw(dt, p.x, p.z, p.yaw, this.pulses.slots, loud, scream);
+    this.hud.ring(dt, this.mic, this.state === 'play' ? chargeLvl : 0, this.mic.state === 'on');
+    if (settings.radar) {
+      const loud = Math.max(this.mic.loud, this.stepNoise, chargeLvl);
+      const scream = this.mic.screamHeld > 0.1 || chargeLvl >= CFG.SCREAM;
+      this.radar.draw(dt, p.x, p.z, p.yaw, this.pulses.slots, loud, scream);
+    }
   }
 }
 

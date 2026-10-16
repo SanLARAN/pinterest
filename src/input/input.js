@@ -3,7 +3,7 @@ import { settings } from '../core/storage.js';
 
 const GAME_KEYS = new Set([
   'KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space',
-  'ShiftLeft', 'ShiftRight', 'KeyC', 'KeyF', 'KeyM', 'KeyP', 'KeyR', 'KeyQ', 'KeyE',
+  'ShiftLeft', 'ShiftRight', 'KeyC', 'KeyF', 'KeyM', 'KeyP', 'KeyR', 'KeyQ', 'KeyE', 'Tab',
 ]);
 
 export class Input {
@@ -17,6 +17,8 @@ export class Input {
     this.sprint = false;
     this.crouch = false;
     this.pingHeld = false;
+    this.peekHeld = false; // Tab (or a tap on the top strip on touch): show time + score
+    this.peekTouchUntil = 0;
     this.events = [];
     this.locked = false;
     this.lockFailed = false;
@@ -62,6 +64,9 @@ export class Input {
         case 'KeyM':
           this.emit('mic');
           break;
+        case 'Tab':
+          this.peekHeld = true;
+          break;
         case 'Escape':
         case 'KeyP':
           this.emit('pause');
@@ -77,6 +82,7 @@ export class Input {
     });
     window.addEventListener('keyup', (e) => {
       this.keys.delete(e.code);
+      if (e.code === 'Tab') this.peekHeld = false;
       if (e.code === 'Space' && this.pingHeld) {
         this.pingHeld = false;
         this.emit('pingUp');
@@ -84,6 +90,7 @@ export class Input {
     });
     window.addEventListener('blur', () => {
       this.keys.clear();
+      this.peekHeld = false;
       if (this.pingHeld) {
         this.pingHeld = false;
         this.emit('pingUp');
@@ -306,6 +313,14 @@ export class Input {
       }
     });
     btn('#tStone', () => this.emit('throw'));
+    const peekZone = el.querySelector('#peekZone');
+    if (peekZone) {
+      peekZone.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        this.setTouch(true);
+        this.emit('peek');
+      });
+    }
     btn('#tCrouch', () => {
       this.crouch = !this.crouch;
       this.emit('crouch');
@@ -347,6 +362,7 @@ export class Input {
   reset() {
     this.keys.clear();
     this.pingHeld = false;
+    this.peekHeld = false;
     this.crouch = false;
     this.lookDX = this.lookDY = 0;
     this.events = [];

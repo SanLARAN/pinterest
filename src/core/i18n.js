@@ -23,9 +23,6 @@ const STR = {
     micIframe: 'Браузер блокирует микрофон во встроенном окне.',
     micOpenTab: 'Открыть в новой вкладке',
     micTest: 'проверь микрофон: скажи «эй»',
-    zoneQuiet: 'тихо',
-    zoneEcho: 'эхо',
-    zoneScream: 'КРИК',
     score: 'СЧЁТ',
     best: 'рекорд',
     dawnIn: 'до рассвета',
@@ -42,7 +39,8 @@ const STR = {
     tutMoveTouch: 'уходи тихо — левый стик · до упора = бег (шумно)',
     tutStone: 'ПКМ / F — бросить камень и отвлечь их',
     tutStoneTouch: 'КАМЕНЬ — бросить и отвлечь их',
-    tutShards: 'собирай янтарные осколки · дождись рассвета',
+    tutShards: 'собирай янтарные осколки · Tab — сколько до рассвета',
+    tutShardsTouch: 'собирай янтарные осколки · тап по верху экрана — время',
     tutScream: 'и что бы ни случилось — не кричи',
     // alerts
     aHeard: 'ОНО УСЛЫШАЛО',
@@ -80,6 +78,7 @@ const STR = {
     sMic: 'Микрофон',
     sMicSens: 'Чувствительность микрофона',
     sEcho: 'Эхо голоса',
+    sRadar: 'Радар (подсказка)',
     sScares: 'Скримеры',
     sScaresFull: 'полные',
     sScaresReduced: 'мягкие (без вспышек)',
@@ -93,10 +92,11 @@ const STR = {
     // how to
     howtoBody: `
 <p><b>Ты в огромном тёмном лесу и ничего не видишь.</b> Любой звук — эхолокатор: волна расходится от тебя и на секунды проявляет деревья, камни… и <span class="red">их</span>.</p>
-<p><b>Микрофон:</b> щёлкни языком, хлопни, скажи «эй». Громче звук — дальше видно. Но <span class="red">они слышат так же далеко</span>. Крик (красная зона) — мгновенная охота.</p>
+<p><b>Микрофон:</b> щёлкни языком, хлопни, скажи «эй». Громче звук — дальше видно. Но <span class="red">они слышат так же далеко</span>. Крик (кольцо вокруг точки стало красным) — мгновенная охота.</p>
 <p><b>Без микрофона:</b> ПРОБЕЛ / ЛКМ — щелчок, удерживай — громче.</p>
 <p><b>Твари</b> идут туда, где был звук, а не туда, где ты сейчас. Пискнул — уходи. Камень (ПКМ / F) уводит их в сторону и подсвечивает место падения.</p>
 <p><b>Шаги</b> тоже шумят: бег громкий, красться — тихо. Врезался в дерево — это слышно.</p>
+<p><b>Интерфейса почти нет.</b> Кольцо вокруг точки — твоя громкость, красный пунктир — граница крика. Время и счёт всплывают каждую минуту и по Tab. Глаза в темноте — не всегда чьи-то.</p>
 <p><b>Очки:</b> время × множитель опасности, янтарные осколки, проходы впритык, отрывы от погони. Дожить до рассвета (30:00) — огромный бонус.</p>
 <table class="keys">
 <tr><td>WASD</td><td>движение</td></tr>
@@ -105,6 +105,7 @@ const STR = {
 <tr><td>ПРОБЕЛ / ЛКМ</td><td>эхо: тап — щелчок, удерживай — громко</td></tr>
 <tr><td>ПКМ / F</td><td>бросить камень</td></tr>
 <tr><td>Shift / C</td><td>бег / красться</td></tr>
+<tr><td>Tab</td><td>время, счёт, камни</td></tr>
 <tr><td>M · Esc / P</td><td>микрофон · пауза</td></tr>
 </table>`,
     touchPing: 'ЭХО',
@@ -140,9 +141,6 @@ const STR = {
     micIframe: 'The browser blocks the mic inside embedded frames.',
     micOpenTab: 'Open in a new tab',
     micTest: 'test your mic: say “hey”',
-    zoneQuiet: 'quiet',
-    zoneEcho: 'echo',
-    zoneScream: 'SCREAM',
     score: 'SCORE',
     best: 'best',
     dawnIn: 'until dawn',
@@ -158,7 +156,8 @@ const STR = {
     tutMoveTouch: 'move away quietly — left stick · push fully to run (loud)',
     tutStone: 'RMB / F — throw a stone to distract them',
     tutStoneTouch: 'STONE — throw it to distract them',
-    tutShards: 'collect amber shards · wait for dawn',
+    tutShards: 'collect amber shards · Tab — time until dawn',
+    tutShardsTouch: 'collect amber shards · tap the top of the screen — time',
     tutScream: 'and whatever happens — do not scream',
     aHeard: 'IT HEARD THAT',
     aHunt: 'HUNTED',
@@ -193,6 +192,7 @@ const STR = {
     sMic: 'Microphone',
     sMicSens: 'Mic sensitivity',
     sEcho: 'Voice echo',
+    sRadar: 'Radar (assist)',
     sScares: 'Jumpscares',
     sScaresFull: 'full',
     sScaresReduced: 'gentle (no flashes)',
@@ -205,10 +205,11 @@ const STR = {
     off: 'off',
     howtoBody: `
 <p><b>You are in a vast dark forest and you cannot see.</b> Every sound is sonar: a wave spreads out from you and for a few seconds reveals trees, rocks… and <span class="red">them</span>.</p>
-<p><b>Microphone:</b> click your tongue, clap, say “hey”. Louder sound — you see further. But <span class="red">they hear just as far</span>. A scream (red zone) means an instant hunt.</p>
+<p><b>Microphone:</b> click your tongue, clap, say “hey”. Louder sound — you see further. But <span class="red">they hear just as far</span>. A scream (the ring around the dot turns red) means an instant hunt.</p>
 <p><b>No mic:</b> SPACE / LMB — a click, hold for louder.</p>
 <p><b>Monsters</b> walk to where the sound was, not where you are. Made a noise? Move. A stone (RMB / F) lures them away and lights up where it lands.</p>
 <p><b>Footsteps</b> make noise too: running is loud, sneaking is quiet. Bumping into a tree is loud.</p>
+<p><b>There is almost no interface.</b> The ring around the dot is your loudness, the red dashed line is where screaming starts. Time and score surface every minute and on Tab. Eyes in the dark don't always belong to something.</p>
 <p><b>Score:</b> time × danger multiplier, amber shards, close calls, escaped hunts. Reaching dawn (30:00) gives a huge bonus.</p>
 <table class="keys">
 <tr><td>WASD</td><td>move</td></tr>
@@ -217,6 +218,7 @@ const STR = {
 <tr><td>SPACE / LMB</td><td>echo: tap = click, hold = loud</td></tr>
 <tr><td>RMB / F</td><td>throw stone</td></tr>
 <tr><td>Shift / C</td><td>run / sneak</td></tr>
+<tr><td>Tab</td><td>time, score, stones</td></tr>
 <tr><td>M · Esc / P</td><td>mic · pause</td></tr>
 </table>`,
     touchPing: 'ECHO',

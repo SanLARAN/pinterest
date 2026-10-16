@@ -1,4 +1,9 @@
-// HUD: DOM overlay. Only touches the DOM when values actually change.
+// Minimal HUD. Nothing lives on screen permanently except a faint dot.
+//  - your loudness is a ring around the dot (with a dashed red line where screaming starts)
+//  - stamina / stones appear under the dot only when they change
+//  - time and score "peek" in at the start, every minute, and while Tab is held (tap top on touch)
+//  - a hairline at the very top of the screen slowly fills toward dawn
+// Only touches the DOM when values actually change.
 import { t } from '../core/i18n.js';
 import { CFG } from '../core/config.js';
 
@@ -13,31 +18,30 @@ export function fmtScore(n) {
   return Math.floor(n).toLocaleString('ru-RU').replace(/\u00a0/g, ' ');
 }
 
+const RING_MIN = 7;
+const RING_SPAN = 27;
+const ringR = (u) => RING_MIN + RING_SPAN * Math.min(1.12, Math.max(0, u));
+
 export class HUD {
   constructor() {
     this.el = $('hud');
-    this.score = $('scoreVal');
-    this.mult = $('multVal');
-    this.timer = $('timerVal');
     this.dawn = $('dawnFill');
-    this.dawnLbl = $('dawnLbl');
+    this.peekEl = $('peek');
+    this.peekTime = $('peekTime');
+    this.peekSub = $('peekSub');
     this.stones = $('stones');
+    this.stamWrap = $('stam');
     this.stam = $('stamFill');
-    this.stamWrap = $('stamina');
-    this.meterFill = $('meterFill');
-    this.meterTrig = $('meterTrig');
-    this.meterScream = $('meterScream');
-    this.meterLbl = $('meterLbl');
-    this.meter = $('meter');
+    this.cross = $('crosshair');
+    this.noiseRing = $('noiseRing');
+    this.screamRing = $('screamRing');
+    this.ripple = $('ripple');
     this.alert = $('alert');
     this.hint = $('hint');
     this.intro = $('intro');
-    this.chargeRing = $('chargeRing');
-    this.cross = $('crosshair');
-    this.micBtn = $('micBtn');
     this.popups = [];
     const pc = $('popups');
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < 6; i++) {
       const d = document.createElement('div');
       d.className = 'popup';
       pc.appendChild(d);
@@ -45,12 +49,21 @@ export class HUD {
     }
     this.popIdx = 0;
     this.cache = {};
-    this.alertUntil = 0;
     this.hintKey = null;
+    this.clock = 0;
+    this.peekUntil = 0;
+    this.stonesUntil = 0;
+    this.lastMinute = -1;
+    this.ringU = 0;
   }
 
   show(on) {
     this.el.classList.toggle('hidden', !on);
+    if (on) {
+      this.cache = {};
+      this.lastMinute = -1;
+      this.ringU = 0;
+    }
   }
 
   _set(key, el, val) {
@@ -58,90 +71,101 @@ export class HUD {
     this.cache[key] = val;
     el.textContent = val;
   }
+  _cls(key, el, cls, on) {
+    const k = key + ':' + cls;
+    if (this.cache[k] === on) return;
+    this.cache[k] = on;
+    el.classList.toggle(cls, on);
+  }
 
-  update(g) {
-    this._set('score', this.score, fmtScore(g.score));
-    this._set('mult', this.mult, '×' + g.mult.toFixed(1));
-    this._set('timer', this.timer, fmtTime(g.time));
-    const left = CFG.RUN_SECONDS - g.time;
-    this._set('dawnLbl', this.dawnLbl, `${t('dawnIn')} ${fmtTime(left)}`);
-    const pct = Math.min(100, (g.time / CFG.RUN_SECONDS) * 100).toFixed(2);
-    if (this.cache.dawn !== pct) {
-      this.cache.dawn = pct;
-      this.dawn.style.width = pct + '%';
+  // show time + score for a few seconds
+  peek(sec = 3) {
+    this.peekUntil = Math.max(this.peekUntil, this.clock + sec);
+  }
+
+  update(g, dt, peekHeld = false) {
+    this.clock += dt;
+    // hairline toward dawn
+    const pct = Math.min(1, g.time / CFG.RUN_SECONDS);
+    const pv = pct.toFixed(4);
+    if (this.cache.dawn !== pv) {
+      this.cache.dawn = pv;
+      this.dawn.style.transform = `scaleX(${pv})`;
     }
+    // every survived minute, the time surfaces for a moment
+    const minute = Math.floor(g.time / 60);
+    if (minute !== this.lastMinute) {
+      if (this.lastMinute < 0) this.peek(g.time < 2 ? 4.5 : 3);
+      else this.peek(3.2);
+      this.lastMinute = minute;
+    }
+    const show = peekHeld || this.clock < this.peekUntil;
+    if (show) {
+      const left = Math.max(0, CFG.RUN_SECONDS - g.time);
+      this._set('pt', this.peekTime, fmtTime(g.time));
+      this._set('ps', this.peekSub, `${t('dawnIn')} ${fmtTime(left)} · ${t('score')} ${fmtScore(g.score)} ×${g.mult.toFixed(1)}`);
+    }
+    this._cls('peek', this.peekEl, 'show', show);
+
+    // stones: only when the count changes (or while peeking)
     const st = g.player.stones;
     if (this.cache.stones !== st) {
+      if (this.cache.stones !== undefined) this.stonesUntil = this.clock + 2.4;
       this.cache.stones = st;
       [...this.stones.children].forEach((c, i) => c.classList.toggle('on', i < st));
     }
+    this._cls('stones', this.stones, 'show', show || this.clock < this.stonesUntil);
+
+    // stamina: only while it isn't full
     const sp = g.player.stamina;
     const sv = Math.round(sp);
     if (this.cache.stam !== sv) {
       this.cache.stam = sv;
-      this.stam.style.transform = `scaleX(${sp / 100})`;
+      this.stam.style.transform = `scaleX(${(sp / 100).toFixed(3)})`;
     }
-    this.stamWrap.classList.toggle('low', g.player.exhausted);
-    this.stamWrap.classList.toggle('full', sp >= 99.5);
+    this._cls('stam', this.stamWrap, 'show', sp < 99.5);
+    this._cls('stam', this.stamWrap, 'low', g.player.exhausted);
   }
 
-  meterUpdate(mic, extraLevel, micOn) {
-    const lvl = Math.max(mic.meter, extraLevel);
-    const pct = Math.min(1, lvl / 1.05);
-    this.meterFill.style.transform = `scaleY(${pct})`;
-    // trigger line position in meter space: trig relative to floor..scream
-    let trigPos = 0.32;
-    if (micOn && mic.screamDb > mic.floor) trigPos = Math.min(0.8, Math.max(0.05, (mic.trig - mic.floor) / (mic.screamDb - mic.floor)));
-    const tp = (trigPos * 100).toFixed(1);
-    if (this.cache.trig !== tp) {
-      this.cache.trig = tp;
-      this.meterTrig.style.bottom = tp + '%';
+  flashStones() {
+    this.stonesUntil = this.clock + 2.4;
+  }
+
+  // loudness ring. u-space: 0 = silence, uT = where sound starts to echo, uS = scream.
+  ring(dt, mic, chargeLoud, micOn) {
+    let uT = 0.3;
+    if (micOn && mic.screamDb > mic.floor) uT = Math.min(0.8, Math.max(0.05, (mic.trig - mic.floor) / (mic.screamDb - mic.floor)));
+    const uS = uT + CFG.SCREAM * (1 - uT);
+    let u = micOn ? mic.meter : 0;
+    if (chargeLoud > 0) u = Math.max(u, uT + chargeLoud * (1 - uT));
+    this.ringU = u > this.ringU ? u : Math.max(u, this.ringU - dt * 2.4);
+    const v = this.ringU;
+    const r = ringR(v).toFixed(1);
+    if (this.cache.ringR !== r) {
+      this.cache.ringR = r;
+      this.noiseRing.setAttribute('r', r);
     }
-    const scPos = (CFG.SCREAM * (1 - trigPos) + trigPos) / 1.05;
-    const sp = (scPos * 100).toFixed(1);
-    if (this.cache.scr !== sp) {
-      this.cache.scr = sp;
-      this.meterScream.style.bottom = sp + '%';
-      this.meterScream.style.height = 100 - sp + '%';
+    const sr = ringR(uS).toFixed(1);
+    if (this.cache.scrR !== sr) {
+      this.cache.scrR = sr;
+      this.screamRing.setAttribute('r', sr);
     }
-    let zone = 'q';
-    if (pct >= scPos) zone = 's';
-    else if (pct >= trigPos) zone = 'e';
+    const zone = v >= uS ? 's' : v >= uT ? 'e' : v > 0.09 ? 'q' : ''; // below 0.09: room noise, keep the dot alone
     if (this.cache.zone !== zone) {
       this.cache.zone = zone;
-      this.meter.dataset.zone = zone;
-      this.meterLbl.textContent = zone === 's' ? t('zoneScream') : zone === 'e' ? t('zoneEcho') : t('zoneQuiet');
+      this.cross.dataset.zone = zone;
     }
-    this.meter.classList.toggle('nomic', !micOn);
+    this._cls('cross', this.cross, 'charging', chargeLoud > 0);
   }
 
-  setMic(state) {
-    const on = state === 'on';
-    this.micBtn.classList.toggle('off', !on);
-    this.micBtn.title = on ? t('micOn') : t('micOff');
-  }
-
-  charge(v, danger = false) {
-    // v in [0,1] or -1 for hidden
-    const c = 2 * Math.PI * 18;
-    if (v < 0) {
-      if (this.cache.charge !== -1) {
-        this.cache.charge = -1;
-        this.chargeRing.style.strokeDashoffset = c;
-        this.cross.classList.remove('charging', 'danger');
-      }
-      return;
-    }
-    this.cache.charge = v;
-    this.chargeRing.style.strokeDashoffset = c * (1 - v);
-    this.cross.classList.add('charging');
-    this.cross.classList.toggle('danger', danger);
+  setMic() {
+    /* the minimal HUD has no mic button; toggles are announced with a popup */
   }
 
   pulseCross() {
-    this.cross.classList.remove('kick');
-    void this.cross.offsetWidth;
-    this.cross.classList.add('kick');
+    this.ripple.classList.remove('go');
+    void this.ripple.offsetWidth;
+    this.ripple.classList.add('go');
   }
 
   popup(text, kind = '') {
@@ -154,6 +178,7 @@ export class HUD {
 
   flashAlert(text, kind = '', dur = 1.6) {
     this.alert.textContent = text;
+    this.alert.dataset.text = text;
     this.alert.className = '';
     void this.alert.offsetWidth;
     this.alert.className = 'show ' + kind;

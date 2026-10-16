@@ -1,5 +1,6 @@
-// Lightweight post pipeline: HDR scene -> bloom (1/4 res) -> composite with
-// film grain, chromatic aberration, shockwave, glitch, vignette and danger tint.
+// Lightweight post pipeline: HDR scene -> bloom (1/4 res) -> composite with film grain,
+// chromatic aberration, shockwave, glitch, ash grade (only red survives), tunnel vignette,
+// fear flicker and tape-roll interference.
 import * as THREE from 'three';
 
 const FS_VERT = /* glsl */ `
@@ -57,6 +58,8 @@ uniform float uShockAmp;
 uniform float uBloom;
 uniform float uFade;
 uniform float uWarm;
+uniform float uFlicker;
+uniform float uAsh;
 varying vec2 vUv;
 
 float hash12(vec2 p) {
@@ -68,6 +71,15 @@ float hash12(vec2 p) {
 void main() {
   vec2 uv = vUv;
   float aspect = uRes.x / uRes.y;
+  // something close: the image starts to roll like a dying tape
+  if (uDanger > 0.25) {
+    float k = (uDanger - 0.25) * 1.33;
+    float band = fract(uTime * 0.23);
+    float yb = uv.y - band;
+    float roll = exp(-yb * yb * 700.0);
+    uv.x += roll * k * 0.01 * sin(uv.y * 380.0 + uTime * 40.0);
+    uv.x += (hash12(vec2(floor(uv.y * 160.0), floor(uTime * 30.0))) - 0.5) * 0.0025 * k;
+  }
   if (uGlitch > 0.001) {
     float line = floor(uv.y * 48.0);
     float g = hash12(vec2(line, floor(uTime * 24.0)));
@@ -93,21 +105,32 @@ void main() {
   vec3 bl = texture2D(tBloom, uv).rgb;
   col += bl * uBloom;
 
-  // filmic-ish tone curve
+  // tone: filmic shoulder, crushed toe — shadows fall into true black
   col = 1.0 - exp(-col * 1.4);
+  col = max(col - 0.01, 0.0) * 1.01;
+  col = pow(col, vec3(1.15));
+  // the forest is ash; only blood (and amber) keeps its colour
+  float lum = dot(col, vec3(0.299, 0.587, 0.114));
+  float redness = clamp((col.r - col.b) * 2.2 - 0.08, 0.0, 1.0);
+  vec3 ash = vec3(lum) * vec3(0.9, 0.98, 1.05);
+  col = mix(col, mix(ash, col, redness), uAsh);
   col = mix(col, col * vec3(1.06, 0.98, 0.9), uWarm);
 
-  float vig = smoothstep(1.15, 0.2, dist);
-  col *= mix(1.0, vig, 0.8);
+  // tunnel vision: the dark closes in when something is near
+  float vig = smoothstep(1.02 - uDanger * 0.32, 0.1, dist);
+  col *= mix(1.0, vig, 0.92);
   float beat = 0.6 + 0.4 * sin(uTime * 6.0);
-  col += vec3(0.5, 0.0, 0.02) * uDanger * (1.0 - vig) * beat;
+  col += vec3(0.3, 0.0, 0.01) * uDanger * (1.0 - vig) * beat;
 
-  col = mix(col, vec3(0.75, 0.02, 0.02), clamp(uRed, 0.0, 1.0) * 0.55);
+  col = mix(col, vec3(0.62, 0.015, 0.01), clamp(uRed, 0.0, 1.0) * 0.5);
   col += vec3(uWhite);
 
+  // grain: the darkness is never empty
   float n = hash12(gl_FragCoord.xy + fract(uTime * 7.13) * 917.0);
-  col += (n - 0.5) * uGrain;
-  col *= 0.95 + 0.05 * sin(gl_FragCoord.y * 3.14159 + uTime * 2.0);
+  col += (n - 0.5) * uGrain * (0.75 + 0.5 * (1.0 - clamp(lum * 3.0, 0.0, 1.0)));
+  col *= 0.965 + 0.035 * sin(gl_FragCoord.y * 3.14159 + uTime * 2.0);
+  // slow film breathing + fear flicker
+  col *= (0.975 + 0.025 * sin(uTime * 1.7 + sin(uTime * 0.37) * 3.0)) * (1.0 - uFlicker);
   col *= uFade;
   gl_FragColor = vec4(max(col, 0.0), 1.0);
 }
@@ -132,7 +155,7 @@ export class Post {
     this.fsScene.add(this.quad);
 
     this.bright = new THREE.ShaderMaterial({
-      uniforms: { tSrc: { value: null }, uTexel: { value: new THREE.Vector2() }, uThreshold: { value: 0.55 } },
+      uniforms: { tSrc: { value: null }, uTexel: { value: new THREE.Vector2() }, uThreshold: { value: 0.5 } },
       vertexShader: FS_VERT, fragmentShader: BRIGHT_FRAG, depthTest: false, depthWrite: false,
     });
     this.blur = new THREE.ShaderMaterial({
@@ -153,9 +176,11 @@ export class Post {
         uGlitch: { value: 0 },
         uShockR: { value: 0 },
         uShockAmp: { value: 0 },
-        uBloom: { value: 1.1 },
+        uBloom: { value: 0.8 },
         uFade: { value: 1 },
         uWarm: { value: 0 },
+        uFlicker: { value: 0 },
+        uAsh: { value: 0.62 },
       },
       vertexShader: FS_VERT, fragmentShader: COMPOSITE_FRAG, depthTest: false, depthWrite: false,
     });

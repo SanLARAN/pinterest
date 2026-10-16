@@ -19,48 +19,26 @@
       </div>
     </div>
 
-    <!-- HUD -->
+    <!-- HUD: almost nothing. the dark is the interface. -->
     <div id="hud" class="hidden">
-      <div id="hudTop">
-        <div id="scoreBox">
-          <div class="lbl" data-i18n="score">СЧЁТ</div>
-          <div class="row"><span id="scoreVal">0</span><span id="multVal">×1.0</span></div>
-        </div>
-        <div id="timeBox">
-          <div id="timerVal">00:00</div>
-          <div id="dawnBar"><div id="dawnFill"></div><i class="sun"></i></div>
-          <div id="dawnLbl"></div>
-        </div>
-        <div id="topBtns">
-          <button id="micBtn" class="iconbtn" aria-label="mic">
-            <svg viewBox="0 0 24 24"><path d="M12 3a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V6a3 3 0 0 1 3-3z"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/><path class="slash" d="M4 4l16 16"/></svg>
-          </button>
-          <button id="pauseBtn" class="iconbtn" aria-label="pause">
-            <svg viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></svg>
-          </button>
-        </div>
+      <div id="dawnLine"><i id="dawnFill"></i></div>
+      <div id="peek">
+        <div id="peekTime">00:00</div>
+        <div id="peekSub"></div>
       </div>
-
       <canvas id="radar"></canvas>
-
-      <div id="rightPanel">
-        <div id="meter" data-zone="q">
-          <div class="track">
-            <div id="meterScream"></div>
-            <div id="meterFill"></div>
-            <div id="meterTrig"></div>
-          </div>
-          <div id="meterLbl">тихо</div>
-        </div>
-        <div class="sideStack">
-          <div id="stones" title="stones"><i></i><i></i><i></i></div>
-          <div id="stamina"><div id="stamFill"></div></div>
-        </div>
-      </div>
-
+      <button id="pauseBtn" class="iconbtn" aria-label="pause">
+        <svg viewBox="0 0 24 24"><path d="M9 6v12M15 6v12"/></svg>
+      </button>
       <div id="crosshair">
-        <svg viewBox="0 0 44 44"><circle class="track" cx="22" cy="22" r="18" /><circle id="chargeRing" cx="22" cy="22" r="18" /></svg>
+        <svg viewBox="-50 -50 100 100" aria-hidden="true">
+          <circle id="screamRing" r="30" />
+          <circle id="noiseRing" r="7" />
+        </svg>
+        <div id="ripple"></div>
         <div class="dot"></div>
+        <div id="stam"><i id="stamFill"></i></div>
+        <div id="stones"><i></i><i></i><i></i></div>
       </div>
       <div id="alert"></div>
       <div id="popups"></div>
@@ -71,6 +49,7 @@
 
     <!-- touch controls -->
     <div id="touch">
+      <div id="peekZone"></div>
       <div id="joyZone"></div>
       <div id="lookZone"></div>
       <div id="joyBase"><div id="joyKnob"></div></div>
@@ -85,34 +64,29 @@
         <div class="title-block">
           <h1 class="title" id="titleText" data-text="ТИШЕ">ТИШЕ</h1>
           <div class="tagline" data-i18n="tagline"></div>
-          <div class="subtitle" data-i18n="subtitle"></div>
         </div>
-        <div class="menu-body">
-          <div class="menu-col">
-            <button class="btn primary" id="btnPlay"><span data-i18n="play">ИГРАТЬ</span></button>
-            <div class="btn-row">
-              <button class="btn" id="btnHow"><span data-i18n="howto"></span></button>
-              <button class="btn" id="btnSettings"><span data-i18n="settings"></span></button>
+        <div class="menu-main">
+          <button class="btn primary" id="btnPlay"><span data-i18n="play">ИГРАТЬ</span></button>
+          <div id="bestLine"></div>
+          <nav class="menu-links">
+            <button class="link" id="btnHow"><span data-i18n="howto"></span></button>
+            <i>·</i>
+            <button class="link" id="btnScores"><span data-i18n="scores"></span></button>
+            <i>·</i>
+            <button class="link" id="btnSettings"><span data-i18n="settings"></span></button>
+          </nav>
+          <div id="micPanel">
+            <div class="mic-row">
+              <span id="micStatus"></span>
+              <button class="chip" id="micToggle"></button>
             </div>
-            <label class="callsign"><span data-i18n="callsign"></span><input id="nameInput" maxlength="14" autocomplete="off" spellcheck="false" placeholder="???" /></label>
-            <div id="micPanel">
-              <div class="mic-row">
-                <span id="micStatus"></span>
-                <button class="chip" id="micToggle"></button>
-              </div>
-              <div id="micTest"><div class="bar"><div id="micTestFill"></div><div id="micTestTrig"></div></div><span data-i18n="micTest"></span></div>
-              <div id="micWarn"></div>
-            </div>
-            <div class="hp"><svg viewBox="0 0 24 24"><path d="M4 15v-3a8 8 0 0 1 16 0v3"/><rect x="3" y="14" width="4" height="7" rx="1.5"/><rect x="17" y="14" width="4" height="7" rx="1.5"/></svg><span data-i18n="headphones"></span></div>
-          </div>
-          <div class="menu-col scores-col">
-            <h3><span data-i18n="scores"></span></h3>
-            <div id="scoreTable" class="score-table"></div>
+            <div id="micTest"><div class="bar"><div id="micTestFill"></div><div id="micTestTrig"></div></div><span data-i18n="micTest"></span></div>
+            <div id="micWarn"></div>
           </div>
         </div>
         <div class="menu-foot">
+          <div class="hp"><svg viewBox="0 0 24 24"><path d="M4 15v-3a8 8 0 0 1 16 0v3"/><rect x="3" y="14" width="4" height="7" rx="1.5"/><rect x="17" y="14" width="4" height="7" rx="1.5"/></svg><span data-i18n="headphones"></span></div>
           <button id="langBtn" class="chip">RU · EN</button>
-          <span class="ver">v1.0 · WASD · SPACE · F</span>
         </div>
       </div>
     </div>
@@ -158,6 +132,7 @@
           <label class="check"><span data-i18n="sMic"></span><input type="checkbox" id="sMic" /></label>
           <label><span data-i18n="sMicSens"></span><input type="range" id="sMicSens" min="0" max="1" step="0.01" /></label>
           <label class="check"><span data-i18n="sEcho"></span><input type="checkbox" id="sEcho" /></label>
+          <label class="check"><span data-i18n="sRadar"></span><input type="checkbox" id="sRadar" /></label>
           <label><span data-i18n="sScares"></span>
             <select id="sScares"><option value="full" data-i18n="sScaresFull"></option><option value="reduced" data-i18n="sScaresReduced"></option></select>
           </label>
@@ -169,6 +144,16 @@
           </label>
         </div>
         <button class="btn primary" id="btnSettingsBack"><span data-i18n="back"></span></button>
+      </div>
+    </div>
+
+    <!-- high scores -->
+    <div id="scoresPanel" class="screen modal">
+      <div class="panel form-panel">
+        <h2 data-i18n="scores"></h2>
+        <label class="callsign"><span data-i18n="callsign"></span><input id="nameInput" maxlength="14" autocomplete="off" spellcheck="false" placeholder="???" /></label>
+        <div id="scoreTable" class="score-table"></div>
+        <button class="btn primary" id="btnScoresBack"><span data-i18n="back"></span></button>
       </div>
     </div>
 

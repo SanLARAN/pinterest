@@ -16,11 +16,12 @@ import { shared, createWorldMaterial, createMotes, createSky } from './render/so
 import { Pulses } from './render/pulses.js';
 import { Post } from './render/post.js';
 import { Ghosts } from './render/ghosts.js';
+import { Eyes } from './render/eyes.js';
 import { Particles } from './render/particles.js';
 import { audio } from './audio/audio.js';
 import { mic, Mic } from './audio/mic.js';
 import { Input } from './input/input.js';
-import { HUD } from './ui/hud.js';
+import { HUD, fmtTime, fmtScore } from './ui/hud.js';
 import { Radar } from './ui/radar.js';
 import { Menus } from './ui/menus.js';
 import { Game } from './game/game.js';
@@ -61,6 +62,7 @@ const worldMat = createWorldMaterial();
 const world = new World(scene, worldMat);
 const pulses = new Pulses();
 const ghosts = new Ghosts(scene);
+const eyes = new Eyes(scene);
 const particles = new Particles(scene);
 const motes = createMotes(2600);
 scene.add(motes);
@@ -151,6 +153,7 @@ const menus = new Menus({
       updateMicUI();
     }
     if (key === 'quality') applyQuality();
+    if (key === 'radar') applyRadar();
     if (key === 'lang' || key === undefined) {
       hud.cache = {};
       updateMicUI();
@@ -182,12 +185,14 @@ async function toggleMic() {
   }
   saveSettings();
   updateMicUI();
+  if (state === 'playing') hud.popup(mic.state === 'on' ? t('micOn') : t('micOff'), 'dim');
 }
 
-$('micBtn').addEventListener('click', (e) => {
-  e.stopPropagation();
-  toggleMic();
-});
+function applyRadar() {
+  document.body.classList.toggle('radar-on', !!settings.radar);
+  radar.resize();
+}
+
 $('pauseBtn').addEventListener('click', (e) => {
   e.stopPropagation();
   if (state === 'playing') pause();
@@ -197,7 +202,7 @@ window.addEventListener('pointerdown', () => audio.init(), { capture: true });
 window.addEventListener('keydown', () => audio.init(), { capture: true });
 
 // ---------------- attract mode (menu background) ----------------
-const attract = { rig: null, yaw: 0.6, nextPing: 0.4 };
+const attract = { rig: null, yaw: 0.6, nextPing: 0.4, nextGlint: 2.2 };
 function setupAttract() {
   const rig = buildListener();
   const a = 2.35, d = 21;
@@ -216,8 +221,19 @@ function setupAttract() {
 function attractPulse(loud, white = true) {
   const p = camera.position;
   pulses.emit(p.x, p.y - 0.3, p.z, menuTime, {
-    radius: CFG.revealRadius(loud), strength: 0.85 + loud * 0.5, decay: 0.42, color: white ? [1, 1, 1] : [1, 0.2, 0.15], kind: 'player',
+    radius: CFG.revealRadius(loud), strength: 0.85 + loud * 0.5, decay: 0.42, color: white ? [0.84, 0.92, 1.0] : [1, 0.2, 0.15], kind: 'player',
   });
+  attract.lastPing = menuTime;
+}
+
+// between the pings, the thing in the trees looks at you
+function attractGlint() {
+  const rig = attract.rig;
+  rig.root.updateMatrixWorld(true);
+  const h = rig.nodes.head;
+  const v = h.getWorldPosition(new THREE.Vector3());
+  const yaw = rig.root.rotation.y;
+  eyes.add(v.x + Math.sin(yaw) * 0.09, v.y + 0.06, v.z + Math.cos(yaw) * 0.09, yaw, { time: menuTime, life: 0.75, intensity: 0.85, blink: Math.random() < 0.5, spacing: 0.26, size: 0.16 });
 }
 
 function updateAttract(dt) {
@@ -230,7 +246,11 @@ function updateAttract(dt) {
   shared.uCam.value.copy(camera.position);
   if (state === 'menu' && menuTime > attract.nextPing) {
     attractPulse(0.5 + Math.random() * 0.35);
-    attract.nextPing = menuTime + 2.8 + Math.random() * 1.6;
+    attract.nextPing = menuTime + 3.2 + Math.random() * 2.2;
+  }
+  if (state === 'menu' && menuTime > attract.nextGlint) {
+    if (menuTime - (attract.lastPing ?? -9) > 2.2 && attract.nextPing - menuTime > 0.9) attractGlint();
+    attract.nextGlint = menuTime + 2.5 + Math.random() * 4;
   }
   // talk to the menu: your voice lights the forest
   if (mic.state === 'on') {
@@ -249,6 +269,7 @@ function updateAttract(dt) {
     if (d > s.prevR && d <= s.curR) ghosts.spawn(attract.rig, menuTime, { strength: 1.0, life: 2.6, decay: 1.0, color: 0xff2a20 });
   }
   ghosts.update(menuTime);
+  eyes.update(menuTime, pixScale());
   particles.update(dt, pixScale());
   const u = post.u;
   u.uAberr.value = 0.2;
@@ -260,7 +281,10 @@ function updateAttract(dt) {
   u.uShockAmp.value = 0;
   u.uFade.value = Math.min(1, u.uFade.value + dt * 0.8);
   u.uWarm.value = 0;
+  u.uFlicker.value = 0;
+  u.uAsh.value = 0.62;
   shared.uDawn.value = 0;
+  shared.uFear.value = 0;
 }
 
 // ---------------- state transitions ----------------
@@ -277,6 +301,7 @@ function startRun() {
   menus.only(null);
   menus.show('settingsPanel', false);
   menus.show('howPanel', false);
+  menus.show('scoresPanel', false);
   hud.show(true);
   hud.cache = {};
   input.reset();
@@ -306,7 +331,7 @@ function pause() {
   setBodyState();
   audio.setPaused(true);
   input.exitLock();
-  $('pauseStats').textContent = `${t('score')} ${Math.floor(game.score)} · ${$('timerVal').textContent}`;
+  $('pauseStats').innerHTML = `${fmtTime(game.time)} · ${t('dawnIn')} ${fmtTime(CFG.RUN_SECONDS - game.time)}<br>${t('score')} ${fmtScore(game.score)} ×${game.mult.toFixed(1)}`;
   menus.only('pause');
 }
 
@@ -329,6 +354,7 @@ function toMenu() {
   }
   pulses.clear();
   ghosts.clear();
+  eyes.clear();
   particles.clear();
   input.exitLock();
   audio.setPaused(false);
@@ -369,6 +395,7 @@ function handleEvents(events) {
       case 'pause':
         if (menus.isOpen('settingsPanel')) menus.closeSettings();
         else if (menus.isOpen('howPanel')) menus.show('howPanel', false);
+        else if (menus.isOpen('scoresPanel')) menus.show('scoresPanel', false);
         else if (state === 'playing') pause();
         else if (state === 'paused') resume();
         break;
@@ -380,12 +407,15 @@ function handleEvents(events) {
         if (state === 'over' || state === 'paused') startRun();
         break;
       case 'confirm':
-        if (menus.isOpen('settingsPanel') || menus.isOpen('howPanel')) break;
+        if (menus.isOpen('settingsPanel') || menus.isOpen('howPanel') || menus.isOpen('scoresPanel')) break;
         if (state === 'over' || state === 'menu') startRun();
         else if (state === 'paused') resume();
         break;
       case 'mic':
         toggleMic();
+        break;
+      case 'peek':
+        if (state === 'playing') hud.peek(3.5);
         break;
     }
   }
@@ -417,6 +447,7 @@ function frame(now) {
     if (state === 'playing') {
       shared.uTime.value = game.time;
       ghosts.update(game.time);
+      eyes.update(game.time, pixScale());
       particles.update(dt, pixScale());
       game.applyView(camera, now / 1000);
       shared.uCam.value.copy(camera.position);
@@ -441,6 +472,7 @@ function frame(now) {
     game.time += rawDt;
     shared.uTime.value = game.time;
     ghosts.update(game.time);
+    eyes.update(game.time, pixScale());
     particles.update(rawDt, pixScale());
     game.applyView(camera, now / 1000);
     shared.uCam.value.copy(camera.position);
@@ -457,6 +489,7 @@ function frame(now) {
 // ---------------- boot ----------------
 function boot() {
   applyQuality();
+  applyRadar();
   requestAnimationFrame(frame);
   // let the boot screen paint before the heavy generation
   setTimeout(() => {
@@ -466,7 +499,7 @@ function boot() {
       $('bootText').textContent = 'world generation failed: ' + e.message;
       throw e;
     }
-    game = new Game({ scene, camera, world, pulses, ghosts, particles, audio, mic, input, hud, radar, post });
+    game = new Game({ scene, camera, world, pulses, ghosts, eyes, particles, audio, mic, input, hud, radar, post });
     game.onEnd = onEnd;
     setupAttract();
     // warm up shaders so the first ping doesn't hitch
@@ -476,7 +509,7 @@ function boot() {
       perf.fpsEl.style.cssText = 'position:fixed;right:8px;top:64px;z-index:99;font:11px JetBrains Mono,monospace;color:#8ef0ff;opacity:.8;pointer-events:none';
       document.body.appendChild(perf.fpsEl);
     }
-    window.__hush = { world, game, pulses, ghosts, renderer, perf, mic, audio, input, startRun, pause, toMenu, get state() { return state; } };
+    window.__hush = { world, game, pulses, ghosts, eyes, renderer, perf, mic, audio, input, hud, post, debug: DEBUG, startRun, pause, toMenu, get state() { return state; } };
     state = 'menu';
     menuTime = 0;
     post.u.uFade.value = 0;

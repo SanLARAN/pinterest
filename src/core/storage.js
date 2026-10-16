@@ -13,6 +13,7 @@ const DEFAULTS = {
   voiceEcho: true,
   scares: 'full',
   quality: 'auto',
+  radar: false, // minimal HUD by default; the radar is an opt-in assist
   name: '',
   tutorialDone: false,
 };
