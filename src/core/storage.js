@@ -53,6 +53,7 @@ export function submitScore(entry) {
     time: Math.round(entry.time),
     won: !!entry.won,
     shards: entry.shards | 0,
+    gens: entry.gens | 0,
     date: Date.now(),
   };
   list.push(item);

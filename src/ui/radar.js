@@ -126,7 +126,7 @@ export class Radar {
     for (let i = this.blips.length - 1; i >= 0; i--) {
       const b = this.blips[i];
       const age = this.t - b.t;
-      const life = b.type === 'monster' ? 4 : b.type === 'shard' ? 6 : 3;
+      const life = b.type === 'monster' ? 4 : b.type === 'shard' || b.type === 'beacon' ? 6 : 3;
       if (age > life) {
         this.blips.splice(i, 1);
         continue;
@@ -162,6 +162,12 @@ export class Radar {
         ctx.arc(X, Y, 3 * this.dpr * pop, 0, Math.PI * 2);
         ctx.fill();
         ctx.shadowBlur = 0;
+      } else if (b.type === 'beacon') {
+        // a generator's radio / a body: an amber square
+        const s = 3.5 * this.dpr * pop;
+        ctx.strokeStyle = `rgba(255,185,90,${f})`;
+        ctx.lineWidth = 1.5 * this.dpr;
+        ctx.strokeRect(X - s, Y - s, s * 2, s * 2);
       } else if (b.type === 'stone') {
         ctx.strokeStyle = `rgba(230,245,255,${f})`;
         ctx.lineWidth = 1.5 * this.dpr;

@@ -106,9 +106,10 @@ void main() {
   col += bl * uBloom;
 
   // tone: filmic shoulder, crushed toe — shadows fall into true black
-  col = 1.0 - exp(-col * 1.4);
+  // (in daylight the toe and the tunnel let go: the world is open)
+  col = 1.0 - exp(-col * (1.4 + 0.35 * uWarm));
   col = max(col - 0.01, 0.0) * 1.01;
-  col = pow(col, vec3(1.15));
+  col = pow(col, vec3(1.15 - 0.17 * uWarm));
   // the forest is ash; only blood (and amber) keeps its colour
   float lum = dot(col, vec3(0.299, 0.587, 0.114));
   float redness = clamp((col.r - col.b) * 2.2 - 0.08, 0.0, 1.0);
@@ -118,7 +119,7 @@ void main() {
 
   // tunnel vision: the dark closes in when something is near
   float vig = smoothstep(1.02 - uDanger * 0.32, 0.1, dist);
-  col *= mix(1.0, vig, 0.92);
+  col *= mix(1.0, vig, 0.92 * (1.0 - 0.72 * uWarm));
   float beat = 0.6 + 0.4 * sin(uTime * 6.0);
   col += vec3(0.3, 0.0, 0.01) * uDanger * (1.0 - vig) * beat;
 

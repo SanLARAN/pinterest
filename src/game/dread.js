@@ -38,16 +38,17 @@ export class Dread {
     m.rig.root.updateMatrixWorld(true);
     n.getWorldPosition(_v);
     const yaw = m.yaw + (m.headYaw || 0);
-    const fwd = m.type === 'crawler' ? 0.16 : 0.09;
-    return { x: _v.x + Math.sin(yaw) * fwd, y: _v.y + (m.type === 'crawler' ? 0.07 : 0.06), z: _v.z + Math.cos(yaw) * fwd, yaw };
+    const fwd = m.type === 'crawler' ? 0.16 : m.type === 'howler' ? 0.24 : 0.09;
+    const up = m.type === 'crawler' ? 0.07 : m.type === 'howler' ? 0.08 : 0.06;
+    return { x: _v.x + Math.sin(yaw) * fwd, y: _v.y + up, z: _v.z + Math.cos(yaw) * fwd, yaw };
   }
 
   glintMonster(m, intensity, life, blink = false) {
     const e = this.eyePos(m);
     this.eyes.add(e.x, e.y, e.z, e.yaw, {
       time: this.g.time, life, intensity, blink,
-      spacing: m.type === 'crawler' ? 0.2 : 0.26,
-      size: m.type === 'crawler' ? 0.13 : 0.16,
+      spacing: m.type === 'crawler' ? 0.2 : m.type === 'howler' ? 0.18 : 0.26,
+      size: m.type === 'crawler' || m.type === 'howler' ? 0.13 : 0.16,
       color: EYE_RED,
     });
   }
@@ -69,7 +70,7 @@ export class Dread {
     // ---- real eyes ----
     for (const m of g.monsters) {
       if (m.state === 'hunt') hunted = true;
-      if (m.scripted === 'freeze' || m.state === 'flee') continue;
+      if (m.scripted === 'freeze' || m.state === 'flee' || m.noEyes) continue; // the Watcher has no face to glint
       const d = m.playerDist;
       if (d > 42 || d < 2.5) continue;
       if (m.glintT === undefined) m.glintT = rng.float(2, 6);
@@ -91,7 +92,7 @@ export class Dread {
       m.sniffT = (m.sniffT ?? rng.float(0.6, 2)) - dt;
       if (m.sniffT > 0) continue;
       m.sniffT = rng.float(3.5, 6.5);
-      g.audio.sniff(m.x, m.y + (m.type === 'crawler' ? 0.7 : 2.1), m.z, 0.42 + 0.25 * (1 - m.playerDist / 8));
+      g.audio.sniff(m.x, m.y + m.headY, m.z, 0.42 + 0.25 * (1 - m.playerDist / 8));
     }
 
     // ---- hallucinations (only once you know what is out there, never mid-chase) ----

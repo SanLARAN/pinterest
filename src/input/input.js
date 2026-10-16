@@ -3,7 +3,7 @@ import { settings } from '../core/storage.js';
 
 const GAME_KEYS = new Set([
   'KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space',
-  'ShiftLeft', 'ShiftRight', 'KeyC', 'KeyF', 'KeyM', 'KeyP', 'KeyR', 'KeyQ', 'KeyE', 'Tab',
+  'ShiftLeft', 'ShiftRight', 'KeyC', 'KeyF', 'KeyM', 'KeyP', 'KeyR', 'KeyE', 'Tab', 'Enter',
 ]);
 
 export class Input {
@@ -17,6 +17,7 @@ export class Input {
     this.sprint = false;
     this.crouch = false;
     this.pingHeld = false;
+    this.useHeld = false; // E (or the hands button on touch): search / repair, held
     this.peekHeld = false; // Tab (or a tap on the top strip on touch): show time + score
     this.peekTouchUntil = 0;
     this.events = [];
@@ -57,6 +58,10 @@ export class Input {
         case 'KeyF':
           this.emit('throw');
           break;
+        case 'KeyE':
+          this.useHeld = true;
+          this.emit('useDown');
+          break;
         case 'KeyC':
           this.crouch = !this.crouch;
           this.emit('crouch');
@@ -83,6 +88,7 @@ export class Input {
     window.addEventListener('keyup', (e) => {
       this.keys.delete(e.code);
       if (e.code === 'Tab') this.peekHeld = false;
+      if (e.code === 'KeyE') this.useHeld = false;
       if (e.code === 'Space' && this.pingHeld) {
         this.pingHeld = false;
         this.emit('pingUp');
@@ -91,6 +97,7 @@ export class Input {
     window.addEventListener('blur', () => {
       this.keys.clear();
       this.peekHeld = false;
+      this.useHeld = false;
       if (this.pingHeld) {
         this.pingHeld = false;
         this.emit('pingUp');
@@ -325,6 +332,13 @@ export class Input {
       this.crouch = !this.crouch;
       this.emit('crouch');
     });
+    btn('#tUse', () => {
+      this.useHeld = true;
+      this.emit('useDown');
+    }, () => {
+      this.useHeld = false;
+    });
+    btn('#tSkip', () => this.emit('skip'));
   }
 
   // called once per frame; resolves continuous axes
@@ -335,8 +349,8 @@ export class Input {
     if (k.has('KeyS') || k.has('ArrowDown')) my -= 1;
     if (k.has('KeyD')) mx += 1;
     if (k.has('KeyA')) mx -= 1;
-    if (k.has('ArrowLeft') || k.has('KeyQ')) turn -= 1;
-    if (k.has('ArrowRight') || k.has('KeyE')) turn += 1;
+    if (k.has('ArrowLeft')) turn -= 1;
+    if (k.has('ArrowRight')) turn += 1;
     let sprint = k.has('ShiftLeft') || k.has('ShiftRight');
     if (this.joy.id !== -1) {
       mx += this.joy.x;
@@ -362,6 +376,7 @@ export class Input {
   reset() {
     this.keys.clear();
     this.pingHeld = false;
+    this.useHeld = false;
     this.peekHeld = false;
     this.crouch = false;
     this.lookDX = this.lookDY = 0;

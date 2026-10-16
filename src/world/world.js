@@ -83,6 +83,7 @@ export class World {
       const fn = this['lm_' + kind];
       if (fn) fn.call(this, L, rng);
     }
+    this.genSites(); // own RNG: the forest stays exactly the same
 
     this.genTrees(rng);
     this.genScatter(rng);
@@ -611,6 +612,93 @@ export class World {
     const ty = this.terrain.height(L.x + tx, L.z + tz);
     this.deadTree(L.x + tx, ty, L.z + tz, 1.5, rng);
     this.effigy(L.x + tx + 1.3, L.z + tz + 0.5, rng);
+  }
+
+  // ---------------- generators ----------------
+  // Five generator sites: the camp + four landmarks. Each one gets a clear spot for the generator
+  // (with a lamp post), a spot nearby for the body of whoever tried to fix it, and colliders.
+  genSites() {
+    const rng = new RNG(4242);
+    this.sites = [];
+    const ids = ['camp', ...CFG.GEN_SITES];
+    for (const id of ids) {
+      const L = LANDMARKS.find((l) => l.id === id);
+      let gx, gz, cx, cz;
+      if (id === 'camp') {
+        // in plain view from where you wake up; the body lies between you and it
+        gx = L.x - 3.8; gz = L.z + 7.4;
+        cx = L.x - 1.5; cz = L.z + 5.3;
+      } else {
+        const g = this._freeSpot(L.x, L.z, 4, L.r - 2.5, 2.1, rng);
+        gx = g.x; gz = g.z;
+        const c = this._freeSpot(gx, gz, 2.8, 4.6, 1.0, rng, L);
+        cx = c.x; cz = c.z;
+      }
+      const yaw = Math.atan2(L.x - gx, L.z - gz) + (id === 'camp' ? 0 : rng.float(-0.5, 0.5));
+      const gy = this.terrain.height(gx, gz);
+      const [px, pz] = rot(0.78, -0.32, yaw);
+      const [hx, hz] = rot(0.78 + 0.42, -0.32, yaw);
+      const site = {
+        id, x: gx, z: gz, y: gy, yaw,
+        lamp: { x: gx + hx, y: gy + 3.0, z: gz + hz },
+        corpse: { x: cx, z: cz, yaw: Math.atan2(gx - cx, gz - cz) + rng.float(-0.6, 0.6), seed: rng.int(1, 1e6) },
+      };
+      this.sites.push(site);
+      this.genProp(site);
+      const [ax, az] = rot(-0.5, 0, yaw), [bx, bz] = rot(0.5, 0, yaw);
+      this.col.add(gx + ax, gz + az, gx + bx, gz + bz, 0.48, 1.2, CAP.METAL);
+      this.col.circle(gx + px, gz + pz, 0.1, 3.2, CAP.METAL);
+    }
+  }
+
+  _freeSpot(ox, oz, minR, maxR, clear, rng, inside = null) {
+    const a0 = rng.float(0, Math.PI * 2);
+    for (let r = minR; r <= maxR; r += 0.6) {
+      for (let k = 0; k < 20; k++) {
+        const a = a0 + (k / 20) * Math.PI * 2;
+        const x = ox + Math.cos(a) * r, z = oz + Math.sin(a) * r;
+        if (inside && Math.hypot(x - inside.x, z - inside.z) > inside.r - 1) continue;
+        if (this.col.free(x, z, clear)) return { x, z };
+      }
+    }
+    return { x: ox + minR, z: oz };
+  }
+
+  // a battered portable generator on skids, with a work lamp on a pole
+  genProp(s) {
+    this.addProp(s.x, s.z, (b) => {
+      const base = makeBase(s.x, s.y, s.z, s.yaw);
+      const M = KIND.METAL;
+      localPlace(b, base, 0, 0, 0);
+      for (const z of [-0.3, 0.3]) b.limb([-0.68, 0.06, z], [0.68, 0.06, z], 0.045, 0.045, M, 4); // skids
+      localPlace(b, base, 0, 0.12, 0);
+      b.box(1.12, 0.6, 0.6, M, { bottom: true }); // engine housing
+      localPlace(b, base, 0.05, 0.72, 0);
+      b.box(0.86, 0.24, 0.48, M, { bottom: true }); // fuel tank
+      localPlace(b, base, 0.3, 0.96, 0.05);
+      b.cylinder(6, 0.06, 0.06, 0.06, M); // filler cap
+      localPlace(b, base, 0.3, 0.42, 0.31, Math.PI / 2, 0, 0);
+      b.cylinder(8, 0.2, 0.2, 0.08, M); // flywheel cover
+      localPlace(b, base, -0.33, 0.46, 0.31);
+      b.box(0.34, 0.26, 0.04, KIND.WOOD); // control panel
+      localPlace(b, base, 0, 0, 0);
+      // roll cage
+      for (const [x, z] of [[-0.62, -0.34], [0.62, -0.34], [-0.62, 0.34], [0.62, 0.34]]) b.limb([x, 0.06, z], [x, 0.98, z], 0.025, 0.025, M, 4);
+      for (const z of [-0.34, 0.34]) b.limb([-0.62, 0.98, z], [0.62, 0.98, z], 0.025, 0.025, M, 4);
+      b.limb([-0.48, 0.72, -0.18], [-0.52, 1.28, -0.22], 0.045, 0.04, M, 5); // exhaust
+      // lamp pole + head
+      const px = 0.78, pz = -0.32;
+      b.limb([px, 0, pz], [px, 3.15, pz], 0.05, 0.035, M, 5);
+      b.limb([px, 3.12, pz], [px + 0.42, 3.18, pz], 0.025, 0.02, M, 4);
+      localPlace(b, base, px + 0.42, 2.98, pz);
+      b.cone(6, 0.2, 0.22, M);
+      localPlace(b, base, 0, 0, 0);
+      b.limb([0.56, 0.3, -0.3], [px, 0.05, pz + 0.05], 0.015, 0.015, M, 3); // cable
+      b.limb([px, 0.05, pz + 0.05], [px, 1.2, pz + 0.02], 0.012, 0.012, M, 3);
+      // a toolbox someone dropped
+      localPlace(b, base, -0.95, 0.12, 0.55, 0, 0.5, 0);
+      b.box(0.42, 0.22, 0.2, KIND.WOOD);
+    });
   }
 
   // ---------------- meshes ----------------

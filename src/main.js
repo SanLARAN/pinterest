@@ -34,6 +34,7 @@ const DEBUG = {
   t: parseFloat(params.get('t')) || 0,
   speed: parseFloat(params.get('speed')) || 1,
   autostart: params.has('autostart'),
+  night: params.has('night'), // skip the morning
   nomic: params.has('nomic'),
   fps: params.has('fps'),
 };
@@ -306,6 +307,7 @@ function startRun() {
   hud.cache = {};
   input.reset();
   game.reset();
+  if (DEBUG.night || DEBUG.t > 0) game.startNight();
   if (DEBUG.t > 0) {
     game.time = DEBUG.t;
     game.firstPingT = Math.max(0, DEBUG.t - 30);
@@ -327,12 +329,15 @@ function startRun() {
 }
 
 function pause() {
-  if (state !== 'playing' || !game || game.state !== 'play') return;
+  if (state !== 'playing' || !game || !['play', 'morning', 'dusk'].includes(game.state)) return;
   state = 'paused';
   setBodyState();
   audio.setPaused(true);
   input.exitLock();
-  $('pauseStats').innerHTML = `${fmtTime(game.time)} · ${t('dawnIn')} ${fmtTime(CFG.RUN_SECONDS - game.time)}<br>${t('score')} ${fmtScore(game.score)} ×${game.mult.toFixed(1)}`;
+  const night = game.state === 'play';
+  $('pauseStats').innerHTML = night
+    ? `${fmtTime(game.time)} · ${t('generators')} ${game.objectives.count}/5<br>${t('score')} ${fmtScore(game.score)} ×${game.mult.toFixed(1)}`
+    : `${t('morningBig')}`;
   menus.only('pause');
 }
 
@@ -352,7 +357,11 @@ function toMenu() {
     for (const m of game.monsters) m.dispose();
     game.monsters = [];
     game.state = 'idle';
+    game.objectives.silence();
+    audio.setMorning(false);
   }
+  shared.uDawn.value = 0;
+  shared.uMorning.value = 0;
   pulses.clear();
   ghosts.clear();
   eyes.clear();
@@ -375,11 +384,12 @@ function toMenu() {
 function onEnd(res) {
   const stats = {
     ...game.stats,
-    time: Math.min(game.time, CFG.RUN_SECONDS),
+    gens: game.objectives.count,
+    time: game.time,
     score: game.score,
     loudestDb: -100,
   };
-  const { rank, list } = submitScore({ name: settings.name || '???', score: game.score, time: stats.time, won: res.won, shards: stats.shards });
+  const { rank, list } = submitScore({ name: settings.name || '???', score: game.score, time: stats.time, won: res.won, shards: stats.shards, gens: stats.gens });
   menus.showOver(res, stats, rank, list);
   menus.renderScores();
   state = 'over';
@@ -456,7 +466,7 @@ function frame(now) {
       game.hudUpdate(rawDt);
       // pointer-lock hint (or drag-to-look hint when the browser/iframe refuses pointer lock)
       let lockMsg = '';
-      if (!input.touch && game.state === 'play' && !input.locked) {
+      if (!input.touch && (game.state === 'play' || game.state === 'morning') && !input.locked) {
         if (!input.lockFailed) lockMsg = t('clickToLook');
         else {
           if (!perf.dragHintAt) perf.dragHintAt = now;
@@ -511,7 +521,7 @@ function boot() {
       perf.fpsEl.style.cssText = 'position:fixed;right:8px;top:64px;z-index:99;font:11px JetBrains Mono,monospace;color:#8ef0ff;opacity:.8;pointer-events:none';
       document.body.appendChild(perf.fpsEl);
     }
-    window.__hush = { world, game, pulses, ghosts, eyes, renderer, perf, mic, audio, input, hud, post, debug: DEBUG, startRun, pause, toMenu, get state() { return state; } };
+    window.__hush = { world, game, shared, pulses, ghosts, eyes, renderer, perf, mic, audio, input, hud, post, debug: DEBUG, startRun, pause, toMenu, get state() { return state; } };
     state = 'menu';
     menuTime = 0;
     post.u.uFade.value = 0;

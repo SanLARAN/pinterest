@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
     <meta name="theme-color" content="#000000" />
-    <meta name="description" content="ТИШЕ — low-poly эхолокационный хоррор. Ты слеп в огромном лесу: твой микрофон — эхолокатор. Продержись 30 минут и не закричи." />
+    <meta name="description" content="ТИШЕ — low-poly эхолокационный хоррор. Ты слеп в огромном лесу: твой микрофон — эхолокатор. Запусти пять генераторов и не закричи." />
     <title>ТИШЕ — эхолокационный хоррор</title>
     <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
   </head>
@@ -24,6 +24,8 @@
       <div id="dawnLine"><i id="dawnFill"></i></div>
       <div id="peek">
         <div id="peekTime">00:00</div>
+        <div id="peekGens"><i></i><i></i><i></i><i></i><i></i></div>
+        <div id="peekTask"></div>
         <div id="peekSub"></div>
       </div>
       <canvas id="radar"></canvas>
@@ -34,16 +36,21 @@
         <svg viewBox="-50 -50 100 100" aria-hidden="true">
           <circle id="screamRing" r="30" />
           <circle id="noiseRing" r="7" />
+          <circle id="useRing" r="13" transform="rotate(-90)" />
         </svg>
         <div id="ripple"></div>
+        <div id="beacon"><i></i></div>
         <div class="dot"></div>
         <div id="stam"><i id="stamFill"></i></div>
         <div id="stones"><i></i><i></i><i></i></div>
       </div>
       <div id="alert"></div>
       <div id="popups"></div>
+      <div id="use"></div>
       <div id="hint"></div>
       <div id="intro"></div>
+      <div id="note"><div class="k"></div><div class="t"></div><div class="f"></div></div>
+      <div id="skip"></div>
       <div id="lockHint"></div>
     </div>
 
@@ -56,6 +63,8 @@
       <button id="tPing" class="tbtn big"><span data-i18n="touchPing">ЭХО</span></button>
       <button id="tStone" class="tbtn"><span data-i18n="touchStone">КАМЕНЬ</span></button>
       <button id="tCrouch" class="tbtn"><span data-i18n="touchCrouch">ТИХО</span></button>
+      <button id="tUse" class="tbtn"><span data-i18n="touchUse">РУКИ</span></button>
+      <button id="tSkip" class="tbtn wide"><span data-i18n="touchSkip">ПРОПУСТИТЬ</span></button>
     </div>
 
     <!-- main menu -->

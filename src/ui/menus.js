@@ -162,7 +162,7 @@ export class Menus {
     if (target === 'scoreTable') {
       const best = list[0];
       const bl = $('bestLine');
-      if (bl) bl.innerHTML = best ? `${esc(t('best'))} <b>${fmtScore(best.score)}</b> · ${fmtTime(best.time)}${best.won ? ' ☀' : ''}` : '';
+      if (bl) bl.innerHTML = best ? `${esc(t('best'))} <b>${fmtScore(best.score)}</b> · ${fmtTime(best.time)} · ${best.won ? '☀' : `${best.gens | 0}/5`}` : '';
     }
     const el = $(target);
     if (!el) return;
@@ -173,7 +173,8 @@ export class Menus {
     let html = `<div class="row head"><span class="r">${t('rank')}</span><span class="n">${esc(t('name'))}</span><span class="s">${esc(t('score'))}</span><span class="t">${esc(t('time'))}</span></div>`;
     list.forEach((s, i) => {
       const me = i === highlightRank ? ' me' : '';
-      html += `<div class="row${me}"><span class="r">${i + 1}</span><span class="n">${esc(s.name || '???')}${s.won ? '<span class="w">☀</span>' : ''}</span><span class="s">${fmtScore(s.score)}</span><span class="t">${fmtTime(s.time)}</span></div>`;
+      const mark = s.won ? '<span class="w">☀</span>' : s.gens ? `<span class="g">${s.gens | 0}/5</span>` : '';
+      html += `<div class="row${me}"><span class="r">${i + 1}</span><span class="n">${esc(s.name || '???')}${mark}</span><span class="s">${fmtScore(s.score)}</span><span class="t">${fmtTime(s.time)}</span></div>`;
     });
     el.innerHTML = html;
   }
@@ -206,9 +207,9 @@ export class Menus {
   showOver(res, stats, rank, list) {
     const won = res.won;
     $('over').classList.toggle('won', won);
-    $('overKicker').textContent = won ? '06:00' : `${t('survived')} ${fmtTime(stats.time)}`;
-    let title = t('winTitle');
-    if (!won) title = res.cause === 'scream' ? t('deadScream') : res.cause === 'crawler' ? t('deadCrawler') : t('deadTitle');
+    $('overKicker').textContent = won ? `${t('winKicker')} · ${fmtTime(stats.time)}` : `${t('survived')} ${fmtTime(stats.time)} · ${t('generators')} ${stats.gens | 0}/5`;
+    const titles = { scream: 'deadScream', crawler: 'deadCrawler', watcher: 'deadWatcher', howler: 'deadHowler' };
+    const title = won ? t('winTitle') : t(titles[res.cause] || 'deadTitle');
     $('overTitle').textContent = title;
     const who = !won && res.cause !== 'scream' ? (t('deathBy')[res.cause] || '') : '';
     $('overSub').textContent = won ? t('winSub') : who ? `— ${who}` : '';
@@ -216,6 +217,7 @@ export class Menus {
     $('newRecord').classList.toggle('show', rank === 0 && stats.score > 0);
     const loud = `${Math.round((stats.loudest / 0.78) * 100)}%`;
     $('overStats').innerHTML = [
+      [`${stats.gens | 0}/5`, t('gensGot')],
       [stats.shards, t('shardsGot')],
       [stats.close, t('closeCalls')],
       [stats.escapes, t('escapes')],

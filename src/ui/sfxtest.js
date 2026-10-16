@@ -39,6 +39,15 @@ export function mountSfxPanel(audio) {
     ['вдали: крик', () => amb('scream')],
     ['вдали: шаги', () => amb('steps')],
     ['вдали: металл', () => amb('groan')],
+    ['утро: птицы', () => { for (let i = 0; i < 6; i++) setTimeout(() => audio.bird(), i * 450); }],
+    ['стемнело', () => { audio.startAmbience(); audio.dusk(); }],
+    ['генератор: запуск', () => audio.genStart(...at(4, 2, 0.6))],
+    ['генератор: шнур / искра / стук', () => { audio.cordPull(...at(2, 1, 0.6)); setTimeout(() => audio.spark(...at(2, 1, 0.7)), 900); setTimeout(() => audio.clank(...at(2, 1, 0.6), 1), 1700); }],
+    ['рация генератора', () => audio.beacon(...at(40, -25, 1.1))],
+    ['тело нашлось (мухи)', () => { audio.discover(); const f = audio.flies(...at(2, 0.5, 0.3)); setTimeout(() => f && f.stop(), 4000); }],
+    ['Наблюдатель: суставы + появление', () => { for (let i = 0; i < 5; i++) setTimeout(() => audio.crack(...at(6 - i, 3, 1.5), 0.7), i * 420); setTimeout(() => audio.watcherSting(), 2300); }],
+    ['Ревун: вдох и вой', () => { audio.howlerInhale(...at(25, -12, 1.8)); setTimeout(() => audio.howlerHowl(...at(25, -12, 2.2)), 1800); }],
+    ['Ревун: рявк', () => audio.howlerBark(...at(9, 3, 1.8))],
     ['напряжение: 0', (b) => {
       tension = tension >= 1 ? 0 : tension + 0.5;
       audio.startAmbience();

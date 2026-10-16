@@ -12,8 +12,12 @@ export const shared = {
   uPC: { value: Array.from({ length: N }, () => new THREE.Vector4(1, 1, 1, 0)) }, // rgb tint
   uCam: { value: new THREE.Vector3() },
   uDawn: { value: 0 },
+  uMorning: { value: 0 }, // 1 = the calm morning (high sun, blue sky), 0 = the victory dawn
   uFear: { value: 0 }, // 0..1 — when something hunts you, the forest bleeds red
   uSun: { value: new THREE.Vector3(0.5, 0.35, -0.8).normalize() },
+  // work lamps of running generators: xyz + intensity (0 = off)
+  uLamp: { value: Array.from({ length: 5 }, () => new THREE.Vector4(0, -100, 0, 0)) },
+  uLampR: { value: CFG.LAMP_R },
 };
 
 const PULSE_GLSL = /* glsl */ `
@@ -24,8 +28,27 @@ uniform vec4 uPB[MAXP];
 uniform vec4 uPC[MAXP];
 uniform vec3 uCam;
 uniform float uDawn;
+uniform float uMorning;
 uniform float uFear;
 uniform vec3 uSun;
+uniform vec4 uLamp[5];
+uniform float uLampR;
+
+// steady warm light pooled under the work lamps of running generators
+vec3 lampLight(vec3 P, vec3 Nrm) {
+  vec3 acc = vec3(0.0);
+  for (int i = 0; i < 5; i++) {
+    vec4 Lm = uLamp[i];
+    if (Lm.w <= 0.001) continue;
+    vec3 dv = Lm.xyz - P;
+    float d = length(dv);
+    if (d > uLampR * 1.5) continue;
+    float fall = 1.0 - smoothstep(uLampR * 0.12, uLampR * 1.5, d);
+    float facing = dot(Nrm, Nrm) > 0.5 ? 0.35 + 0.65 * abs(dot(Nrm, dv / max(d, 0.001))) : 1.0;
+    acc += vec3(1.0, 0.72, 0.4) * Lm.w * fall * fall * facing;
+  }
+  return acc;
+}
 
 // accumulate sonar light at point P (N = facing normal, may be zero for points)
 vec3 sonarLight(vec3 P, vec3 Nrm, out float ringOut) {
@@ -109,6 +132,21 @@ const vec3 KC[12] = vec3[12](
   vec3(0.34, 0.46, 0.54),  // water
   vec3(1.00, 0.70, 0.25)   // shard
 );
+// daylight palette: what the forest looks like when you can actually see it
+const vec3 DC[12] = vec3[12](
+  vec3(0.34, 0.38, 0.22),  // ground: moss and needles
+  vec3(0.42, 0.33, 0.25),  // bark
+  vec3(0.25, 0.42, 0.21),  // leaf
+  vec3(0.52, 0.52, 0.49),  // rock
+  vec3(0.62, 0.47, 0.32),  // wood
+  vec3(0.86, 0.62, 0.18),  // metal: generators are painted safety yellow
+  vec3(0.50, 0.38, 0.27),  // effigy: just sticks, in daylight
+  vec3(0.78, 0.24, 0.20),  // flesh
+  vec3(0.86, 0.80, 0.72),  // bone
+  vec3(1.00, 1.00, 1.00),  // eye
+  vec3(0.36, 0.52, 0.62),  // water
+  vec3(1.00, 0.70, 0.25)   // shard
+);
 
 void main() {
   vec3 Nrm = normalize(cross(dFdx(vWorld), dFdy(vWorld)));
@@ -120,6 +158,8 @@ void main() {
 
   float ring;
   vec3 L = sonarLight(vWorld, Nrm, ring);
+  vec3 lamp = lampLight(vWorld, Nrm);
+  L += lamp;
 
   float edge = edgeFactor(vBary, k == 0 ? 0.75 : 1.0);
   float distEdge = 1.0 - smoothstep(14.0, 90.0, camD) * 0.82;
@@ -140,6 +180,7 @@ void main() {
   float edgeGain = (k == 5 ? 1.75 : 1.4);
 
   vec3 col = base * L * (face + edge * edgeGain);
+  col += base * lamp * (0.17 + 0.12 * st); // a lamp fills surfaces, not just their edges
   col += vec3(0.78, 0.85, 0.9) * ring * edge * 0.42;
   // rare sparkles on the wavefront
   float sp = step(0.993, hash13(floor(vWorld * 11.0) + floor(uTime * 14.0)));
@@ -154,15 +195,16 @@ void main() {
     col = mix(col, vec3(lum * 1.55, lum * 0.16, lum * 0.12), uFear * 0.65);
   }
 
-  // dawn: the forest becomes visible
+  // daylight (the morning, or the dawn you earned): the forest becomes visible
   if (uDawn > 0.0) {
+    vec3 dbase = DC[k];
     float sunL = max(dot(Nrm, uSun), 0.0);
     float sky = 0.5 + 0.5 * Nrm.y;
-    vec3 warm = vec3(1.0, 0.8, 0.62);
-    vec3 day = base * (0.32 * sky + 1.05 * sunL * warm) * (0.75 + 0.35 * st);
-    day += edge * base * 0.12;
-    vec3 fogC = vec3(0.62, 0.52, 0.5);
-    float fog = 1.0 - exp(-camD * 0.016);
+    vec3 warm = mix(vec3(1.0, 0.8, 0.62), vec3(1.0, 0.93, 0.82), uMorning);
+    vec3 day = dbase * (mix(0.36, 0.5, uMorning) * sky + 1.05 * sunL * warm) * (0.8 + 0.3 * st);
+    day += edge * dbase * 0.1;
+    vec3 fogC = mix(vec3(0.62, 0.52, 0.5), vec3(0.72, 0.76, 0.78), uMorning);
+    float fog = 1.0 - exp(-camD * mix(0.016, 0.011, uMorning));
     day = mix(day, fogC, fog);
     col = mix(col, day + col * 0.3, uDawn);
   }
@@ -280,7 +322,7 @@ void main() {
   vec3 halfB = vec3(uBox * 0.5, 6.0, uBox * 0.5);
   vec3 wp = uCam + mod(p - uCam + halfB, vec3(uBox, 12.0, uBox)) - halfB;
   float ring;
-  vec3 L = sonarLight(wp, vec3(0.0), ring);
+  vec3 L = sonarLight(wp, vec3(0.0), ring) + lampLight(wp, vec3(0.0)) * 1.6;
   vCol = (L * 0.3 + ring * vec3(0.7, 0.76, 0.8) * 0.38) * (0.3 + aSeed.w);
   vec4 mv = viewMatrix * vec4(wp, 1.0);
   gl_Position = projectionMatrix * mv;
@@ -320,7 +362,7 @@ export function createMotes(count = 2600) {
 export function createSky() {
   const geo = new THREE.SphereGeometry(140, 24, 12);
   const mat = new THREE.ShaderMaterial({
-    uniforms: { uDawn: shared.uDawn, uSun: shared.uSun, uTime: shared.uTime },
+    uniforms: { uDawn: shared.uDawn, uSun: shared.uSun, uTime: shared.uTime, uMorning: shared.uMorning },
     vertexShader: /* glsl */ `
       varying vec3 vDir;
       void main() {
@@ -330,12 +372,13 @@ export function createSky() {
       }`,
     fragmentShader: /* glsl */ `
       uniform float uDawn;
+      uniform float uMorning;
       uniform vec3 uSun;
       varying vec3 vDir;
       void main() {
         float h = clamp(vDir.y, -0.2, 1.0);
-        vec3 top = vec3(0.28, 0.42, 0.7);
-        vec3 hor = vec3(1.25, 0.72, 0.5);
+        vec3 top = mix(vec3(0.28, 0.42, 0.7), vec3(0.34, 0.54, 0.86), uMorning);
+        vec3 hor = mix(vec3(1.25, 0.72, 0.5), vec3(0.98, 0.9, 0.82), uMorning);
         vec3 c = mix(hor, top, smoothstep(-0.05, 0.55, h));
         float sun = pow(max(dot(vDir, uSun), 0.0), 64.0) * 2.5 + pow(max(dot(vDir, uSun), 0.0), 6.0) * 0.4;
         c += vec3(1.0, 0.75, 0.5) * sun;

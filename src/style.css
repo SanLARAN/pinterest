@@ -171,6 +171,7 @@ body:not(.in-menu) #noise-overlay { animation: none; visibility: hidden; }
 .score-table .row .t { text-align: right; color: rgba(214, 205, 192, 0.45); font-variant-numeric: tabular-nums; }
 .score-table .row .n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .score-table .row .n .w { color: var(--amber); margin-left: 6px; font-size: 11px; }
+.score-table .row .n .g { color: rgba(214, 160, 76, 0.6); margin-left: 7px; font-size: 10px; letter-spacing: 0.06em; }
 .score-table .row:nth-child(2) .r { color: var(--red); }
 .score-table .row.me { background: rgba(160, 20, 12, 0.14); box-shadow: inset 2px 0 0 var(--red); animation: meRow 1.4s ease-in-out infinite alternate; }
 @keyframes meRow { from { background: rgba(160, 20, 12, 0.06); } to { background: rgba(160, 20, 12, 0.2); } }
@@ -196,7 +197,7 @@ body:not(.in-menu) #noise-overlay { animation: none; visibility: hidden; }
 .badge { align-self: center; display: none; font-size: 11px; letter-spacing: 0.38em; padding: 5px 14px; border: 1px solid var(--red); color: var(--red); border-radius: 99px; animation: badge 0.9s ease-in-out infinite alternate; }
 .badge.show { display: inline-block; }
 @keyframes badge { from { box-shadow: 0 0 0 rgba(224, 54, 44, 0); } to { box-shadow: 0 0 18px rgba(224, 54, 44, 0.45); } }
-.stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; border-top: 1px solid rgba(167, 180, 182, 0.1); border-bottom: 1px solid rgba(167, 180, 182, 0.1); padding: 10px 0; }
+.stats-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; border-top: 1px solid rgba(167, 180, 182, 0.1); border-bottom: 1px solid rgba(167, 180, 182, 0.1); padding: 10px 0; }
 .stats-grid div { padding: 2px 4px; }
 .stats-grid b { display: block; color: var(--bone); font-size: 16px; font-weight: 400; }
 .stats-grid span { font-size: 9px; letter-spacing: 0.16em; color: var(--ash-dim); text-transform: uppercase; }
@@ -228,9 +229,9 @@ body:not(.in-menu) #noise-overlay { animation: none; visibility: hidden; }
 /* ---------------- HUD (minimal) ---------------- */
 #hud { position: fixed; inset: 0; z-index: 10; pointer-events: none; }
 
-/* a hairline at the top edge that slowly fills toward dawn */
+/* a hairline at the top edge: one fifth lights up per running generator */
 #dawnLine { position: absolute; left: 0; right: 0; top: 0; height: 1px; background: rgba(167, 180, 182, 0.05); }
-#dawnFill { position: absolute; inset: 0; transform-origin: left; transform: scaleX(0); background: linear-gradient(90deg, rgba(167, 180, 182, 0.12), rgba(214, 160, 76, 0.45)); }
+#dawnFill { position: absolute; inset: 0; transform-origin: left; transform: scaleX(0); transition: transform 1.6s ease; background: linear-gradient(90deg, rgba(214, 160, 76, 0.2), rgba(214, 160, 76, 0.6)); }
 
 /* time + score surface for a moment, then sink back into the dark */
 #peek {
@@ -239,6 +240,12 @@ body:not(.in-menu) #noise-overlay { animation: none; visibility: hidden; }
 }
 #peek.show { opacity: 1; transform: translate(-50%, 0); transition: opacity 0.35s ease, transform 0.35s ease; }
 #peekTime { font-size: 15px; letter-spacing: 0.4em; text-indent: 0.4em; color: rgba(214, 205, 192, 0.8); font-variant-numeric: tabular-nums; }
+#peekGens { display: flex; gap: 7px; justify-content: center; margin-top: 8px; }
+#peekGens i { width: 10px; height: 3px; background: rgba(167, 180, 182, 0.2); }
+#peekGens i.on { background: var(--amber); box-shadow: 0 0 8px rgba(214, 160, 76, 0.75); }
+#peekTask { margin: 8px auto 0; font-size: 11px; letter-spacing: 0.12em; color: rgba(214, 205, 192, 0.75); max-width: min(520px, 84vw); white-space: normal; line-height: 1.5; }
+#peekTask:empty { display: none; }
+#peekTask.fresh { color: #e2b56c; text-shadow: 0 0 12px rgba(214, 160, 76, 0.45); }
 #peekSub { margin-top: 5px; font-size: 10px; letter-spacing: 0.2em; color: rgba(167, 180, 182, 0.5); text-transform: uppercase; font-variant-numeric: tabular-nums; }
 
 /* only on touch: a faint pause button */
@@ -266,6 +273,12 @@ body.radar-on #radar { display: block; }
 #crosshair.charging #screamRing { opacity: 0.45; }
 #crosshair .dot { position: absolute; left: 50%; top: 50%; width: 3px; height: 3px; margin: -1.5px; border-radius: 50%; background: rgba(214, 205, 192, 0.42); }
 #crosshair[data-zone='s'] .dot { background: var(--red); }
+#useRing { stroke: var(--amber); stroke-width: 1.6; stroke-linecap: round; opacity: 0; transition: opacity 0.2s; }
+/* radio beacon: an amber tick on a ring around the dot, pointing where the beep came from */
+#beacon { position: absolute; left: 50%; top: 50%; width: 0; height: 0; transform: rotate(var(--a, 0rad)); opacity: 0; }
+#beacon i { position: absolute; left: -1px; top: -47px; width: 2px; height: 9px; border-radius: 1px; background: var(--amber); box-shadow: 0 0 8px rgba(214, 160, 76, 0.9); }
+#beacon.go { animation: beaconFade 1.8s ease-out forwards; }
+@keyframes beaconFade { 0% { opacity: var(--o, 1); } 55% { opacity: calc(var(--o, 1) * 0.6); } 100% { opacity: 0; } }
 #ripple { position: absolute; left: 50%; top: 50%; width: 20px; height: 20px; margin: -10px; border-radius: 50%; border: 1px solid rgba(214, 205, 192, 0.6); opacity: 0; }
 #ripple.go { animation: ripple 0.7s ease-out; }
 @keyframes ripple { 0% { opacity: 0.55; transform: scale(0.4); } 100% { opacity: 0; transform: scale(4.2); } }
@@ -317,6 +330,32 @@ body.radar-on #radar { display: block; }
   100% { opacity: 0; transform: translate(-50%, -26px); }
 }
 
+/* "E — search": a word under the dot when something can be used */
+#use {
+  position: absolute; left: 50%; top: calc(50% + 62px); transform: translateX(-50%); white-space: nowrap; font-size: 11px; letter-spacing: 0.22em;
+  text-transform: uppercase; color: rgba(214, 205, 192, 0.85); text-shadow: 0 0 6px #000, 0 0 2px #000; opacity: 0; transition: opacity 0.25s;
+}
+#use.show { opacity: 1; }
+#use.blocked { color: rgba(214, 160, 76, 0.8); letter-spacing: 0.16em; }
+
+/* a note found on a body */
+#note {
+  position: absolute; left: 50%; bottom: calc(66px + var(--safe-b)); width: min(470px, 86vw); transform: translate(-50%, 10px);
+  background: rgba(9, 7, 6, 0.93); border: 1px solid rgba(214, 205, 192, 0.14); border-left: 2px solid var(--blood);
+  padding: 14px 18px 12px; opacity: 0; pointer-events: none; transition: opacity 0.7s, transform 0.7s;
+}
+#note.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; transition: opacity 0.35s, transform 0.35s; }
+#note .k { font-size: 10px; letter-spacing: 0.3em; text-transform: uppercase; color: var(--amber); margin-bottom: 9px; }
+#note .t { font-size: 13px; line-height: 1.65; color: var(--bone); font-style: italic; }
+body.note-open #use { opacity: 0; }
+body.touch #note { left: calc(14px + var(--safe-l)); width: min(440px, 62vw); transform: translate(0, 10px); }
+body.touch #note.show { transform: translate(0, 0); }
+#note .f { margin-top: 10px; font-size: 9px; letter-spacing: 0.24em; text-transform: uppercase; text-align: right; color: rgba(167, 180, 182, 0.45); }
+
+/* morning: how to skip it */
+#skip { position: absolute; right: calc(18px + var(--safe-r)); bottom: calc(16px + var(--safe-b)); font-size: 10px; letter-spacing: 0.26em; text-transform: uppercase; color: rgba(36, 28, 20, 0.9); text-shadow: 0 0 8px rgba(255, 240, 220, 0.85); }
+body.touch #skip { display: none; }
+
 #hint {
   position: absolute; left: 50%; bottom: calc(26px + var(--safe-b)); transform: translateX(-50%); max-width: min(560px, 70vw); text-align: center;
   font-size: 12px; letter-spacing: 0.1em; color: rgba(214, 205, 192, 0.7); text-shadow: 0 0 8px #000, 0 0 2px #000; opacity: 0; transition: opacity 0.6s;
@@ -329,6 +368,10 @@ body.radar-on #radar { display: block; }
 #intro .big { font-size: clamp(20px, 3.6vw, 36px); letter-spacing: 0.42em; text-indent: 0.42em; color: rgba(214, 205, 192, 0.85); }
 #intro.show .big { animation: introBreath 3.2s ease-in-out infinite; }
 #intro .small { margin-top: 18px; font-size: 12px; letter-spacing: 0.12em; color: rgba(167, 180, 182, 0.55); }
+body.morning #intro .big { color: rgba(46, 34, 24, 0.85); text-shadow: 0 0 22px rgba(255, 238, 214, 0.7); }
+body.morning #intro .small { color: rgba(56, 44, 32, 0.7); }
+body.morning #hint { color: rgba(46, 34, 24, 0.85); text-shadow: 0 0 10px rgba(255, 238, 214, 0.9), 0 0 2px rgba(255, 238, 214, 0.9); }
+body.morning #crosshair .dot { background: rgba(40, 30, 22, 0.5); }
 #intro.red .big { color: var(--red); text-shadow: 0 0 24px rgba(200, 20, 12, 0.7); letter-spacing: 0.55em; }
 @keyframes introBreath { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }
 
@@ -355,11 +398,18 @@ body.touch.playing #touch { display: block; }
 #tPing { right: calc(24px + var(--safe-r)); bottom: calc(26px + var(--safe-b)); width: 92px; height: 92px; font-size: 12px; }
 #tStone { right: calc(132px + var(--safe-r)); bottom: calc(20px + var(--safe-b)); width: 62px; height: 62px; }
 #tCrouch { right: calc(40px + var(--safe-r)); bottom: calc(132px + var(--safe-b)); width: 56px; height: 56px; }
+#tUse { display: none; right: calc(136px + var(--safe-r)); bottom: calc(102px + var(--safe-b)); width: 70px; height: 70px; border-color: rgba(214, 160, 76, 0.5); color: var(--amber); }
+body.can-use #tUse { display: grid; }
+#tSkip { display: none; left: 50%; bottom: calc(18px + var(--safe-b)); transform: translateX(-50%); width: auto; height: 34px; padding: 0 18px; border-radius: 17px; color: rgba(40, 30, 20, 0.8); border-color: rgba(40, 30, 20, 0.35); background: rgba(255, 245, 230, 0.25); }
+#tSkip.down { transform: translateX(-50%) scale(0.94); }
+body.morning #tSkip { display: grid; }
+body.morning #tPing, body.morning #tStone { opacity: 0.25; }
 #tCrouch.on, body.crouching #tCrouch { background: rgba(214, 205, 192, 0.12); color: var(--bone); border-color: rgba(214, 205, 192, 0.45); }
 body.touch #radar { width: 104px; height: 104px; left: calc(12px + var(--safe-l)); bottom: auto; top: calc(12px + var(--safe-t)); }
 body.touch #hint { bottom: calc(12px + var(--safe-b)); font-size: 11px; max-width: 46vw; }
 body.touch #popups { top: calc(50% + 40px); }
 @media (orientation: portrait) {
+  body.touch #note { top: calc(112px + var(--safe-t)); bottom: auto; width: calc(100vw - 28px - var(--safe-l) - var(--safe-r)); }
   body.touch #tCrouch { bottom: calc(146px + var(--safe-b)); }
   body.touch #hint { bottom: auto; top: calc(118px + var(--safe-t)); max-width: 80vw; }
 }

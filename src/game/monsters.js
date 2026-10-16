@@ -193,6 +193,128 @@ export function buildShade() {
   return R;
 }
 
+// ---------------- Watcher: too tall, too thin, no face ----------------
+export function buildWatcher() {
+  const R = makeRig('watcher');
+  const N = (name, parent, x, y, z) => node(R, name, parent, x, y, z);
+  const hips = N('hips', null, 0, 1.8, 0);
+  part(R, hips, (b) => { b.place(0, -0.03, 0); b.box(0.3, 0.16, 0.18, KIND.FLESH); });
+  const spine = N('spine', hips, 0, 0.05, 0);
+  part(R, spine, (b) => {
+    b.identity();
+    b.taper(0.2, 0.13, 0.32, 0.17, 0.9, KIND.FLESH, -0.04);
+    for (let k = 0; k < 5; k++) {
+      for (const s of [-1, 1]) {
+        b.identity();
+        b.limb([s * 0.03, 0.4 + k * 0.1, 0.085], [s * 0.16, 0.36 + k * 0.1, 0.02], 0.012, 0.008, KIND.BONE, 3);
+      }
+    }
+  });
+  const chest = N('chest', spine, 0, 0.9, -0.04);
+  const neck = N('neck', chest, 0, 0, 0.02);
+  part(R, neck, (b) => { b.identity(); b.limb([0, 0, 0], [0, 0.44, 0.07], 0.045, 0.034, KIND.FLESH); });
+  const head = N('head', neck, 0, 0.44, 0.07);
+  part(R, head, (b) => {
+    // a long smooth skull with nothing on the front of it
+    b.place(0, 0.17, -0.02); b.octa(0.125, 0.27, KIND.FLESH);
+    b.place(0, 0.3, -0.05); b.octa(0.09, 0.16, KIND.BONE);
+  });
+  // the face is two plates that can open like a split seam, lined with teeth
+  for (const s of [-1, 1]) {
+    const side = s < 0 ? 'L' : 'R';
+    const f = N('face' + side, head, s * 0.004, 0.17, 0.09);
+    part(R, f, (b) => {
+      b.place(s * 0.055, 0, 0.0); b.box(0.1, 0.4, 0.035, KIND.BONE);
+      for (let k = 0; k < 6; k++) {
+        b.place(s * 0.008, 0.15 - k * 0.06, 0.012, 0, 0, s * -Math.PI / 2);
+        b.cone(3, 0.012, 0.05, KIND.BONE);
+      }
+    });
+    const sh = N('shoulder' + side, chest, s * 0.2, -0.03, 0);
+    part(R, sh, (b) => { b.identity(); b.limb([0, 0, 0], [0, -1.05, 0], 0.045, 0.032, KIND.FLESH); });
+    const el = N('elbow' + side, sh, 0, -1.05, 0);
+    part(R, el, (b) => { b.identity(); b.limb([0, 0, 0], [0, -1.05, 0], 0.032, 0.022, KIND.FLESH); });
+    const hand = N('hand' + side, el, 0, -1.05, 0);
+    part(R, hand, (b) => {
+      b.identity();
+      for (let k = 0; k < 3; k++) {
+        const a = (k - 1) * 0.07;
+        b.limb([a * 0.4, 0, 0.01], [a + s * 0.02, -0.5, 0.05], 0.012, 0.003, KIND.BONE, 3);
+      }
+    });
+    const th = N('thigh' + side, hips, s * 0.1, -0.06, 0);
+    part(R, th, (b) => { b.identity(); b.limb([0, 0, 0], [0, -0.9, 0.04], 0.05, 0.035, KIND.FLESH); });
+    const kn = N('knee' + side, th, 0, -0.9, 0.04);
+    part(R, kn, (b) => { b.identity(); b.limb([0, 0, 0], [0, -0.86, -0.06], 0.035, 0.022, KIND.FLESH); });
+    const ft = N('foot' + side, kn, 0, -0.86, -0.06);
+    part(R, ft, (b) => { b.identity(); b.limb([0, 0, 0], [0, -0.02, 0.24], 0.022, 0.008, KIND.BONE, 3); });
+  }
+  return R;
+}
+
+// ---------------- Howler: a hunched brute that walks on its knuckles ----------------
+export function buildHowler() {
+  const R = makeRig('howler');
+  const N = (name, parent, x, y, z) => node(R, name, parent, x, y, z);
+  const pelvis = N('pelvis', null, 0, 1.05, -0.45);
+  part(R, pelvis, (b) => { b.place(0, 0, 0); b.box(0.62, 0.42, 0.5, KIND.FLESH); });
+  const chest = N('chest', pelvis, 0, 0.12, 0.15);
+  part(R, chest, (b) => {
+    b.place(0, 0, 0, Math.PI / 2 - 0.42, 0, 0);
+    b.taper(0.66, 0.52, 1.08, 0.78, 1.05, KIND.FLESH, 0.08);
+    // ridge of bone spikes down the back
+    for (let k = 0; k < 6; k++) {
+      b.place(0, 0.36 + k * 0.05, 0.05 + k * 0.17, -0.9, 0, 0);
+      b.cone(4, 0.06, 0.26 - k * 0.02, KIND.BONE);
+    }
+  });
+  const neck = N('neck', chest, 0, 0.5, 0.92);
+  part(R, neck, (b) => { b.identity(); b.limb([0, -0.05, -0.1], [0, 0.02, 0.18], 0.17, 0.14, KIND.FLESH); });
+  const head = N('head', neck, 0, 0.02, 0.22);
+  part(R, head, (b) => {
+    b.place(0, 0.02, -0.04, Math.PI / 2, 0, 0);
+    b.taper(0.38, 0.3, 0.26, 0.18, 0.4, KIND.BONE);
+    b.place(0, 0.14, 0.02); b.rock(0.17, mulberry(11), KIND.BONE, 0.2, 0.7);
+    for (let e = 0; e < 4; e++) {
+      b.place((e % 2 ? 1 : -1) * (0.08 + (e > 1 ? 0.05 : 0)), 0.1 - (e > 1 ? 0.04 : 0), 0.24 - (e > 1 ? 0.05 : 0));
+      b.octa(0.02, 0.018, KIND.EYE);
+    }
+  });
+  const jaw = N('jaw', head, 0, -0.1, -0.02);
+  part(R, jaw, (b) => {
+    b.place(0, 0, 0, Math.PI / 2 + 0.15, 0, 0);
+    b.taper(0.36, 0.12, 0.26, 0.07, 0.5, KIND.BONE);
+    for (let k = 0; k < 6; k++) {
+      for (const s of [-1, 1]) {
+        b.place(s * (0.14 - k * 0.015), 0.03, 0.08 + k * 0.065, 0, 0, 0);
+        b.cone(3, 0.018, 0.08, KIND.BONE);
+      }
+    }
+  });
+  for (const s of [-1, 1]) {
+    const side = s < 0 ? 'L' : 'R';
+    const sh = N('shoulder' + side, chest, s * 0.52, 0.36, 0.78);
+    part(R, sh, (b) => { b.identity(); b.limb([0, 0, 0], [s * 0.08, -0.82, 0.12], 0.13, 0.09, KIND.FLESH, 5); });
+    const el = N('elbow' + side, sh, s * 0.08, -0.82, 0.12);
+    part(R, el, (b) => { b.identity(); b.limb([0, 0, 0], [0, -0.78, 0.06], 0.09, 0.08, KIND.FLESH, 5); });
+    const hand = N('hand' + side, el, 0, -0.78, 0.06);
+    part(R, hand, (b) => {
+      b.identity();
+      for (let k = 0; k < 3; k++) {
+        const a = (k - 1) * 0.07;
+        b.limb([a, 0, 0], [a * 1.4, -0.12, 0.2], 0.035, 0.012, KIND.BONE, 3);
+      }
+    });
+    const th = N('thigh' + side, pelvis, s * 0.28, -0.12, 0);
+    part(R, th, (b) => { b.identity(); b.limb([0, 0, 0], [0, -0.5, 0.18], 0.14, 0.1, KIND.FLESH, 5); });
+    const kn = N('knee' + side, th, 0, -0.5, 0.18);
+    part(R, kn, (b) => { b.identity(); b.limb([0, 0, 0], [0, -0.46, -0.16], 0.1, 0.07, KIND.FLESH, 5); });
+    const ft = N('foot' + side, kn, 0, -0.46, -0.16);
+    part(R, ft, (b) => { b.identity(); b.limb([0, 0, 0], [0, -0.02, 0.3], 0.07, 0.03, KIND.BONE, 4); });
+  }
+  return R;
+}
+
 function mulberry(seed) {
   let a = seed;
   return () => {
@@ -249,15 +371,96 @@ function animCrawler(m, dt, t) {
   n.jaw.rotation.x = m.state === 'hunt' ? 0.5 + Math.sin(t * 30) * 0.15 : 0.08;
 }
 
+// it walks like something imitating walking: long slow strides, arms dragging behind
+function animWatcher(m, dt, t) {
+  const n = m.rig.nodes;
+  const amp = clamp(m.speedCur / 3.2, 0, 1.1);
+  const p = m.phase;
+  const s = Math.sin(p);
+  n.thighL.rotation.x = s * 0.55 * amp;
+  n.thighR.rotation.x = -s * 0.55 * amp;
+  n.kneeL.rotation.x = Math.max(0, -s) * 0.7 * amp + 0.05;
+  n.kneeR.rotation.x = Math.max(0, s) * 0.7 * amp + 0.05;
+  n.shoulderL.rotation.x = 0.18 * amp + Math.sin(p + 0.6) * 0.12 * amp;
+  n.shoulderR.rotation.x = 0.18 * amp - Math.sin(p + 0.6) * 0.12 * amp;
+  n.shoulderL.rotation.z = -0.06;
+  n.shoulderR.rotation.z = 0.06;
+  n.elbowL.rotation.x = -0.1;
+  n.elbowR.rotation.x = -0.1;
+  n.spine.rotation.x = 0.12 + amp * 0.2;
+  n.hips.position.y = 1.8 + Math.abs(s) * 0.05 * amp;
+  // the head sits at a wrong angle, and drifts further when it's near you
+  const near = clamp(1 - m.playerDist / 14, 0, 1);
+  n.neck.rotation.x = -0.15 - near * 0.2;
+  n.head.rotation.z = Math.sin(t * 0.37 + m.seed) * 0.25 + (0.35 + near * 0.5) * (m.seed > 5 ? 1 : -1);
+  n.head.rotation.y = clamp(m.headYaw, -1.2, 1.2);
+  n.faceL.rotation.y = 0;
+  n.faceR.rotation.y = 0;
+}
+
+function animHowler(m, dt, t) {
+  const n = m.rig.nodes;
+  const amp = clamp(m.speedCur / 2.4, 0, 1.3);
+  const p = m.phase;
+  const s = Math.sin(p);
+  const st = m.state;
+  let rear = 0, jaw = 0.1 + Math.max(0, Math.sin(t * 0.9 + m.seed)) * 0.08, spread = 0;
+  if (st === 'inhale') {
+    const k = clamp(m.stateT / 1.8, 0, 1);
+    rear = k * 0.55;
+    jaw = 0.15 + k * 0.25;
+    spread = k * 0.35;
+    n.chest.scale.setScalar(1 + k * 0.12); // the chest fills like a bellows
+  } else if (st === 'howl') {
+    const k = clamp(m.stateT / 0.25, 0, 1) * (1 - clamp((m.stateT - 1.4) / 0.4, 0, 1));
+    rear = 0.55 + 0.35 * k;
+    jaw = 0.4 + 0.75 * k + Math.sin(t * 30) * 0.08 * k;
+    spread = 0.35 + 0.55 * k;
+    n.chest.scale.setScalar(1.12 - 0.1 * k);
+  } else {
+    n.chest.scale.setScalar(1);
+    if (st === 'hunt') jaw = 0.55 + Math.sin(t * 22) * 0.12;
+  }
+  n.pelvis.rotation.x = -rear * 0.5;
+  n.pelvis.position.y = 1.05 + Math.abs(Math.sin(p * 2)) * 0.05 * amp - (st === 'hunt' ? 0.1 : 0);
+  n.chest.rotation.x = -rear * 0.75;
+  n.neck.rotation.x = -rear * 0.9 + (st === 'hunt' ? 0.15 : 0);
+  n.head.rotation.x = -rear * 0.5;
+  n.head.rotation.y = clamp(m.headYaw, -0.7, 0.7) * (1 - rear);
+  n.jaw.rotation.x = jaw;
+  // knuckle-walk: front arms and back legs in opposite phase
+  const sw = rear > 0.05 ? 0 : 1;
+  n.shoulderL.rotation.x = s * 0.5 * amp * sw - rear * 1.2;
+  n.shoulderR.rotation.x = -s * 0.5 * amp * sw - rear * 1.2;
+  n.shoulderL.rotation.z = -spread;
+  n.shoulderR.rotation.z = spread;
+  n.elbowL.rotation.x = Math.max(0, s) * 0.4 * amp * sw - rear * 0.4;
+  n.elbowR.rotation.x = Math.max(0, -s) * 0.4 * amp * sw - rear * 0.4;
+  n.thighL.rotation.x = -s * 0.45 * amp + rear * 0.6;
+  n.thighR.rotation.x = s * 0.45 * amp + rear * 0.6;
+  n.kneeL.rotation.x = Math.max(0, s) * 0.6 * amp;
+  n.kneeR.rotation.x = Math.max(0, -s) * 0.6 * amp;
+}
+
 // ---------------- AI ----------------
 let _id = 0;
+const RIGS = { listener: buildListener, crawler: buildCrawler, watcher: buildWatcher, howler: buildHowler };
 export class Monster {
   constructor(type, game) {
     this.id = ++_id;
     this.type = type;
     this.game = game;
     this.cfg = CFG.MONSTER[type];
-    this.rig = type === 'listener' ? buildListener() : buildCrawler();
+    this.rig = RIGS[type]();
+    this.ghostColor = 0xff2a20; // what its echo afterimage looks like
+    this.noEyes = false;
+    this.headY = type === 'crawler' ? 0.7 : 2.1; // where sniffs / breath come from
+    this.stepGain = type === 'crawler' ? 0.5 : 1;
+    this.stepPitch = 1;
+    this.strideHz = type === 'crawler' ? 3.2 : 1.55;
+    this.strideRef = type === 'crawler' ? 2.5 : 1.8;
+    this.huntTarget = null; // null = it knows where you are while hunting
+    this.lampGhost = null; // live afterimage while it stands in a lamp's light
     this.x = 0;
     this.z = 0;
     this.y = 0;
@@ -299,7 +502,22 @@ export class Monster {
   dispose() {
     if (this.breath) this.breath.stop();
     this.breath = null;
+    if (this.lampGhost) this.game.ghosts.release(this.lampGhost);
+    this.lampGhost = null;
     this.alive = false;
+  }
+
+  // how much this one should make your heart race right now (0..1)
+  danger() {
+    const d = this.playerDist;
+    if (this.state === 'hunt') return 0.55 + 0.45 * clamp(1 - d / 40, 0, 1);
+    if (this.state === 'investigate' || this.state === 'search') return 0.55 * clamp(1 - d / 28, 0, 1);
+    return 0.4 * clamp(1 - d / 14, 0, 1);
+  }
+
+  animate(dt, t) {
+    if (this.type === 'listener') animListener(this, dt, t);
+    else animCrawler(this, dt, t);
   }
 
   get hearingMult() {
@@ -394,6 +612,57 @@ export class Monster {
     r.rotation.y = this.yaw;
   }
 
+  // walk toward (tx, tz) at `speed`, sliding around trees, detouring when stuck
+  _steer(dt, tx, tz, speed, turnRate = this.state === 'hunt' ? 7 : 2.6) {
+    const g = this.game;
+    const cfg = this.cfg;
+    // detour if stuck
+    if (this.detourT > 0) {
+      this.detourT -= dt;
+      tx = this.dtx;
+      tz = this.dtz;
+    }
+
+    // ---- steering ----
+    const dx = tx - this.x, dz = tz - this.z;
+    const dist = Math.hypot(dx, dz);
+    if (dist > 0.05 && speed > 0) {
+      const want = Math.atan2(dx, dz);
+      const da = angleDiff(this.yaw, want);
+      this.yaw += clamp(da, -turnRate * dt, turnRate * dt);
+      // slow down for sharp turns
+      speed *= 1 - Math.min(0.7, Math.abs(da) / Math.PI);
+    }
+    this.speedCur = lerp(this.speedCur, speed, 1 - Math.exp(-6 * dt));
+    const ox = this.x, oz = this.z;
+    this.x += Math.sin(this.yaw) * this.speedCur * dt;
+    this.z += Math.cos(this.yaw) * this.speedCur * dt;
+    const pos = { x: this.x, z: this.z };
+    g.world.col.resolve(pos, cfg.radius);
+    if (g.world.lake) {
+      const L = g.world.lake;
+      const lx = pos.x - L.x, lz = pos.z - L.z, ld = Math.hypot(lx, lz);
+      if (ld < L.r + 0.5) { pos.x = L.x + (lx / ld) * (L.r + 0.5); pos.z = L.z + (lz / ld) * (L.r + 0.5); }
+    }
+    const w = CFG.WORLD_WALL;
+    this.x = clamp(pos.x, -w, w);
+    this.z = clamp(pos.z, -w, w);
+    const moved = Math.hypot(this.x - ox, this.z - oz);
+    if (this.speedCur > 0.5 && moved < this.speedCur * dt * 0.3) {
+      this.stuckT += dt;
+      if (this.stuckT > 0.6) {
+        const side = Math.random() < 0.5 ? -1 : 1;
+        const a = this.yaw + side * (Math.PI / 2 + Math.random() * 0.6);
+        this.dtx = this.x + Math.sin(a) * 4;
+        this.dtz = this.z + Math.cos(a) * 4;
+        this.detourT = 0.9;
+        this.stuckT = 0;
+      }
+    } else this.stuckT = Math.max(0, this.stuckT - dt);
+    this.y = lerp(this.y, g.world.terrain.height(this.x, this.z), 1 - Math.exp(-12 * dt));
+
+  }
+
   update(dt, t) {
     const g = this.game;
     const p = g.player;
@@ -462,8 +731,8 @@ export class Monster {
       }
       case 'hunt': {
         this.lock -= dt;
-        tx = p.x;
-        tz = p.z;
+        tx = this.huntTarget ? this.huntTarget.x : p.x;
+        tz = this.huntTarget ? this.huntTarget.z : p.z;
         if (pd < 4) this.lock = Math.max(this.lock, 1.2);
         speed = cfg.hunt * (pd < 7 ? 1.18 : 1);
         if (this.stateT < 0.7) speed *= 0.25; // the windup screech
@@ -488,51 +757,7 @@ export class Monster {
     }
     speed *= scale;
 
-    // detour if stuck
-    if (this.detourT > 0) {
-      this.detourT -= dt;
-      tx = this.dtx;
-      tz = this.dtz;
-    }
-
-    // ---- steering ----
-    const dx = tx - this.x, dz = tz - this.z;
-    const dist = Math.hypot(dx, dz);
-    if (dist > 0.05 && speed > 0) {
-      const want = Math.atan2(dx, dz);
-      const turnRate = this.state === 'hunt' ? 7 : 2.6;
-      const da = angleDiff(this.yaw, want);
-      this.yaw += clamp(da, -turnRate * dt, turnRate * dt);
-      // slow down for sharp turns
-      speed *= 1 - Math.min(0.7, Math.abs(da) / Math.PI);
-    }
-    this.speedCur = lerp(this.speedCur, speed, 1 - Math.exp(-6 * dt));
-    const ox = this.x, oz = this.z;
-    this.x += Math.sin(this.yaw) * this.speedCur * dt;
-    this.z += Math.cos(this.yaw) * this.speedCur * dt;
-    const pos = { x: this.x, z: this.z };
-    g.world.col.resolve(pos, cfg.radius);
-    if (g.world.lake) {
-      const L = g.world.lake;
-      const lx = pos.x - L.x, lz = pos.z - L.z, ld = Math.hypot(lx, lz);
-      if (ld < L.r + 0.5) { pos.x = L.x + (lx / ld) * (L.r + 0.5); pos.z = L.z + (lz / ld) * (L.r + 0.5); }
-    }
-    const w = CFG.WORLD_WALL;
-    this.x = clamp(pos.x, -w, w);
-    this.z = clamp(pos.z, -w, w);
-    const moved = Math.hypot(this.x - ox, this.z - oz);
-    if (this.speedCur > 0.5 && moved < this.speedCur * dt * 0.3) {
-      this.stuckT += dt;
-      if (this.stuckT > 0.6) {
-        const side = Math.random() < 0.5 ? -1 : 1;
-        const a = this.yaw + side * (Math.PI / 2 + Math.random() * 0.6);
-        this.dtx = this.x + Math.sin(a) * 4;
-        this.dtz = this.z + Math.cos(a) * 4;
-        this.detourT = 0.9;
-        this.stuckT = 0;
-      }
-    } else this.stuckT = Math.max(0, this.stuckT - dt);
-    this.y = lerp(this.y, g.world.terrain.height(this.x, this.z), 1 - Math.exp(-12 * dt));
+    this._steer(dt, tx, tz, speed);
 
     // head tracks the player when hunting / close
     if (this.state !== 'idle') {
@@ -542,10 +767,8 @@ export class Monster {
     }
 
     // ---- animation + sounds ----
-    const strideHz = this.type === 'crawler' ? 3.2 : 1.55;
-    this.phase += dt * Math.PI * 2 * strideHz * clamp(this.speedCur / (this.type === 'crawler' ? 2.5 : 1.8), 0, 2.2);
-    if (this.type === 'listener') animListener(this, dt, t);
-    else animCrawler(this, dt, t);
+    this.phase += dt * Math.PI * 2 * this.strideHz * clamp(this.speedCur / this.strideRef, 0, 2.2);
+    this.animate(dt, t);
     this.syncRig();
 
     const audio = g.audio;
@@ -554,8 +777,8 @@ export class Monster {
     if (sign !== this.lastStepSign) {
       this.lastStepSign = sign;
       if (near && this.speedCur > 0.4) {
-        const gain = clamp(0.15 + this.speedCur * 0.08, 0, 0.7) * (this.type === 'crawler' ? 0.5 : 1);
-        audio.heavyStep(this.x, this.y + 0.2, this.z, gain);
+        const gain = clamp(0.15 + this.speedCur * 0.08, 0, 0.7) * this.stepGain;
+        audio.heavyStep(this.x, this.y + 0.2, this.z, gain, this.stepPitch);
       }
     }
     if (this.type === 'crawler' && near) {
@@ -566,9 +789,9 @@ export class Monster {
       }
     }
     if (pd < 28 && audio.ready) {
-      if (!this.breath) this.breath = audio.breather(this.x, this.y + 2.2, this.z);
+      if (!this.breath) this.breath = audio.breather(this.x, this.y + 2.2, this.z, this.type === 'howler');
       if (this.breath) {
-        this.breath.setPos(this.x, this.y + (this.type === 'crawler' ? 0.7 : 2.6), this.z);
+        this.breath.setPos(this.x, this.y + (this.type === 'crawler' ? 0.7 : this.type === 'howler' ? 1.8 : 2.6), this.z);
         const rate = this.state === 'hunt' ? 2.8 : this.state === 'investigate' || this.state === 'search' ? 1.5 : 1;
         const gain = this.state === 'hunt' ? 0.9 : 0.45;
         this.breath.update(rate, gain);
@@ -578,6 +801,253 @@ export class Monster {
       this.breath = null;
     }
   }
+}
+
+// ---------------- the Watcher ----------------
+// It never hears you and makes no sound you would call a footstep. It moves only while nothing lights
+// it: every time your echo finds it, it is a little closer. Freeze it with light; the lamps keep it out.
+export class Watcher extends Monster {
+  constructor(game) {
+    super('watcher', game);
+    this.ghostColor = 0xd9e4ec;
+    this.noEyes = true;
+    this.headY = 3.2;
+    this.strideHz = 0.95;
+    this.strideRef = 3.0;
+    this.lit = false;
+    this.litStreak = 0;
+    this.lampWait = 0;
+    this.crackT = 1;
+    this.lurkT = 3;
+    this.state = 'lurk';
+    this.x = this.z = 1e4;
+    this.playerDist = 1e4;
+  }
+
+  hear() {
+    return null;
+  }
+
+  danger() {
+    if (this.state === 'lurk' || this.state === 'flee') return 0;
+    return clamp(1 - this.playerDist / 26, 0, 1) * (this.lit ? 0.5 : 0.8);
+  }
+
+  animate(dt, t) {
+    animWatcher(this, dt, t);
+  }
+
+  // somewhere behind you, in the dark, away from the lamps
+  appearBehind(dmin, dmax) {
+    const g = this.game, p = g.player, w = CFG.WORLD_WALL - 6;
+    const f = p.forward();
+    for (let k = 0; k < 40; k++) {
+      const a = (Math.random() - 0.5) * 2.4;
+      const ca = Math.cos(a), sa = Math.sin(a);
+      const bx = -f.x * ca + f.z * sa, bz = -f.z * ca - f.x * sa;
+      const d = dmin + Math.random() * (dmax - dmin);
+      const x = p.x + bx * d, z = p.z + bz * d;
+      if (Math.abs(x) > w || Math.abs(z) > w || !g.world.col.free(x, z, 0.8)) continue;
+      const L = g.world.lake;
+      if (L && Math.hypot(x - L.x, z - L.z) < L.r + 3) continue;
+      if (g.objectives.lampAt(x, z) > 0.005) continue;
+      if (g.lightAt(x, g.world.terrain.height(x, z) + 1.8, z) > 0.02) continue;
+      this.spawn(x, z, 'stalk');
+      this.yaw = Math.atan2(p.x - x, p.z - z);
+      this.litStreak = 0;
+      this.revealed = false;
+      return true;
+    }
+    return false;
+  }
+
+  vanish(sec) {
+    this.state = 'lurk';
+    this.stateT = 0;
+    this.lurkT = sec;
+    this.x = this.z = 1e4;
+    this.playerDist = 1e4;
+    this.lit = false;
+    this.speedCur = 0;
+    if (this.lampGhost) this.game.ghosts.release(this.lampGhost);
+    this.lampGhost = null;
+    this.syncRig();
+  }
+
+  setState(s) {
+    if (s === 'flee') this.vanish(1e9); // when the lights come back it simply isn't there
+    else super.setState(s);
+  }
+
+  dispose() {
+    super.dispose();
+    this.game.audio.watcherPresence(0);
+  }
+
+  update(dt, t) {
+    const g = this.game, p = g.player, cfg = this.cfg;
+    this.stateT += dt;
+    if (this.state === 'lurk') {
+      this.lurkT -= dt;
+      g.audio.watcherPresence(0);
+      if (this.lurkT <= 0 && !g.objectives.inLamp(p.x, p.z) && !this.appearBehind(27, 37)) this.lurkT = 1.5;
+      return;
+    }
+    const pdx = p.x - this.x, pdz = p.z - this.z;
+    const pd = Math.hypot(pdx, pdz);
+    this.playerDist = pd;
+    const lampL = g.objectives.lampAt(this.x, this.z);
+    const lit = g.lightAt(this.x, this.y + 1.8, this.z) > cfg.litThreshold || lampL > 0.08;
+    this.lit = lit;
+    this.state = lit ? 'frozen' : 'stalk';
+    this.litStreak = lit ? this.litStreak + dt : Math.max(0, this.litStreak - dt * 0.5);
+    this.lampWait = g.objectives.inLamp(p.x, p.z) ? this.lampWait + dt : 0;
+    // it gets bored of being stared at, and it won't wait forever at the edge of a lamp
+    if (this.litStreak > 14 || this.lampWait > 9) {
+      this.vanish(18 + Math.random() * 16);
+      return;
+    }
+    if (pd > 60 && !lit) {
+      if (!this.appearBehind(27, 37)) this.vanish(2);
+      return;
+    }
+    let speed = 0;
+    if (!lit) {
+      speed = cfg.stalk * g.speedScale * (pd < 4 ? 0.8 : 1);
+      // it will not step into a lamp's light
+      const la = Math.min(1.2, speed * 0.4);
+      if (g.objectives.lampAt(this.x + Math.sin(this.yaw) * la, this.z + Math.cos(this.yaw) * la) > 0.05) speed = 0;
+    }
+    if (speed > 0) {
+      this._steer(dt, p.x, p.z, speed, 3.2);
+      this.phase += dt * Math.PI * 2 * this.strideHz * clamp(this.speedCur / this.strideRef, 0, 2);
+      this.headYaw = lerp(this.headYaw, clamp(angleDiff(this.yaw, Math.atan2(pdx, pdz)), -1.2, 1.2), 1 - Math.exp(-3 * dt));
+      this.animate(dt, t);
+      this.syncRig();
+    } else if (!lit) {
+      this.speedCur = 0;
+    } else {
+      this.speedCur = 0; // lit: not a single joint moves. the pose holds exactly.
+    }
+    if (!lit && pd < CFG.MONSTER.killDist + 0.15 && this.stateT > 0.6) {
+      g.kill(this);
+      return;
+    }
+    // bones creaking as it walks; a thin ringing that grows as it closes in
+    const presence = clamp(1 - pd / 24, 0, 1);
+    g.audio.watcherPresence(presence, this.x, this.y + 2.8, this.z, !lit && this.speedCur > 0.3);
+    if (!lit && this.speedCur > 0.5 && pd < 24) {
+      this.crackT -= dt;
+      if (this.crackT <= 0) {
+        g.audio.crack(this.x, this.y + 0.8 + Math.random() * 2.2, this.z, 0.3 + presence * 0.55);
+        this.crackT = 0.3 + Math.random() * 0.55;
+      }
+    }
+    if (pd < 10) g.fx.glitch = Math.max(g.fx.glitch, (1 - pd / 10) * (lit ? 0.1 : 0.32));
+  }
+}
+
+// ---------------- the Howler ----------------
+// Nearly deaf. Every half a minute it fills its chest and howls, and the howl is its eyes: whatever
+// is moving inside that wave gets charged. Stand still and it looks straight through you.
+export class Howler extends Monster {
+  constructor(game) {
+    super('howler', game);
+    this.ghostColor = 0xff5a14;
+    this.headY = 1.8;
+    this.stepGain = 2.4;
+    this.stepPitch = 0.6;
+    this.strideHz = 1.2;
+    this.strideRef = 2.2;
+    this.howlT = 14 + Math.random() * 8;
+    this.barkT = 0;
+  }
+
+  animate(dt, t) {
+    animHowler(this, dt, t);
+  }
+
+  danger() {
+    if (this.state === 'inhale' || this.state === 'howl') return this.playerDist < this.cfg.howlR ? 0.78 : 0.15;
+    return super.danger();
+  }
+
+  hear(nx, nz, loud, source, scream) {
+    if (this.state === 'inhale' || this.state === 'howl') return null;
+    if (loud < this.cfg.minLoud) return null; // clicks, footsteps, breathing: too quiet for it
+    const r = super.hear(nx, nz, loud, source, scream);
+    if (r === 'hunt' && source !== 'stone' && source !== 'scare') this.huntTarget = { x: nx, z: nz };
+    return r;
+  }
+
+  startHunt() {
+    if (!this.huntTarget) this.huntTarget = { x: this.game.player.x, z: this.game.player.z };
+    super.startHunt();
+  }
+
+  update(dt, t) {
+    const g = this.game, p = g.player;
+    if (this.state === 'inhale' || this.state === 'howl') {
+      this.stateT += dt;
+      this.playerDist = Math.hypot(p.x - this.x, p.z - this.z);
+      this.speedCur = lerp(this.speedCur, 0, 1 - Math.exp(-8 * dt));
+      if (this.state === 'inhale' && this.stateT >= 1.8) {
+        this.setState('howl');
+        g.onHowl(this);
+      } else if (this.state === 'howl') {
+        // the wave rolls out at ~30 m/s; anything moving inside it is seen
+        const reach = Math.min(this.cfg.howlR, Math.max(0, this.stateT - 0.1) * 30);
+        if (this.stateT < 1.9 && this.playerDist < reach && g.movingForHowler()) this.spot();
+        else if (this.stateT > 2.0) {
+          this.setState('wander');
+          this.pickWander();
+        }
+      }
+      this.animate(dt, t);
+      this.syncRig();
+      return;
+    }
+    if (this.state === 'hunt') {
+      this.barkT -= dt;
+      if (this.barkT <= 0) {
+        this.barkT = 1.0 + Math.random() * 0.35;
+        g.onHowlerBark(this);
+        if (this.playerDist < 18 && g.movingForHowler()) this.huntTarget = { x: p.x, z: p.z };
+      }
+      const ht = this.huntTarget;
+      if (ht && Math.hypot(ht.x - this.x, ht.z - this.z) < 1.7 && this.playerDist > 2.4 && this.stateT > 0.8) {
+        // it got to where it saw you, and you're not there
+        this.huntTarget = null;
+        this.setState('search');
+        this.searchDur = 3.5 + Math.random() * 2.5;
+        g.onMonsterLost(this);
+      }
+    } else if (this.state !== 'flee') {
+      this.huntTarget = null;
+      this.howlT -= dt;
+      if (this.howlT <= 0 && this.state !== 'idle') {
+        this.howlT = 24 + Math.random() * 14;
+        this.setState('inhale');
+        g.onHowlerInhale(this);
+      }
+    }
+    super.update(dt, t);
+  }
+
+  spot() {
+    const p = this.game.player;
+    this.huntTarget = { x: p.x, z: p.z };
+    this.yaw = Math.atan2(p.x - this.x, p.z - this.z);
+    this.state = 'wander';
+    this.startHunt();
+    this.barkT = 1.1;
+  }
+}
+
+export function createMonster(type, game) {
+  if (type === 'watcher') return new Watcher(game);
+  if (type === 'howler') return new Howler(game);
+  return new Monster(type, game);
 }
 
 export class ShadeRig {

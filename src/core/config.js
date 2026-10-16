@@ -5,8 +5,11 @@ export const CFG = {
   WORLD_WALL: 286, // player / monsters can't go past this
   CHUNK: 40,
   TERRAIN_CELL: 2.5,
-  RUN_SECONDS: 30 * 60, // survive until dawn
-  GRACE_SECONDS: 12, // at the start monsters can't hunt you
+  RUN_SECONDS: 30 * 60, // after this the forest wakes up: everything starts closing in on you
+  GRACE_SECONDS: 12, // at the start of the night monsters can't hunt you
+  MORNING_SECONDS: 32, // the calm before: daylight, birds, a humming generator
+  DUSK_SECONDS: 3.6, // ...and then the light dies
+  CAMP_LEASH: 26, // in the morning you stay around the camp
 
   CAMERA_FAR: 150,
   FOV: 72,
@@ -46,15 +49,35 @@ export const CFG = {
   MONSTER: {
     listener: { wander: 1.05, investigate: 2.1, hunt: 4.7, hearing: 1.0, lock: 6.0, radius: 0.45 },
     crawler: { wander: 1.6, investigate: 3.2, hunt: 6.1, hearing: 0.62, stepHearing: 2.2, lock: 3.2, radius: 0.45 },
+    // the Watcher: deaf, faceless, moves only while nothing lights it
+    watcher: { stalk: 3.5, hearing: 0, lock: 0, radius: 0.4, litThreshold: 0.13, arrive: 240, arriveGens: 2 },
+    // the Howler: half-deaf brute that "sees" with its howl — anything moving when it howls gets charged
+    howler: { wander: 1.25, investigate: 2.6, hunt: 6.4, hearing: 0.6, minLoud: 0.4, lock: 6.5, radius: 0.6, arrive: 480, arriveGens: 3, howlR: 46 },
     killDist: 1.35,
   },
+
+  // the five generators, in the order the chain leads you to them.
+  // mode: hold = just work; cord = then pull the starter cord; spark = it shorts out while you work;
+  //       clank = loud metal work; spinup = after the work it takes a while (and a lot of noise) to start
+  GENERATORS: [
+    { part: 'fuel', mode: 'cord', dur: 4, clank: [1.0, 1.5], clankLoud: 0.12, pulls: 3, pullLoud: 0.34, startLoud: 0.6 },
+    { part: 'plug', mode: 'hold', dur: 7, clank: [0.9, 1.4], clankLoud: 0.15, startLoud: 0.62 },
+    { part: 'fuses', mode: 'spark', dur: 9, clank: [1.0, 1.6], clankLoud: 0.16, spark: [1.3, 3.0], sparkLoud: 0.5, startLoud: 0.64 },
+    { part: 'belt', mode: 'clank', dur: 10, clank: [0.55, 0.95], clankLoud: 0.3, startLoud: 0.66 },
+    { part: 'battery', mode: 'spinup', dur: 8, clank: [1.0, 1.5], clankLoud: 0.15, spin: 9, spinLoud: 0.42, startLoud: 0.72 },
+  ],
+  GEN_SITES: ['cabin', 'tower', 'stones', 'wreck'], // the camp is always the first one
+  LAMP_R: 10, // radius of warm light around a running generator
 
   SCORE: {
     perSecond: 10,
     shard: 250,
     closeCall: 300,
     escape: 500,
-    dawn: 25000,
+    corpse: 400,
+    generator: 2000,
+    win: 25000, // + speedBonus for every second left before RUN_SECONDS
+    speedBonus: 10,
   },
 
   SHARDS: 46,

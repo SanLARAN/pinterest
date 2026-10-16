@@ -760,16 +760,16 @@ export class AudioEngine {
     this._noiseBurst(t, { type: 'highpass', f: 2000, a: 0.0008, d: 0.03, gain: 0.5 * gain, dest: pn });
   }
 
-  heavyStep(x, y, z, gain = 0.5) {
+  heavyStep(x, y, z, gain = 0.5, pitch = 1) {
     if (!this.ready) return;
     const t = this.now;
     const pn = this._panner(x, y, z, 3, 1.2);
     pn.connect(this.sfx);
-    const o = this._osc('sine', 75); o.frequency.exponentialRampToValueAtTime(40, t + 0.12);
+    const o = this._osc('sine', 75 * pitch); o.frequency.exponentialRampToValueAtTime(40 * pitch, t + 0.12 / pitch);
     const g = this._gain(); o.connect(g).connect(pn);
-    this._env(g, t, 0.003, gain, 0.15);
-    o.start(t); o.stop(t + 0.2);
-    const n = this._noise(); const bp = this._filter('bandpass', 500 + Math.random() * 400, 1); const g2 = this._gain();
+    this._env(g, t, 0.003, gain, 0.15 / pitch);
+    o.start(t); o.stop(t + 0.2 / pitch + 0.05);
+    const n = this._noise(); const bp = this._filter('bandpass', (500 + Math.random() * 400) * pitch, 1); const g2 = this._gain();
     n.connect(bp).connect(g2).connect(pn);
     this._env(g2, t, 0.003, gain * 0.6, 0.09);
     n.start(t, Math.random()); n.stop(t + 0.15);
@@ -816,13 +816,13 @@ export class AudioEngine {
   }
 
   // persistent breathing voice attached to a monster (returns handle with setPos / stop)
-  breather(x, y, z) {
+  breather(x, y, z, low = false) {
     if (!this.ready) return null;
-    const pn = this._panner(x, y, z, 2.5, 1.4);
+    const pn = this._panner(x, y, z, low ? 4 : 2.5, low ? 1.1 : 1.4);
     pn.connect(this.sfx);
     const g = this._gain(0);
     const n = this._noise(this.pink);
-    const bp = this._filter('bandpass', 520, 2.2);
+    const bp = this._filter('bandpass', low ? 300 : 520, 2.2);
     n.connect(bp).connect(g).connect(pn);
     n.start(this.now, Math.random() * 2);
     const self = this;
@@ -848,7 +848,7 @@ export class AudioEngine {
         p.linearRampToValueAtTime(0.0001, t + per * 0.5);
         p.linearRampToValueAtTime(gain * 0.8, t + per * 0.75);
         p.linearRampToValueAtTime(0.0001, t + per * 0.98);
-        bp.frequency.setValueAtTime(420 + Math.random() * 300, t);
+        bp.frequency.setValueAtTime(low ? 230 + Math.random() * 150 : 420 + Math.random() * 300, t);
       },
       stop() {
         try { g.gain.setTargetAtTime(0, self.now, 0.05); n.stop(self.now + 0.3); } catch { /* */ }
@@ -1291,6 +1291,496 @@ export class AudioEngine {
       this._tone(tt, { f, fEnd: f * (0.7 + Math.random() * 0.6), a: 0.01, d: 0.12, gain: 0.04 });
       this._tone(tt + 0.15, { f: f * 1.1, fEnd: f * 0.8, a: 0.01, d: 0.1, gain: 0.03 });
     }
+  }
+
+  // ---------- morning ----------
+  // daylight: no drone under the forest, birds everywhere
+  setMorning(on) {
+    this.morning = on;
+    if (!this.ctx) return;
+    const t = this.now;
+    const n = this.ambNodes;
+    if (n) {
+      n.dg.gain.cancelScheduledValues(t);
+      n.dg.gain.setTargetAtTime(on ? 0 : 0.07, t, on ? 0.2 : 2.5);
+      n.tg.gain.setTargetAtTime(0, t, 0.3);
+      n.sub.gain.setTargetAtTime(0, t, 0.3);
+    }
+    if (on) this.nextBird = t + 0.4;
+  }
+
+  morningTick() {
+    if (!this.ready || !this.morning) return;
+    const t = this.now;
+    if (t < (this.nextBird || 0)) return;
+    this.nextBird = t + 0.3 + Math.random() * 1.5;
+    this.bird();
+  }
+
+  bird(kind = null) {
+    if (!this.ready) return;
+    const L = this.listener;
+    const r = Math.random();
+    kind = kind || (r < 0.4 ? 'chirp' : r < 0.64 ? 'trill' : r < 0.84 ? 'tsee' : r < 0.92 ? 'cuckoo' : 'pecker');
+    const far = kind === 'cuckoo' || kind === 'pecker';
+    const a = Math.random() * Math.PI * 2, d = far ? 35 + Math.random() * 25 : 10 + Math.random() * 28;
+    const x = L.x + Math.cos(a) * d, z = L.z + Math.sin(a) * d, y = L.y + 3 + Math.random() * 7;
+    const pn = this._panner(x, y, z, 6, 0.6);
+    const bg = this._gain(6); // calls are synthesized quietly; this is where they get their voice
+    bg.connect(pn);
+    pn.connect(this.amb);
+    const rs = this._gain(0.35); pn.connect(rs); rs.connect(this.revSend);
+    const t = this.now;
+    const dest = bg;
+    if (kind === 'chirp') {
+      const n = 2 + Math.floor(Math.random() * 4);
+      const f0 = 3000 + Math.random() * 2200;
+      const up = Math.random() < 0.5;
+      for (let i = 0; i < n; i++) {
+        const tt = t + i * (0.07 + Math.random() * 0.05);
+        const f = f0 * (1 + (Math.random() - 0.5) * 0.12);
+        this._tone(tt, { f, fEnd: f * (up ? 1.35 : 0.7), a: 0.004, d: 0.055, gain: 0.07, dest });
+      }
+    } else if (kind === 'trill') {
+      const dur = 0.5 + Math.random() * 0.6;
+      const o = this._osc('sine', 3800 + Math.random() * 1200);
+      const m = this._osc('sine', 24 + Math.random() * 10);
+      const mg = this._gain(500 + Math.random() * 400);
+      m.connect(mg).connect(o.frequency);
+      const g = this._gain(0);
+      o.connect(g).connect(dest);
+      this._env(g, t, 0.05, 0.05, dur * 0.6, dur * 0.3);
+      o.start(t); m.start(t); o.stop(t + dur + 0.1); m.stop(t + dur + 0.1);
+    } else if (kind === 'tsee') {
+      // "tea-cher, tea-cher": high, low, high, low
+      const reps = 2 + Math.floor(Math.random() * 2);
+      const hi = 5600 + Math.random() * 900, lo = hi * 0.72;
+      for (let i = 0; i < reps; i++) {
+        const tt = t + i * 0.36;
+        this._tone(tt, { f: hi, fEnd: hi * 0.96, a: 0.01, d: 0.1, gain: 0.05, dest });
+        this._tone(tt + 0.15, { f: lo, fEnd: lo * 0.9, a: 0.01, d: 0.12, gain: 0.05, dest });
+      }
+    } else if (kind === 'cuckoo') {
+      this._tone(t, { type: 'triangle', f: 680, fEnd: 650, a: 0.04, d: 0.22, gain: 0.1, dest });
+      this._tone(t + 0.34, { type: 'triangle', f: 560, fEnd: 530, a: 0.04, d: 0.3, gain: 0.09, dest });
+    } else {
+      // a woodpecker, somewhere
+      const n = 12 + Math.floor(Math.random() * 8);
+      const f = 900 + Math.random() * 400;
+      for (let i = 0; i < n; i++) {
+        const tt = t + i * 0.055;
+        this._tone(tt, { f, fEnd: f * 0.85, a: 0.001, d: 0.025, gain: 0.16 * (1 - i / (n * 1.6)), dest });
+      }
+    }
+  }
+
+  // the light dies: birds cut out, the forest holds its breath, something enormous booms far away
+  dusk() {
+    if (!this.ready) return;
+    this.setMorning(false);
+    const t = this.now;
+    this.duck(0.03, 0.5, 2.2, 4);
+    this._noiseBurst(t, { buf: this.pink, type: 'lowpass', f: 260, fEnd: 2600, a: 1.7, d: 0.05, gain: 0.22, dest: this.body });
+    const tb = t + 1.8;
+    this._tone(tb, { f: 52, fEnd: 21, a: 0.008, d: 2.8, gain: 0.95, dest: this.body });
+    this._noiseBurst(tb, { buf: this.brown, type: 'lowpass', f: 220, a: 0.01, d: 2.4, gain: 1.4, dest: this.body, rev: 0.9 });
+    this._noiseBurst(tb, { type: 'bandpass', f: 900, q: 0.7, a: 0.004, d: 0.5, gain: 0.25, dest: this.body, rev: 0.6 });
+    [3136, 3322].forEach((f) => this._tone(tb, { f, a: 0.002, d: 2.2, gain: 0.012, dest: this.body }));
+  }
+
+  // ---------- generators ----------
+  // a persistent engine at (x,y,z): returns { spin(level 0..1), sputter(), stop() }
+  genHum(x, y, z, spinning = false) {
+    if (!this.ready) return null;
+    const t = this.now;
+    const pn = this._panner(x, y, z, 2.5, 1.15);
+    pn.connect(this.amb);
+    const out = this._gain(0);
+    out.connect(pn);
+    const o1 = this._osc('sawtooth', 52), o2 = this._osc('sawtooth', 104.5);
+    const lp = this._filter('lowpass', 460, 1.3);
+    const am = this._gain(0.6);
+    const lfo = this._osc('square', 13);
+    const lfoG = this._gain(0.38);
+    lfo.connect(lfoG).connect(am.gain);
+    o1.connect(lp); o2.connect(lp);
+    lp.connect(am).connect(out);
+    const n = this._noise(this.white);
+    const bp = this._filter('bandpass', 2300, 1.5);
+    const ng = this._gain(0.035);
+    n.connect(bp).connect(ng).connect(am);
+    const srcs = [o1, o2, lfo, n];
+    srcs.forEach((q) => q.start(t));
+    const self = this;
+    const set = (lvl, tc = 0.25) => {
+      const now = self.now;
+      o1.frequency.setTargetAtTime(30 + 22 * lvl, now, tc);
+      o2.frequency.setTargetAtTime(60 + 44.5 * lvl, now, tc);
+      lfo.frequency.setTargetAtTime(6 + 7 * lvl, now, tc);
+      lp.frequency.setTargetAtTime(260 + 200 * lvl, now, tc);
+      out.gain.setTargetAtTime(0.03 + 0.17 * lvl, now, tc);
+    };
+    if (spinning) set(0.05, 0.05);
+    else set(1, 0.4);
+    let dead = false;
+    return {
+      spin(lvl) { if (!dead) set(Math.min(1, Math.max(0, lvl)), 0.3); },
+      sputter() {
+        if (dead) return;
+        const now = self.now;
+        // it catches, misses, catches, and runs down to nothing
+        for (let i = 0; i < 7; i++) {
+          const tt = now + i * 0.19;
+          out.gain.setValueAtTime(i % 2 ? 0.04 : 0.2 * (1 - i / 9), tt);
+          o1.frequency.setValueAtTime(52 - i * 4.2, tt);
+          lfo.frequency.setValueAtTime(13 - i * 1.3, tt);
+        }
+        out.gain.setTargetAtTime(0, now + 1.35, 0.12);
+      },
+      stop() {
+        if (dead) return;
+        dead = true;
+        const now = self.now;
+        out.gain.cancelScheduledValues(now);
+        out.gain.setTargetAtTime(0, now, 0.15);
+        srcs.forEach((q) => { try { q.stop(now + 0.8); } catch { /* */ } });
+      },
+    };
+  }
+
+  genStart(x, y, z) {
+    if (!this.ready) return;
+    const t = this.now;
+    const pn = this._panner(x, y, z, 4, 0.9);
+    pn.connect(this.sfx);
+    const rs = this._gain(0.4); pn.connect(rs); rs.connect(this.revSend);
+    // starter whine, two coughs, then it catches
+    const st = this._osc('sawtooth', 170);
+    st.frequency.exponentialRampToValueAtTime(420, t + 0.6);
+    const sbp = this._filter('bandpass', 900, 2);
+    const sg = this._gain(0);
+    st.connect(sbp).connect(sg).connect(pn);
+    this._env(sg, t, 0.04, 0.22, 0.12, 0.45);
+    st.start(t); st.stop(t + 0.7);
+    [0.22, 0.46].forEach((d) => this._noiseBurst(t + d, { buf: this.brown, type: 'lowpass', f: 320, a: 0.005, d: 0.16, gain: 1.6, dest: pn }));
+    this._noiseBurst(t + 0.68, { buf: this.brown, type: 'lowpass', f: 420, a: 0.004, d: 0.3, gain: 2.0, dest: pn });
+    this._noiseBurst(t + 0.7, { type: 'highpass', f: 3000, a: 0.0006, d: 0.02, gain: 0.5, dest: pn }); // relay
+    // the lamp: a hot filament tink and mains hum swelling up
+    this._tone(t + 0.85, { f: 3700, a: 0.001, d: 0.35, gain: 0.05, dest: pn });
+    [100, 150].forEach((f, i) => this._tone(t + 0.8, { f, a: 0.3, d: 1.2, hold: 0.4, gain: i ? 0.03 : 0.05, dest: pn }));
+    // and in your chest: relief (a warm chord that doesn't quite resolve)
+    [196, 246.9, 293.7, 370].forEach((f, i) => this._tone(t + 0.75 + i * 0.06, { type: 'triangle', f, a: 0.6, d: 2.6, hold: 0.4, gain: 0.035, dest: this.body, rev: 0.7 }));
+  }
+
+  cordPull(x, y, z, ok = false) {
+    if (!this.ready) return;
+    const t = this.now;
+    const pn = this._panner(x, y, z, 2.5, 1.1);
+    pn.connect(this.sfx);
+    this._noiseBurst(t, { type: 'bandpass', f: 1100, fEnd: 3600, q: 2, a: 0.03, d: 0.18, gain: 0.5, dest: pn }); // the cord zips out
+    if (ok) return; // genStart takes it from here
+    for (let i = 0; i < 4; i++) {
+      this._noiseBurst(t + 0.18 + i * 0.075, { buf: this.brown, type: 'lowpass', f: 300, a: 0.004, d: 0.07, gain: 1.0 * (1 - i / 4.5), dest: pn });
+    }
+    this._noiseBurst(t + 0.5, { buf: this.pink, type: 'bandpass', f: 500, q: 0.8, a: 0.05, d: 0.5, gain: 0.15, dest: pn }); // exhaust sigh
+  }
+
+  clank(x, y, z, heavy = 0.6) {
+    if (!this.ready) return;
+    const t = this.now;
+    const pn = this._panner(x, y, z, 2.5, 1.2);
+    pn.connect(this.sfx);
+    const f = 480 + Math.random() * 380;
+    [[1, 0.32, 0.22], [2.76, 0.18, 0.14], [5.4, 0.09, 0.08], [8.93, 0.05, 0.05]].forEach(([m, d, g]) => {
+      this._tone(t, { f: f * m, a: 0.001, d: d * (0.7 + heavy * 0.6), gain: g * heavy * 2, dest: pn });
+    });
+    this._noiseBurst(t, { type: 'highpass', f: 2800, a: 0.0005, d: 0.012, gain: 0.9 * heavy, dest: pn });
+  }
+
+  glug(x, y, z) {
+    if (!this.ready) return;
+    const t = this.now;
+    const pn = this._panner(x, y, z, 2, 1.3);
+    pn.connect(this.sfx);
+    const n = 3 + Math.floor(Math.random() * 4);
+    for (let i = 0; i < n; i++) {
+      const tt = t + i * (0.09 + Math.random() * 0.06);
+      const f = 180 + Math.random() * 140;
+      this._tone(tt, { f, fEnd: f * 2.1, a: 0.004, d: 0.05, gain: 0.18, dest: pn });
+    }
+    this._noiseBurst(t, { buf: this.pink, type: 'lowpass', f: 700, a: 0.08, d: 0.4, hold: 0.2, gain: 0.25, dest: pn });
+  }
+
+  spark(x, y, z) {
+    if (!this.ready) return;
+    const t = this.now;
+    const pn = this._panner(x, y, z, 3, 1.0);
+    pn.connect(this.sfx);
+    const rs = this._gain(0.3); pn.connect(rs); rs.connect(this.revSend);
+    this._noiseBurst(t, { type: 'highpass', f: 2200, a: 0.0004, d: 0.035, gain: 2.2, dest: pn });
+    const o = this._osc('sawtooth', 118);
+    const bp = this._filter('bandpass', 1700, 2.2);
+    const rm = this._ring(o, 61, t, 0.4);
+    const g = this._gain(0);
+    rm.connect(bp).connect(g).connect(pn);
+    this._env(g, t, 0.002, 0.5, 0.25, 0.05);
+    o.start(t); o.stop(t + 0.4);
+    this._noiseBurst(t + 0.02, { type: 'highpass', f: 6000, a: 0.01, d: 0.45, gain: 0.18, dest: pn });
+  }
+
+  // a portable radio taped to the generator: it chirps until somebody makes it run
+  beacon(x, y, z) {
+    if (!this.ready) return;
+    const t = this.now;
+    const pn = this._panner(x, y, z, 8, 0.45);
+    pn.connect(this.sfx);
+    this._noiseBurst(t, { type: 'bandpass', f: 2600, q: 1.2, a: 0.004, d: 0.1, gain: 0.26, dest: pn });
+    this._tone(t + 0.05, { type: 'square', f: 1318.5, a: 0.003, d: 0.06, hold: 0.04, gain: 0.12, dest: pn });
+    this._tone(t + 0.19, { type: 'square', f: 987.8, a: 0.003, d: 0.08, hold: 0.04, gain: 0.12, dest: pn });
+  }
+
+  // flies over a body: returns { stop() }
+  flies(x, y, z) {
+    if (!this.ready) return null;
+    const t = this.now;
+    const pn = this._panner(x, y, z, 1.1, 1.5);
+    pn.connect(this.amb);
+    const bp = this._filter('bandpass', 620, 1.2);
+    const g = this._gain(0);
+    bp.connect(g).connect(pn);
+    const srcs = [];
+    [188, 212, 243].forEach((f) => {
+      const o = this._osc('sawtooth', f);
+      const m = this._osc('sine', 6 + Math.random() * 8);
+      const mg = this._gain(14 + Math.random() * 10);
+      m.connect(mg).connect(o.frequency);
+      const og = this._gain(0.33);
+      const tr = this._osc('sine', 0.3 + Math.random() * 0.6);
+      const tg = this._gain(0.3);
+      tr.connect(tg).connect(og.gain);
+      o.connect(og).connect(bp);
+      srcs.push(o, m, tr);
+    });
+    srcs.forEach((q) => q.start(t));
+    g.gain.setTargetAtTime(0.36, t, 0.6);
+    const self = this;
+    return {
+      stop() {
+        const now = self.now;
+        g.gain.setTargetAtTime(0, now, 0.3);
+        srcs.forEach((q) => { try { q.stop(now + 1.5); } catch { /* */ } });
+      },
+    };
+  }
+
+  // your echo just touched a body: something low and wrong in your chest
+  discover(x, y, z) {
+    if (!this.ready) return;
+    const t = this.now;
+    const g = this._gain(0);
+    const lp = this._filter('lowpass', 650, 0.8);
+    g.connect(lp);
+    this._out(lp, this.body, 0.5);
+    [110, 116.5].forEach((f) => { const o = this._osc('sawtooth', f); o.connect(g); o.start(t); o.stop(t + 3); });
+    this._env(g, t, 0.7, 0.05, 1.9, 0.2);
+    this._tone(t + 0.2, { f: 1975, a: 0.6, d: 1.6, gain: 0.006, dest: this.body });
+    void x; void y; void z;
+  }
+
+  paper() {
+    if (!this.ready) return;
+    const t = this.now;
+    this._noiseBurst(t, { type: 'bandpass', f: 1400, q: 0.8, a: 0.06, d: 0.18, gain: 0.12, dest: this.body });
+    for (let i = 0; i < 5; i++) {
+      this._noiseBurst(t + 0.05 + i * (0.04 + Math.random() * 0.05), { type: 'highpass', f: 2600 + Math.random() * 2000, a: 0.001, d: 0.02 + Math.random() * 0.03, gain: 0.16, dest: this.body });
+    }
+  }
+
+  // ---------- the Watcher ----------
+  // a thin ringing that grows as it closes in, breath-like hiss while it moves, and something
+  // under it you feel in your teeth. level 0 = gone.
+  watcherPresence(level, x = 0, y = 0, z = 0, moving = false) {
+    if (!this.ready) return;
+    if (!this.wNodes) {
+      if (level <= 0) return;
+      const t = this.now;
+      const pn = this._panner(x, y, z, 4, 1.0);
+      pn.connect(this.amb);
+      const out = this._gain(1);
+      out.connect(pn);
+      const g1 = this._gain(0), g2 = this._gain(0), g3 = this._gain(0);
+      [1760, 1767.3].forEach((f) => { const o = this._osc('sine', f); o.connect(g1); o.start(t); });
+      const n = this._noise(this.pink);
+      const bp = this._filter('bandpass', 2600, 3);
+      const am = this._gain(0.6);
+      const lfo = this._osc('sine', 0.35); const lg = this._gain(0.4); lfo.connect(lg).connect(am.gain);
+      n.connect(bp).connect(am).connect(g2);
+      n.start(t); lfo.start(t);
+      const lp = this._filter('lowpass', 320, 0.8);
+      [73.4, 77.8].forEach((f) => { const o = this._osc('sawtooth', f); o.connect(lp); o.start(t); });
+      lp.connect(g3);
+      [g1, g2, g3].forEach((g) => g.connect(out));
+      this.wNodes = { pn, g1, g2, g3, level: 0 };
+    }
+    const n = this.wNodes;
+    if (level <= 0 && n.level <= 0) return;
+    n.level = level;
+    const t = this.now;
+    n.g1.gain.setTargetAtTime(level * level * 0.03, t, 0.4);
+    n.g2.gain.setTargetAtTime(level * (moving ? 0.14 : 0.04), t, 0.25);
+    n.g3.gain.setTargetAtTime(level * 0.1, t, 0.5);
+    if (level > 0 && n.pn.positionX) {
+      n.pn.positionX.setTargetAtTime(x, t, 0.1);
+      n.pn.positionY.setTargetAtTime(y, t, 0.1);
+      n.pn.positionZ.setTargetAtTime(z, t, 0.1);
+    }
+  }
+
+  // joints popping, somewhere close
+  crack(x, y, z, gain = 0.5) {
+    if (!this.ready) return;
+    const t = this.now;
+    const pn = this._panner(x, y, z, 2, 1.2);
+    pn.connect(this.sfx);
+    const n = 2 + Math.floor(Math.random() * 3);
+    let tt = t;
+    for (let i = 0; i < n; i++) {
+      this._noiseBurst(tt, { type: 'bandpass', f: 1600 + Math.random() * 1800, q: 4, a: 0.0005, d: 0.008 + Math.random() * 0.01, gain: gain * 3.2, dest: pn });
+      tt += 0.015 + Math.random() * 0.035;
+    }
+    this._tone(t, { f: 150, fEnd: 90, a: 0.001, d: 0.05, gain: gain * 0.3, dest: pn });
+  }
+
+  // the first time your echo finds it: a thin, high shriek of strings and a drop
+  watcherSting() {
+    if (!this.ready) return;
+    const t = this.now;
+    this._tone(t, { f: 60, fEnd: 24, a: 0.004, d: 1.2, gain: 0.7 });
+    const str = this._gain(0);
+    const lp = this._filter('lowpass', 7500, 0.7);
+    str.connect(lp);
+    this._out(lp, this.sfx, 0.9);
+    [1568, 1661.2, 1760, 2093, 2217.5].forEach((f, i) => {
+      const o = this._osc('sawtooth', f);
+      const vib = this._osc('sine', 7 + Math.random() * 3);
+      const vg = this._gain(20 + i * 6);
+      vib.connect(vg).connect(o.detune);
+      o.frequency.exponentialRampToValueAtTime(f * 1.03, t + 1.2);
+      const og = this._gain(0.06);
+      o.connect(og).connect(str);
+      o.start(t); vib.start(t); o.stop(t + 1.5); vib.stop(t + 1.5);
+    });
+    this._env(str, t, 0.006, 0.9, 1.2, 0.08);
+    this._noiseBurst(t, { type: 'highpass', f: 4000, a: 0.002, d: 0.4, gain: 0.15, rev: 0.6 });
+  }
+
+  // far away, something like a wet finger on the rim of a glass
+  watcherArrive() {
+    if (!this.ready) return;
+    const L = this.listener;
+    const a = Math.random() * Math.PI * 2;
+    const x = L.x + Math.cos(a) * 40, z = L.z + Math.sin(a) * 40;
+    const pn = this._panner(x, L.y + 3, z, 12, 0.6);
+    pn.connect(this.sfx);
+    const rs = this._gain(0.8); pn.connect(rs); rs.connect(this.revSend);
+    const t = this.now;
+    [1244.5, 1864.7].forEach((f, i) => {
+      const o = this._osc('sine', f);
+      const v = this._osc('sine', 4.5); const vg = this._gain(9); v.connect(vg).connect(o.detune);
+      const g = this._gain(0);
+      o.connect(g).connect(pn);
+      this._env(g, t, 1.4, i ? 0.05 : 0.09, 2.2, 1.6);
+      o.start(t); v.start(t); o.stop(t + 5.4); v.stop(t + 5.4);
+    });
+  }
+
+  // ---------- the Howler ----------
+  howlerInhale(x, y, z) {
+    if (!this.ready) return;
+    const t = this.now, dur = 1.8;
+    const pn = this._panner(x, y, z, 7, 0.6);
+    pn.connect(this.sfx);
+    const rs = this._gain(0.5); pn.connect(rs); rs.connect(this.revSend);
+    const n = this._noise(this.pink);
+    const bp = this._filter('bandpass', 260, 1.4);
+    bp.frequency.exponentialRampToValueAtTime(1150, t + dur);
+    const g = this._gain(0);
+    n.connect(bp).connect(g).connect(pn);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(1.3, t + dur - 0.05);
+    g.gain.linearRampToValueAtTime(0.0001, t + dur);
+    n.start(t, Math.random()); n.stop(t + dur + 0.05);
+    const o = this._osc('sawtooth', 36);
+    o.frequency.linearRampToValueAtTime(44, t + dur);
+    const lp = this._filter('lowpass', 170, 1);
+    const og = this._gain(0);
+    o.connect(lp).connect(og).connect(pn);
+    og.gain.setValueAtTime(0.0001, t);
+    og.gain.exponentialRampToValueAtTime(0.5, t + dur - 0.05);
+    og.gain.linearRampToValueAtTime(0.0001, t + dur);
+    o.start(t); o.stop(t + dur + 0.05);
+    this.duck(0.25, 0.6, dur - 0.6, 1.5); // the forest holds its breath with it
+  }
+
+  howlerHowl(x, y, z, gain = 1) {
+    if (!this.ready) return;
+    const t = this.now;
+    const ctx = this.ctx;
+    const pn = this._panner(x, y, z, 10, 0.45);
+    pn.connect(this.sfx);
+    // the panner only attenuates the dry voice: scale the forest's answer by distance too
+    const L = this.listener;
+    const dist = Math.hypot(x - L.x, z - L.z);
+    const wet = Math.sqrt(10 / (10 + 0.45 * Math.max(0, dist - 10)));
+    const dl = ctx.createDelay(1.5);
+    dl.delayTime.value = 0.55;
+    const elp = this._filter('lowpass', 1200, 0.7);
+    const fb = this._gain(0.4);
+    dl.connect(elp).connect(fb).connect(dl);
+    const eg = this._gain(0.45 * wet);
+    elp.connect(eg);
+    eg.connect(this.sfx);
+    eg.connect(this.revSend);
+    if (!this.offline) setTimeout(() => { try { dl.disconnect(); fb.disconnect(); } catch { /* */ } }, 8000);
+    const mix = this._gain(0);
+    const sh = this._shaper(this.distScream);
+    const post = this._gain(0.55);
+    mix.connect(sh).connect(post);
+    post.connect(pn);
+    post.connect(dl);
+    const rs = this._gain(0.9 * wet); post.connect(rs); rs.connect(this.revSend);
+    const v = this._voice(t, {
+      f0: [[0, 92], [0.3, 150], [1.3, 126], [2.1, 66]], vowel: [[0, 'o'], [0.35, 'A'], [1.5, 'u']],
+      dur: 2.2, vib: [4.5, 45], jitter: 45, rasp: 0.6, q: 5, fg: 3,
+    });
+    const vg = this._gain(0.7); v.connect(vg).connect(mix);
+    const v2 = this._voice(t, {
+      f0: [[0, 300], [0.3, 470], [1.3, 410], [2.1, 220]], vowel: [[0, 'A'], [1.2, 'o']],
+      dur: 2.2, vib: [5.5, 60], jitter: 40, rasp: 0.3, q: 6, fg: 3,
+    });
+    const v2g = this._gain(0.35); v2.connect(v2g).connect(mix);
+    this._env(mix, t, 0.12, 0.55 * gain, 1.2, 0.8);
+    const sub = this._osc('sine', 46);
+    sub.frequency.exponentialRampToValueAtTime(32, t + 2.2);
+    const sg = this._gain(0);
+    sub.connect(sg).connect(pn);
+    this._env(sg, t, 0.1, 0.7 * gain, 1.6, 0.5);
+    sub.start(t); sub.stop(t + 2.3);
+  }
+
+  howlerBark(x, y, z) {
+    if (!this.ready) return;
+    const t = this.now;
+    const pn = this._panner(x, y, z, 6, 0.7);
+    pn.connect(this.sfx);
+    const mix = this._gain(0);
+    const sh = this._shaper(this.distScream);
+    const post = this._gain(0.5);
+    mix.connect(sh).connect(post).connect(pn);
+    const rs = this._gain(0.4); post.connect(rs); rs.connect(this.revSend);
+    const v = this._voice(t, { f0: [[0, 120], [0.08, 175], [0.38, 85]], vowel: [[0, 'A'], [0.3, 'o']], dur: 0.42, jitter: 60, rasp: 0.8, q: 5, fg: 3 });
+    v.connect(mix);
+    this._env(mix, t, 0.015, 0.6, 0.3, 0.05);
   }
 
   // ---------- UI ----------

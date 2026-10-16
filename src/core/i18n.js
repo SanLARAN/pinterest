@@ -3,7 +3,7 @@ const STR = {
   ru: {
     title: 'ТИШЕ',
     tagline: 'Ты слеп. Лес — нет.',
-    subtitle: 'эхолокационный хоррор · продержись 30 минут',
+    subtitle: 'эхолокационный хоррор · запусти пять генераторов',
     play: 'ИГРАТЬ',
     scores: 'РЕКОРДЫ',
     settings: 'НАСТРОЙКИ',
@@ -25,7 +25,7 @@ const STR = {
     micTest: 'проверь микрофон: скажи «эй»',
     score: 'СЧЁТ',
     best: 'рекорд',
-    dawnIn: 'до рассвета',
+    generators: 'генераторы',
     stones: 'камни',
     stamina: 'дыхание',
     // intro / tutorial
@@ -39,9 +39,45 @@ const STR = {
     tutMoveTouch: 'уходи тихо — левый стик · до упора = бег (шумно)',
     tutStone: 'ПКМ / F — бросить камень и отвлечь их',
     tutStoneTouch: 'КАМЕНЬ — бросить и отвлечь их',
-    tutShards: 'собирай янтарные осколки · Tab — сколько до рассвета',
-    tutShardsTouch: 'собирай янтарные осколки · тап по верху экрана — время',
+    tutUse: 'у генератора лежит тело — подойди и удерживай E · Tab — что делать дальше',
+    tutUseTouch: 'у генератора лежит тело — подойди, появится кнопка РУКИ · тап по верху — задача',
     tutScream: 'и что бы ни случилось — не кричи',
+    // morning
+    morningBig: 'утро',
+    morningSmall: 'лагерь на старой просеке',
+    morningHint: 'осмотрись · WASD — идти, мышь — смотреть',
+    morningHintTouch: 'осмотрись · левый стик — идти, правая часть экрана — смотреть',
+    morningGen: 'генератор тарахтит. птицы. всё хорошо.',
+    campLeash: 'не уходи далеко от лагеря',
+    skipHint: 'Enter — пропустить',
+    touchSkip: 'ПРОПУСТИТЬ',
+    touchUse: 'РУКИ',
+    // generators, bodies, notes
+    siteAt: { camp: 'в лагере', cabin: 'у охотничьей избушки', tower: 'у старой вышки', stones: 'у каменного круга', wreck: 'у разбитой машины' },
+    parts: { fuel: 'канистра бензина', plug: 'свеча зажигания', fuses: 'предохранители', belt: 'приводной ремень', battery: 'аккумулятор' },
+    actions: { fuel: 'залить бензин', plug: 'вкрутить свечу', fuses: 'поменять предохранители', belt: 'натянуть ремень', battery: 'подключить аккумулятор' },
+    noteKicker: 'записка',
+    noteClose: 'E / тап — убрать',
+    notes: [
+      'Свет вырубился разом, генератор заглох. Бензин в канистре — залей и дёрни шнур. Второй генератор — {next}, иди на писк рации. И тише. ОНИ слышат.',
+      'Свечу я выкрутил, держи. Третий — {next}. Там ходит высокий, без лица. Пока на него падает свет — он не двигается. Не давай ему темноты.',
+      'Предохранители в кармане. Искрят — будет громко. Четвёртый — {next}. Услышишь глубокий вдох — замри. Оно видит своим воем: кто шевелится, того и берёт.',
+      'Ремень снял с машины. Последний генератор — {next}. Камень уводит их в сторону: брось подальше — и иди.',
+      'Аккумулятор ещё держит. Подключи — генератор долго раскручивается и ревёт на весь лес. Продержись. Я не смог.',
+    ],
+    taskCamp: 'генератор в лагере заглох — найди, чем его заправить',
+    taskFollow: 'иди на писк рации — генератор {site}',
+    taskFindNext: 'найди следующий генератор',
+    taskRepair: 'почини генератор {site}',
+    taskSpin: 'генератор раскручивается — продержись',
+    useSearch: 'E · обыскать',
+    useHold: 'удерживай E · {action}',
+    useCord: 'E · дёрнуть шнур {n}/{m}',
+    useNeed: 'нужно: {part}',
+    useSpin: 'раскручивается…',
+    useSearchT: 'РУКИ · обыскать',
+    useHoldT: 'держи РУКИ · {action}',
+    useCordT: 'РУКИ · дёрнуть шнур {n}/{m}',
     // alerts
     aHeard: 'ОНО УСЛЫШАЛО',
     aHunt: 'ОХОТА',
@@ -53,13 +89,25 @@ const STR = {
     aExhausted: 'ты задыхаешься — это слышно',
     aNoStones: 'нет камней',
     aMicLost: 'микрофон отключён',
-    aDawnSoon: 'небо светлеет…',
+    aFound: 'НАЙДЕНО',
+    aGenOn: 'ГЕНЕРАТОР {n}/5',
+    aSpinUp: 'РАСКРУЧИВАЕТСЯ… ДЕРЖИСЬ',
+    aWatcherArrive: 'в темноте появилось что-то новое',
+    aHowlerArrive: 'что-то огромное проснулось',
+    aAwake: 'ЛЕС ПРОСНУЛСЯ',
+    hintWatcher: 'НАБЛЮДАТЕЛЬ — двигается только в темноте. держи его на свету',
+    hintHowler: 'глубокий вдох… ЗАМРИ',
+    hintHowlerSpot: 'оно увидело движение — уйди с этого места и снова замри',
     // ends
     deadTitle: 'ТЕБЯ НАШЛИ',
     deadScream: 'ТЫ ЗАКРИЧАЛ',
     deadCrawler: 'ОНО ПОЛЗЛО К ТЕБЕ',
-    winTitle: 'РАССВЕТ',
-    winSub: 'ты дожил до утра. лес отпускает тебя.',
+    deadWatcher: 'ОНО ПОДОШЛО В ТЕМНОТЕ',
+    deadHowler: 'ОНО УВИДЕЛО ДВИЖЕНИЕ',
+    winTitle: 'СВЕТ',
+    winKicker: 'генераторы 5/5',
+    winSub: 'пять генераторов гудят. тьма отступает. лес отпускает тебя.',
+    gensGot: 'генераторы',
     survived: 'продержался',
     shardsGot: 'осколки',
     closeCalls: 'впритык',
@@ -91,21 +139,21 @@ const STR = {
     off: 'выкл',
     // how to
     howtoBody: `
-<p><b>Ты в огромном тёмном лесу и ничего не видишь.</b> Любой звук — эхолокатор: волна расходится от тебя и на секунды проявляет деревья, камни… и <span class="red">их</span>.</p>
-<p><b>Микрофон:</b> щёлкни языком, хлопни, скажи «эй». Громче звук — дальше видно. Но <span class="red">они слышат так же далеко</span>. Крик (кольцо вокруг точки стало красным) — мгновенная охота.</p>
-<p><b>Без микрофона:</b> ПРОБЕЛ / ЛКМ — щелчок, удерживай — громче.</p>
-<p><b>Твари</b> идут туда, где был звук, а не туда, где ты сейчас. Пискнул — уходи. Камень (ПКМ / F) уводит их в сторону и подсвечивает место падения.</p>
-<p><b>Шаги</b> тоже шумят: бег громкий, красться — тихо. Врезался в дерево — это слышно.</p>
-<p><b>Интерфейса почти нет.</b> Кольцо вокруг точки — твоя громкость, красный пунктир — граница крика. Время и счёт всплывают каждую минуту и по Tab. Глаза в темноте — не всегда чьи-то.</p>
-<p><b>Очки:</b> время × множитель опасности, янтарные осколки, проходы впритык, отрывы от погони. Дожить до рассвета (30:00) — огромный бонус.</p>
+<p><b>Утро. Лагерь, гудит генератор, поют птицы.</b> А потом свет гаснет разом — и ты в огромном тёмном лесу, где ничего не видно. Любой звук — эхолокатор: волна расходится от тебя и на секунды проявляет деревья, камни… и <span class="red">их</span>.</p>
+<p><b>Цель — запустить пять генераторов.</b> У каждого лежит тело того, кто пытался раньше: обыщи его (удерживай E) — там деталь и записка, где искать следующий. Генератор, о котором ты знаешь, пищит рацией — иди на звук. Починка шумит: стук, искры, рёв мотора при запуске. Запустил — уходи. Вокруг работающего генератора горит лампа: в её свете видно тварей.</p>
+<p><b>Микрофон:</b> щёлкни языком, хлопни, скажи «эй». Громче звук — дальше видно. Но <span class="red">они слышат так же далеко</span>. Крик (кольцо вокруг точки стало красным) — мгновенная охота. <b>Без микрофона:</b> ПРОБЕЛ / ЛКМ — щелчок, удерживай — громче.</p>
+<p><b>Слушатели и Ползуны</b> идут туда, где был звук. Пискнул — уходи. Камень (ПКМ / F) уводит их в сторону. Позже приходят двое других, по одному на лес: <b>Наблюдатель</b> глух, но двигается, только пока на него не падает свет, — свети на него; лампы он обходит. <b>Ревун</b> почти не слышит, но иногда набирает воздух и воет: всё, что движется в этой волне, он видит. Услышал вдох — замри.</p>
+<p><b>Интерфейса почти нет.</b> Кольцо вокруг точки — твоя громкость. Tab — время, генераторы и текущая задача. Полоска сверху заполняется с каждым генератором. Через 30 минут лес просыпается окончательно.</p>
+<p><b>Очки:</b> время × множитель опасности, найденные тела, генераторы, осколки, проходы впритык, отрывы. За победу — бонус, и тем больше, чем быстрее.</p>
 <table class="keys">
-<tr><td>WASD</td><td>движение</td></tr>
-<tr><td>Стрелки · Q / E</td><td>движение и поворот без мыши</td></tr>
+<tr><td>WASD · стрелки</td><td>движение и поворот</td></tr>
 <tr><td>Мышь</td><td>обзор (клик — захват курсора)</td></tr>
 <tr><td>ПРОБЕЛ / ЛКМ</td><td>эхо: тап — щелчок, удерживай — громко</td></tr>
+<tr><td>E (удерживать)</td><td>обыскать тело · чинить генератор</td></tr>
 <tr><td>ПКМ / F</td><td>бросить камень</td></tr>
 <tr><td>Shift / C</td><td>бег / красться</td></tr>
-<tr><td>Tab</td><td>время, счёт, камни</td></tr>
+<tr><td>Tab</td><td>время, генераторы, задача</td></tr>
+<tr><td>Enter</td><td>пропустить утро</td></tr>
 <tr><td>M · Esc / P</td><td>микрофон · пауза</td></tr>
 </table>`,
     touchPing: 'ЭХО',
@@ -116,12 +164,14 @@ const STR = {
     deathBy: {
       listener: 'Слушатель',
       crawler: 'Ползун',
+      watcher: 'Наблюдатель',
+      howler: 'Ревун',
     },
   },
   en: {
     title: 'HUSH',
     tagline: 'You are blind. The forest is not.',
-    subtitle: 'an echolocation horror · survive 30 minutes',
+    subtitle: 'an echolocation horror · start five generators',
     play: 'PLAY',
     scores: 'HIGH SCORES',
     settings: 'SETTINGS',
@@ -143,7 +193,7 @@ const STR = {
     micTest: 'test your mic: say “hey”',
     score: 'SCORE',
     best: 'best',
-    dawnIn: 'until dawn',
+    generators: 'generators',
     stones: 'stones',
     stamina: 'breath',
     intro1: 'you cannot see anything',
@@ -156,9 +206,43 @@ const STR = {
     tutMoveTouch: 'move away quietly — left stick · push fully to run (loud)',
     tutStone: 'RMB / F — throw a stone to distract them',
     tutStoneTouch: 'STONE — throw it to distract them',
-    tutShards: 'collect amber shards · Tab — time until dawn',
-    tutShardsTouch: 'collect amber shards · tap the top of the screen — time',
+    tutUse: 'there is a body by the generator — walk up and hold E · Tab — what to do next',
+    tutUseTouch: 'there is a body by the generator — walk up, a HANDS button appears · tap the top — task',
     tutScream: 'and whatever happens — do not scream',
+    morningBig: 'morning',
+    morningSmall: 'camp at the old clearing',
+    morningHint: 'look around · WASD to walk, mouse to look',
+    morningHintTouch: 'look around · left stick to walk, right side of the screen to look',
+    morningGen: 'the generator chugs. birds. all is well.',
+    campLeash: "don't wander far from camp",
+    skipHint: 'Enter — skip',
+    touchSkip: 'SKIP',
+    touchUse: 'HANDS',
+    siteAt: { camp: 'at the camp', cabin: 'by the hunting cabin', tower: 'by the old tower', stones: 'by the stone circle', wreck: 'by the wrecked truck' },
+    parts: { fuel: 'a can of fuel', plug: 'a spark plug', fuses: 'fuses', belt: 'a drive belt', battery: 'a battery' },
+    actions: { fuel: 'pour the fuel', plug: 'fit the spark plug', fuses: 'replace the fuses', belt: 'fit the belt', battery: 'connect the battery' },
+    noteKicker: 'note',
+    noteClose: 'E / tap — put away',
+    notes: [
+      "The lights died all at once and the generator stalled. Fuel's in the can — pour it in, pull the cord. The second generator is {next}, follow the radio beeps. And be quiet. THEY hear.",
+      "I took the spark plug out — it's yours. The third one is {next}. Something tall walks there, no face. While light is on it, it can't move. Don't give it the dark.",
+      'Fuses are in my pocket. They spark — it will be loud. The fourth is {next}. If you hear a deep breath in — freeze. It sees with its howl: whatever moves, it takes.',
+      "Pulled the belt off the truck. The last generator is {next}. A stone pulls them away: throw it far, then walk.",
+      "The battery still holds. Hook it up — it takes forever to spin up and roars the whole forest awake. Hold on. I couldn't.",
+    ],
+    taskCamp: 'the camp generator stalled — find something to fuel it',
+    taskFollow: 'follow the radio beeps — generator {site}',
+    taskFindNext: 'find the next generator',
+    taskRepair: 'repair the generator {site}',
+    taskSpin: 'the generator is spinning up — hold on',
+    useSearch: 'E · search',
+    useHold: 'hold E · {action}',
+    useCord: 'E · pull the cord {n}/{m}',
+    useNeed: 'need: {part}',
+    useSpin: 'spinning up…',
+    useSearchT: 'HANDS · search',
+    useHoldT: 'hold HANDS · {action}',
+    useCordT: 'HANDS · pull the cord {n}/{m}',
     aHeard: 'IT HEARD THAT',
     aHunt: 'HUNTED',
     aEscaped: 'ESCAPED',
@@ -169,12 +253,24 @@ const STR = {
     aExhausted: 'you are gasping — they can hear it',
     aNoStones: 'no stones',
     aMicLost: 'microphone disconnected',
-    aDawnSoon: 'the sky is getting lighter…',
+    aFound: 'FOUND',
+    aGenOn: 'GENERATOR {n}/5',
+    aSpinUp: 'SPINNING UP… HOLD ON',
+    aWatcherArrive: 'something new is out in the dark',
+    aHowlerArrive: 'something huge has woken up',
+    aAwake: 'THE FOREST IS AWAKE',
+    hintWatcher: 'THE WATCHER — moves only in the dark. keep it lit',
+    hintHowler: 'a deep breath… FREEZE',
+    hintHowlerSpot: 'it saw you move — get off this spot, then freeze again',
     deadTitle: 'IT FOUND YOU',
     deadScream: 'YOU SCREAMED',
     deadCrawler: 'IT CRAWLED TO YOU',
-    winTitle: 'DAWN',
-    winSub: 'you made it to morning. the forest lets you go.',
+    deadWatcher: 'IT CAME CLOSER IN THE DARK',
+    deadHowler: 'IT SAW YOU MOVE',
+    winTitle: 'LIGHT',
+    winKicker: 'generators 5/5',
+    winSub: 'five generators hum. the dark backs off. the forest lets you go.',
+    gensGot: 'generators',
     survived: 'survived',
     shardsGot: 'shards',
     closeCalls: 'close calls',
@@ -204,21 +300,21 @@ const STR = {
     on: 'on',
     off: 'off',
     howtoBody: `
-<p><b>You are in a vast dark forest and you cannot see.</b> Every sound is sonar: a wave spreads out from you and for a few seconds reveals trees, rocks… and <span class="red">them</span>.</p>
-<p><b>Microphone:</b> click your tongue, clap, say “hey”. Louder sound — you see further. But <span class="red">they hear just as far</span>. A scream (the ring around the dot turns red) means an instant hunt.</p>
-<p><b>No mic:</b> SPACE / LMB — a click, hold for louder.</p>
-<p><b>Monsters</b> walk to where the sound was, not where you are. Made a noise? Move. A stone (RMB / F) lures them away and lights up where it lands.</p>
-<p><b>Footsteps</b> make noise too: running is loud, sneaking is quiet. Bumping into a tree is loud.</p>
-<p><b>There is almost no interface.</b> The ring around the dot is your loudness, the red dashed line is where screaming starts. Time and score surface every minute and on Tab. Eyes in the dark don't always belong to something.</p>
-<p><b>Score:</b> time × danger multiplier, amber shards, close calls, escaped hunts. Reaching dawn (30:00) gives a huge bonus.</p>
+<p><b>Morning. A camp, a humming generator, birdsong.</b> Then the light dies all at once — and you are in a vast dark forest where you cannot see. Every sound is sonar: a wave spreads out from you and for a few seconds reveals trees, rocks… and <span class="red">them</span>.</p>
+<p><b>The goal: start five generators.</b> By each one lies the body of someone who tried before you: search it (hold E) for the part and a note about where the next one is. A generator you know about beeps on its radio — follow the sound. Repairs are noisy: clanks, sparks, the engine roaring to life. Got it running? Leave. A running generator lights a lamp, and in its light you can see them.</p>
+<p><b>Microphone:</b> click your tongue, clap, say “hey”. Louder sound — you see further. But <span class="red">they hear just as far</span>. A scream (the ring around the dot turns red) means an instant hunt. <b>No mic:</b> SPACE / LMB — a click, hold for louder.</p>
+<p><b>Listeners and Crawlers</b> walk to where the sound was. Made a noise? Move. A stone (RMB / F) lures them away. Later two others arrive, one of each per forest: <b>the Watcher</b> is deaf but moves only while no light is on it — keep it lit; it won't enter a lamp. <b>The Howler</b> barely hears, but now and then it fills its chest and howls: whatever moves inside that wave, it sees. Hear the breath — freeze.</p>
+<p><b>There is almost no interface.</b> The ring around the dot is your loudness. Tab shows time, generators and the current task. The hairline at the top fills with each generator. After 30 minutes the forest wakes up for good.</p>
+<p><b>Score:</b> time × danger multiplier, bodies found, generators, shards, close calls, escapes. Winning gives a bonus — bigger the faster you are.</p>
 <table class="keys">
-<tr><td>WASD</td><td>move</td></tr>
-<tr><td>Arrows · Q / E</td><td>move &amp; turn without a mouse</td></tr>
+<tr><td>WASD · arrows</td><td>move &amp; turn</td></tr>
 <tr><td>Mouse</td><td>look (click to lock cursor)</td></tr>
 <tr><td>SPACE / LMB</td><td>echo: tap = click, hold = loud</td></tr>
+<tr><td>E (hold)</td><td>search a body · repair a generator</td></tr>
 <tr><td>RMB / F</td><td>throw stone</td></tr>
 <tr><td>Shift / C</td><td>run / sneak</td></tr>
-<tr><td>Tab</td><td>time, score, stones</td></tr>
+<tr><td>Tab</td><td>time, generators, task</td></tr>
+<tr><td>Enter</td><td>skip the morning</td></tr>
 <tr><td>M · Esc / P</td><td>mic · pause</td></tr>
 </table>`,
     touchPing: 'ECHO',
@@ -229,6 +325,8 @@ const STR = {
     deathBy: {
       listener: 'Listener',
       crawler: 'Crawler',
+      watcher: 'Watcher',
+      howler: 'Howler',
     },
   },
 };

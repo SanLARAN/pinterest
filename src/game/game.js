@@ -4,7 +4,8 @@ import { CFG, dangerMultiplier, monsterTargets } from '../core/config.js';
 import { RNG, Simplex2, clamp, lerp, smoothstep, damp } from '../core/rng.js';
 import { t } from '../core/i18n.js';
 import { settings, saveSettings } from '../core/storage.js';
-import { Monster, ShadeRig } from './monsters.js';
+import { createMonster, ShadeRig } from './monsters.js';
+import { Objectives } from './objectives.js';
 import { Player } from './player.js';
 import { Shards } from './shards.js';
 import { Stones } from './stones.js';
@@ -16,6 +17,9 @@ import { Pulses } from '../render/pulses.js';
 const RED = [1.0, 0.13, 0.08];
 const SONAR = [0.84, 0.92, 1.0]; // cold, colourless light
 const STONE = [0.85, 0.95, 1.0];
+const HOWL = [1.0, 0.36, 0.1];
+const LAMPC = [1.0, 0.74, 0.42];
+const MORNING_LIGHT = 0.95;
 const _v = new THREE.Vector3();
 
 export class Game {
@@ -26,6 +30,9 @@ export class Game {
     this.shards = new Shards(this.scene);
     this.stones = new Stones();
     this.shade = new ShadeRig();
+    this.objectives = new Objectives(this);
+    this.hud.onNoteClose = () => this.objectives.closeNote();
+    this.events = [];
     this.monsters = [];
     this.timeline = [];
     this.noiseGen = new Simplex2(99);
@@ -49,8 +56,8 @@ export class Game {
     this.time = 0;
     this.score = 0;
     this.mult = 1;
-    this.stats = { shards: 0, close: 0, escapes: 0, loudest: 0, hunts: 0 };
-    this.state = 'play';
+    this.stats = { shards: 0, close: 0, escapes: 0, loudest: 0, hunts: 0, gens: 0, bodies: 0 };
+    this.state = 'morning';
     this.grace = true;
     this.fx = this._fxDefaults();
     this.timeline = [];
@@ -63,15 +70,38 @@ export class Game {
     for (const m of this.monsters) m.dispose();
     this.monsters = [];
     this.shards.reset(this.world, this.rng);
+    this.objectives.reset(this.rng);
+    this.objectives.setMorning(true);
     this.charge = { active: false, t: 0 };
     this.pingCD = 0;
     this.stepNoise = 0;
-    this.lastHeardAlert = -10;
-    this.lastScreamAlert = -10;
-    this.screamFlag = false;
     this.killer = null;
     this.deathT = 0;
     this.dawnT = 0;
+    this.morningT = 0;
+    this.duskT = 0;
+    this.duskHit = false;
+    this.leashT = 0;
+    this.morningAudio = false;
+    this.events = [];
+    this._resetNight();
+    shared.uDawn.value = MORNING_LIGHT;
+    shared.uMorning.value = 1;
+    shared.uSun.value.set(0.42, 0.62, -0.66).normalize(); // a high, friendly sun
+    shared.uFear.value = 0;
+    this.dread.reset();
+    this.hud.setIntro(null);
+    this.hud.setHint(null);
+    this.hud.setUse(null);
+    this.hud.showNote(null);
+    this.hud.setSkip(true);
+  }
+
+  // everything that measures the night starts from zero when the light dies
+  _resetNight() {
+    this.lastHeardAlert = -10;
+    this.lastScreamAlert = -10;
+    this.screamFlag = false;
     this.nextScare = 80 + this.rng.float(0, 35);
     this.scareCount = 0;
     this.firstPingT = -1;
@@ -79,12 +109,115 @@ export class Game {
     this.intro = { t: 0, phase: 0, autoSnap: false, revealDone: false, itHearsT: -1 };
     this.tut = { step: 0, t: 0, done: settings.tutorialDone };
     this.lastMultStep = 1;
-    this.dawnWarned = false;
-    shared.uDawn.value = 0;
-    shared.uFear.value = 0;
-    this.dread.reset();
+    this.endgame = false;
+    this.wakeT = 0;
+    this.hinted = {};
+  }
 
-    // the first thing you'll ever see: something standing in the trees, facing you
+  // ---------------- morning → dusk → night ----------------
+  updateMorning(dt, raw) {
+    const p = this.player;
+    this.morningT += dt;
+    this.time += dt;
+    if (!this.morningAudio && this.audio.ready && this.audio.ambOn) {
+      this.morningAudio = true;
+      this.audio.setMorning(true);
+    }
+    for (const e of raw.events) {
+      if (e === 'confirm' || e === 'skip') {
+        this.startDusk();
+        return;
+      }
+    }
+    const pev = p.update(dt, this.input, raw.look);
+    if (pev.step) this.audio.footstep(pev.step.intensity * 0.8);
+    if (pev.bump) {
+      this.audio.bump();
+      this.addTrauma(0.12);
+    }
+    // stay around the camp — there's nothing out there you need yet
+    const cx = 0, cz = 3, R = CFG.CAMP_LEASH;
+    const dx = p.x - cx, dz = p.z - cz, d = Math.hypot(dx, dz);
+    if (d > R) {
+      p.x = cx + (dx / d) * R;
+      p.z = cz + (dz / d) * R;
+      p.vx *= 0.2;
+      p.vz *= 0.2;
+      this.leashT = 2.8;
+    }
+    const hud = this.hud;
+    if (this.morningT > 0.8 && this.morningT < 7.5) hud.setIntro(t('morningBig'), t('morningSmall'));
+    else hud.setIntro(null);
+    let hint = null;
+    if (this.morningT > 8 && this.morningT < 17) hint = this.input.touch ? t('morningHintTouch') : t('morningHint');
+    else if (this.morningT > 19 && this.morningT < 26) hint = t('morningGen');
+    if (this.leashT > 0) {
+      this.leashT -= dt;
+      hint = t('campLeash');
+    }
+    hud.setHint(hint);
+    this.objectives.update(dt, false);
+    this.pulses.update(this.time);
+    this.audio.morningTick();
+    this.fx.danger = 0;
+    this._commonFx(dt);
+    if (this.morningT >= CFG.MORNING_SECONDS) this.startDusk();
+  }
+
+  startDusk() {
+    if (this.state !== 'morning') return;
+    this.state = 'dusk';
+    this.duskT = 0;
+    this.duskHit = false;
+    this.duskLight = shared.uDawn.value;
+    this.hud.setIntro(null);
+    this.hud.setHint(null);
+    this.hud.setSkip(false);
+    this.audio.dusk();
+    this.objectives.campFail();
+  }
+
+  updateDusk(dt, raw) {
+    this.duskT += dt;
+    this.time += dt;
+    const k = this.duskT;
+    // the light drains in under two seconds, stuttering like a dying bulb — then it's just gone
+    let L = this.duskLight * (1 - smoothstep(0.15, 1.75, k));
+    if (k > 0.45 && k < 1.75 && Math.sin(k * 61) * Math.sin(k * 23) > 0.2) L *= 0.2;
+    shared.uDawn.value = Math.max(0, L);
+    this.player.update(dt, this.input, raw.look, true); // you stop dead and stare
+    if (k >= 1.8 && !this.duskHit) {
+      this.duskHit = true;
+      shared.uDawn.value = 0;
+      this.addTrauma(0.55);
+      this.fx.glitch = 0.7;
+      this.fx.shockT = 0;
+      this.fx.shockAmp = 0.7;
+    }
+    this.objectives.update(dt, false);
+    this.pulses.update(this.time);
+    this._commonFx(dt);
+    if (k >= CFG.DUSK_SECONDS) this.startNight();
+  }
+
+  startNight() {
+    this.state = 'play';
+    this.time = 0;
+    shared.uDawn.value = 0;
+    shared.uMorning.value = 0;
+    shared.uSun.value.set(0.5, 0.35, -0.8).normalize(); // if you ever see the sky again, it'll be a sunrise
+    this.pulses.clear();
+    this.ghosts.clear();
+    this.timeline = [];
+    this.audio.setMorning(false);
+    this.objectives.setMorning(false);
+    this.objectives.startNight();
+    this._resetNight();
+    this.dread.reset();
+    this.hud.setSkip(false);
+    this.hud.setIntro(null);
+    this.hud.setHint(null);
+    // the first thing you'll ever see in the dark: something standing in the trees, facing you
     const p = this.player;
     const f = p.forward();
     let mx = p.x + f.x * 17 + f.z * 2.5, mz = p.z + f.z * 17 - f.x * 2.5;
@@ -92,15 +225,28 @@ export class Game {
       mx += this.rng.float(-2, 2);
       mz += this.rng.float(-2, 2);
     }
-    const m = new Monster('listener', this);
+    const m = createMonster('listener', this);
     m.spawn(mx, mz, 'idle');
     m.yaw = Math.atan2(p.x - mx, p.z - mz);
     m.scripted = 'freeze';
     m.intro = true;
     this.monsters.push(m);
     this.spawnMonster('listener', 75, 100);
-    this.hud.setIntro(null);
-    this.hud.setHint(null);
+  }
+
+  // how brightly the sound waves light (x, y, z) right now
+  lightAt(x, y, z) {
+    let L = 0;
+    for (const s of this.pulses.slots) {
+      if (!s.active) continue;
+      L += Pulses.lightAt(s, Math.hypot(x - s.x, y - s.y, z - s.z), this.time);
+    }
+    return L;
+  }
+
+  // what the Howler's wave counts as "moving"
+  movingForHowler() {
+    return this.player.speed > 0.7 || (this.charge.active && this.charge.t > 0.3);
   }
 
   // ---------------- helpers ----------------
@@ -119,7 +265,7 @@ export class Game {
       if (!this.world.col.free(x, z, 1)) continue;
       const L = this.world.lake;
       if (L && Math.hypot(x - L.x, z - L.z) < L.r + 3) continue;
-      const m = new Monster(type, this);
+      const m = createMonster(type, this);
       m.spawn(x, z);
       this.monsters.push(m);
       return m;
@@ -252,7 +398,7 @@ export class Game {
     this.stones.throw(e.x + dx * 0.4, e.y - 0.15, e.z + dz * 0.4, dx, dy, dz);
     this.audio.throwWhoosh();
     this.addTrauma(0.05);
-    if (this.tut.step === 2) this.tut.t = 99;
+    if (this.tut.step === 3) this.tut.t = 99;
   }
 
   onStoneImpact(h) {
@@ -302,8 +448,18 @@ export class Game {
 
   onMonsterHunt(m) {
     this.stats.hunts++;
-    this.audio.screech(m.x, m.y + 2.4, m.z, 1);
-    this.pulses.emit(m.x, m.y + 1.6, m.z, this.time, { radius: 26, strength: 0.95, decay: 0.75, color: RED, kind: 'monster' });
+    if (m.type === 'howler') {
+      this.audio.howlerBark(m.x, m.y + 1.8, m.z);
+      this.pulses.emit(m.x, m.y + 1.6, m.z, this.time, { radius: 20, strength: 0.9, decay: 0.8, color: HOWL, kind: 'monster' });
+      if (!this.hinted.howlSpot) {
+        this.hinted.howlSpot = true;
+        this.hud.setHint(`<span class="red">${t('hintHowlerSpot')}</span>`);
+        this.timeline.push({ at: this.time + 4.5, fn: () => this.hud.setHint(null) });
+      }
+    } else {
+      this.audio.screech(m.x, m.y + 2.4, m.z, 1);
+      this.pulses.emit(m.x, m.y + 1.6, m.z, this.time, { radius: 26, strength: 0.95, decay: 0.75, color: RED, kind: 'monster' });
+    }
     this.hud.flashAlert(t('aHunt'), 'danger', 1.8);
     this.fx.glitch = Math.max(this.fx.glitch, 0.65);
     this.fx.red = Math.max(this.fx.red, 0.3);
@@ -330,6 +486,113 @@ export class Game {
       this.hud.popup(`+${Math.round(pts)} ${t('aEscaped')}`, 'cyan');
       this.fx.slowT = 0.5;
     }
+  }
+
+  // ---------------- the Howler ----------------
+  onHowlerInhale(m) {
+    this.audio.howlerInhale(m.x, m.y + 1.8, m.z);
+    const d = m.playerDist;
+    if (d < m.cfg.howlR + 8) {
+      this.fx.danger = Math.max(this.fx.danger, 0.5);
+      if (!this.hinted.howl) {
+        this.hinted.howl = true;
+        this.hud.setHint(`<span class="red">${t('hintHowler')}</span>`);
+        this.timeline.push({ at: this.time + 4.2, fn: () => this.hud.setHint(null) });
+      }
+    }
+  }
+
+  onHowl(m) {
+    const R = m.cfg.howlR;
+    this.audio.howlerHowl(m.x, m.y + 2.2, m.z, 1);
+    // the howl is a wave of its own: it lights the forest red for everyone, you included
+    const s = this.pulses.emit(m.x, m.y + 2.0, m.z, this.time, { radius: R, strength: 1.05, decay: 0.55, color: HOWL, kind: 'monster' });
+    this.echoTicks(s, 0.5);
+    const d = m.playerDist;
+    if (d < R) {
+      const k = 1 - d / R;
+      this.addTrauma(0.2 + 0.4 * k);
+      this.fx.red = Math.max(this.fx.red, 0.2 + 0.3 * k);
+      this.fx.shockT = 0;
+      this.fx.shockAmp = 0.3 + 0.6 * k;
+    }
+    this.radar.blip(m.x, m.z, 'monster', true);
+  }
+
+  onHowlerBark(m) {
+    this.audio.howlerBark(m.x, m.y + 1.8, m.z);
+    this.pulses.emit(m.x, m.y + 1.6, m.z, this.time, { radius: 18, strength: 0.8, decay: 0.9, color: HOWL, kind: 'monster' });
+    if (m.playerDist < 18) this.addTrauma(0.12);
+  }
+
+  // the two that come later: one of each, ever
+  updateArrivals() {
+    const n = this.objectives.count;
+    for (const type of ['watcher', 'howler']) {
+      if (this.monsters.some((m) => m.type === type)) continue;
+      const c = CFG.MONSTER[type];
+      const due = this.time >= c.arrive || (n >= c.arriveGens && this.time >= c.arrive * 0.5);
+      if (!due || this.state !== 'play') continue;
+      if (type === 'watcher') {
+        const w = createMonster('watcher', this);
+        w.vanish(6);
+        this.monsters.push(w);
+        this.audio.watcherArrive();
+      } else {
+        const h = this.spawnMonster('howler', 70, 110);
+        if (!h) continue;
+        h.howlT = 26;
+        // far away, it announces itself
+        this.audio.howlerHowl(h.x, h.y + 2.2, h.z, 0.8);
+      }
+      this.hud.flashAlert(t(type === 'watcher' ? 'aWatcherArrive' : 'aHowlerArrive'), 'warn', 2.6);
+      this.audio.sting(0.3);
+    }
+  }
+
+  // ---------------- objectives ----------------
+  onCorpseSearched(body, k) {
+    this.stats.bodies++;
+    const pts = CFG.SCORE.corpse * this.mult;
+    this.score += pts;
+    this.hud.popup(`+${Math.round(pts)} ${t('aFound')}: ${t('parts')[CFG.GENERATORS[k].part]}`, 'amber');
+    this.particles.burst(body.x, body.y + 0.3, body.z, 18, { color: [1.0, 0.72, 0.3], speed: 2.5, up: 1.5, life: 0.8, size: 0.06, gravity: -4, drag: 2 });
+    this.audio.heartbeat(0.7);
+    this.addTrauma(0.06);
+    this.noise(body.x, body.z, 0.1, 'repair');
+  }
+
+  onSpark(g) {
+    const x = g.x, y = g.y + 0.7, z = g.z;
+    this.audio.spark(x, y, z);
+    this.particles.burst(x, y, z, 34, { color: [1.0, 0.9, 0.55], speed: 7, up: 2.5, life: 0.55, size: 0.05, gravity: -9, drag: 1.2 });
+    this.pulses.emit(x, y, z, this.time, { radius: 8, strength: 0.95, decay: 1.6, color: [0.85, 0.92, 1.0], kind: 'stone' });
+    this.noise(x, z, g.spec.sparkLoud, 'repair');
+    this.addTrauma(0.18);
+    this.fx.white = Math.max(this.fx.white, 0.12);
+    this.fx.glitch = Math.max(this.fx.glitch, 0.3);
+  }
+
+  onSpinUp(g) {
+    this.hud.flashAlert(t('aSpinUp'), 'warn', 2.2);
+    this.audio.sting(0.25);
+  }
+
+  onGeneratorStarted(g, count) {
+    this.stats.gens = count;
+    const pts = CFG.SCORE.generator * this.mult;
+    this.score += pts;
+    this.hud.popup(`+${Math.round(pts)}`, 'amber');
+    this.hud.flashAlert(t('aGenOn').replace('{n}', count), 'dawn', 2.6);
+    this.hud.peek(4);
+    // the light coming back: a warm wave rolls out from the lamp
+    const L = g.site.lamp;
+    this.pulses.emit(L.x, L.y - 1, L.z, this.time, { radius: 24, strength: 1.0, decay: 0.45, color: LAMPC, kind: 'shard' });
+    this.particles.burst(L.x, L.y, L.z, 30, { color: [1.0, 0.82, 0.5], speed: 4, life: 0.9, size: 0.06, gravity: -3, drag: 1.6 });
+    this.fx.white = Math.max(this.fx.white, 0.08);
+    this.addTrauma(0.15);
+    this.noise(g.x, g.z, g.spec.startLoud, 'repair');
+    if (count >= 5) this.timeline.push({ at: this.time + 1.4, fn: () => { if (this.state === 'play') this.startDawn(); } });
   }
 
   // ---------------- death ----------------
@@ -379,6 +642,27 @@ export class Game {
       n.shoulderL.rotation.x = -2.1; n.shoulderR.rotation.x = -2.1;
       n.shoulderL.rotation.z = -0.5; n.shoulderR.rotation.z = 0.5;
       n.elbowL.rotation.x = -0.5; n.elbowR.rotation.x = -0.5;
+    } else if (m.type === 'watcher') {
+      // its face comes apart down the middle
+      const open = Math.min(1, tt * 3.2);
+      n.faceL.rotation.y = -1.1 * open;
+      n.faceR.rotation.y = 1.1 * open;
+      n.head.rotation.z = 0.9 + Math.sin(tt * 40) * 0.08;
+      n.neck.rotation.x = 0.5;
+      n.spine.rotation.x = 0.7;
+      n.shoulderL.rotation.x = -2.5; n.shoulderR.rotation.x = -2.5;
+      n.shoulderL.rotation.z = -0.7; n.shoulderR.rotation.z = 0.7;
+      n.elbowL.rotation.x = -0.9; n.elbowR.rotation.x = -0.9;
+    } else if (m.type === 'howler') {
+      n.pelvis.rotation.x = 0.1;
+      n.chest.rotation.x = 0.15;
+      n.chest.scale.setScalar(1);
+      n.neck.rotation.x = 0.1;
+      n.head.rotation.x = -0.2 + Math.sin(tt * 36) * 0.08;
+      n.head.rotation.z = Math.sin(tt * 47) * 0.15;
+      n.jaw.rotation.x = 1.15 + Math.sin(tt * 30) * 0.15;
+      n.shoulderL.rotation.x = -1.6; n.shoulderR.rotation.x = -1.6;
+      n.shoulderL.rotation.z = -0.9; n.shoulderR.rotation.z = 0.9;
     } else {
       n.head.rotation.z = Math.sin(tt * 50) * 0.2;
       n.jaw.rotation.x = 0.9 + Math.sin(tt * 40) * 0.2;
@@ -392,10 +676,10 @@ export class Game {
     r.updateMatrixWorld(true);
     n.head.getWorldPosition(_v);
     const lunge = Math.max(0, 1 - tt * 5);
-    const dist = (m.type === 'listener' ? 1.05 : 0.95) + lunge * 1.8;
+    const dist = (m.type === 'listener' ? 1.05 : m.type === 'howler' ? 1.3 : m.type === 'watcher' ? 0.9 : 0.95) + lunge * 1.8;
     r.position.set(p.x + fx * dist - _v.x, camY - _v.y + 0.12, p.z + fz * dist - _v.z);
     const strobe = reduced ? 1 : (Math.floor(tt * 14) % 2 === 0 ? 1.6 : 0.35);
-    if (!this.jsGhost) this.jsGhost = this.ghosts.spawn(rig, this.time, { sticky: true, strength: strobe, full: 1, color: 0xff3020 });
+    if (!this.jsGhost) this.jsGhost = this.ghosts.spawn(rig, this.time, { sticky: true, strength: strobe, full: 1, color: m.type === 'watcher' ? 0xe8eef4 : m.type === 'howler' ? 0xff5a18 : 0xff3020 });
     else {
       this.ghosts.refresh(this.jsGhost, rig);
       this.jsGhost.strength = strobe;
@@ -418,12 +702,16 @@ export class Game {
   }
 
   // ---------------- dawn ----------------
+  // all five generators run: the lamps flare, the dark backs off, and the sky goes pale
   startDawn() {
     this.state = 'dawn';
     this.dawnT = 0;
     this.hud.setIntro(null);
     this.hud.intro.classList.remove('red');
-    this.score += CFG.SCORE.dawn;
+    this.hud.setUse(null);
+    this.objectives.closeNote();
+    this.winBonus = CFG.SCORE.win + Math.max(0, Math.round(CFG.RUN_SECONDS - this.time)) * CFG.SCORE.speedBonus;
+    this.score += this.winBonus;
     this.audio.dawn();
     this.audio.setAmbience(0.25, 0);
     this.hud.setHint(null);
@@ -560,6 +848,9 @@ export class Game {
     const fx = this.fx;
     const input = this.input;
     const look = raw.look;
+    this.events = raw.events;
+    if (this.state === 'morning') return this.updateMorning(dt, raw);
+    if (this.state === 'dusk') return this.updateDusk(dt, raw);
 
     if (this.state === 'dying') {
       this.updateDying(dt);
@@ -595,6 +886,11 @@ export class Game {
         this.charge.t = 0;
       } else if (e === 'pingUp') this.pingRelease();
       else if (e === 'throw') this.throwStone();
+    }
+    // E puts a note away
+    if (this.objectives.note && raw.events.includes('useDown')) {
+      this.objectives.closeNote();
+      this.events = raw.events.filter((e) => e !== 'useDown');
     }
     if (this.charge.active) {
       this.charge.t += dt; // the loudness ring around the dot shows how loud this will be
@@ -658,6 +954,9 @@ export class Game {
     const nearest = this.updateMonsters(dt);
     if (this.state !== 'play') return; // killed this frame
     this.shards.update(dt, this);
+    this.objectives.update(dt, true);
+    if (this.state !== 'play') return;
+    this.updateArrivals();
     this.updateFronts();
     this.updateDirector(dt);
     if (this.time > this.nextScare) {
@@ -676,30 +975,36 @@ export class Game {
     this.audio.update(fx.danger, this.time / CFG.RUN_SECONDS);
     this.audio.setAmbience(0.9, fx.danger);
 
-    // dawn approaching
-    const left = CFG.RUN_SECONDS - this.time;
-    shared.uDawn.value = left < 60 ? (1 - left / 60) * 0.12 : 0;
-    if (left < 60 && !this.dawnWarned) {
-      this.dawnWarned = true;
-      this.hud.flashAlert(t('aDawnSoon'), 'dawn', 2.5);
+    // past half an hour the forest stops pretending: everything starts closing in on you
+    if (this.time > CFG.RUN_SECONDS) {
+      if (!this.endgame) {
+        this.endgame = true;
+        this.wakeT = 5;
+        this.hud.flashAlert(t('aAwake'), 'danger', 3);
+        this.audio.sting(0.7);
+      }
+      this.wakeT -= dt;
+      if (this.wakeT <= 0) {
+        this.wakeT = 14;
+        for (const m of this.monsters) {
+          if (m.state === 'wander' || m.state === 'search' || m.state === 'idle') m.investigate(p.x + this.rng.float(-7, 7), p.z + this.rng.float(-7, 7));
+        }
+      }
     }
-    if (left <= 0) this.startDawn();
 
     this._commonFx(dt);
   }
 
   updateMonsters(dt) {
-    const p = this.player;
     let danger = 0;
     for (const m of this.monsters) {
       m.update(dt, this.time);
       if (this.state !== 'play') return 1;
-      const d = m.playerDist;
-      if (m.state === 'hunt') danger = Math.max(danger, 0.55 + 0.45 * clamp(1 - d / 40, 0, 1));
-      else if (m.state === 'investigate' || m.state === 'search') danger = Math.max(danger, 0.55 * clamp(1 - d / 28, 0, 1));
-      else danger = Math.max(danger, 0.4 * clamp(1 - d / 14, 0, 1));
+      danger = Math.max(danger, m.danger());
+      this.lampGhost(m);
       // close call: it passed right by you and never knew
-      if (m.state !== 'hunt' && d < 4.6 && this.time - m.lastCloseCall > 25 && this.firstPingT >= 0) {
+      const d = m.playerDist;
+      if (m.type !== 'watcher' && m.state !== 'hunt' && d < 4.6 && this.time - m.lastCloseCall > 25 && this.firstPingT >= 0) {
         m.lastCloseCall = this.time;
         this.stats.close++;
         const pts = CFG.SCORE.closeCall * this.mult;
@@ -707,12 +1012,28 @@ export class Game {
         this.hud.popup(`+${Math.round(pts)} ${t('aClose')}`, 'red');
         this.fx.slowT = 0.7;
         this.audio.heartbeat(0.9);
-        this.audio.sniff(m.x, m.y + (m.type === 'crawler' ? 0.7 : 2.1), m.z, 0.55);
+        this.audio.sniff(m.x, m.y + m.headY, m.z, 0.55);
         this.addTrauma(0.12);
       }
     }
-    void p;
     return danger;
+  }
+
+  // standing in a lamp's light, a monster can simply be seen — a live afterimage that follows it
+  lampGhost(m) {
+    const lit = m.state === 'lurk' ? 0 : this.objectives.lampAt(m.x, m.z);
+    if (lit > 0.06) {
+      const str = Math.min(0.85, 0.22 + lit * 1.3);
+      if (!m.lampGhost) m.lampGhost = this.ghosts.spawn(m.rig, this.time, { sticky: true, strength: str, full: 0.25, color: m.ghostColor, jitter: 0.6 });
+      else {
+        this.ghosts.refresh(m.lampGhost, m.rig);
+        m.lampGhost.strength = str;
+      }
+      m.lastGhostT = this.time;
+    } else if (m.lampGhost) {
+      this.ghosts.release(m.lampGhost);
+      m.lampGhost = null;
+    }
   }
 
   updateFronts() {
@@ -722,8 +1043,22 @@ export class Game {
         if (d > s.prevR && d <= s.curR && d <= s.radius) {
           const fall = 1 - smoothstep(s.radius * 0.42, s.radius, d);
           const str = clamp(s.strength * (0.65 + 0.7 * fall), 0.6, 1.8);
-          this.ghosts.spawn(m.rig, this.time, { strength: str, color: 0xff2a20, life: 2.9, decay: 0.85 });
+          this.ghosts.spawn(m.rig, this.time, { strength: str, color: m.ghostColor, life: 2.9, decay: 0.85 });
           m.lastGhostT = this.time;
+          if (m.type === 'watcher' && !m.revealed) {
+            m.revealed = true;
+            if (this.time - (this.lastWatcherSting ?? -99) > 40) {
+              this.lastWatcherSting = this.time;
+              this.audio.watcherSting();
+              this.addTrauma(0.3);
+              this.fx.glitch = Math.max(this.fx.glitch, 0.5);
+            }
+            if (!this.hinted.watcher) {
+              this.hinted.watcher = true;
+              this.hud.setHint(`<span class="red">${t('hintWatcher')}</span>`);
+              this.timeline.push({ at: this.time + 5.5, fn: () => this.hud.setHint(null) });
+            }
+          }
           this.radar.blip(m.x, m.z, 'monster', m.state === 'hunt');
           if (s.kind !== 'monster') this.audio.monsterReturn(0, m.x, m.y + 2, m.z, 0.25 + str * 0.3);
           if (m.intro && !this.intro.revealDone && s.kind === 'player') {
@@ -737,6 +1072,7 @@ export class Game {
         }
       }
       this.shards.onFront(s, this);
+      this.objectives.onFront(s);
     }
   }
 
@@ -756,7 +1092,10 @@ export class Game {
     this.dirT = 1.0;
     const want = monsterTargets(this.time);
     let L = 0, C = 0;
-    for (const m of this.monsters) (m.type === 'listener' ? L++ : C++);
+    for (const m of this.monsters) {
+      if (m.type === 'listener') L++;
+      else if (m.type === 'crawler') C++;
+    }
     if (L < want.listeners) this.spawnMonster('listener', 60, 90);
     else if (C < want.crawlers) this.spawnMonster('crawler', 55, 85);
     for (const m of this.monsters) {
@@ -795,17 +1134,16 @@ export class Game {
     if (tut.done) return;
     tut.t += dt;
     const touch = this.input.touch;
-    const p = this.player;
     if (tut.step === 0) {
-      if (tut.t > 2.2) { tut.step = 1; tut.t = 0; }
+      if (tut.t > 2.2) { tut.step = this.morningT < 17 ? 1 : 2; tut.t = 0; }
     } else if (tut.step === 1) {
       hud.setHint(touch ? t('tutMoveTouch') : t('tutMove'));
-      if ((p.distFromSpawn > 12 && tut.t > 4) || tut.t > 16) { tut.step = 2; tut.t = 0; }
+      if (tut.t > 7) { tut.step = 2; tut.t = 0; }
     } else if (tut.step === 2) {
-      hud.setHint(touch ? t('tutStoneTouch') : t('tutStone'));
-      if (tut.t > 8) { tut.step = 3; tut.t = 0; }
+      hud.setHint(touch ? t('tutUseTouch') : t('tutUse'));
+      if (tut.t > 9 || this.stats.bodies > 0) { tut.step = 3; tut.t = 0; }
     } else if (tut.step === 3) {
-      hud.setHint(touch ? t('tutShardsTouch') : t('tutShards'));
+      hud.setHint(touch ? t('tutStoneTouch') : t('tutStone'));
       if (tut.t > 7) { tut.step = 4; tut.t = 0; }
     } else if (tut.step === 4) {
       hud.setHint(`<span class="red">${t('tutScream')}</span>`);
