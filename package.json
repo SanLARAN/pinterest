@@ -1,0 +1,43 @@
+{
+  "name": "echo-30",
+  "version": "1.0.0",
+  "description": "ЭХО-30 / ECHO-30 — a 3D echolocation low-poly horror game: a huge dark forest, your microphone as the only flashlight, 5 generators, and things that hear you scream.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "serve": "node tools/serve.mjs",
+    "check": "node tools/checkui.mjs",
+    "smoke": "node tools/smoke.mjs",
+    "test": "node tools/checkui.mjs && node tools/cooptest.mjs && node tools/smoke.mjs",
+    "deploy": "vite build",
+    "cooptest": "node tools/cooptest.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SanLARAN/pinterest.git"
+  },
+  "keywords": [
+    "game",
+    "horror",
+    "three-js",
+    "echolocation",
+    "webgl",
+    "webaudio",
+    "co-op"
+  ],
+  "author": "SanLARAN",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/SanLARAN/pinterest/issues"
+  },
+  "homepage": "https://sanlaran.github.io/pinterest/",
+  "dependencies": {
+    "peerjs": "^1.5.4",
+    "three": "^0.169.0"
+  },
+  "devDependencies": {
+    "vite": "^7.3.7"
+  },
+  "type": "module"
+}

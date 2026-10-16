@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" content="#04070a" />
+<meta name="description" content="ЭХО-30 — 3D эхолокационный хоррор: огромный тёмный лес, микрофон вместо фонаря, 5 генераторов и твари, которые слышат твой крик." />
+<title>ЭХО-30 // ECHO-30 — sonar horror</title>
+<link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+  <script type="module" crossorigin src="./assets/index-BypSpd8Y.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/three-C3uWwXVM.js">
+  <link rel="stylesheet" crossorigin href="./assets/index-BJbm8O5A.css">
+</head>
+<body>
+<div id="app">
+  <canvas id="gl"></canvas>
+
+  <!-- ============ FULLSCREEN FX LAYERS ============ -->
+  <div id="fx" aria-hidden="true">
+    <div class="fx-vignette" id="fxVignette"></div>
+    <div class="fx-grain"></div>
+    <div class="fx-scan"></div>
+    <div class="fx-flash" id="fxFlash"></div>
+    <div class="fx-damage" id="fxDamage"></div>
+    <div class="fx-breath" id="fxBreath"></div>
+    <div class="fx-aberr" id="fxAberr"></div>
+  </div>
+
+  <!-- ============ JUMPSCARE ============ -->
+  <div id="jumpscare" class="hidden" aria-hidden="true">
+    <img id="jumpscareImg" alt="" />
+    <div class="js-static"></div>
+  </div>
+
+  <!-- ============ HUD ============ -->
+  <div id="hud" class="hidden">
+    <div class="hud-top-left">
+      <div class="clock">
+        <div class="clock-time" id="hudClock">06:12</div>
+        <div class="clock-label" id="hudPhase" data-i18n="phase_morning">УТРО</div>
+      </div>
+      <div class="night-timer" id="hudNightWrap">
+        <div class="nt-label" data-i18n="until_dawn">ДО РАССВЕТА</div>
+        <div class="nt-bar"><i id="hudNightBar"></i></div>
+        <div class="nt-time" id="hudNight">30:00</div>
+      </div>
+    </div>
+
+    <div class="hud-top-center">
+      <div id="hudObjective" class="objective"></div>
+      <div id="hudToastWrap" class="toast-wrap"></div>
+    </div>
+
+    <div class="hud-top-right">
+      <canvas id="radar" width="240" height="240"></canvas>
+      <div class="radar-frame"></div>
+      <div class="radar-tag" data-i18n="sonar">СОНАР</div>
+    </div>
+
+    <div class="hud-compass" id="hudCompass"></div>
+
+    <div class="hud-bottom-left">
+      <div class="nerve" id="hudNerve">
+        <span class="n-pip"></span><span class="n-pip"></span><span class="n-pip"></span>
+      </div>
+      <div class="meter stamina"><i id="hudStamina"></i></div>
+      <div class="meter echo"><i id="hudEcho"></i></div>
+      <div class="stamina-label"><span data-i18n="stamina">ДЫХАНИЕ</span><span id="hudItems"></span></div>
+    </div>
+
+    <div class="hud-bottom-center">
+      <div class="micbox" id="micBox">
+        <div class="mic-title"><span id="micLabel" data-i18n="mic_live">МИКРОФОН</span><span class="mic-state" id="micState">ON</span></div>
+        <div class="mic-meter">
+          <div class="mic-zones"><i class="z-safe"></i><i class="z-voice"></i><i class="z-scream"></i></div>
+          <div class="mic-needle" id="micNeedle"></div>
+          <div class="mic-level" id="micLevel"></div>
+        </div>
+        <div class="mic-hint" id="micHint" data-i18n="mic_hint">тихий щелчок голосом = эхо · КРИК = смерть</div>
+      </div>
+      <div class="silence" id="hudSilence"><span data-i18n="silence">ТИШИНА</span> <b id="hudSilenceT">0:00</b></div>
+    </div>
+
+    <div class="hud-bottom-right">
+      <div class="score"><span data-i18n="score">ОЧКИ</span><b id="hudScore">0</b></div>
+      <div class="gens"><span data-i18n="generators">ГЕНЕРАТОРЫ</span><b id="hudGens">0/5</b></div>
+      <div class="pingcd" id="hudPingCd"><i></i></div>
+    </div>
+
+    <div class="hud-center">
+      <div class="reticle" id="reticle"><i></i><b></b></div>
+      <div class="noise-ring" id="noiseRing"></div>
+      <div class="interact" id="hudInteract"></div>
+      <div class="danger" id="hudDanger"></div>
+    </div>
+
+    <div class="hud-hint" id="hudHint"></div>
+
+    <!-- touch controls -->
+    <div id="touch" class="hidden">
+      <div class="tstick" id="tStickL"><div class="tknob" id="tKnobL"></div></div>
+      <div class="tlook" id="tLook"></div>
+      <div class="tstick right" id="tStickR"><div class="tknob" id="tKnobR"></div></div>
+      <div class="tbtns">
+        <button class="tbtn ping" id="btnPing" data-i18n="t_ping">ЭХО</button>
+        <button class="tbtn use" id="btnUse" data-i18n="t_use">РУКИ</button>
+        <button class="tbtn run" id="btnRun" data-i18n="t_run">БЕГ</button>
+        <button class="tbtn crouch" id="btnCrouch" data-i18n="t_breath">ТИХО</button>
+        <button class="tbtn shout" id="btnShout" data-i18n="t_shout">КРИК</button>
+        <button class="tbtn pause" id="btnPause">II</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ MENU ============ -->
+  <div id="menu" class="screen">
+    <div class="menu-bg"></div>
+    <div class="menu-inner">
+      <div class="brand">
+        <div class="brand-sub" data-i18n="brand_sub">sonar horror // low-poly forest</div>
+        <h1 class="brand-title">ЭХО<span>-30</span></h1>
+        <div class="brand-tag" data-i18n="brand_tag">Ты ничего не видишь. Твой голос — единственный фонарь.</div>
+      </div>
+
+      <div class="menu-cols">
+        <div class="col">
+          <div class="panel">
+            <div class="panel-h" data-i18n="night_len">ДЛИНА НОЧИ</div>
+            <div class="segs" id="segNight">
+              <button data-v="480" data-i18n="night_arcade">АРКАДА 8м</button>
+              <button data-v="900" data-i18n="night_short">КОРОТКАЯ 15м</button>
+              <button class="on" data-v="1800" data-i18n="night_canon">КАНОН 30м</button>
+            </div>
+            <div class="panel-h" data-i18n="audio_in">ЗВУКОВОЙ ВВОД</div>
+            <div class="segs" id="segMic">
+              <button class="on" data-v="mic" data-i18n="mic_on">МИКРОФОН</button>
+              <button data-v="keys" data-i18n="mic_off">КЛАВИШИ</button>
+            </div>
+            <div class="row">
+              <button class="btn ghost sm" id="btnCalib" data-i18n="calibrate">КАЛИБРОВКА</button>
+              <div class="calib-bar"><i id="calibBar"></i><u id="calibMark1"></u><u id="calibMark2"></u></div>
+            </div>
+            <div class="slider"><label for="micSens" data-i18n="mic_sens">Чувствительность микрофона</label>
+              <input type="range" id="micSens" min="0.3" max="3" step="0.05" value="1" /><b id="micSensV">1.00×</b></div>
+            <div class="panel-h" data-i18n="snd">ЗВУК</div>
+            <div class="slider"><label for="sndMaster" data-i18n="snd_master">Общая громкость</label>
+              <input type="range" id="sndMaster" min="0" max="1" step="0.01" value="0.85" /><b id="sndMasterV">85%</b></div>
+            <div class="slider"><label for="sndAmb" data-i18n="snd_amb">Лес: ветер, дрон</label>
+              <input type="range" id="sndAmb" min="0" max="1.5" step="0.01" value="0.9" /><b id="sndAmbV">90%</b></div>
+            <div class="slider"><label for="sndMon" data-i18n="snd_mon">Твари и страх</label>
+              <input type="range" id="sndMon" min="0" max="1.5" step="0.01" value="1" /><b id="sndMonV">100%</b></div>
+            <div class="slider"><label for="sndSfx" data-i18n="snd_sfx">Эхо и действия</label>
+              <input type="range" id="sndSfx" min="0" max="1.5" step="0.01" value="1" /><b id="sndSfxV">100%</b></div>
+            <div class="slider"><label for="sndUi" data-i18n="snd_ui">Меню</label>
+              <input type="range" id="sndUi" min="0" max="1.5" step="0.01" value="0.8" /><b id="sndUiV">80%</b></div>
+            <div class="panel-h" data-i18n="hud_label">ИНТЕРФЕЙС</div>
+            <div class="segs" id="segHud">
+              <button data-v="full" data-i18n="hud_full">ПОЛНЫЙ</button>
+              <button class="on" data-v="min" data-i18n="hud_min">МИНИМУМ</button>
+              <button data-v="none" data-i18n="hud_none">НИЧЕГО</button>
+            </div>
+            <div class="sub" data-i18n="hud_hint_min">Остались сонар, нервы и микрофон</div>
+            <div class="row toggles">
+              <label class="chk"><input type="checkbox" id="chkFade" checked /><span data-i18n="hud_fade">Гасить в тишине</span></label>
+            </div>
+            <div class="panel-h" data-i18n="graphics">ГРАФИКА</div>
+            <div class="segs" id="segQ">
+              <button data-v="low" data-i18n="q_low">НИЗК.</button>
+              <button class="on" data-v="high" data-i18n="q_high">ВЫС.</button>
+            </div>
+            <div class="row toggles">
+              <label class="chk"><input type="checkbox" id="chkShake" checked /><span data-i18n="shake">Тряска экрана</span></label>
+              <label class="chk"><input type="checkbox" id="chkScares" checked /><span data-i18n="scares">Скримеры</span></label>
+            </div>
+          </div>
+
+          <div class="panel coop">
+            <div class="panel-h" data-i18n="coop">ОНЛАЙН КООП <em id="coopState" class="tag">offline</em></div>
+            <div class="row">
+              <button class="btn ghost sm" id="btnHost" data-i18n="coop_host">СОЗДАТЬ КОМНАТУ</button>
+              <input id="joinCode" class="inp" maxlength="8" placeholder="КОД" autocomplete="off" spellcheck="false" />
+              <button class="btn ghost sm" id="btnJoin" data-i18n="coop_join">ВОЙТИ</button>
+            </div>
+            <div class="coop-msg" id="coopMsg" data-i18n="coop_msg">P2P через WebRTC. Хост считает монстров, гости видят общий мир. Голосовой чат включается в игре — товарищ услышит твой крик.</div>
+            <div class="row">
+              <label class="chk"><input type="checkbox" id="chkVoice" /><span data-i18n="voice_chat">Голосовой чат</span></label>
+              <span class="room-code" id="roomCode"></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="col">
+          <div class="panel">
+            <div class="panel-h" data-i18n="controls">УПРАВЛЕНИЕ</div>
+            <ul class="keys">
+              <li><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span data-i18n="k_move">идти</span></li>
+              <li><kbd>МЫШЬ</kbd><span data-i18n="k_look">смотреть</span></li>
+              <li><kbd>SPACE</kbd><span data-i18n="k_ping">эхолокационный щелчок (удерживай = мощный импульс)</span></li>
+              <li><kbd>X</kbd><span data-i18n="k_shout">КРИК — видно всё, но твари сбегутся</span></li>
+              <li><kbd>SHIFT</kbd><span data-i18n="k_run">бег (шумно)</span></li>
+              <li><kbd>CTRL</kbd><span data-i18n="k_crouch">красться (тихо)</span></li>
+              <li><kbd>Q</kbd><span data-i18n="k_breath">задержать дыхание</span></li>
+              <li><kbd>E</kbd><span data-i18n="k_use">чинить / обыскать труп</span></li>
+              <li><kbd>TAB</kbd><span data-i18n="k_map">цели и записки</span></li>
+              <li><kbd>ESC</kbd><span data-i18n="k_pause">пауза</span></li>
+              <li><kbd>H</kbd><span data-i18n="k_hud">интерфейс: минимум → ничего → полный</span></li>
+              <li><kbd>M</kbd><span data-i18n="k_mute">звук вкл/выкл</span></li>
+              <li class="micline"><kbd>🎙</kbd><span data-i18n="k_mic">голос: тихий щелчок языком = эхо. Не кричи.</span></li>
+            </ul>
+          </div>
+
+          <div class="panel">
+            <div class="panel-h"><span data-i18n="highscores">РЕКОРДЫ</span><button class="linkbtn" id="btnClearHs" data-i18n="clear">стереть</button></div>
+            <div class="hs" id="hsTable"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="menu-foot">
+        <button class="btn big" id="btnStart" data-i18n="start">ВОЙТИ В ЛЕС</button>
+        <div class="foot-note">
+          <span id="menuVersion">v1.0</span> ·
+          <button class="linkbtn" id="btnLang">EN</button> ·
+          <span class="warn" data-i18n="epilepsy">Есть вспышки, громкие звуки и скримеры. Нужны наушники и микрофон.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ OBJECTIVES / NOTES OVERLAY ============ -->
+  <div id="notes" class="screen hidden soft">
+    <div class="notes-inner">
+      <div class="panel">
+        <div class="panel-h" data-i18n="objectives">ЗАДАЧИ</div>
+        <ul id="objList" class="objlist"></ul>
+      </div>
+      <div class="panel">
+        <div class="panel-h" data-i18n="found_notes">НАЙДЕННЫЕ ЗАПИСКИ</div>
+        <div id="noteList" class="notelist"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ PAUSE ============ -->
+  <div id="pause" class="screen hidden soft">
+    <div class="pause-inner panel">
+      <h2 data-i18n="paused">ПАУЗА</h2>
+      <div class="p-stats" id="pauseStats"></div>
+      <div class="p-btns">
+        <button class="btn" id="btnResume" data-i18n="resume">ПРОДОЛЖИТЬ</button>
+        <button class="btn ghost" id="btnRestart" data-i18n="restart">ЗАНОВО</button>
+        <button class="btn ghost" id="btnMenu" data-i18n="to_menu">В МЕНЮ</button>
+      </div>
+      <div class="p-hint" data-i18n="pause_hint">Монстры ждут. Они не дышат, пока ты в меню.</div>
+    </div>
+  </div>
+
+  <!-- ============ GAME OVER / WIN ============ -->
+  <div id="over" class="screen hidden">
+    <div class="over-inner">
+      <h2 class="over-title" id="overTitle">ТЫ ЗАКРИЧАЛ</h2>
+      <div class="over-cause" id="overCause"></div>
+      <div class="over-stats" id="overStats"></div>
+      <div class="over-score"><span data-i18n="final_score">ИТОГ</span><b id="overScore">0</b><em id="overRecord" class="hidden" data-i18n="new_record">НОВЫЙ РЕКОРД</em></div>
+      <div class="row nameRow">
+        <input id="hsName" class="inp" maxlength="12" placeholder="ИМЯ" autocomplete="off" spellcheck="false" />
+        <button class="btn" id="btnSaveHs" data-i18n="save_score">ЗАПИСАТЬ</button>
+      </div>
+      <div class="p-btns">
+        <button class="btn big" id="btnAgain" data-i18n="again">ЕЩЁ РАЗ <kbd>R</kbd></button>
+        <button class="btn ghost" id="btnOverMenu" data-i18n="to_menu">В МЕНЮ</button>
+      </div>
+      <div class="hs" id="hsTableOver"></div>
+    </div>
+  </div>
+
+  <!-- ============ BOOT / LOADING ============ -->
+  <div id="boot" class="screen">
+    <div class="boot-inner">
+      <div class="boot-title">ЭХО-30</div>
+      <div class="boot-bar"><i id="bootBar"></i></div>
+      <div class="boot-msg" id="bootMsg">инициализация сонара…</div>
+    </div>
+  </div>
+</div>
+</body>
+</html>
