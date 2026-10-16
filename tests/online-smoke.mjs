@@ -61,27 +61,39 @@ try {
   if (NET) ua.searchParams.set('net', NET);
   A = await player('A', ua.toString());
   await A.page.evaluate(async () => { const h = window.__hush; h.audio.init(); await h.mic.start(h.audio); });
-  const code = await A.page.evaluate(async () => { const h = window.__hush; await h.coop.create(); return h.coop.code; });
-  log('room', code);
-  await sleep(3000);
-  log('A relays', JSON.stringify(await relays(A.page)));
-  const link = await A.page.evaluate(() => window.__hush.coop.inviteLink());
-  log('invite', link);
+  // public trackers / relays sometimes just don't pass an offer along: one more try with a fresh room
+  // before calling it broken (a real break fails both)
+  let seated = false, tJoin = 0, tries = 0;
+  for (tries = 1; tries <= 2 && !seated; tries++) {
+    if (tries > 1) {
+      log('no join — one more try with a fresh room');
+      await B.browser.close().catch(() => {});
+      B = null;
+    }
+    const code = await A.page.evaluate(async () => { const h = window.__hush; await h.coop.create(); return h.coop.code; });
+    log('room', code);
+    await sleep(3000);
+    log('A relays', JSON.stringify(await relays(A.page)));
+    const link = await A.page.evaluate(() => window.__hush.coop.inviteLink());
+    log('invite', link);
 
-  const tJoin = Date.now();
-  const ub = new URL(link); // same server as A (the link carries the room, and the signalling choice)
-  ub.protocol = ua.protocol;
-  ub.host = ua.host;
-  B = await player('B', ub.toString());
-  await B.page.evaluate(async () => { const h = window.__hush; h.audio.init(); await h.mic.start(h.audio); h.coop.syncVoice(); h.coop.announce(); });
-  const seated = await until(async () => {
-    const a = await A.page.evaluate(() => window.__hush.coop.players().length);
-    const b = await B.page.evaluate(() => { const me = window.__hush.coop.me(); return me && me.slot; });
-    return a === 2 && b === 1;
-  }, JOIN_TIMEOUT);
-  log('B relays', JSON.stringify(await relays(B.page)));
-  check(`found each other through public signalling (${NET || 'nostr + torrent'})`, !!seated, seated ? `${((Date.now() - tJoin) / 1000).toFixed(1)} s after B opened the link` : 'timeout');
-  facts.push(seated ? `joined in ${((Date.now() - tJoin) / 1000).toFixed(1)} s` : 'no join');
+    tJoin = Date.now();
+    const ub = new URL(link); // same server as A (the link carries the room, and the signalling choice)
+    ub.protocol = ua.protocol;
+    ub.host = ua.host;
+    B = await player('B', ub.toString());
+    await B.page.evaluate(async () => { const h = window.__hush; h.audio.init(); await h.mic.start(h.audio); h.coop.syncVoice(); h.coop.announce(); });
+    seated = await until(async () => {
+      const a = await A.page.evaluate(() => window.__hush.coop.players().length);
+      const b = await B.page.evaluate(() => { const me = window.__hush.coop.me(); return me && me.slot; });
+      return a === 2 && b === 1;
+    }, tries === 1 ? Math.min(JOIN_TIMEOUT, 90000) : JOIN_TIMEOUT);
+    log('B relays', JSON.stringify(await relays(B.page)));
+  }
+  tries--;
+  const retry = tries > 1 ? ' (second try)' : '';
+  check(`found each other through public signalling (${NET || 'nostr + torrent'})`, !!seated, seated ? `${((Date.now() - tJoin) / 1000).toFixed(1)} s after B opened the link${retry}` : 'timeout, twice');
+  facts.push(seated ? `joined in ${((Date.now() - tJoin) / 1000).toFixed(1)} s${retry}` : 'no join (2 tries)');
   const ra = await relays(A.page), rb = await relays(B.page);
   facts.push(`relays A nostr ${ra.nostr.open}/${ra.nostr.total} torrent ${ra.torrent.open}/${ra.torrent.total}; B nostr ${rb.nostr.open}/${rb.nostr.total} torrent ${rb.torrent.open}/${rb.torrent.total}`);
   if (!seated) throw new Error('no connection');

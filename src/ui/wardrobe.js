@@ -432,7 +432,15 @@ export class Wardrobe {
       this.open();
     });
     this.btn.addEventListener('pointerenter', () => {
-      if (this.mq) this.mq.setHover(true);
+      if (this.mq) {
+        this.mq.setHover(true);
+        // it notices you: a wave (not every time)
+        const now = performance.now();
+        if (!this.mq.gesture && now - (this._waved || -1e9) > 8000) {
+          this._waved = now;
+          this.mq.play('wave');
+        }
+      }
       if (this.audio && this.audio.ready) this.audio.uiHover();
     });
     this.btn.addEventListener('pointerleave', () => this.mq && this.mq.setHover(false));
