@@ -9,9 +9,9 @@ export class Stones {
   clear() {
     this.list = [];
   }
-  throw(x, y, z, dx, dy, dz) {
+  throw(x, y, z, dx, dy, dz, owner = null) {
     const sp = 16.5;
-    this.list.push({ x, y, z, vx: dx * sp, vy: dy * sp + 4.2, vz: dz * sp, t: 0, trailT: 0 });
+    this.list.push({ x, y, z, vx: dx * sp, vy: dy * sp + 4.2, vz: dz * sp, t: 0, trailT: 0, owner });
   }
   update(dt, game) {
     const world = game.world;
@@ -48,7 +48,7 @@ export class Stones {
       }
       if (hit || s.t > 4) {
         this.list.splice(i, 1);
-        if (hit) game.onStoneImpact(hit);
+        if (hit) game.onStoneImpact(hit, s.owner);
         continue;
       }
       s.x = nx; s.y = ny; s.z = nz;

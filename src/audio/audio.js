@@ -77,6 +77,7 @@ export class AudioEngine {
     this.listener = { x: 0, y: 0, z: 0, fx: 0, fz: -1 };
     this._outBuf = null;
     this.offline = false; // true when rendering into an OfflineAudioContext (sound tests)
+    this.voices = new Map(); // co-op: friends' microphones
   }
 
   get ready() {
@@ -155,6 +156,13 @@ export class AudioEngine {
     this.echoBus.connect(this.gateAnalyser);
     revOut.connect(this.gateAnalyser);
     this._gateBuf = new Float32Array(this.gateAnalyser.fftSize);
+
+    // co-op voices: muffled by a hit like everything else, but never paused (the world doesn't stop online),
+    // and fed to the mic's self-gate so a friend in your speakers doesn't count as you making noise
+    this.voiceBus = ctx.createGain();
+    this.voiceBus.gain.value = 1.15;
+    this.voiceBus.connect(this.stunLP);
+    this.voiceBus.connect(this.gateAnalyser);
 
     this.white = makeNoise(ctx, 'white', 2);
     this.pink = makeNoise(ctx, 'pink', 3);
@@ -311,23 +319,26 @@ export class AudioEngine {
   }
 
   // ---------- player sounds ----------
-  click(loud = 0.3) {
+  click(loud = 0.3, dest = null) {
     if (!this.ready) return;
     const t = this.now;
-    this._noiseBurst(t, { f: 3400, q: 2.5, a: 0.0008, d: 0.03, gain: 0.7 + loud });
-    this._tone(t, { f: 2100, fEnd: 900, a: 0.001, d: 0.05, gain: 0.35 });
-    this._tone(t + 0.01, { f: 1250, fEnd: 990, a: 0.004, d: 0.7, gain: 0.07, rev: 0.6 });
+    const o = dest || this.sfx;
+    this._noiseBurst(t, { f: 3400, q: 2.5, a: 0.0008, d: 0.03, gain: 0.7 + loud, dest: o });
+    this._tone(t, { f: 2100, fEnd: 900, a: 0.001, d: 0.05, gain: 0.35, dest: o });
+    this._tone(t + 0.01, { f: 1250, fEnd: 990, a: 0.004, d: 0.7, gain: 0.07, rev: 0.6, dest: o });
   }
 
-  clap(loud = 0.6) {
+  clap(loud = 0.6, dest = null) {
     if (!this.ready) return;
     const t = this.now;
-    for (let i = 0; i < 3; i++) this._noiseBurst(t + i * 0.009, { f: 1150 + i * 200, q: 0.9, a: 0.001, d: 0.012, gain: 0.6 * loud });
-    this._noiseBurst(t + 0.027, { f: 1200, q: 0.7, a: 0.001, d: 0.14, gain: 0.9 * loud, rev: 0.9 });
+    const o = dest || this.sfx;
+    for (let i = 0; i < 3; i++) this._noiseBurst(t + i * 0.009, { f: 1150 + i * 200, q: 0.9, a: 0.001, d: 0.012, gain: 0.6 * loud, dest: o });
+    this._noiseBurst(t + 0.027, { f: 1200, q: 0.7, a: 0.001, d: 0.14, gain: 0.9 * loud, rev: 0.9, dest: o });
   }
 
-  shout(loud = 0.9) {
+  shout(loud = 0.9, dest = null) {
     if (!this.ready) return;
+    const out = dest || this.sfx;
     const t = this.now;
     const dur = 0.35 + loud * 0.25;
     const src = this._osc('sawtooth', 170 + loud * 90);
@@ -344,11 +355,11 @@ export class AudioEngine {
     const mix = this._gain(1);
     f1.connect(mix); f2.connect(mix); const g3 = this._gain(0.5); f3.connect(g3).connect(mix);
     mix.connect(shaper).connect(g);
-    this._out(g, this.sfx, 0.8);
+    this._out(g, out, 0.8);
     this._env(g, t, 0.03, 0.55 * loud, 0.25, dur - 0.1);
     src.start(t); vib.start(t);
     src.stop(t + dur + 0.4); vib.stop(t + dur + 0.4);
-    this._noiseBurst(t, { f: 1800, q: 0.8, a: 0.02, d: 0.25, hold: dur - 0.15, gain: 0.08 * loud });
+    this._noiseBurst(t, { f: 1800, q: 0.8, a: 0.02, d: 0.25, hold: dur - 0.15, gain: 0.08 * loud, dest: out });
   }
 
   sonarSweep(loud, big = false) {
@@ -451,13 +462,147 @@ export class AudioEngine {
     this._noiseBurst(t0, { f: 7000, q: 1, a: 0.01, d: 0.5, gain: 0.08, type: 'highpass' });
   }
 
-  footstep(intensity = 0.5) {
+  footstep(intensity = 0.5, dest = null) {
     if (!this.ready) return;
     const t = this.now;
+    const o = dest || this.sfx;
     const f = 650 + Math.random() * 700;
-    this._noiseBurst(t, { f, q: 0.9, a: 0.002, d: 0.06 + intensity * 0.06, gain: 0.12 + intensity * 0.3 });
-    this._noiseBurst(t + 0.02, { f: f * 2.4, q: 2, a: 0.004, d: 0.05, gain: 0.04 + intensity * 0.08 });
-    if (intensity > 0.6) this._tone(t, { f: 95, fEnd: 55, a: 0.002, d: 0.08, gain: 0.25 * intensity });
+    this._noiseBurst(t, { f, q: 0.9, a: 0.002, d: 0.06 + intensity * 0.06, gain: 0.12 + intensity * 0.3, dest: o });
+    this._noiseBurst(t + 0.02, { f: f * 2.4, q: 2, a: 0.004, d: 0.05, gain: 0.04 + intensity * 0.08, dest: o });
+    if (intensity > 0.6) this._tone(t, { f: 95, fEnd: 55, a: 0.002, d: 0.08, gain: 0.25 * intensity, dest: o });
+  }
+
+  // ---------- co-op: your friends in the forest ----------
+  // a teammate's footstep, from where they walk
+  mateStep(x, y, z, intensity = 0.4) {
+    if (!this.ready) return;
+    const pn = this._panner(x, y, z, 2.5, 1.3);
+    pn.connect(this.sfx);
+    this.footstep(intensity * 0.8, pn);
+  }
+
+  // a teammate's click / clap / shout (their mic voice comes through the voice chat instead)
+  matePing(x, y, z, loud, scream = 0.78) {
+    if (!this.ready) return;
+    const pn = this._panner(x, y, z, 4, 1.0);
+    pn.connect(this.sfx);
+    if (loud < 0.36) this.click(loud, pn);
+    else if (loud < scream) this.clap(loud, pn);
+    else this.shout(loud, pn);
+  }
+
+  // somewhere out there, a friend just died
+  mateDeath(x, y, z, near = false) {
+    if (!this.ready) return;
+    const t = this.now;
+    const pn = this._panner(x, y, z, 6, 0.8);
+    pn.connect(this.sfx);
+    // a cut-off human scream: formant buzz that chokes into silence
+    const o = this._osc('sawtooth', 310);
+    o.frequency.linearRampToValueAtTime(420, t + 0.12);
+    o.frequency.exponentialRampToValueAtTime(140, t + 0.75);
+    const f1 = this._filter('bandpass', 950, 5), f2 = this._filter('bandpass', 1500, 6);
+    const g = this._gain();
+    o.connect(f1); o.connect(f2); f1.connect(g); f2.connect(g);
+    this._out(g, pn, 0.9);
+    this._env(g, t, 0.02, near ? 0.5 : 0.38, 0.12, 0.55);
+    o.start(t); o.stop(t + 0.95);
+    this._noiseBurst(t + 0.58, { type: 'lowpass', f: 420, q: 0.8, a: 0.004, d: 0.4, gain: 0.55, dest: pn, rev: 0.6 });
+    this._tone(t + 0.6, { f: 60, fEnd: 34, a: 0.004, d: 0.5, gain: 0.4, dest: pn });
+  }
+
+  // ---------- co-op voices: a friend's microphone, placed where they stand ----------
+  voiceAttach(id, stream) {
+    this.init();
+    if (!this.ctx) return;
+    this.voiceDetach(id);
+    const ctx = this.ctx;
+    // Chrome only feeds a remote WebRTC stream into Web Audio while some media element is playing it
+    const el = new Audio();
+    el.muted = true;
+    el.srcObject = stream;
+    const pl = el.play();
+    if (pl && pl.catch) pl.catch(() => {});
+    let src;
+    try {
+      src = ctx.createMediaStreamSource(stream);
+    } catch (e) {
+      console.warn('[voice] no audio track yet', e);
+      return;
+    }
+    const hp = this._filter('highpass', 110, 0.7);
+    const lp = this._filter('lowpass', 7200, 0.7);
+    const level = ctx.createAnalyser();
+    level.fftSize = 256;
+    const g = this._gain(1); // mute / proximity fade
+    const dry = this._gain(1); // lobby: straight into your ears
+    const wet = this._gain(0); // in the forest: from where they are
+    const rv = this._gain(0); // ...with a little of the forest around it
+    const pn = this._panner(0, 0, 0, 2.2, 1.15);
+    pn.maxDistance = 90;
+    src.connect(hp).connect(lp).connect(g);
+    lp.connect(level);
+    g.connect(dry);
+    g.connect(wet);
+    g.connect(rv);
+    dry.connect(this.voiceBus);
+    wet.connect(pn).connect(this.voiceBus);
+    rv.connect(this.revSend);
+    this.voices.set(id, { el, src, hp, lp, g, dry, wet, rv, pn, level, buf: new Float32Array(256), spatial: false });
+  }
+
+  voiceSpatial(id, on) {
+    const v = this.voices.get(id);
+    if (!v || v.spatial === on) return;
+    v.spatial = on;
+    const t = this.now;
+    v.dry.gain.setTargetAtTime(on ? 0 : 1, t, 0.08);
+    v.wet.gain.setTargetAtTime(on ? 1 : 0, t, 0.08);
+    v.rv.gain.setTargetAtTime(on ? 0.22 : 0, t, 0.08);
+  }
+
+  voiceSet(id, x, y, z, gain) {
+    const v = this.voices.get(id);
+    if (!v) return;
+    const t = this.now;
+    const p = v.pn;
+    if (p.positionX) {
+      p.positionX.setTargetAtTime(x, t, 0.03);
+      p.positionY.setTargetAtTime(y, t, 0.03);
+      p.positionZ.setTargetAtTime(z, t, 0.03);
+    } else p.setPosition(x, y, z);
+    if (Math.abs((v.lastGain ?? -1) - gain) > 0.01) {
+      v.lastGain = gain;
+      v.g.gain.setTargetAtTime(gain, t, 0.06);
+    }
+  }
+
+  // how loud a friend is talking right now (0..1) — for the lobby's talk indicator
+  voiceLevel(id) {
+    const v = this.voices.get(id);
+    if (!v) return 0;
+    v.level.getFloatTimeDomainData(v.buf);
+    let s = 0;
+    for (let i = 0; i < v.buf.length; i++) s += v.buf[i] * v.buf[i];
+    const db = 20 * Math.log10(Math.sqrt(s / v.buf.length) + 1e-9);
+    return Math.max(0, Math.min(1, (db + 55) / 40));
+  }
+
+  voiceDetach(id) {
+    const v = this.voices.get(id);
+    if (!v) return;
+    this.voices.delete(id);
+    try {
+      v.src.disconnect();
+      v.g.disconnect();
+      v.pn.disconnect();
+      v.rv.disconnect();
+    } catch { /* */ }
+    v.el.srcObject = null;
+  }
+
+  voiceDetachAll() {
+    for (const id of [...this.voices.keys()]) this.voiceDetach(id);
   }
 
   bump() {

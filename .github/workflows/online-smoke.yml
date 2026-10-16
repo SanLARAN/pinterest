@@ -1,0 +1,45 @@
+# Co-op over the real internet: two headless Chrome players find each other through the PUBLIC
+# signalling networks (Nostr relays, WebTorrent trackers), connect over WebRTC, talk (fake mic) and
+# start a night. Each network is also tried on its own, to see which ones are reachable.
+# Runs by hand (Actions → "Online smoke test" → Run workflow) and when the test itself changes.
+name: Online smoke test
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [arena/2a2936ce-pinterest]
+    paths:
+      - tests/online-smoke.mjs
+      - .github/workflows/online-smoke.yml
+      - src/net/**
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        net: [default, nostr, torrent]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm install --no-save puppeteer-core@24
+      - name: Serve the build
+        run: |
+          npx vite preview --port 4173 --strictPort > preview.log 2>&1 &
+          for i in $(seq 1 30); do curl -sf http://localhost:4173/ > /dev/null && break; sleep 1; done
+      - name: Two players, one room
+        env:
+          BASE: http://localhost:4173/
+          CHROME: /usr/bin/google-chrome
+          NET: ${{ matrix.net }}
+        run: node tests/online-smoke.mjs

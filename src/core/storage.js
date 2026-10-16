@@ -54,6 +54,7 @@ export function submitScore(entry) {
     won: !!entry.won,
     shards: entry.shards | 0,
     gens: entry.gens | 0,
+    coop: entry.coop | 0, // co-op: how many of you were out there
     date: Date.now(),
   };
   list.push(item);

@@ -1,18 +1,27 @@
 // First-person controller: snappy acceleration, stamina, footsteps, bumps into trees.
 import { CFG } from '../core/config.js';
 import { clamp, damp } from '../core/rng.js';
+import { SLOT_OFFSET } from './remote.js';
 
 export class Player {
   constructor(world) {
     this.world = world;
+    this.id = 'me';
+    this.alive = true;
     this.reset();
   }
 
-  reset() {
+  // slot: co-op seat — everyone wakes up around the same fire
+  reset(slot = 0) {
     const s = this.world.spawn;
-    this.x = s.x;
-    this.z = s.z;
+    const [ox, oz] = SLOT_OFFSET[slot % 4] || [0, 0];
+    const cy = Math.cos(s.yaw), sy = Math.sin(s.yaw);
+    const pos = { x: s.x + cy * ox + sy * oz, z: s.z - sy * ox + cy * oz };
+    if (slot) this.world.col.resolve(pos, CFG.PLAYER.radius);
+    this.x = pos.x;
+    this.z = pos.z;
     this.yaw = s.yaw;
+    this.alive = true;
     this.pitch = -0.04;
     this.roll = 0;
     this.vx = 0;

@@ -118,7 +118,8 @@ export class HUD {
     const show = night && (peekHeld || this.clock < this.peekUntil);
     if (show) {
       this._set('pt', this.peekTime, fmtTime(g.time));
-      this._set('ps', this.peekSub, `${t('generators')} ${gens}/5 · ${t('score')} ${fmtScore(g.score)} ×${g.mult.toFixed(1)}`);
+      const team = g.online ? ` · ${t('teamAlive').replace('{n}', g.livePlayers().length).replace('{m}', g.remotes.size + 1)}` : '';
+      this._set('ps', this.peekSub, `${t('generators')} ${gens}/5 · ${t('score')} ${fmtScore(g.score)} ×${g.mult.toFixed(1)}${team}`);
       this._set('ptask', this.peekTask, g.objectives.taskText());
       if (this.cache.pg !== gens) {
         this.cache.pg = gens;

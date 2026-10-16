@@ -26,6 +26,11 @@ import { Radar } from './ui/radar.js';
 import { Menus } from './ui/menus.js';
 import { Game } from './game/game.js';
 import { buildListener } from './game/monsters.js';
+import { PLAYER_COLORS } from './game/remote.js';
+import { Coop, myName } from './net/coop.js';
+import { cleanCode } from './net/net.js';
+import { Lobby } from './ui/lobby.js';
+import { Mates } from './ui/mates.js';
 
 setLang(settings.lang);
 
@@ -73,7 +78,10 @@ const hud = new HUD();
 const radar = new Radar($('radar'));
 const input = new Input(canvas);
 input.bindTouchUI($('touch'));
+const coop = new Coop({ audio, mic });
+const mates = new Mates($('mates'));
 let game = null;
+let runOnline = false; // the current / last run is a co-op night
 
 let state = 'boot'; // boot | menu | playing | paused | over
 let overAt = 0;
@@ -139,8 +147,10 @@ function perfTick(dt) {
 const menus = new Menus({
   onPlay: () => startRun(),
   onResume: () => resume(),
-  onRestart: () => startRun(),
+  onRestart: () => restartRun(),
   onMenu: () => toMenu(),
+  onCoop: () => lobby.open(),
+  onLobby: () => toMenu(true),
   onMicToggle: () => toggleMic(),
   onSettingsChanged: (key) => {
     if (key === 'volume') audio.setVolume(settings.volume);
@@ -149,15 +159,16 @@ const menus = new Menus({
       if (!settings.micEnabled && mic.state === 'on') mic.stop();
       if (settings.micEnabled && mic.state !== 'on') {
         audio.init();
-        mic.start(audio).then(updateMicUI);
+        mic.start(audio).then(micChanged);
       }
-      updateMicUI();
+      micChanged();
     }
     if (key === 'quality') applyQuality();
     if (key === 'radar') applyRadar();
     if (key === 'lang' || key === undefined) {
       hud.cache = {};
       updateMicUI();
+      lobby.render();
       $('lockHint').textContent = input.lockFailed ? t('dragToLook') : t('clickToLook');
     }
   },
@@ -168,10 +179,37 @@ const menus = new Menus({
   },
 });
 
+// ---------------- co-op ----------------
+const lobby = new Lobby({
+  coop, mic, audio,
+  onMicToggle: () => toggleMic(),
+  uiSound: (k) => {
+    if (!audio.ready) return;
+    if (k === 'hover') audio.uiHover();
+    else audio.uiClick();
+  },
+});
+coop.on('change', () => lobby.render());
+coop.on('start', (d) => startRun({ coop: d }));
+coop.on('hostLost', () => {
+  if (runOnline && game && (state === 'playing' || state === 'paused')) game.hostLost();
+  lobby.render();
+});
+
 function updateMicUI() {
   menus.setMicStatus(mic.state, Mic.inIframe());
   hud.setMic(mic.state);
   $('sMic').checked = settings.micEnabled;
+}
+
+// the mic came on or went off: your friends' voice chat follows
+function micChanged() {
+  updateMicUI();
+  if (coop.active) {
+    coop.syncVoice();
+    coop.announce();
+  }
+  lobby.render();
 }
 
 async function toggleMic() {
@@ -185,7 +223,7 @@ async function toggleMic() {
     await mic.start(audio);
   }
   saveSettings();
-  updateMicUI();
+  micChanged();
   if (state === 'playing') hud.popup(mic.state === 'on' ? t('micOn') : t('micOff'), 'dim');
 }
 
@@ -198,6 +236,7 @@ $('pauseBtn').addEventListener('click', (e) => {
   e.stopPropagation();
   if (state === 'playing') pause();
 });
+$('btnStart').addEventListener('click', () => audio.init());
 // first interaction anywhere unlocks audio (browser autoplay policy)
 window.addEventListener('pointerdown', () => audio.init(), { capture: true });
 window.addEventListener('keydown', () => audio.init(), { capture: true });
@@ -294,24 +333,41 @@ function setBodyState() {
   input.gameActive = state === 'playing';
 }
 
-function startRun() {
+// opts.coop = the host's start message ({ seed, players }) for a co-op night
+function startRun(opts = {}) {
   if (!game) return;
-  if (state === 'over' && performance.now() - overAt < 450) return;
+  const online = !!opts.coop;
+  if (!online && state === 'over' && performance.now() - overAt < 450) return;
+  if (!online && coop.active) coop.leave(); // a solo night: you leave the room
+  if (runOnline && game.online) game.teardownOnline();
   audio.init();
   audio.setVolume(settings.volume);
   menus.only(null);
   menus.show('settingsPanel', false);
   menus.show('howPanel', false);
   menus.show('scoresPanel', false);
+  lobby.close();
   hud.show(true);
   hud.cache = {};
   input.reset();
-  game.reset();
-  if (DEBUG.night || DEBUG.t > 0) game.startNight();
-  if (DEBUG.t > 0) {
-    game.time = DEBUG.t;
-    game.firstPingT = Math.max(0, DEBUG.t - 30);
-    game.tut.done = true;
+  mates.clear();
+  document.body.classList.remove('coop-over', 'coop-guest', 'spectating');
+  document.body.classList.toggle('coop', online);
+  runOnline = online;
+  if (online) {
+    const me = opts.coop.players.find((p) => p.id === coop.selfId);
+    game.setupSolo();
+    game.reset({ seed: opts.coop.seed, slot: me ? me.slot : 0 });
+    game.setupOnline(coop, opts.coop.players);
+  } else {
+    game.setupSolo();
+    game.reset();
+    if (DEBUG.night || DEBUG.t > 0) game.startNight();
+    if (DEBUG.t > 0) {
+      game.time = DEBUG.t;
+      game.firstPingT = Math.max(0, DEBUG.t - 30);
+      game.tut.done = true;
+    }
   }
   state = 'playing';
   setBodyState();
@@ -322,17 +378,29 @@ function startRun() {
   audio.setAmbience(0.9, 0);
   audio.setPaused(false);
   if (settings.micEnabled && !DEBUG.nomic && (mic.state === 'off')) {
-    mic.start(audio).then(updateMicUI);
+    mic.start(audio).then(micChanged);
     updateMicUI();
   }
   lastFrame = performance.now();
+}
+
+// "again": solo restarts at once; in co-op only the host can call a new night (for everyone)
+function restartRun() {
+  if (runOnline || coop.active) {
+    if (coop.active && coop.isHost && state !== 'playing') coop.startRun();
+    return;
+  }
+  startRun();
 }
 
 function pause() {
   if (state !== 'playing' || !game || !['play', 'morning', 'dusk'].includes(game.state)) return;
   state = 'paused';
   setBodyState();
-  audio.setPaused(true);
+  if (game.online) {
+    game.inputMuted = true;
+    input.reset();
+  } else audio.setPaused(true);
   input.exitLock();
   const night = game.state === 'play';
   $('pauseStats').innerHTML = night
@@ -348,18 +416,31 @@ function resume() {
   state = 'playing';
   setBodyState();
   audio.setPaused(false);
+  if (game) game.inputMuted = false;
   if (!input.touch) input.requestLock();
   lastFrame = performance.now();
 }
 
-function toMenu() {
+// keepRoom: co-op "to the lobby" — stay in the room with your friends
+function toMenu(keepRoom = false) {
+  const wasOnline = runOnline;
   if (game) {
     for (const m of game.monsters) m.dispose();
     game.monsters = [];
     game.state = 'idle';
     game.objectives.silence();
     audio.setMorning(false);
+    game.inputMuted = false;
+    if (game.online) game.teardownOnline();
+    game.setupSolo();
   }
+  runOnline = false;
+  if (wasOnline || coop.active) {
+    if (keepRoom && coop.active) coop.leaveRun();
+    else coop.leave();
+  }
+  mates.clear();
+  document.body.classList.remove('coop', 'coop-over', 'coop-guest', 'spectating');
   shared.uDawn.value = 0;
   shared.uMorning.value = 0;
   pulses.clear();
@@ -379,9 +460,19 @@ function toMenu() {
   menus.renderScores();
   updateMicUI();
   post.u.uFade.value = 0;
+  if (keepRoom && coop.active) lobby.open();
+  lobby.menuLabel();
+}
+
+function teamSummary() {
+  const me = coop.me();
+  const out = [{ name: myName(), color: PLAYER_COLORS[me ? me.slot % 4 : 0], alive: game.player.alive, score: game.score, self: true, slot: me ? me.slot : 0 }];
+  for (const r of game.remotes.values()) out.push({ name: r.name, color: r.color, alive: r.alive, score: r.score, slot: r.slot });
+  return out.sort((a, b) => a.slot - b.slot);
 }
 
 function onEnd(res) {
+  const online = runOnline;
   const stats = {
     ...game.stats,
     gens: game.objectives.count,
@@ -389,9 +480,23 @@ function onEnd(res) {
     score: game.score,
     loudestDb: -100,
   };
-  const { rank, list } = submitScore({ name: settings.name || '???', score: game.score, time: stats.time, won: res.won, shards: stats.shards, gens: stats.gens });
-  menus.showOver(res, stats, rank, list);
+  const team = online ? teamSummary() : null;
+  const { rank, list } = submitScore({ name: settings.name || '???', score: game.score, time: stats.time, won: res.won, shards: stats.shards, gens: stats.gens, coop: online ? Math.max(team.length, game.teamSize || 1) : 0 });
+  menus.showOver(res, stats, rank, list, team);
   menus.renderScores();
+  if (online) {
+    coop.endRun();
+    game.teardownOnline();
+    game.inputMuted = false;
+    document.body.classList.add('coop-over');
+    document.body.classList.toggle('coop-guest', !coop.isHost || !coop.active);
+    $('restartHint').textContent = coop.isHost && coop.active ? t('restartHint') : t('coopRestartHint');
+  } else {
+    document.body.classList.remove('coop-over', 'coop-guest');
+    $('restartHint').textContent = t('restartHint');
+  }
+  document.body.classList.remove('spectating');
+  mates.clear();
   state = 'over';
   overAt = performance.now();
   setBodyState();
@@ -405,7 +510,8 @@ function handleEvents(events) {
   for (const e of events) {
     switch (e) {
       case 'pause':
-        if (menus.isOpen('settingsPanel')) menus.closeSettings();
+        if (lobby.isOpen()) lobby.close();
+        else if (menus.isOpen('settingsPanel')) menus.closeSettings();
         else if (menus.isOpen('howPanel')) menus.show('howPanel', false);
         else if (menus.isOpen('scoresPanel')) menus.show('scoresPanel', false);
         else if (state === 'playing') pause();
@@ -416,11 +522,12 @@ function handleEvents(events) {
         if (state === 'playing' && !input.touch) pause();
         break;
       case 'restart':
-        if (state === 'over' || state === 'paused') startRun();
+        if (state === 'over' || (state === 'paused' && !runOnline)) restartRun();
         break;
       case 'confirm':
-        if (menus.isOpen('settingsPanel') || menus.isOpen('howPanel') || menus.isOpen('scoresPanel')) break;
-        if (state === 'over' || state === 'menu') startRun();
+        if (menus.isOpen('settingsPanel') || menus.isOpen('howPanel') || menus.isOpen('scoresPanel') || lobby.isOpen()) break;
+        if (state === 'over') restartRun();
+        else if (state === 'menu') startRun();
         else if (state === 'paused') resume();
         break;
       case 'mic':
@@ -433,13 +540,24 @@ function handleEvents(events) {
   }
 }
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden && state === 'playing') pause();
+  // solo: hiding the tab pauses. co-op: the night goes on (see the background tick below)
+  if (document.hidden && state === 'playing' && !runOnline) pause();
 });
 
 // ---------------- main loop ----------------
 let lastFrame = performance.now();
 function frame(now) {
   requestAnimationFrame(frame);
+  step(now, true);
+}
+
+// browsers stop requestAnimationFrame in hidden tabs. In co-op the host's tab runs the monsters for
+// everyone (and a guest still has to answer), so a hidden co-op tab keeps stepping without drawing.
+setInterval(() => {
+  if (document.hidden && runOnline && (state === 'playing' || state === 'paused')) step(performance.now(), false);
+}, 50);
+
+function step(now, render) {
   let rawDt = (now - lastFrame) / 1000;
   lastFrame = now;
   if (!(rawDt > 0)) rawDt = 1 / 60;
@@ -453,10 +571,14 @@ function frame(now) {
 
   if (state === 'menu') {
     updateAttract(rawDt);
-  } else if (state === 'playing') {
-    const dt = Math.min(rawDt, 0.05) * game.fx.timeScale * DEBUG.speed;
-    game.update(dt, { look, events });
-    if (state === 'playing') {
+  } else if (state === 'playing' || (state === 'paused' && runOnline && game && game.state !== 'over')) {
+    const dt = Math.min(rawDt, 0.05) * (runOnline ? 1 : game.fx.timeScale) * DEBUG.speed;
+    game.update(dt, state === 'paused' ? { look: { dx: 0, dy: 0 }, events: [] } : { look, events });
+    if (!render && state !== 'over') {
+      game.applyView(camera, now / 1000);
+      return;
+    }
+    if (state === 'playing' || state === 'paused') {
       shared.uTime.value = game.time;
       ghosts.update(game.time);
       eyes.update(game.time, pixScale());
@@ -464,6 +586,7 @@ function frame(now) {
       game.applyView(camera, now / 1000);
       shared.uCam.value.copy(camera.position);
       game.hudUpdate(rawDt);
+      if (runOnline) mates.update(game, camera, input.peekHeld || hud.clock < hud.peekUntil);
       // pointer-lock hint (or drag-to-look hint when the browser/iframe refuses pointer lock)
       let lockMsg = '';
       if (!input.touch && (game.state === 'play' || game.state === 'morning') && !input.locked) {
@@ -490,6 +613,7 @@ function frame(now) {
     shared.uCam.value.copy(camera.position);
   }
   if (state !== 'playing') document.body.classList.remove('needlock');
+  if (!render) return;
 
   sky.position.copy(camera.position);
   motes.material.uniforms.uPix.value = 9 * (post.h / 900);
@@ -521,7 +645,7 @@ function boot() {
       perf.fpsEl.style.cssText = 'position:fixed;right:8px;top:64px;z-index:99;font:11px JetBrains Mono,monospace;color:#8ef0ff;opacity:.8;pointer-events:none';
       document.body.appendChild(perf.fpsEl);
     }
-    window.__hush = { world, game, shared, pulses, ghosts, eyes, renderer, perf, mic, audio, input, hud, post, debug: DEBUG, startRun, pause, toMenu, get state() { return state; } };
+    window.__hush = { world, game, shared, pulses, ghosts, eyes, renderer, perf, mic, audio, input, hud, post, coop, lobby, debug: DEBUG, startRun, pause, resume, toMenu, get state() { return state; } };
     state = 'menu';
     menuTime = 0;
     post.u.uFade.value = 0;
@@ -529,6 +653,13 @@ function boot() {
     updateMicUI();
     if (DEBUG.autostart) startRun();
     if (params.has('sfx')) import('./ui/sfxtest.js').then((m) => m.mountSfxPanel(audio));
+    lobby.menuLabel();
+    // an invite link (?room=CODE): straight into your friend's room
+    const room = cleanCode(params.get('room'));
+    if (room.length >= 4) {
+      lobby.open();
+      coop.join(room).catch((e) => console.warn('[coop] join failed', e)).finally(() => lobby.render());
+    }
   }, 60);
 }
 boot();

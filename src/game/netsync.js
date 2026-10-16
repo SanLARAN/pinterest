@@ -1,0 +1,234 @@
+// In-game co-op traffic.
+//
+//  everyone → everyone  'ps'  own state, 15/s: position, look, speed, flags, loudness, score
+//                       'ev'  things that happened: pulses, stones, shards, repair sounds, found parts
+//                       'ob'  the objectives (generators, bodies) — merged monotonically, see Objectives
+//  guest → host         'nz'  a noise the guest made (voice, ping, steps, repairs): the host's monsters hear it
+//                       'sk'  "skip the morning"
+//  host → everyone      'sn'  monster snapshot, 10/s
+//                       'ev'  monster events (hunt, howl, kill...), phase changes (dusk, dawn, end)
+import { createMonster, STATES, TYPES } from './monsters.js';
+import { PF } from './remote.js';
+
+const PS_HZ = 15;
+const SNAP_HZ = 10;
+export const NOISE_SRC = ['voice', 'ping', 'step', 'bump', 'breath', 'repair'];
+const r2 = (v) => Math.round(v * 100) / 100;
+const r3 = (v) => Math.round(v * 1000) / 1000;
+
+export class NetSync {
+  constructor(game, coop) {
+    this.g = game;
+    this.coop = coop;
+    this.psT = 0;
+    this.snT = 0;
+    this.obT = 0;
+    this.obBeat = 3;
+    this.voiceAcc = 0;
+    this.voiceScream = false;
+    this.voiceT = 0;
+  }
+
+  get host() {
+    return this.coop.isHost;
+  }
+
+  // ---------------- outgoing ----------------
+  send(type, data, target) {
+    this.coop.send(type, data, target);
+  }
+
+  ev(name, ...args) {
+    this.coop.send('ev', [name, ...args]);
+  }
+
+  // a noise this machine's player made: the host's monsters must hear it
+  noise(x, z, loud, source, scream) {
+    const i = NOISE_SRC.indexOf(source);
+    if (i < 0) return;
+    if (source === 'voice') {
+      // the mic reports every frame; batch it to ~8 messages a second (loudest wins)
+      this.voiceAcc = Math.max(this.voiceAcc, loud);
+      this.voiceScream = this.voiceScream || scream;
+      return;
+    }
+    this.coop.toHost('nz', [r2(x), r2(z), r3(loud), i, scream ? 1 : 0]);
+  }
+
+  tick(dt) {
+    const g = this.g;
+    const p = g.player;
+    // own state
+    this.psT -= dt;
+    if (this.psT <= 0) {
+      this.psT = p.alive ? 1 / PS_HZ : 0.5;
+      let f = 0;
+      if (p.crouching) f |= PF.crouch;
+      if (p.sprinting) f |= PF.sprint;
+      if (p.alive) f |= PF.alive;
+      if (g.charge && g.charge.active && g.charge.t > 0.3) f |= PF.charging;
+      if (g.input.useHeld) f |= PF.use;
+      const loud = g.mic.state === 'on' ? g.mic.loud : 0;
+      this.send('ps', [r2(p.x), r2(p.y), r2(p.z), r3(p.yaw), r3(p.pitch), r2(p.speed), f, r2(loud), Math.floor(g.score)]);
+    }
+    // batched voice noise → host
+    if (!this.host) {
+      this.voiceT -= dt;
+      if (this.voiceT <= 0 && this.voiceAcc > 0) {
+        this.voiceT = 0.12;
+        this.coop.toHost('nz', [r2(p.x), r2(p.z), r3(this.voiceAcc), 0, this.voiceScream ? 1 : 0]);
+        this.voiceAcc = 0;
+        this.voiceScream = false;
+      }
+    }
+    // monsters (host)
+    if (this.host && (g.state === 'play' || g.state === 'dawn')) {
+      this.snT -= dt;
+      if (this.snT <= 0) {
+        this.snT = 1 / SNAP_HZ;
+        this.send('sn', { t: r2(g.time), m: g.monsters.map((m) => this.packMonster(m)) });
+      }
+    }
+    // objectives: when they change (throttled), plus a slow heartbeat that heals anything lost
+    const ob = g.objectives;
+    this.obT -= dt;
+    this.obBeat -= dt;
+    if ((ob.dirty && this.obT <= 0) || this.obBeat <= 0) {
+      this.obT = 0.15;
+      this.obBeat = 3;
+      ob.dirty = false;
+      this.send('ob', ob.netState());
+    }
+  }
+
+  packMonster(m) {
+    let fl = 0;
+    if (m.lit) fl |= 1;
+    if (m.intro) fl |= 2;
+    if (m.scripted === 'freeze') fl |= 4;
+    return [m.id, TYPES.indexOf(m.type), r2(m.x), r2(m.z), r3(m.yaw), r2(m.headYaw || 0), r2(m.speedCur), STATES.indexOf(m.state), fl];
+  }
+
+  // ---------------- incoming ----------------
+  process() {
+    const g = this.g;
+    for (const [type, d, pid] of this.coop.drain()) {
+      try {
+        this.handle(type, d, pid);
+      } catch (e) {
+        console.warn('[sync] bad message', type, e);
+      }
+      if (g.state === 'over' || g.state === 'idle') break;
+    }
+  }
+
+  handle(type, d, pid) {
+    const g = this.g;
+    const isHostMsg = pid === this.coop.hostId;
+    switch (type) {
+      case 'ps': {
+        const r = g.remotes.get(pid);
+        if (r) r.push(d);
+        break;
+      }
+      case 'sn':
+        if (!this.host && isHostMsg && d && Array.isArray(d.m)) this.applySnap(d);
+        break;
+      case 'ob':
+        if (d) g.objectives.netMerge(d, g.remotes.get(pid));
+        break;
+      case 'nz': {
+        if (!this.host || !Array.isArray(d)) break;
+        const r = g.remotes.get(pid);
+        if (!r || !r.alive || g.state !== 'play') break;
+        g.noise(+d[0], +d[1], Math.min(1, +d[2]), NOISE_SRC[d[3]] || 'voice', !!d[4], pid);
+        break;
+      }
+      case 'sk':
+        if (this.host && g.state === 'morning') g.startDusk();
+        break;
+      case 'ev':
+        if (Array.isArray(d)) this.event(d, pid, isHostMsg);
+        break;
+      case '_left':
+        g.removeRemote(pid);
+        break;
+    }
+  }
+
+  event(d, pid, isHostMsg) {
+    const g = this.g;
+    const [name, a, b, c, e, f] = d;
+    const r = g.remotes.get(pid);
+    switch (name) {
+      // ---- from any player ----
+      case 'pu':
+        if (r) g.remotePulse(r, +a, +b, +c, +e, !!f);
+        break;
+      case 'st':
+        if (r) g.stones.throw(+a, +b, +c, +e, +f, +d[6], pid);
+        break;
+      case 'sh':
+        g.shards.take(a | 0);
+        break;
+      case 'fx':
+        g.objectives.remoteFx(a, b | 0, c);
+        break;
+      case 'fd':
+        if (r) g.fxMateFound(r, b | 0);
+        break;
+      // ---- from the host only ----
+      default: {
+        if (!isHostMsg || this.host) break;
+        const m = typeof a === 'number' ? g.monsterById(a) : null;
+        switch (name) {
+          case 'du': if (g.state === 'morning') g.startDusk(); break;
+          case 'hu': if (m) g.fxHunt(m, b); break;
+          case 'in': if (m) g.fxInvestigate(m, +c || 0, b); break;
+          case 'lo': if (m) g.fxLost(m, b); break;
+          case 'ih': if (m) g.fxInhale(m); break;
+          case 'hw': if (m) g.fxHowl(m); break;
+          case 'hb': if (m) g.fxBark(m); break;
+          case 'ar': g.fxArrive(a); break;
+          case 'wk': g.fxWake(); break;
+          case 'ki': g.netKill(a, b, c, +e, +f); break;
+          case 'dn': if (g.state === 'play') g.startDawn(); break;
+          case 'en': g.endOnline(false); break;
+        }
+      }
+    }
+  }
+
+  applySnap(d) {
+    const g = this.g;
+    const now = performance.now();
+    g.netT = +d.t || 0;
+    const seen = new Set();
+    for (const a of d.m) {
+      if (!Array.isArray(a)) continue;
+      const [id, ti, x, z, yaw, hy, spd, si, fl] = a;
+      const type = TYPES[ti];
+      if (!type) continue;
+      seen.add(id);
+      let m = g.monsterById(id);
+      if (!m) {
+        m = createMonster(type, g, id);
+        m.puppet = true;
+        m.x = x;
+        m.z = z;
+        m.yaw = yaw;
+        m.state = STATES[si] || 'wander';
+        if (Math.abs(x) < 2000) m.y = g.world.terrain.height(x, z);
+        g.monsters.push(m);
+      }
+      m.pushSnap(now, { x, z, yaw, hy, spd, st: STATES[si] || 'wander', lit: !!(fl & 1), intro: !!(fl & 2), scr: !!(fl & 4) });
+    }
+    for (let i = g.monsters.length - 1; i >= 0; i--) {
+      const m = g.monsters[i];
+      if (!seen.has(m.id)) {
+        m.dispose();
+        g.monsters.splice(i, 1);
+      }
+    }
+  }
+}

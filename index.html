@@ -56,6 +56,8 @@
       <div id="note"><div class="k"></div><div class="t"></div><div class="f"></div></div>
       <div id="skip"></div>
       <div id="lockHint"></div>
+      <div id="mates"></div>
+      <div id="spect"></div>
     </div>
 
     <!-- touch controls -->
@@ -80,6 +82,7 @@
         </div>
         <div class="menu-main">
           <button class="btn primary" id="btnPlay"><span data-i18n="play">ИГРАТЬ</span></button>
+          <button class="btn coop-btn" id="btnCoop"><span class="coop-ico" aria-hidden="true"><i></i><i></i></span><span id="btnCoopText" data-i18n="coopBtn">С ДРУЗЬЯМИ</span></button>
           <div id="bestLine"></div>
           <nav class="menu-links">
             <button class="link" id="btnHow"><span data-i18n="howto"></span></button>
@@ -113,6 +116,7 @@
         <button class="btn" id="btnRestartP"><span data-i18n="restart"></span></button>
         <button class="btn" id="btnSettingsP"><span data-i18n="settings"></span></button>
         <button class="btn" id="btnMenuP"><span data-i18n="menu"></span></button>
+        <div id="pauseCoop" class="mini-note" data-i18n="pauseCoop"></div>
       </div>
     </div>
 
@@ -125,12 +129,14 @@
         <div id="newRecord" class="badge" data-i18n="newRecord"></div>
         <div id="overScore" class="big-score">0</div>
         <div id="overStats" class="stats-grid"></div>
+        <div id="overTeam" class="team-table"></div>
         <div id="overTable" class="score-table compact"></div>
         <div class="btn-row">
           <button class="btn primary" id="btnRestart"><span data-i18n="restart"></span></button>
+          <button class="btn" id="btnLobby"><span data-i18n="toLobby"></span></button>
           <button class="btn" id="btnMenu"><span data-i18n="menu"></span></button>
         </div>
-        <div class="restart-hint" data-i18n="restartHint"></div>
+        <div class="restart-hint" id="restartHint" data-i18n="restartHint"></div>
       </div>
     </div>
 
@@ -167,6 +173,37 @@
         <label class="callsign"><span data-i18n="callsign"></span><input id="nameInput" maxlength="14" autocomplete="off" spellcheck="false" placeholder="???" /></label>
         <div id="scoreTable" class="score-table"></div>
         <button class="btn primary" id="btnScoresBack"><span data-i18n="back"></span></button>
+      </div>
+    </div>
+
+    <!-- co-op: rooms -->
+    <div id="coopPanel" class="screen modal">
+      <div class="panel form-panel coop">
+        <h2 data-i18n="coopTitle">С ДРУЗЬЯМИ</h2>
+        <div id="coopHome" class="coop-view">
+          <label class="callsign"><span data-i18n="callsign"></span><input id="coopName" maxlength="14" autocomplete="off" spellcheck="false" placeholder="???" /></label>
+          <button class="btn primary" id="btnCreate"><span data-i18n="coopCreate">СОЗДАТЬ КОМНАТУ</span></button>
+          <div class="coop-or"><span data-i18n="coopOr">или войди по коду друга</span></div>
+          <form class="coop-join" id="coopJoinForm" autocomplete="off">
+            <input id="coopCode" maxlength="64" autocomplete="off" spellcheck="false" placeholder="K7Q2M" aria-label="code" />
+            <button class="btn" id="btnJoin" type="submit"><span data-i18n="coopJoin">ВОЙТИ</span></button>
+          </form>
+          <div id="coopHomeMsg" class="coop-msg"></div>
+          <div class="coop-note" data-i18n="coopNote"></div>
+        </div>
+        <div id="coopRoom" class="coop-view">
+          <div class="coop-code">
+            <span class="k" data-i18n="coopRoom">КОМНАТА</span>
+            <b id="coopCodeOut">-----</b>
+            <button class="chip" id="btnCopy"><span id="btnCopyText" data-i18n="coopCopy">скопировать ссылку</span></button>
+          </div>
+          <div id="coopList"></div>
+          <div id="coopStatus" class="coop-msg"></div>
+          <div id="coopMicRow" class="coop-mic"><span id="coopMicText"></span><button class="chip" id="btnCoopMic"></button></div>
+          <button class="btn primary" id="btnStart"><span data-i18n="coopStart">НАЧАТЬ</span></button>
+          <button class="btn" id="btnLeave"><span data-i18n="coopLeave">ВЫЙТИ ИЗ КОМНАТЫ</span></button>
+        </div>
+        <button class="btn" id="btnCoopBack"><span data-i18n="back"></span></button>
       </div>
     </div>
 

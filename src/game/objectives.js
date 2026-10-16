@@ -5,6 +5,10 @@
 //
 // A running generator lights a warm pool around its lamp: monsters standing in it can be seen, and
 // the Watcher won't step into it. Its radio beeps until it runs, so you can find it by ear.
+//
+// Co-op: every player works on the objectives on their own machine and shares the state. Nothing here
+// ever goes backwards (a part found stays found, progress only grows, a running engine keeps running),
+// so merging is simply "furthest wins" — no host round-trip, and two people on one engine can't conflict.
 import * as THREE from 'three';
 import { CFG } from '../core/config.js';
 import { MeshBuilder, KIND } from '../world/builder.js';
@@ -17,6 +21,7 @@ const USE_R_GEN = 2.4;
 const SEARCH_TIME = 1.1;
 const LAMP_I = 1.15;
 const NOTE_SECONDS = 11;
+const PH = ['dead', 'work', 'cord', 'spin', 'running'];
 
 const _m = new THREE.Matrix4();
 const _l = new THREE.Matrix4();
@@ -74,6 +79,71 @@ export class Objectives {
     this.chain = [];
     this.target = null;
     this.note = null;
+    this.dirty = false;
+  }
+
+  // ---------------- co-op ----------------
+  netState() {
+    return {
+      g: this.gens.map((g) => [PH.indexOf(g.phase), Math.round(g.progress * 1000) / 1000, g.pulls, Math.round(g.spinT * 100) / 100, (g.hasPart ? 1 : 0) | (g.known ? 2 : 0) | (g.running ? 4 : 0)]),
+      b: this.bodies.reduce((m, b, i) => m | (b.searched ? 1 << i : 0), 0),
+    };
+  }
+
+  // someone else's view of the objectives: take whatever is further along
+  netMerge(s, by = null) {
+    if (!s || !Array.isArray(s.g)) return;
+    for (let k = 0; k < this.gens.length; k++) {
+      const g = this.gens[k], r = s.g[k];
+      if (!Array.isArray(r)) continue;
+      const ph = PH[r[0]] || 'dead';
+      const fl = r[4] | 0;
+      if (fl & 1) g.hasPart = true;
+      if (fl & 2 && !g.known) {
+        g.known = true;
+        g.beaconT = 3.5;
+      }
+      if (+r[1] > g.progress) g.progress = Math.min(1, +r[1]);
+      if ((r[2] | 0) > g.pulls) g.pulls = r[2] | 0;
+      const want = PH.indexOf(ph), have = PH.indexOf(g.phase);
+      if (want > have) {
+        if (ph === 'running') this._start(g, by || true);
+        else {
+          g.phase = ph;
+          if (ph === 'cord') {
+            g.pullCD = 0;
+            g.pullQueued = false;
+          }
+          if (ph === 'spin') {
+            g.spinT = Math.max(g.spinT, +r[3] || 0);
+            g.spinNoiseT = 0.6;
+            this.g.onSpinUp(g);
+          }
+        }
+      } else if (ph === 'spin' && g.phase === 'spin') g.spinT = Math.max(g.spinT, +r[3] || 0);
+    }
+    const mask = s.b | 0;
+    this.bodies.forEach((body, i) => {
+      if (mask & (1 << i) && !body.searched) {
+        body.searched = true;
+        body.item.visible = false;
+        if (this.target && this.target.obj === body) this.searchT = 0;
+      }
+    });
+  }
+
+  // a teammate's repair noises: you hear them working
+  remoteFx(kind, k, extra) {
+    const g = this.gens[k];
+    if (!g) return;
+    const a = this.g.audio;
+    if (kind === 'clank') a.clank(g.x, g.y + 0.6, g.z, extra ? 1 : 0.55);
+    else if (kind === 'glug') a.glug(g.x, g.y + 0.9, g.z);
+    else if (kind === 'spark') this.g.onSpark(g, true);
+    else if (kind === 'pull') {
+      a.cordPull(g.x, g.y + 0.6, g.z, !!extra);
+      this.g.particles.burst(g.x - 0.4, g.y + 1.25, g.z, extra ? 4 : 10, { color: [0.35, 0.35, 0.38], speed: 1.2, up: 1.5, life: 1.2, size: 0.09, gravity: 0.6, drag: 1.2 });
+    }
   }
 
   // ---------------- meshes ----------------
@@ -177,6 +247,7 @@ export class Objectives {
     this.lastTask = '';
     this.pendingTask = null;
     this.count = 0;
+    this.dirty = false;
     this.firstRevealDone = false;
     for (let i = 0; i < 5; i++) shared.uLamp.value[i].w = 0;
     for (const gl of this.glows) gl.core.visible = gl.halo.visible = false;
@@ -269,6 +340,7 @@ export class Objectives {
   update(dt, night) {
     const game = this.g;
     const p = game.player;
+    const ears = game.ears();
     const audio = game.audio;
 
     // lamps + hum
@@ -297,13 +369,14 @@ export class Objectives {
     // flies around the bodies (you hear them before you find them)
     for (const body of this.bodies) {
       if (!body.mesh.visible) continue;
-      const d = Math.hypot(body.x - p.x, body.z - p.z);
+      const d = Math.hypot(body.x - ears.x, body.z - ears.z);
       if (d < 15 && !body.flies && audio.ready) body.flies = audio.flies(body.x, body.y + 0.3, body.z);
       else if (d > 20 && body.flies) { body.flies.stop(); body.flies = null; }
     }
 
     // radio beacons on generators you know about
     for (const g of this.gens) {
+      if (!p.alive) break;
       if (!g.known || g.running || g.phase === 'spin') continue;
       g.beaconT -= dt;
       if (g.beaconT > 0) continue;
@@ -327,7 +400,7 @@ export class Objectives {
       else if (audio.ready) g.hum = audio.genHum(g.x, g.y + 0.5, g.z, true);
       if (g.spinNoiseT <= 0) {
         g.spinNoiseT = 1.8;
-        game.noise(g.x, g.z, g.spec.spinLoud, 'repair');
+        game.noise(g.x, g.z, g.spec.spinLoud, 'repair'); // the machine itself: only the host's monsters listen
         game.particles.burst(g.x, g.y + 1.0, g.z, 8, { color: [1, 0.8, 0.45], speed: 3, up: 2, life: 0.5, size: 0.05, gravity: -6, drag: 1.5 });
       }
       if (g.spinT >= g.spec.spin) this._start(g);
@@ -339,7 +412,11 @@ export class Objectives {
       if (this.note.t <= 0) this.closeNote();
     }
 
-    this._interact(dt);
+    if (p.alive) this._interact(dt);
+    else if (this.target) {
+      this.target = null;
+      game.hud.setUse(null);
+    }
 
     // task changes surface for a moment (once the intro has had its say)
     const task = this.taskText();
@@ -422,6 +499,8 @@ export class Objectives {
     const g = this.gens[k];
     g.hasPart = true;
     g.known = true;
+    this.dirty = true;
+    if (game.sync) game.sync.ev('fd', this.bodies.indexOf(body), k);
     const next = this.gens[k + 1];
     if (next && !next.running) {
       next.known = true;
@@ -450,12 +529,14 @@ export class Objectives {
     const spec = g.spec;
     if (g.phase === 'dead') g.phase = 'work';
     g.progress = Math.min(1, g.progress + dt / spec.dur);
+    this.dirty = true;
     g.clankT -= dt;
     if (g.clankT <= 0) {
       g.clankT = spec.clank[0] + Math.random() * (spec.clank[1] - spec.clank[0]);
       if (spec.part === 'fuel') game.audio.glug(g.x, g.y + 0.9, g.z);
       else game.audio.clank(g.x, g.y + 0.6, g.z, spec.mode === 'clank' ? 1 : 0.55);
-      game.noise(g.x, g.z, spec.clankLoud, 'repair');
+      if (game.sync) game.sync.ev('fx', spec.part === 'fuel' ? 'glug' : 'clank', g.k, spec.mode === 'clank' ? 1 : 0);
+      game.playerNoise(g.x, g.z, spec.clankLoud, 'repair');
       game.addTrauma(spec.mode === 'clank' ? 0.05 : 0.02);
     }
     if (spec.mode === 'spark') {
@@ -463,6 +544,7 @@ export class Objectives {
       if (g.sparkT <= 0) {
         g.sparkT = spec.spark[0] + Math.random() * (spec.spark[1] - spec.spark[0]);
         game.onSpark(g);
+        if (game.sync) game.sync.ev('fx', 'spark', g.k);
       }
     }
     if (g.progress >= 1) {
@@ -484,23 +566,28 @@ export class Objectives {
     const spec = g.spec;
     g.pulls++;
     g.pullCD = 0.75;
+    this.dirty = true;
     const ok = g.pulls >= spec.pulls;
     game.audio.cordPull(g.x, g.y + 0.6, g.z, ok);
-    game.noise(g.x, g.z, spec.pullLoud, 'repair');
+    if (game.sync) game.sync.ev('fx', 'pull', g.k, ok ? 1 : 0);
+    game.playerNoise(g.x, g.z, spec.pullLoud, 'repair');
     game.addTrauma(0.08);
     game.particles.burst(g.x - 0.4, g.y + 1.25, g.z, ok ? 4 : 10, { color: [0.35, 0.35, 0.38], speed: 1.2, up: 1.5, life: 1.2, size: 0.09, gravity: 0.6, drag: 1.2 });
     if (ok) this._start(g);
   }
 
-  _start(g) {
+  // by: null = you (or the machine), a teammate, or true = someone else
+  _start(g, by = null) {
+    if (g.running) return;
     const game = this.g;
     g.phase = 'running';
     g.running = true;
     g.flick = 1.2;
     if (g.hum) g.hum.spin(1); // a spun-up engine just keeps going
     this.count = this.gens.filter((q) => q.running).length;
+    if (!by) this.dirty = true;
     game.audio.genStart(g.x, g.y + 0.6, g.z);
-    game.onGeneratorStarted(g, this.count);
+    game.onGeneratorStarted(g, this.count, by && by !== true ? by : null);
   }
 
   // a sound wave just found something

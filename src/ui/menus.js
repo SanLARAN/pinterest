@@ -12,7 +12,7 @@ function esc(s) {
 export class Menus {
   constructor(handlers) {
     this.h = handlers; // { onPlay, onResume, onRestart, onMenu, onMicToggle, onSettingsChanged, uiSound }
-    this.screens = ['menu', 'pause', 'over', 'settingsPanel', 'howPanel', 'scoresPanel', 'boot'];
+    this.screens = ['menu', 'pause', 'over', 'settingsPanel', 'howPanel', 'scoresPanel', 'coopPanel', 'boot'];
     this.settingsReturn = null;
     this.highlight = -1;
     this._bind();
@@ -56,6 +56,8 @@ export class Menus {
       el.addEventListener('mouseenter', () => this.h.uiSound && this.h.uiSound('hover'));
     };
     click('btnPlay', () => this.h.onPlay());
+    click('btnCoop', () => this.h.onCoop && this.h.onCoop());
+    click('btnLobby', () => this.h.onLobby && this.h.onLobby());
     click('btnHow', () => this.show('howPanel'));
     click('btnHowBack', () => this.show('howPanel', false));
     click('btnScores', () => {
@@ -173,7 +175,7 @@ export class Menus {
     let html = `<div class="row head"><span class="r">${t('rank')}</span><span class="n">${esc(t('name'))}</span><span class="s">${esc(t('score'))}</span><span class="t">${esc(t('time'))}</span></div>`;
     list.forEach((s, i) => {
       const me = i === highlightRank ? ' me' : '';
-      const mark = s.won ? '<span class="w">☀</span>' : s.gens ? `<span class="g">${s.gens | 0}/5</span>` : '';
+      const mark = (s.won ? '<span class="w">☀</span>' : s.gens ? `<span class="g">${s.gens | 0}/5</span>` : '') + (s.coop > 1 ? `<span class="c">${esc(t('coopTag').replace('{n}', s.coop))}</span>` : '');
       html += `<div class="row${me}"><span class="r">${i + 1}</span><span class="n">${esc(s.name || '???')}${mark}</span><span class="s">${fmtScore(s.score)}</span><span class="t">${fmtTime(s.time)}</span></div>`;
     });
     el.innerHTML = html;
@@ -204,15 +206,29 @@ export class Menus {
     $('micTestTrig').style.left = `${(trigPos * 100).toFixed(1)}%`;
   }
 
-  showOver(res, stats, rank, list) {
+  showOver(res, stats, rank, list, team = null) {
     const won = res.won;
     $('over').classList.toggle('won', won);
     $('overKicker').textContent = won ? `${t('winKicker')} · ${fmtTime(stats.time)}` : `${t('survived')} ${fmtTime(stats.time)} · ${t('generators')} ${stats.gens | 0}/5`;
     const titles = { scream: 'deadScream', crawler: 'deadCrawler', watcher: 'deadWatcher', howler: 'deadHowler' };
-    const title = won ? t('winTitle') : t(titles[res.cause] || 'deadTitle');
-    $('overTitle').textContent = title;
+    let title = won ? t('winTitle') : t(titles[res.cause] || 'deadTitle');
     const who = !won && res.cause !== 'scream' ? (t('deathBy')[res.cause] || '') : '';
-    $('overSub').textContent = won ? t('winSub') : who ? `— ${who}` : '';
+    let sub = won ? t('winSub') : who ? `— ${who}` : '';
+    if (res.coop) {
+      if (res.hostLost) {
+        title = t('hostLostTitle');
+        sub = t('hostLostSub');
+      } else if (won && !res.alive) sub = t('teamWonDead');
+      else if (!won) sub = `${t('teamAllDead')}${who ? ` · ${who}` : ''}`;
+    }
+    $('overTitle').textContent = title;
+    $('overSub').textContent = sub;
+    const tt = $('overTeam');
+    if (team && team.length) {
+      tt.innerHTML = `<div class="row head"><span>${esc(t('teamHead'))}</span></div>` + team.map((m) =>
+        `<div class="row"><i class="dot" style="--c:${m.color}"></i><span class="n">${esc(m.name)}${m.self ? ` <em>· ${esc(t('coopYou'))}</em>` : ''}</span>` +
+        `<span class="st ${m.alive ? 'alive' : ''}">${esc(m.alive ? t('stAlive') : t('stDead'))}</span><span class="s">${fmtScore(m.score)}</span></div>`).join('');
+    } else tt.innerHTML = '';
     $('overScore').textContent = fmtScore(stats.score);
     $('newRecord').classList.toggle('show', rank === 0 && stats.score > 0);
     const loud = `${Math.round((stats.loudest / 0.78) * 100)}%`;

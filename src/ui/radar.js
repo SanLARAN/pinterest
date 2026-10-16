@@ -168,6 +168,16 @@ export class Radar {
         ctx.strokeStyle = `rgba(255,185,90,${f})`;
         ctx.lineWidth = 1.5 * this.dpr;
         ctx.strokeRect(X - s, Y - s, s * 2, s * 2);
+      } else if (b.type === 'mate') {
+        // a teammate: a small cyan ring
+        ctx.strokeStyle = `rgba(142,240,255,${f})`;
+        ctx.shadowColor = 'rgba(142,240,255,0.8)';
+        ctx.shadowBlur = 8 * this.dpr * f;
+        ctx.lineWidth = 1.5 * this.dpr;
+        ctx.beginPath();
+        ctx.arc(X, Y, 3.5 * this.dpr * pop, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.shadowBlur = 0;
       } else if (b.type === 'stone') {
         ctx.strokeStyle = `rgba(230,245,255,${f})`;
         ctx.lineWidth = 1.5 * this.dpr;

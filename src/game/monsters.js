@@ -442,12 +442,90 @@ function animHowler(m, dt, t) {
   n.kneeR.rotation.x = Math.max(0, -s) * 0.6 * amp;
 }
 
+// ---------------- Survivor: a teammate (co-op). seen only as a cold afterimage, like everything else ----------------
+export function buildSurvivor() {
+  const R = makeRig('survivor');
+  R.root.rotation.order = 'YXZ'; // turn first, then (when dead) tip over
+  const N = (name, parent, x, y, z) => node(R, name, parent, x, y, z);
+  const hips = N('hips', null, 0, 0.94, 0);
+  part(R, hips, (b) => { b.place(0, -0.06, 0); b.box(0.32, 0.16, 0.2, KIND.WOOD); });
+  const chest = N('chest', hips, 0, 0.06, 0);
+  part(R, chest, (b) => {
+    b.identity();
+    b.taper(0.34, 0.2, 0.42, 0.24, 0.56, KIND.WOOD);
+    b.place(0, 0.3, -0.17); b.box(0.3, 0.38, 0.14, KIND.METAL); // backpack
+    b.place(-0.16, 0.52, -0.13, 0, 0, -Math.PI / 2); b.cylinder(6, 0.055, 0.055, 0.32, KIND.METAL, { ringEdges: false }); // bedroll
+  });
+  const head = N('head', chest, 0, 0.66, 0.02);
+  part(R, head, (b) => {
+    b.identity();
+    b.octa(0.115, 0.15, KIND.FLESH);
+    b.place(0, 0.02, -0.02, -0.25, 0, 0); b.cone(7, 0.17, 0.32, KIND.WOOD); // hood
+  });
+  for (const s of [-1, 1]) {
+    const sh = N(s < 0 ? 'shL' : 'shR', chest, s * 0.24, 0.5, 0);
+    part(R, sh, (b) => { b.identity(); b.limb([0, 0, 0], [s * 0.04, -0.3, 0.02], 0.055, 0.045, KIND.WOOD, 4); });
+    const el = N(s < 0 ? 'elL' : 'elR', sh, s * 0.04, -0.3, 0.02);
+    part(R, el, (b) => { b.identity(); b.limb([0, 0, 0], [0, -0.28, 0.06], 0.045, 0.035, KIND.FLESH, 4); });
+    const th = N(s < 0 ? 'thL' : 'thR', hips, s * 0.1, -0.08, 0);
+    part(R, th, (b) => { b.identity(); b.limb([0, 0, 0], [0, -0.42, 0.02], 0.075, 0.06, KIND.WOOD, 4); });
+    const kn = N(s < 0 ? 'knL' : 'knR', th, 0, -0.42, 0.02);
+    part(R, kn, (b) => { b.identity(); b.limb([0, 0, 0], [0, -0.42, -0.02], 0.06, 0.045, KIND.WOOD, 4); b.place(0, -0.44, 0.05); b.box(0.1, 0.07, 0.24, KIND.ROCK); });
+  }
+  return R;
+}
+
+// walk cycle + crouch + lying dead
+export function poseSurvivor(rig, phase, speed, crouch, dead) {
+  const n = rig.nodes;
+  if (dead) {
+    rig.root.rotation.x = -Math.PI / 2;
+    n.hips.position.y = 0.2;
+    n.head.rotation.set(0, 0, 0.6);
+    n.shL.rotation.set(-2.6, 0, -0.3); n.shR.rotation.set(-0.4, 0, 0.5);
+    n.thL.rotation.set(0.2, 0, 0); n.thR.rotation.set(-0.15, 0, 0);
+    n.knL.rotation.x = 0.4; n.knR.rotation.x = 0.1;
+    return;
+  }
+  rig.root.rotation.x = 0;
+  const amp = clamp(speed / 3.2, 0, 1.4);
+  const s = Math.sin(phase);
+  n.hips.position.y = crouch ? 0.62 : 0.94 - Math.abs(Math.cos(phase)) * 0.03 * amp;
+  n.chest.rotation.x = crouch ? 0.55 : 0.08 * amp;
+  n.head.rotation.set(crouch ? -0.35 : 0, 0, 0);
+  n.thL.rotation.x = s * 0.55 * amp - (crouch ? 1.1 : 0);
+  n.thR.rotation.x = -s * 0.55 * amp - (crouch ? 1.1 : 0);
+  n.knL.rotation.x = Math.max(0, -s) * 0.7 * amp + (crouch ? 1.6 : 0);
+  n.knR.rotation.x = Math.max(0, s) * 0.7 * amp + (crouch ? 1.6 : 0);
+  n.shL.rotation.set(-s * 0.45 * amp, 0, -0.06);
+  n.shR.rotation.set(s * 0.45 * amp, 0, 0.06);
+  n.elL.rotation.x = -0.25 - amp * 0.2;
+  n.elR.rotation.x = -0.25 - amp * 0.2;
+}
+
 // ---------------- AI ----------------
+// A monster runs in one of two modes:
+//  • authoritative (solo, or the co-op host): think() decides where it goes and whom it hunts
+//  • puppet (co-op guest): follow() replays the host's snapshots, slightly delayed and interpolated
+// Either way present() animates it and makes it sound like itself, relative to whoever listens here.
 let _id = 0;
 const RIGS = { listener: buildListener, crawler: buildCrawler, watcher: buildWatcher, howler: buildHowler };
+export function buildRig(type) {
+  return RIGS[type]();
+}
+// stand-in "player" when nobody is alive: far away, still
+const FAR = { x: 1e5, z: 1e5, y: 0, speed: 0, alive: false, charging: false, forward: () => ({ x: 0, z: -1 }) };
+const INTERP_DELAY = 140; // ms behind the newest snapshot: hides network jitter
+export const STATES = ['idle', 'wander', 'investigate', 'search', 'hunt', 'flee', 'feed', 'lurk', 'stalk', 'frozen', 'inhale', 'howl'];
+export const TYPES = ['listener', 'crawler', 'watcher', 'howler'];
+
+function lerpAngle(a, b, k) {
+  return a + angleDiff(a, b) * k;
+}
+
 export class Monster {
-  constructor(type, game) {
-    this.id = ++_id;
+  constructor(type, game, id) {
+    this.id = id ?? ++_id;
     this.type = type;
     this.game = game;
     this.cfg = CFG.MONSTER[type];
@@ -459,7 +537,7 @@ export class Monster {
     this.stepPitch = 1;
     this.strideHz = type === 'crawler' ? 3.2 : 1.55;
     this.strideRef = type === 'crawler' ? 2.5 : 1.8;
-    this.huntTarget = null; // null = it knows where you are while hunting
+    this.huntTarget = null; // null = it knows where its target is while hunting
     this.lampGhost = null; // live afterimage while it stands in a lamp's light
     this.x = 0;
     this.z = 0;
@@ -486,15 +564,22 @@ export class Monster {
     this.huntedPlayer = false;
     this.alive = true;
     this.scripted = null;
+    this.playerDist = 1e4; // distance to whoever is listening on this machine (presentation)
+    this.tgt = null; // the player it is paying attention to (AI)
+    this.tgtDist = 1e4;
+    this.feedT = 0;
+    this.puppet = false;
+    this.snaps = [];
   }
 
   spawn(x, z, state = 'wander') {
     this.x = x;
     this.z = z;
     this.y = this.game.world.terrain.height(x, z);
-    this.playerDist = Math.hypot(this.game.player.x - x, this.game.player.z - z);
+    this.playerDist = this.game.distToEars(x, z);
     this.state = state;
     this.stateT = 0;
+    this.pickTarget();
     this.pickWander();
     this.syncRig();
   }
@@ -524,11 +609,32 @@ export class Monster {
     return this.cfg.hearing * this.game.hearingScale;
   }
 
-  pickWander() {
+  // ---------------- whom it cares about ----------------
+  nearestTo(x, z) {
+    let best = null, bd = 1e9;
+    for (const q of this.game.livePlayers()) {
+      const d = Math.hypot(q.x - x, q.z - z);
+      if (d < bd) {
+        bd = d;
+        best = q;
+      }
+    }
+    return best;
+  }
+
+  // whoever it is chasing; otherwise whoever is nearest
+  pickTarget() {
     const g = this.game;
-    const p = g.player;
-    // drift toward the player's region to keep the pressure on
-    if (Math.random() < 0.4) {
+    if (!(this.state === 'hunt' && this.tgt && this.tgt.alive && g.isPlayer(this.tgt))) this.tgt = this.nearestTo(this.x, this.z);
+    this.tgtDist = this.tgt ? Math.hypot(this.tgt.x - this.x, this.tgt.z - this.z) : 1e4;
+    return this.tgt;
+  }
+
+  pickWander() {
+    const live = this.game.livePlayers();
+    // drift toward the players' region to keep the pressure on
+    if (live.length && Math.random() < 0.4) {
+      const p = live[Math.floor(Math.random() * live.length)];
       const a = Math.random() * Math.PI * 2, d = 12 + Math.random() * 30;
       this.tx = p.x + Math.cos(a) * d;
       this.tz = p.z + Math.sin(a) * d;
@@ -548,7 +654,7 @@ export class Monster {
   }
 
   investigate(x, z, slow = false) {
-    if (this.state === 'hunt') return;
+    if (this.state === 'hunt' || this.state === 'feed') return;
     const fresh = this.state !== 'investigate';
     this.setState('investigate');
     this.tx = x;
@@ -558,8 +664,12 @@ export class Monster {
     return fresh;
   }
 
-  startHunt() {
+  startHunt(pl) {
     const g = this.game;
+    if (pl) {
+      this.tgt = pl;
+      this.tgtDist = Math.hypot(pl.x - this.x, pl.z - this.z);
+    }
     const fresh = this.state !== 'hunt';
     this.setState('hunt');
     this.lock = this.cfg.lock;
@@ -567,9 +677,17 @@ export class Monster {
     if (fresh) g.onMonsterHunt(this);
   }
 
-  // noise from the world. returns 'hunt' | 'investigate' | null
-  hear(nx, nz, loud, source, scream) {
-    if (!this.alive || this.state === 'flee' || this.scripted === 'freeze') return null;
+  // it got someone: it stays with the body for a while (co-op — the others can get away)
+  feed(sec = 4.5) {
+    this.setState('feed');
+    this.feedT = sec;
+    this.huntTarget = null;
+    this.speedCur = 0;
+  }
+
+  // noise from the world. pid = which player made it (null: a stone, a machine...). returns 'hunt' | 'investigate' | null
+  hear(nx, nz, loud, source, scream, pid = null) {
+    if (!this.alive || this.state === 'flee' || this.state === 'feed' || this.scripted === 'freeze') return null;
     const dx = nx - this.x, dz = nz - this.z;
     const d = Math.hypot(dx, dz);
     const mult = source === 'step' && this.cfg.stepHearing ? this.cfg.stepHearing : 1;
@@ -577,13 +695,22 @@ export class Monster {
     if (d > R) return null;
     const g = this.game;
     const fromPlayer = source !== 'stone' && source !== 'scare';
+    const who = pid != null ? g.playerById(pid) : null;
     if (this.state === 'hunt') {
       if (fromPlayer) {
         this.lock = Math.max(this.lock, 2.6);
+        // someone much closer giving themselves away pulls it off whoever it was chasing
+        if (who && who.alive && who !== this.tgt) {
+          const dn = Math.hypot(who.x - this.x, who.z - this.z);
+          if (dn < this.tgtDist * 0.6) {
+            this.tgt = who;
+            this.tgtDist = dn;
+          }
+        }
         return 'hunt';
       }
       // a stone can break the chase if you've been quiet for a moment and it lands nearer to it than you are
-      const p = g.player;
+      const p = this.tgt || FAR;
       const pd = Math.hypot(p.x - this.x, p.z - this.z);
       if (source === 'stone' && this.lock < this.cfg.lock * 0.75 && d < pd && pd > 3) {
         this.setState('investigate');
@@ -596,13 +723,13 @@ export class Monster {
       return 'hunt';
     }
     if (fromPlayer && !g.grace && (scream || d < Math.max(2.5, R * 0.22))) {
-      this.startHunt();
+      this.startHunt(who && who.alive ? who : this.nearestTo(nx, nz));
       return 'hunt';
     }
     const err = d * 0.12;
     const a = Math.random() * Math.PI * 2, r = Math.random() * err;
     const fresh = this.investigate(nx + Math.cos(a) * r, nz + Math.sin(a) * r);
-    if (fresh) g.onMonsterInvestigate(this, d);
+    if (fresh) g.onMonsterInvestigate(this, d, pid);
     return 'investigate';
   }
 
@@ -660,28 +787,42 @@ export class Monster {
       }
     } else this.stuckT = Math.max(0, this.stuckT - dt);
     this.y = lerp(this.y, g.world.terrain.height(this.x, this.z), 1 - Math.exp(-12 * dt));
-
   }
 
   update(dt, t) {
+    if (this.puppet) this.follow(dt);
+    else this.think(dt, t);
+    if (!this.alive) return;
+    this.present(dt, t);
+  }
+
+  // ---------------- decisions (authoritative only) ----------------
+  think(dt, t) {
     const g = this.game;
-    const p = g.player;
     this.stateT += dt;
     this.heardCD -= dt;
     this.listenT -= dt;
-    const pdx = p.x - this.x, pdz = p.z - this.z;
-    const pd = Math.hypot(pdx, pdz);
-    this.playerDist = pd;
+    this.pickTarget();
     const cfg = this.cfg;
     const scale = g.speedScale;
 
-    // ---- proximity sense ----
-    if (this.state !== 'hunt' && this.state !== 'flee' && !this.scripted) {
-      const moving = p.speed;
-      const touch = pd < 0.95;
-      const feels = pd < 2.3 && (moving > 1.75 || (moving > 0.3 && pd < 1.5));
-      if (touch || (feels && !g.grace)) this.startHunt();
+    // ---- proximity sense: anyone who walks into it, or rushes past right next to it ----
+    if (this.state !== 'hunt' && this.state !== 'flee' && this.state !== 'feed' && !this.scripted) {
+      for (const q of g.livePlayers()) {
+        const d = Math.hypot(q.x - this.x, q.z - this.z);
+        const touch = d < 0.95;
+        const feels = d < 2.3 && (q.speed > 1.75 || (q.speed > 0.3 && d < 1.5));
+        if (touch || (feels && !g.grace)) {
+          this.startHunt(q);
+          break;
+        }
+      }
     }
+
+    const p = this.tgt || FAR;
+    const pdx = p.x - this.x, pdz = p.z - this.z;
+    const pd = Math.hypot(pdx, pdz);
+    this.tgtDist = pd;
 
     // ---- state machine ----
     let speed = 0;
@@ -736,15 +877,38 @@ export class Monster {
         if (pd < 4) this.lock = Math.max(this.lock, 1.2);
         speed = cfg.hunt * (pd < 7 ? 1.18 : 1);
         if (this.stateT < 0.7) speed *= 0.25; // the windup screech
-        if (pd < CFG.MONSTER.killDist && this.stateT > 0.35) {
-          g.kill(this);
-          return;
+        if (this.stateT > 0.35) {
+          // whoever it reaches: the one it chases first, else whoever is nearest in its way
+          const kd = CFG.MONSTER.killDist;
+          let victim = p.alive && pd < kd ? p : null;
+          if (!victim) {
+            let vd = kd;
+            for (const q of g.livePlayers()) {
+              const d = Math.hypot(q.x - this.x, q.z - this.z);
+              if (d < vd) {
+                vd = d;
+                victim = q;
+              }
+            }
+          }
+          if (victim) {
+            g.kill(this, victim);
+            return;
+          }
         }
         if (this.lock <= 0) {
           this.setState('investigate');
           this.tx = p.x + (Math.random() - 0.5) * 6;
           this.tz = p.z + (Math.random() - 0.5) * 6;
           g.onMonsterLost(this);
+        }
+        break;
+      }
+      case 'feed': {
+        this.feedT -= dt;
+        if (this.feedT <= 0) {
+          this.setState('wander');
+          this.pickWander();
         }
         break;
       }
@@ -759,15 +923,68 @@ export class Monster {
 
     this._steer(dt, tx, tz, speed);
 
-    // head tracks the player when hunting / close
+    // head tracks its target when hunting / close
     if (this.state !== 'idle') {
       const rel = angleDiff(this.yaw, Math.atan2(pdx, pdz));
       const want = this.state === 'hunt' || pd < 10 ? clamp(rel, -0.9, 0.9) : 0;
       this.headYaw = lerp(this.headYaw, want, 1 - Math.exp(-4 * dt));
     }
-
-    // ---- animation + sounds ----
     this.phase += dt * Math.PI * 2 * this.strideHz * clamp(this.speedCur / this.strideRef, 0, 2.2);
+  }
+
+  // ---------------- puppet (co-op guest) ----------------
+  // s: { x, z, yaw, hy, spd, st, lit, intro, scr }
+  pushSnap(now, s) {
+    this.snaps.push({ t: now, ...s });
+    if (this.snaps.length > 8) this.snaps.shift();
+  }
+
+  follow(dt) {
+    const S = this.snaps;
+    if (!S.length) return;
+    const now = performance.now() - INTERP_DELAY;
+    let a = S[0], b = S[0];
+    for (let i = S.length - 1; i >= 0; i--) {
+      if (S[i].t <= now) {
+        a = S[i];
+        b = S[Math.min(i + 1, S.length - 1)];
+        break;
+      }
+    }
+    let k = b.t > a.t ? (now - a.t) / (b.t - a.t) : 1;
+    k = clamp(k, 0, 1.2); // a little extrapolation hides a late packet
+    const jump = Math.hypot(b.x - a.x, b.z - a.z) > 8 || Math.hypot(b.x - this.x, b.z - this.z) > 14;
+    if (jump) {
+      a = b;
+      k = 1;
+    }
+    const k1 = Math.min(k, 1);
+    this.x = lerp(a.x, b.x, k);
+    this.z = lerp(a.z, b.z, k);
+    this.yaw = lerpAngle(a.yaw, b.yaw, k1);
+    this.headYaw = lerp(a.hy, b.hy, k1);
+    this.speedCur = lerp(a.spd, b.spd, k1);
+    const nb = k1 > 0.5 ? b : a;
+    if (nb.st !== this.state) {
+      if (this.state === 'lurk') this.revealed = false; // the Watcher came back: it can sting again
+      this.state = nb.st;
+      this.stateT = 0;
+    } else this.stateT += dt;
+    this.lit = nb.lit;
+    this.intro = nb.intro;
+    this.scripted = nb.scr ? 'freeze' : null;
+    if (Math.abs(this.x) < 2000) {
+      const gy = this.game.world.terrain.height(this.x, this.z);
+      this.y = jump ? gy : lerp(this.y, gy, 1 - Math.exp(-12 * dt));
+    }
+    this.phase += dt * Math.PI * 2 * this.strideHz * clamp(this.speedCur / this.strideRef, 0, 2.2);
+  }
+
+  // ---------------- what you see and hear of it (every machine) ----------------
+  present(dt, t) {
+    const g = this.game;
+    this.playerDist = g.distToEars(this.x, this.z);
+    const pd = this.playerDist;
     this.animate(dt, t);
     this.syncRig();
 
@@ -807,8 +1024,8 @@ export class Monster {
 // It never hears you and makes no sound you would call a footstep. It moves only while nothing lights
 // it: every time your echo finds it, it is a little closer. Freeze it with light; the lamps keep it out.
 export class Watcher extends Monster {
-  constructor(game) {
-    super('watcher', game);
+  constructor(game, id) {
+    super('watcher', game, id);
     this.ghostColor = 0xd9e4ec;
     this.noEyes = true;
     this.headY = 3.2;
@@ -837,9 +1054,10 @@ export class Watcher extends Monster {
     animWatcher(this, dt, t);
   }
 
-  // somewhere behind you, in the dark, away from the lamps
-  appearBehind(dmin, dmax) {
-    const g = this.game, p = g.player, w = CFG.WORLD_WALL - 6;
+  // somewhere behind someone, in the dark, away from the lamps
+  appearBehind(p, dmin, dmax) {
+    const g = this.game, w = CFG.WORLD_WALL - 6;
+    if (!p) return false;
     const f = p.forward();
     for (let k = 0; k < 40; k++) {
       const a = (Math.random() - 0.5) * 2.4;
@@ -852,7 +1070,9 @@ export class Watcher extends Monster {
       if (L && Math.hypot(x - L.x, z - L.z) < L.r + 3) continue;
       if (g.objectives.lampAt(x, z) > 0.005) continue;
       if (g.lightAt(x, g.world.terrain.height(x, z) + 1.8, z) > 0.02) continue;
+      if (g.livePlayers().some((q) => Math.hypot(q.x - x, q.z - z) < dmin * 0.7)) continue; // not right next to someone else
       this.spawn(x, z, 'stalk');
+      this.tgt = p;
       this.yaw = Math.atan2(p.x - x, p.z - z);
       this.litStreak = 0;
       this.revealed = false;
@@ -884,31 +1104,35 @@ export class Watcher extends Monster {
     this.game.audio.watcherPresence(0);
   }
 
-  update(dt, t) {
-    const g = this.game, p = g.player, cfg = this.cfg;
+  think(dt, t) {
+    const g = this.game, cfg = this.cfg;
     this.stateT += dt;
     if (this.state === 'lurk') {
       this.lurkT -= dt;
-      g.audio.watcherPresence(0);
-      if (this.lurkT <= 0 && !g.objectives.inLamp(p.x, p.z) && !this.appearBehind(27, 37)) this.lurkT = 1.5;
+      if (this.lurkT <= 0) {
+        // it picks someone who isn't sheltering in a lamp
+        const live = g.livePlayers().filter((q) => !g.objectives.inLamp(q.x, q.z));
+        const p = live.length ? live[Math.floor(Math.random() * live.length)] : null;
+        if (!p || !this.appearBehind(p, 27, 37)) this.lurkT = 1.5;
+      }
       return;
     }
+    const p = this.pickTarget() || FAR;
     const pdx = p.x - this.x, pdz = p.z - this.z;
-    const pd = Math.hypot(pdx, pdz);
-    this.playerDist = pd;
+    const pd = this.tgtDist;
     const lampL = g.objectives.lampAt(this.x, this.z);
     const lit = g.lightAt(this.x, this.y + 1.8, this.z) > cfg.litThreshold || lampL > 0.08;
     this.lit = lit;
     this.state = lit ? 'frozen' : 'stalk';
     this.litStreak = lit ? this.litStreak + dt : Math.max(0, this.litStreak - dt * 0.5);
-    this.lampWait = g.objectives.inLamp(p.x, p.z) ? this.lampWait + dt : 0;
+    this.lampWait = p.alive && g.objectives.inLamp(p.x, p.z) ? this.lampWait + dt : 0;
     // it gets bored of being stared at, and it won't wait forever at the edge of a lamp
-    if (this.litStreak > 14 || this.lampWait > 9) {
+    if (this.litStreak > 14 || this.lampWait > 9 || !p.alive) {
       this.vanish(18 + Math.random() * 16);
       return;
     }
     if (pd > 60 && !lit) {
-      if (!this.appearBehind(27, 37)) this.vanish(2);
+      if (!this.appearBehind(p, 27, 37)) this.vanish(2);
       return;
     }
     let speed = 0;
@@ -922,17 +1146,37 @@ export class Watcher extends Monster {
       this._steer(dt, p.x, p.z, speed, 3.2);
       this.phase += dt * Math.PI * 2 * this.strideHz * clamp(this.speedCur / this.strideRef, 0, 2);
       this.headYaw = lerp(this.headYaw, clamp(angleDiff(this.yaw, Math.atan2(pdx, pdz)), -1.2, 1.2), 1 - Math.exp(-3 * dt));
-      this.animate(dt, t);
-      this.syncRig();
-    } else if (!lit) {
-      this.speedCur = 0;
     } else {
       this.speedCur = 0; // lit: not a single joint moves. the pose holds exactly.
     }
-    if (!lit && pd < CFG.MONSTER.killDist + 0.15 && this.stateT > 0.6) {
-      g.kill(this);
+    if (!lit && this.stateT > 0.6) {
+      let victim = null, vd = CFG.MONSTER.killDist + 0.15;
+      for (const q of g.livePlayers()) {
+        const d = Math.hypot(q.x - this.x, q.z - this.z);
+        if (d < vd) {
+          vd = d;
+          victim = q;
+        }
+      }
+      if (victim) {
+        g.kill(this, victim);
+        return;
+      }
+    }
+  }
+
+  present(dt, t) {
+    const g = this.game;
+    if (this.state === 'lurk') {
+      this.playerDist = 1e4;
+      g.audio.watcherPresence(0);
       return;
     }
+    this.playerDist = g.distToEars(this.x, this.z);
+    const pd = this.playerDist;
+    const lit = this.lit;
+    if (!lit && this.speedCur > 0.01) this.animate(dt, t);
+    this.syncRig();
     // bones creaking as it walks; a thin ringing that grows as it closes in
     const presence = clamp(1 - pd / 24, 0, 1);
     g.audio.watcherPresence(presence, this.x, this.y + 2.8, this.z, !lit && this.speedCur > 0.3);
@@ -943,7 +1187,7 @@ export class Watcher extends Monster {
         this.crackT = 0.3 + Math.random() * 0.55;
       }
     }
-    if (pd < 10) g.fx.glitch = Math.max(g.fx.glitch, (1 - pd / 10) * (lit ? 0.1 : 0.32));
+    if (pd < 10 && g.localAlive()) g.fx.glitch = Math.max(g.fx.glitch, (1 - pd / 10) * (lit ? 0.1 : 0.32));
   }
 }
 
@@ -951,8 +1195,8 @@ export class Watcher extends Monster {
 // Nearly deaf. Every half a minute it fills its chest and howls, and the howl is its eyes: whatever
 // is moving inside that wave gets charged. Stand still and it looks straight through you.
 export class Howler extends Monster {
-  constructor(game) {
-    super('howler', game);
+  constructor(game, id) {
+    super('howler', game, id);
     this.ghostColor = 0xff5a14;
     this.headY = 1.8;
     this.stepGain = 2.4;
@@ -972,24 +1216,25 @@ export class Howler extends Monster {
     return super.danger();
   }
 
-  hear(nx, nz, loud, source, scream) {
+  hear(nx, nz, loud, source, scream, pid) {
     if (this.state === 'inhale' || this.state === 'howl') return null;
     if (loud < this.cfg.minLoud) return null; // clicks, footsteps, breathing: too quiet for it
-    const r = super.hear(nx, nz, loud, source, scream);
+    const r = super.hear(nx, nz, loud, source, scream, pid);
     if (r === 'hunt' && source !== 'stone' && source !== 'scare') this.huntTarget = { x: nx, z: nz };
     return r;
   }
 
-  startHunt() {
-    if (!this.huntTarget) this.huntTarget = { x: this.game.player.x, z: this.game.player.z };
-    super.startHunt();
+  startHunt(pl) {
+    const p = pl || this.tgt;
+    if (!this.huntTarget && p) this.huntTarget = { x: p.x, z: p.z };
+    super.startHunt(pl);
   }
 
-  update(dt, t) {
-    const g = this.game, p = g.player;
+  think(dt, t) {
+    const g = this.game;
     if (this.state === 'inhale' || this.state === 'howl') {
       this.stateT += dt;
-      this.playerDist = Math.hypot(p.x - this.x, p.z - this.z);
+      this.pickTarget();
       this.speedCur = lerp(this.speedCur, 0, 1 - Math.exp(-8 * dt));
       if (this.state === 'inhale' && this.stateT >= 1.8) {
         this.setState('howl');
@@ -997,14 +1242,22 @@ export class Howler extends Monster {
       } else if (this.state === 'howl') {
         // the wave rolls out at ~30 m/s; anything moving inside it is seen
         const reach = Math.min(this.cfg.howlR, Math.max(0, this.stateT - 0.1) * 30);
-        if (this.stateT < 1.9 && this.playerDist < reach && g.movingForHowler()) this.spot();
+        let seen = null, sd = 1e9;
+        if (this.stateT < 1.9) {
+          for (const q of g.livePlayers()) {
+            const d = Math.hypot(q.x - this.x, q.z - this.z);
+            if (d < reach && d < sd && g.movingForHowler(q)) {
+              sd = d;
+              seen = q;
+            }
+          }
+        }
+        if (seen) this.spot(seen);
         else if (this.stateT > 2.0) {
           this.setState('wander');
           this.pickWander();
         }
       }
-      this.animate(dt, t);
-      this.syncRig();
       return;
     }
     if (this.state === 'hunt') {
@@ -1012,17 +1265,31 @@ export class Howler extends Monster {
       if (this.barkT <= 0) {
         this.barkT = 1.0 + Math.random() * 0.35;
         g.onHowlerBark(this);
-        if (this.playerDist < 18 && g.movingForHowler()) this.huntTarget = { x: p.x, z: p.z };
+        // every bark is another look: anyone moving close by
+        let best = null, bd = 18;
+        for (const q of g.livePlayers()) {
+          const d = Math.hypot(q.x - this.x, q.z - this.z);
+          if (d < bd && g.movingForHowler(q)) {
+            bd = d;
+            best = q;
+          }
+        }
+        if (best) {
+          this.tgt = best;
+          this.huntTarget = { x: best.x, z: best.z };
+        }
       }
       const ht = this.huntTarget;
-      if (ht && Math.hypot(ht.x - this.x, ht.z - this.z) < 1.7 && this.playerDist > 2.4 && this.stateT > 0.8) {
+      const p = this.tgt || FAR;
+      const pd = Math.hypot(p.x - this.x, p.z - this.z);
+      if (ht && Math.hypot(ht.x - this.x, ht.z - this.z) < 1.7 && pd > 2.4 && this.stateT > 0.8) {
         // it got to where it saw you, and you're not there
         this.huntTarget = null;
         this.setState('search');
         this.searchDur = 3.5 + Math.random() * 2.5;
         g.onMonsterLost(this);
       }
-    } else if (this.state !== 'flee') {
+    } else if (this.state !== 'flee' && this.state !== 'feed') {
       this.huntTarget = null;
       this.howlT -= dt;
       if (this.howlT <= 0 && this.state !== 'idle') {
@@ -1031,23 +1298,23 @@ export class Howler extends Monster {
         g.onHowlerInhale(this);
       }
     }
-    super.update(dt, t);
+    super.think(dt, t);
   }
 
-  spot() {
-    const p = this.game.player;
-    this.huntTarget = { x: p.x, z: p.z };
-    this.yaw = Math.atan2(p.x - this.x, p.z - this.z);
+  spot(q) {
+    this.tgt = q;
+    this.huntTarget = { x: q.x, z: q.z };
+    this.yaw = Math.atan2(q.x - this.x, q.z - this.z);
     this.state = 'wander';
-    this.startHunt();
+    this.startHunt(q);
     this.barkT = 1.1;
   }
 }
 
-export function createMonster(type, game) {
-  if (type === 'watcher') return new Watcher(game);
-  if (type === 'howler') return new Howler(game);
-  return new Monster(type, game);
+export function createMonster(type, game, id) {
+  if (type === 'watcher') return new Watcher(game, id);
+  if (type === 'howler') return new Howler(game, id);
+  return new Monster(type, game, id);
 }
 
 export class ShadeRig {

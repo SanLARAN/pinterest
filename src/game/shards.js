@@ -63,6 +63,18 @@ export class Shards {
     return null;
   }
 
+  // someone else picked it up
+  take(i) {
+    const s = this.items[i];
+    if (!s || !s.alive) return;
+    s.alive = false;
+    this.glow[i] = 0;
+    this._m.makeScale(0, 0, 0);
+    this.mesh.setMatrixAt(i, this._m);
+    this.mesh.instanceMatrix.needsUpdate = true;
+    this.glowAttr.needsUpdate = true;
+  }
+
   remaining() {
     return this.items.reduce((n, s) => n + (s.alive ? 1 : 0), 0);
   }
@@ -86,6 +98,7 @@ export class Shards {
 
   update(dt, game) {
     const p = game.player;
+    if (!p.alive) return;
     let dirty = false;
     for (let i = 0; i < this.items.length; i++) {
       const s = this.items[i];
@@ -113,7 +126,7 @@ export class Shards {
         this.mesh.setMatrixAt(i, this._m);
         this.mesh.instanceMatrix.needsUpdate = true;
         dirty = true;
-        game.onShard(s);
+        game.onShard(s, i);
       }
     }
     if (dirty) this.glowAttr.needsUpdate = true;
