@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#000000" />
+    <meta name="description" content="ТИШЕ — low-poly эхолокационный хоррор. Ты слеп в огромном лесу: твой микрофон — эхолокатор. Запусти пять генераторов и не закричи." />
+    <title>ТИШЕ — эхолокационный хоррор</title>
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+  <script type="module" crossorigin src="./assets/index-DcpbJRpd.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-DbmSMIzq.css">
+</head>
+  <body>
+    <canvas id="gl" tabindex="-1"></canvas>
+
+    <!-- boot -->
+    <div id="boot" class="screen show">
+      <div class="boot-inner">
+        <div class="sonar-loader"><i></i><i></i><i></i></div>
+        <div id="bootText">лес растёт…</div>
+      </div>
+    </div>
+
+    <!-- HUD: almost nothing. the dark is the interface. -->
+    <div id="hud" class="hidden">
+      <div id="dawnLine"><i id="dawnFill"></i></div>
+      <div id="peek">
+        <div id="peekTime">00:00</div>
+        <div id="peekGens"><i></i><i></i><i></i><i></i><i></i></div>
+        <div id="peekTask"></div>
+        <div id="peekSub"></div>
+      </div>
+      <canvas id="radar"></canvas>
+      <button id="pauseBtn" class="iconbtn" aria-label="pause">
+        <svg viewBox="0 0 24 24"><path d="M9 6v12M15 6v12"/></svg>
+      </button>
+      <div id="crosshair">
+        <svg viewBox="-50 -50 100 100" aria-hidden="true">
+          <circle id="screamRing" r="30" />
+          <circle id="noiseRing" r="7" />
+          <circle id="useRing" r="13" transform="rotate(-90)" />
+        </svg>
+        <div id="ripple"></div>
+        <div id="beacon"><i></i></div>
+        <div class="dot"></div>
+        <div id="stam"><i id="stamFill"></i></div>
+        <div id="stones"><i></i><i></i><i></i></div>
+      </div>
+      <div id="alert"></div>
+      <div id="popups"></div>
+      <div id="use"></div>
+      <div id="hint"></div>
+      <div id="intro"></div>
+      <div id="note"><div class="k"></div><div class="t"></div><div class="f"></div></div>
+      <div id="skip"></div>
+      <div id="lockHint"></div>
+    </div>
+
+    <!-- touch controls -->
+    <div id="touch">
+      <div id="peekZone"></div>
+      <div id="joyZone"></div>
+      <div id="lookZone"></div>
+      <div id="joyBase"><div id="joyKnob"></div></div>
+      <button id="tPing" class="tbtn big"><span data-i18n="touchPing">ЭХО</span></button>
+      <button id="tStone" class="tbtn"><span data-i18n="touchStone">КАМЕНЬ</span></button>
+      <button id="tCrouch" class="tbtn"><span data-i18n="touchCrouch">ТИХО</span></button>
+      <button id="tUse" class="tbtn"><span data-i18n="touchUse">РУКИ</span></button>
+      <button id="tSkip" class="tbtn wide"><span data-i18n="touchSkip">ПРОПУСТИТЬ</span></button>
+    </div>
+
+    <!-- main menu -->
+    <div id="menu" class="screen">
+      <div class="menu-wrap">
+        <div class="title-block">
+          <h1 class="title" id="titleText" data-text="ТИШЕ">ТИШЕ</h1>
+          <div class="tagline" data-i18n="tagline"></div>
+        </div>
+        <div class="menu-main">
+          <button class="btn primary" id="btnPlay"><span data-i18n="play">ИГРАТЬ</span></button>
+          <div id="bestLine"></div>
+          <nav class="menu-links">
+            <button class="link" id="btnHow"><span data-i18n="howto"></span></button>
+            <i>·</i>
+            <button class="link" id="btnScores"><span data-i18n="scores"></span></button>
+            <i>·</i>
+            <button class="link" id="btnSettings"><span data-i18n="settings"></span></button>
+          </nav>
+          <div id="micPanel">
+            <div class="mic-row">
+              <span id="micStatus"></span>
+              <button class="chip" id="micToggle"></button>
+            </div>
+            <div id="micTest"><div class="bar"><div id="micTestFill"></div><div id="micTestTrig"></div></div><span data-i18n="micTest"></span></div>
+            <div id="micWarn"></div>
+          </div>
+        </div>
+        <div class="menu-foot">
+          <div class="hp"><svg viewBox="0 0 24 24"><path d="M4 15v-3a8 8 0 0 1 16 0v3"/><rect x="3" y="14" width="4" height="7" rx="1.5"/><rect x="17" y="14" width="4" height="7" rx="1.5"/></svg><span data-i18n="headphones"></span></div>
+          <button id="langBtn" class="chip">RU · EN</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- pause -->
+    <div id="pause" class="screen">
+      <div class="panel center-panel">
+        <h2 class="glitch-sm" data-i18n="paused">ПАУЗА</h2>
+        <div id="pauseStats" class="mini-stats"></div>
+        <button class="btn primary" id="btnResume"><span data-i18n="resume"></span></button>
+        <button class="btn" id="btnRestartP"><span data-i18n="restart"></span></button>
+        <button class="btn" id="btnSettingsP"><span data-i18n="settings"></span></button>
+        <button class="btn" id="btnMenuP"><span data-i18n="menu"></span></button>
+      </div>
+    </div>
+
+    <!-- game over / win -->
+    <div id="over" class="screen">
+      <div class="panel over-panel">
+        <div id="overKicker"></div>
+        <h2 id="overTitle" class="over-title"></h2>
+        <div id="overSub"></div>
+        <div id="newRecord" class="badge" data-i18n="newRecord"></div>
+        <div id="overScore" class="big-score">0</div>
+        <div id="overStats" class="stats-grid"></div>
+        <div id="overTable" class="score-table compact"></div>
+        <div class="btn-row">
+          <button class="btn primary" id="btnRestart"><span data-i18n="restart"></span></button>
+          <button class="btn" id="btnMenu"><span data-i18n="menu"></span></button>
+        </div>
+        <div class="restart-hint" data-i18n="restartHint"></div>
+      </div>
+    </div>
+
+    <!-- settings -->
+    <div id="settingsPanel" class="screen modal">
+      <div class="panel form-panel">
+        <h2 data-i18n="settings"></h2>
+        <div class="form">
+          <label><span data-i18n="sVolume"></span><input type="range" id="sVolume" min="0" max="1" step="0.01" /></label>
+          <label><span data-i18n="sMouse"></span><input type="range" id="sMouse" min="0.2" max="3" step="0.05" /></label>
+          <label class="check"><span data-i18n="sInvert"></span><input type="checkbox" id="sInvert" /></label>
+          <label class="check"><span data-i18n="sMic"></span><input type="checkbox" id="sMic" /></label>
+          <label><span data-i18n="sMicSens"></span><input type="range" id="sMicSens" min="0" max="1" step="0.01" /></label>
+          <label class="check"><span data-i18n="sEcho"></span><input type="checkbox" id="sEcho" /></label>
+          <label class="check"><span data-i18n="sRadar"></span><input type="checkbox" id="sRadar" /></label>
+          <label><span data-i18n="sScares"></span>
+            <select id="sScares"><option value="full" data-i18n="sScaresFull"></option><option value="reduced" data-i18n="sScaresReduced"></option></select>
+          </label>
+          <label><span data-i18n="sQuality"></span>
+            <select id="sQuality"><option value="auto" data-i18n="sQAuto"></option><option value="high" data-i18n="sQHigh"></option><option value="low" data-i18n="sQLow"></option></select>
+          </label>
+          <label><span data-i18n="sLang"></span>
+            <select id="sLang"><option value="ru">Русский</option><option value="en">English</option></select>
+          </label>
+        </div>
+        <button class="btn primary" id="btnSettingsBack"><span data-i18n="back"></span></button>
+      </div>
+    </div>
+
+    <!-- high scores -->
+    <div id="scoresPanel" class="screen modal">
+      <div class="panel form-panel">
+        <h2 data-i18n="scores"></h2>
+        <label class="callsign"><span data-i18n="callsign"></span><input id="nameInput" maxlength="14" autocomplete="off" spellcheck="false" placeholder="???" /></label>
+        <div id="scoreTable" class="score-table"></div>
+        <button class="btn primary" id="btnScoresBack"><span data-i18n="back"></span></button>
+      </div>
+    </div>
+
+    <!-- how to play -->
+    <div id="howPanel" class="screen modal">
+      <div class="panel form-panel how">
+        <h2 data-i18n="howto"></h2>
+        <div id="howBody"></div>
+        <button class="btn primary" id="btnHowBack"><span data-i18n="back"></span></button>
+      </div>
+    </div>
+
+    <div id="noise-overlay"></div>
+  </body>
+</html>

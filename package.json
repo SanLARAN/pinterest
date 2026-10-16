@@ -2,11 +2,12 @@
   "name": "hush-echolocation-horror",
   "private": true,
   "version": "1.0.0",
-  "description": "ТИШЕ / HUSH — low-poly echolocation horror. Survive 30 minutes in a pitch-black forest using your microphone as sonar. Don't scream.",
+  "description": "ТИШЕ / HUSH — low-poly echolocation horror with online co-op. Your microphone is your sonar in a pitch-black forest. Start five generators. Don't scream.",
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
+    "build:pages": "vite build --outDir play --emptyOutDir",
     "preview": "vite preview --host 0.0.0.0"
   },
   "dependencies": {
