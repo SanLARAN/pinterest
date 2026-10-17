@@ -312,6 +312,7 @@ export class Atlas {
     if (k === 'seen') return a.seen[sub] | 0;
     if (k === 'kills') return a.kills[sub] | 0;
     if (k === 'part') return a.parts[+sub] | 0;
+    if (k === 'car') return (a.carFit || [])[+sub] | 0;
     if (k === 'site') return a.sites[sub] | 0;
     return a[k] | 0;
   }
@@ -438,6 +439,10 @@ export class Atlas {
   _stopSounds() {
     for (const id of this.soundTimers || []) clearTimeout(id);
     this.soundTimers = [];
+    for (const h of this.soundHandles || []) {
+      try { h.stop(0.3); } catch { /* */ }
+    }
+    this.soundHandles = [];
     this.soundUntil = 0;
     const b = this.el.querySelector('.ent-sound.playing');
     if (b) b.classList.remove('playing');
@@ -549,6 +554,52 @@ export class Atlas {
         later(1500, () => A.throwWhoosh());
         later(2100, () => A.glowLand(...at(1, -1.4, 6), 0.8));
         dur = 2.8;
+        break;
+      case 'gate': {
+        const H = (this.soundHandles = []);
+        const s1 = A.gateSiren(...at(-2, 1, 9), 5.2);
+        if (s1) H.push(s1);
+        later(1200, () => { const m = A.gateMotor(...at(-1.5, -0.6, 6), 3.6); if (m) H.push(m); });
+        later(4800, () => A.gateClunk(...at(1.5, -0.6, 6)));
+        dur = 5.6;
+        break;
+      }
+      case 'uaz': {
+        const H = (this.soundHandles = []);
+        const c = A.uazCrank(...at(-1, -0.5, 3), true);
+        if (c) H.push(c);
+        later(2000, () => {
+          if (c) c.stop(0.05);
+          const e = A.uazStart(...at(-1, -0.5, 3));
+          if (e) {
+            H.push(e);
+            later(3200, () => e.stop(1.2));
+          }
+        });
+        dur = 5.6;
+        break;
+      }
+      case 'wheel':
+        for (let k = 0; k < 3; k++) later(k * 600, () => A.partWork(...at(-0.8, -0.8, 1.4), 'wheel'));
+        later(2000, () => A.partFitted(...at(-0.8, -0.8, 1.4), 'wheel'));
+        dur = 2.9;
+        break;
+      case 'carbattery':
+        A.partWork(...at(-0.8, -0.6, 1.4), 'battery');
+        later(700, () => A.partWork(...at(-0.8, -0.6, 1.4), 'battery'));
+        later(1500, () => A.partFitted(...at(-0.8, -0.6, 1.4), 'battery'));
+        dur = 2.4;
+        break;
+      case 'carb':
+        for (let k = 0; k < 3; k++) later(k * 650, () => A.partWork(...at(-0.8, -0.5, 1.3), 'carb'));
+        later(2100, () => A.partFitted(...at(-0.8, -0.5, 1.3), 'carb'));
+        dur = 2.8;
+        break;
+      case 'jerrycan':
+        A.partPick(...at(-0.6, -0.6, 1.2), 'can', true);
+        for (let k = 0; k < 4; k++) later(600 + k * 450, () => A.partWork(...at(-0.8, -0.7, 1.4), 'can'));
+        later(2700, () => A.partFitted(...at(-0.8, -0.7, 1.4), 'can'));
+        dur = 3.6;
         break;
       default:
         return;

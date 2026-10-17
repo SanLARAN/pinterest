@@ -2,7 +2,7 @@
 // draws the forest — black faces, grainy glowing wire — and lit by an echo that leaves the viewer every few
 // seconds (or whenever you click it). Drag to turn it, wheel / pinch to come closer.
 import * as THREE from 'three';
-import { EDGE_GLSL, KIND_COLORS_GLSL } from '../render/sonar.js';
+import { EDGE_GLSL, KIND_COLORS_GLSL, GARAGE_PAL_GLSL } from '../render/sonar.js';
 import { MeshBuilder, KIND } from '../world/builder.js';
 import { RNG, clamp } from '../core/rng.js';
 import { buildModel } from './atlasModels.js';
@@ -24,6 +24,7 @@ void main() {
 const FRAG = /* glsl */ `
 ${EDGE_GLSL}
 ${KIND_COLORS_GLSL}
+${GARAGE_PAL_GLSL}
 uniform float uTime;
 uniform vec3 uCam;
 uniform vec4 uPing;   // origin xyz, start time
@@ -52,9 +53,21 @@ void main() {
   vec3 V = toCam / camD;
   if (dot(N, toCam) < 0.0) N = -N;
   int k = int(vKind + 0.5); // (an interpolated constant can land a hair under the integer)
-  bool beam = k > 11;
+  bool beam = k == 12;
+  if (k == 50) {
+    // chain-link: the diamonds cut out of the panel, as in the forest (sonar.js)
+    float sc = vWorld.x + vWorld.z;
+    vec2 q = vec2(sc + vWorld.y, sc - vWorld.y) * 5.5;
+    vec2 dl = min(fract(q), 1.0 - fract(q));
+    vec2 fw = fwidth(q);
+    vec2 cv = 1.0 - smoothstep(vec2(0.09) - fw * 0.5, vec2(0.09) + fw * 0.75, dl);
+    float wire = max(cv.x, cv.y);
+    float dither = fract(sin(dot(floor(gl_FragCoord.xy), vec2(12.9898, 78.233))) * 43758.5453);
+    if (wire < dither * 0.92 + 0.04) discard;
+    k = 36;
+  }
   if (beam) k = 11;
-  vec3 base = KC[k];
+  vec3 base = k < 12 ? KC[min(k, 11)] : xNight(k);
   float facing = abs(dot(N, V));
 
   // the echo: a wavefront, a quick flash, a long afterglow

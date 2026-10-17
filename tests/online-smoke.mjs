@@ -225,6 +225,23 @@ try {
   const aFlare = await until(() => A.page.evaluate(() => { const g = window.__hush.game, f = g.flares.list[0]; return f ? (f.owner === g.remotes.keys().next().value ? 'B' : 'someone else') : null; }), 20000);
   check("B's flare flies on the host's machine", aFlare === 'B', String(aFlare));
   facts.push(`door ${aDoor === bDoor ? 'synced' : 'NOT synced'} · flare ${aFlare === 'B' ? 'synced' : 'NOT synced'}`);
+  // the night, and one of the UAZ's parts: B asks for it (the host decides), throws it; it lands for the host too
+  await A.page.evaluate(() => window.__hush.game.startDusk());
+  const night = await until(async () => (await A.page.evaluate(() => window.__hush.game.state)) === 'play' && (await B.page.evaluate(() => window.__hush.game.state)) === 'play', 30000);
+  check('the night falls for both', !!night);
+  const partOk = await (async () => {
+    await B.page.evaluate(() => { const g = window.__hush.game, p = g.escape.parts[2]; g.player.x = p.x + 0.8; g.player.z = p.z; g.player.vx = g.player.vz = 0; });
+    await sleep(1500); // (the host sees B there first)
+    await B.page.evaluate(() => { const g = window.__hush.game; g.escape.pick(g.escape.parts[2]); });
+    const mine = await until(() => B.page.evaluate(() => { const h = window.__hush.game.escape.held; return !!h && h.i === 2; }), 15000);
+    const hostSees = await A.page.evaluate(() => { const q = window.__hush.game.escape.parts[2]; return q.state === 'held' && q.holder !== window.__hush.game.player.id; });
+    if (!mine || !hostSees) return `not granted (B ${mine}, host ${hostSees})`;
+    await B.page.evaluate(() => window.__hush.game.escape.throwHeld());
+    const landed = await until(() => A.page.evaluate(() => { const q = window.__hush.game.escape.parts[2]; return q.state === 'ground' && !q.settle; }), 30000);
+    return landed ? 'ok' : 'no landing';
+  })();
+  check("B's part: granted by the host, thrown, lands on the host's machine", partOk === 'ok', partOk);
+  facts.push(`UAZ part ${partOk === 'ok' ? 'synced' : partOk}`);
   check('no page errors', A.page.errors.length === 0 && B.page.errors.length === 0);
 } catch (e) {
   log('ERROR', e.message);

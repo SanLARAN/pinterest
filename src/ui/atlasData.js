@@ -9,6 +9,7 @@ export const CHAPTERS = [
   { id: 'beasts', num: 'I', entries: ['listener', 'crawler', 'watcher', 'howler', 'shade'] },
   { id: 'tasks', num: 'II', entries: ['generator', 'corpse', 'fuel', 'plug', 'fuses', 'belt', 'battery', 'shard', 'stone', 'flare', 'glowstick'] },
   { id: 'places', num: 'III', entries: ['camp', 'medhut', 'cabin', 'tower', 'stones', 'wreck'] },
+  { id: 'way', num: 'IV', entries: ['yard', 'uaz', 'wheel', 'carbattery', 'carb', 'jerrycan'] },
 ];
 
 export const ENTRIES = {
@@ -34,6 +35,12 @@ export const ENTRIES = {
   tower: { model: 'tower', kind: 'place', log: [['startedHere', 'site:tower']] },
   stones: { model: 'stones', kind: 'place', log: [['startedHere', 'site:stones']] },
   wreck: { model: 'wreck', kind: 'place', log: [['startedHere', 'site:wreck']] },
+  yard: { model: 'yard', sound: 'gate', kind: 'place', log: [['escaped', 'escapes']] },
+  uaz: { model: 'uaz', sound: 'uaz', kind: 'thing', log: [['escaped', 'escapes'], ['fittedCar', 'carParts']] },
+  wheel: { model: 'wheel', sound: 'wheel', kind: 'task', rate: [4, 4], log: [['fitted', 'car:0']] },
+  carbattery: { model: 'carbattery', sound: 'carbattery', kind: 'task', rate: [2, 2], log: [['fitted', 'car:1']] },
+  carb: { model: 'carb', sound: 'carb', kind: 'task', rate: [3, 3], log: [['fitted', 'car:2']] },
+  jerrycan: { model: 'jerrycan', sound: 'jerrycan', kind: 'task', rate: [3, 3], log: [['fitted', 'car:3']] },
 };
 
 const TEXT = {
@@ -67,12 +74,12 @@ const TEXT = {
       cm: 'см',
       mm: 'мм',
     },
-    chapters: { beasts: 'Твари', tasks: 'Задачи', places: 'Места' },
+    chapters: { beasts: 'Твари', tasks: 'Задачи', places: 'Места', way: 'Путь отсюда' },
     rate: { beast: ['слух', 'чутьё', 'скорость', 'угроза'], task: ['шум', 'время'] },
     log: {
       seen: 'ночей рядом', killed: 'убил тебя', appeared: 'являлась', started: 'запущено при тебе', wins: 'побед',
       searched: 'обыскано тел', fitted: 'поставлено', found: 'найдено', thrown: 'брошено', fired: 'выпущено', startedHere: 'запущено здесь',
-      cracked: 'зажжено', revived: 'вернул к жизни',
+      cracked: 'зажжено', revived: 'вернул к жизни', escaped: 'уехал отсюда', fittedCar: 'деталей поставил',
       nights: 'ночей', best: 'дольше всего', deaths: 'смертей', screams: 'закричал', gens: 'генераторов',
     },
     entries: {
@@ -316,6 +323,67 @@ const TEXT = {
         tips: ['Таких машин в лесу две. Генератор — только у одной.'],
         facts: [['генератор', 'один из №2–5 · каждую ночь по-новому'], ['размер', '{len}']],
       },
+      yard: {
+        name: 'Площадка лесхоза', latin: 'у северного края · выход',
+        text: [
+          'Двор за сеткой-рабицей на старых бетонных плитах: будка сторожа, прожектор на столбе, покрышки, бочки, поддоны. Поверх забора — колючка. Ворота откатные, на электроприводе — а тока нет.',
+          'Запусти все пять генераторов — и на площадке дадут свет: вспыхнет прожектор, завоет сирена, ворота поедут сами. Сирену слышно на весь север леса. Им тоже.',
+          'За площадкой — просека через сопки, вниз, к шоссе: его фонари видно сквозь задние ворота, оранжевые точки в низине. Задние ворота на цепи — машина её порвёт.',
+        ],
+        tips: ['Пока ворота закрыты, через забор не лезь: по колючке ток.', 'Открытые ворота — вход и для тварей. Других у них нет: сетка их держит.', 'Журнал сторожа висит на будке, у двери: там сказано, куда растащили детали.'],
+        facts: [['ворота', 'от генераторов · 5/5'], ['прожектор', 'на столбе у машины'], ['до шоссе', '~80 м по просеке'], ['размер', '{len}']],
+      },
+      uaz: {
+        name: 'УАЗ-469', latin: 'тот, что привёз вас сюда, — или его брат',
+        text: [
+          'Армейский внедорожник без тента: брезент свёрнут за задним сиденьем. Четыре места. Его бросили на площадке лесхоза, а всё, без чего он не поедет, растащили по лесу.',
+          'Не хватает колеса (ступица стоит на чурбаке), аккумулятора, карбюратора и бензина. Найди их, принеси в руках и поставь — каждую деталь на своё место (держи E).',
+          'Потом — за руль (E) и держи E: стартер крутит, мотор схватывает с рёвом, который слышит весь лес. Кто успел сесть, тот и уедет. Раненого друга можно усадить на заднее сиденье (R).',
+        ],
+        tips: ['Без аккумулятора стартер только щёлкает. Без карбюратора или бензина — крутит, но не схватывает.', 'Тента нет: тварь достанет и через борт. Не сиди в машине без дела.', 'Работающий мотор зовёт их каждые пару секунд. Заводи, когда все рядом.'],
+        facts: [['мест', '4 · раненого — назад'], ['не хватает', 'колесо, аккумулятор, карбюратор, бензин'], ['завести', '~2 с стартером'], ['длина', '{len}']],
+        quote: 'Колесо, аккумулятор, карбюратор, бензин. Соберёте — уезжайте по просеке на шоссе.',
+      },
+      wheel: {
+        name: 'Колесо', latin: 'запаска УАЗа · ~30 кг',
+        text: [
+          'Колесо в сборе: шина на диске. Тяжёлое и неудобное — его несут перед собой, обеими руками.',
+          'Брошенное (F) встаёт на ребро и катится, виляя, пока не завалится набок. От дерева отскакивает назад.',
+          'На машине — ключом: каждая гайка — громкий лязг.',
+        ],
+        tips: ['Катить быстрее, чем нести, — но громче: каждый удар о землю слышно.', 'Ставится на ступицу спереди слева, где машина стоит на чурбаке.'],
+        facts: [['нести', '2,3 м/с · без бега'], ['поставить', '~5 с'], ['диаметр', '{len}']],
+      },
+      carbattery: {
+        name: 'Аккумулятор', latin: '6СТ-75 · ~20 кг',
+        text: [
+          'Чёрная коробка с двумя клеммами и ремешком-ручкой. Внутри плещется кислота.',
+          'Тяжелее всего остального: с ним идёшь медленнее всех. Бросить далеко не выйдет — упадёт в паре шагов, глухо.',
+          'Ставится в лоток под капотом; клеммы — с искрой.',
+        ],
+        tips: ['Без него машина даже не попробует завестись.'],
+        facts: [['нести', '1,9 м/с · без бега'], ['поставить', '~3 с'], ['длина', '{len}']],
+      },
+      carb: {
+        name: 'Карбюратор', latin: 'К-151 · лёгкий',
+        text: [
+          'Алюминиевая отливка с воздушной горловиной сверху. На верёвочке — картонная бирка.',
+          'Самая лёгкая из деталей: с ним почти не замедляешься, а брошенный он летит далеко — и звенит, когда падает.',
+          'Ставится на голые шпильки впускного коллектора под капотом.',
+        ],
+        tips: ['Звон брошенного карбюратора уводит тварей не хуже камня.'],
+        facts: [['нести', '2,9 м/с · без бега'], ['поставить', '~4 с'], ['длина', '{len}']],
+      },
+      jerrycan: {
+        name: 'Канистра', latin: '20 литров · полная',
+        text: [
+          'Красная железная канистра с тремя ручками и янтарной крышкой. Полная — плещет при каждом шаге.',
+          'Брошенная гулко бьёт о землю, как пустая бочка: громко.',
+          'Заливается в бак через горловину на левом борту, за дверью водителя.',
+        ],
+        tips: ['Не путай с канистрой у генератора в лагере: та давно пуста.'],
+        facts: [['нести', '2,15 м/с · без бега'], ['залить', '~4 с'], ['высота', '{h}']],
+      },
     },
   },
 
@@ -349,12 +417,12 @@ const TEXT = {
       cm: 'cm',
       mm: 'mm',
     },
-    chapters: { beasts: 'Creatures', tasks: 'Objectives', places: 'Places' },
+    chapters: { beasts: 'Creatures', tasks: 'Objectives', places: 'Places', way: 'The way out' },
     rate: { beast: ['hearing', 'senses', 'speed', 'threat'], task: ['noise', 'time'] },
     log: {
       seen: 'nights near it', killed: 'killed you', appeared: 'appeared', started: 'started with you', wins: 'wins',
       searched: 'bodies searched', fitted: 'fitted', found: 'found', thrown: 'thrown', fired: 'fired', startedHere: 'started here',
-      cracked: 'cracked', revived: 'brought back',
+      cracked: 'cracked', revived: 'brought back', escaped: 'drove out', fittedCar: 'parts fitted',
       nights: 'nights', best: 'longest', deaths: 'deaths', screams: 'screamed', gens: 'generators',
     },
     entries: {
@@ -597,6 +665,67 @@ const TEXT = {
         ],
         tips: ['There are two such trucks in the forest. Only one has a generator.'],
         facts: [['generator', 'one of #2–5 · reshuffled every night'], ['size', '{len}']],
+      },
+      yard: {
+        name: 'The forestry yard', latin: 'by the north edge · the way out',
+        text: [
+          'A yard behind chain-link on old concrete slabs: a guard\'s booth, a floodlight on a pole, tyres, drums, pallets. Barbed wire along the top. The gate slides on an electric drive — and there is no power.',
+          'Start all five generators and the power comes back: the floodlight flares, a siren howls and the gate rolls open by itself. The whole north of the forest hears the siren. So do they.',
+          'Beyond the yard a cut runs through the hills, down to the highway: you can see its lamps through the back gate, orange points in the lowland. The back gate is chained — the car will snap it.',
+        ],
+        tips: ['While the gate is shut, don\'t climb the fence: the barbed wire is live.', 'An open gate lets them in too. It\'s their only way in: the fence holds them.', 'The guard\'s log hangs on his booth by the door: it says where the parts went.'],
+        facts: [['gate', 'runs on the generators · 5/5'], ['floodlight', 'on a pole by the car'], ['to the highway', '~80 m down the cut'], ['size', '{len}']],
+      },
+      uaz: {
+        name: 'UAZ-469', latin: 'the one that brought you here — or its brother',
+        text: [
+          'An army jeep with its canvas top rolled up behind the back seat. Four seats. Left in the forestry yard, and everything it can\'t go without carried off into the forest.',
+          'It\'s missing a wheel (the hub sits on a stump), the battery, the carburettor and its fuel. Find them, carry them back in your arms and fit each one in its place (hold E).',
+          'Then get behind the wheel (E) and hold E: the starter grinds, the engine catches with a roar the whole forest hears. Whoever got in, leaves. A friend who is down can be laid in the back (R).',
+        ],
+        tips: ['Without the battery the starter only clicks. Without the carburettor or fuel it turns but won\'t catch.', 'No top: one of them can reach in over the side. Don\'t sit in it for nothing.', 'A running engine calls them every couple of seconds. Start it when everyone is close.'],
+        facts: [['seats', '4 · someone hurt in the back'], ['missing', 'wheel, battery, carburettor, fuel'], ['to start', '~2 s of cranking'], ['length', '{len}']],
+        quote: 'The wheel, the battery, the carburettor, the fuel. Put it together and take the cut to the highway.',
+      },
+      wheel: {
+        name: 'The wheel', latin: 'the UAZ\'s spare · ~30 kg',
+        text: [
+          'A whole wheel: tyre on rim. Heavy and awkward — you carry it in front of you, both arms round it.',
+          'Thrown (F), it lands on its tread and rolls, wobbling, until it falls over. Off a tree it bounces back.',
+          'On the car it goes on with a wheel brace: every nut a loud clang.',
+        ],
+        tips: ['Rolling it is quicker than carrying it — and louder: every bump carries.', 'It goes on the front left hub, where the car sits on a stump.'],
+        facts: [['carrying', '2.3 m/s · no running'], ['to fit', '~5 s'], ['diameter', '{len}']],
+      },
+      carbattery: {
+        name: 'The battery', latin: '6ST-75 · ~20 kg',
+        text: [
+          'A black box with two posts and a strap for a handle. Acid sloshes inside.',
+          'Heavier than everything else: with it you walk slowest of all. It won\'t throw far — a couple of steps, and a dull thud.',
+          'It goes in the tray under the hood; the posts spark as they connect.',
+        ],
+        tips: ['Without it the car won\'t even try to start.'],
+        facts: [['carrying', '1.9 m/s · no running'], ['to fit', '~3 s'], ['length', '{len}']],
+      },
+      carb: {
+        name: 'The carburettor', latin: 'K-151 · light',
+        text: [
+          'An aluminium casting with an air horn on top. A cardboard tag hangs off it on a string.',
+          'The lightest of the parts: it hardly slows you, and thrown it flies far — and rings when it lands.',
+          'It goes on the bare studs of the manifold under the hood.',
+        ],
+        tips: ['The ring of a thrown carburettor pulls them away as well as a stone does.'],
+        facts: [['carrying', '2.9 m/s · no running'], ['to fit', '~4 s'], ['length', '{len}']],
+      },
+      jerrycan: {
+        name: 'The jerry can', latin: '20 litres · full',
+        text: [
+          'A red steel can with three handles and an amber cap. Full — it sloshes with every step.',
+          'Thrown, it booms off the ground like an empty drum: loud.',
+          'It goes into the tank through the filler on the left side, behind the driver\'s door.',
+        ],
+        tips: ['Not the can from the camp\'s generator: that one has been empty for ages.'],
+        facts: [['carrying', '2.15 m/s · no running'], ['to pour', '~4 s'], ['height', '{h}']],
       },
     },
   },

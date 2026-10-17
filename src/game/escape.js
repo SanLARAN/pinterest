@@ -184,12 +184,11 @@ export class Escape {
         s.position.set(L.x, L.y - 0.05, L.z);
         s.scale.setScalar(scale);
         s.material.opacity = op;
+        s.userData.base = scale;
         game.scene.add(s);
         return s;
       };
-      add(0xffe2b0, 0.9, 1);
-      add(0xff9a40, 5.2, 0.85);
-      return add(0xff8a30, 15, 0.13);
+      return [add(0xffe2b0, 0.9, 1), add(0xff9a40, 5.2, 0.85), add(0xff8a30, 15, 0.18)];
     });
     // ...and the glow they put up into the damp air over the lowland
     this.skyGlow = new THREE.Sprite(haloMaterial(0xff8c3a, warmTexture([[0, 'rgba(255,255,255,0.9)'], [0.4, 'rgba(255,255,255,0.35)'], [1, 'rgba(255,255,255,0)']])));
@@ -915,6 +914,7 @@ export class Escape {
     if (mine) {
       g.score += pts;
       g.stats.parts = (g.stats.parts | 0) + 1;
+      (g.stats.carFit ||= [0, 0, 0, 0])[i]++;
       g.hud.popup(`+${pts} · ${t('carParts')[p.key]}`, 'amber');
     } else if (who) g.hud.popup(t('mateFitted').replace('{name}', who.name).replace('{part}', t('carParts')[p.key]), 'amber');
     g.hud.flashAlert(t('aCarParts').replace('{n}', this.count), 'dawn', 2.2);
@@ -1240,6 +1240,7 @@ export class Escape {
     this._updateGate(dt);
     this._updateParts(dt);
     this._updateTraffic(dt);
+    this._lampSizes();
     this._backLeaves(dt);
     // the hood comes down once the battery and the carburettor are in
     const shut = this.has('battery') && this.has('carb');
@@ -1275,6 +1276,17 @@ export class Escape {
     this._viewModel(dt);
   }
 
+  // far off, a sodium lamp still reads as a lamp: its glow never shrinks below a few degrees across
+  _lampSizes() {
+    const c = shared.uCam.value;
+    for (const [core, halo, haze] of this.roadLamps) {
+      const d = c.distanceTo(core.position);
+      core.scale.setScalar(Math.max(core.userData.base, d * 0.016));
+      halo.scale.setScalar(Math.max(halo.userData.base, d * 0.09));
+      haze.scale.setScalar(Math.max(haze.userData.base, d * 0.3));
+    }
+  }
+
   _headlights(I) {
     for (const s of this.carLights) s.visible = I > 0;
     const p = this.carToWorld(-2.1, 0.85, 0, _v);
@@ -1298,6 +1310,28 @@ export class Escape {
     while (d > PI) d -= 2 * PI;
     while (d < -PI) d += 2 * PI;
     me.yaw = fwd + clamp(d, -1.9, 1.9);
+  }
+
+  // ---------------- monsters and the fence ----------------
+  // a monster at (x, z) after (tx, tz) on the other side of the fence: by the gateway (if it's open)
+  route(x, z, tx, tz) {
+    const ain = inYard(x, z, 0.4), bin = inYard(tx, tz, 0.4);
+    if (ain === bin || this.gate.open < 0.8) return null;
+    const gx = this.Y.front.x, gz = this.Y.front.z;
+    const near = ain ? { x: gx, z: gz + 2.4 } : { x: gx, z: gz - 2.4 };
+    const far = ain ? { x: gx, z: gz - 2.4 } : { x: gx, z: gz + 2.4 };
+    const lined = Math.abs(x - gx) < 3.3 && Math.abs(z - gz) < 2.8;
+    if (!lined && Math.hypot(near.x - x, near.z - z) > 1.2) return near;
+    return far;
+  }
+
+  // does the fence stand between these two (nothing reaches through chain-link)?
+  blocks(ax, az, bx, bz) {
+    const ain = inYard(ax, az, -0.15), bin = inYard(bx, bz, -0.15);
+    if (ain === bin) return false;
+    const gx = this.Y.front.x, gz = this.Y.front.z;
+    const inGate = (x, z) => this.gate.open > 0.5 && Math.abs(x - gx) < 4 && Math.abs(z - gz) < 1.6;
+    return !(inGate(ax, az) || inGate(bx, bz));
   }
 
   // ---------------- the E prompt ----------------
@@ -1507,7 +1541,7 @@ export class Escape {
     const bob = Math.sin(me.bobPhase || 0) * 0.018 * clamp(me.speed / 2, 0, 1);
     const lift = a.lift * a.lift;
     const heavy = p.key !== 'carb';
-    const off = heavy ? { wheel: [0, -0.4, -0.72], battery: [0, -0.3, -0.56], can: [0.03, -0.38, -0.58] }[p.key] : [0.07, -0.19, -0.46];
+    const off = heavy ? { wheel: [0, -0.64, -0.8], battery: [0, -0.3, -0.56], can: [0.03, -0.38, -0.58] }[p.key] : [0.07, -0.19, -0.46];
     _v.set(off[0], off[1] - lift * 0.5 + bob + (1 - a.k) * -0.4, off[2]);
     this.view.position.copy(_v.applyMatrix4(camera.matrixWorld));
     this.view.quaternion.copy(camera.quaternion);
@@ -1741,6 +1775,7 @@ export class Escape {
     // the engine, the headlights, a trail of exhaust
     if (this.engineSnd && this.engineSnd.rev) this.engineSnd.rev(clamp(c.v / 25, 0, 1), this.car.position);
     this._headlights(1.6);
+    this._lampSizes();
     c.exT = (c.exT || 0) - dt;
     if (c.exT <= 0) {
       c.exT = 0.08;

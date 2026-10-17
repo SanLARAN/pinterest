@@ -2632,10 +2632,11 @@ export class AudioEngine {
       this._noiseBurst(t, { type: 'bandpass', f: 1200, q: 1.5, a: 0.001, d: 0.05, gain: 0.4 * k, dest: pn });
       this._slosh(t + 0.05, 0.5 * k, pn);
     } else if (key === 'can') {
-      this._tone(t, { f: 330, fEnd: 290, a: 0.001, d: 0.35, gain: 0.25 * k, dest: pn }); // a hollow tin bonk
-      this._tone(t, { f: 870, a: 0.001, d: 0.18, gain: 0.1 * k, dest: pn });
-      this._noiseBurst(t, { type: 'bandpass', f: 1600, q: 1.2, a: 0.001, d: 0.06, gain: 0.6 * k, dest: pn });
-      this._slosh(t + 0.06, 0.2 * k, pn);
+      this._tone(t, { f: 330, fEnd: 290, a: 0.001, d: 0.35, gain: 0.45 * k, dest: pn }); // a hollow tin bonk
+      this._tone(t, { f: 870, a: 0.001, d: 0.18, gain: 0.18 * k, dest: pn });
+      this._noiseBurst(t, { type: 'bandpass', f: 1600, q: 1.2, a: 0.001, d: 0.06, gain: 1.0 * k, dest: pn });
+      this._noiseBurst(t, { buf: this.brown, type: 'lowpass', f: 400, a: 0.002, d: 0.12, gain: 0.8 * k, dest: pn });
+      this._slosh(t + 0.06, 0.5 * k, pn);
     } else {
       [1850, 2700, 4100].forEach((f, i) => this._tone(t, { f: f * (0.95 + Math.random() * 0.1), a: 0.0008, d: 0.16 - i * 0.03, gain: 0.08 * k, dest: pn })); // cast alloy: clink
       this._noiseBurst(t, { type: 'highpass', f: 2600, a: 0.0006, d: 0.03, gain: 0.5 * k, dest: pn });
@@ -2692,8 +2693,8 @@ export class AudioEngine {
     pn.connect(this.sfx);
     this._noiseBurst(t, { type: 'bandpass', f: 2400, q: 2.5, a: 0.001, d: 0.03, gain: 0.3, dest: pn });
     const at = t + (entering ? 0.45 : 0.25);
-    this._tone(at, { f: 110, fEnd: 60, a: 0.002, d: 0.18, gain: 0.6, dest: pn });
-    this._noiseBurst(at, { buf: this.brown, type: 'lowpass', f: 700, a: 0.001, d: 0.12, gain: 1.0, dest: pn });
+    this._tone(at, { f: 110, fEnd: 60, a: 0.002, d: 0.18, gain: 0.42, dest: pn });
+    this._noiseBurst(at, { buf: this.brown, type: 'lowpass', f: 700, a: 0.001, d: 0.12, gain: 0.7, dest: pn });
     this._noiseBurst(at + 0.02, { type: 'bandpass', f: 1600, q: 3, a: 0.001, d: 0.04, gain: 0.3, dest: pn });
   }
 

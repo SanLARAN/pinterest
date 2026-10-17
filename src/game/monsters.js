@@ -703,6 +703,13 @@ export class Monster {
           g.doors.push(rt.door, this, dt);
           this.stuckT = 0;
         }
+      } else if (g.escape) {
+        // into (or out of) the forestry yard: through the gateway, once the gate is open
+        const yr = g.escape.route(this.x, this.z, tx, tz);
+        if (yr) {
+          tx = yr.x;
+          tz = yr.z;
+        }
       }
     }
 
@@ -853,6 +860,7 @@ export class Monster {
             }
           }
           if (victim && g.doors && g.doors.blocks(this.x, this.z, victim.x, victim.z)) victim = null; // not through a wall or a shut door
+          if (victim && g.escape && g.escape.blocks(this.x, this.z, victim.x, victim.z)) victim = null; // ...or the yard's fence
           if (victim) {
             g.kill(this, victim);
             return;
@@ -1028,6 +1036,7 @@ export class Watcher extends Monster {
       const d = dmin + Math.random() * (dmax - dmin);
       const x = p.x + bx * d, z = p.z + bz * d;
       if (Math.abs(x) > w || Math.abs(z) > w || !g.world.col.free(x, z, 0.8)) continue;
+      if (g.world.inYard(x, z, 1) !== g.world.inYard(p.x, p.z, 1)) continue; // (not on the other side of the yard's fence)
       const L = g.world.lake;
       if (L && Math.hypot(x - L.x, z - L.z) < L.r + 3) continue;
       if (g.objectives.lampAt(x, z) > 0.005) continue;
@@ -1125,6 +1134,7 @@ export class Watcher extends Monster {
         }
       }
       if (victim && g.doors && g.doors.blocks(this.x, this.z, victim.x, victim.z)) victim = null;
+      if (victim && g.escape && g.escape.blocks(this.x, this.z, victim.x, victim.z)) victim = null;
       if (victim) {
         g.kill(this, victim);
         return;

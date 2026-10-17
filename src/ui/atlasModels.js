@@ -13,6 +13,8 @@ import { World, LANDMARKS } from '../world/world.js';
 import { buildListener, buildCrawler, buildWatcher, buildHowler, buildShade, ANIMS } from '../game/monsters.js';
 import { placer, buildCorpse, buildToolBag, buildFlareGun } from '../game/objectives.js';
 import { buildDoorLeaf } from '../game/doors.js';
+import { buildForestCar, buildPart, WHEELS, MISSING, HOOD_HINGE, HOOD_OPEN, PARTS } from '../game/uaz.js';
+import { buildYard, buildGateLeaf, buildBackLeaf, GATE, BACK, CAR_AT, LAMP_AT } from '../world/yard.js';
 
 const BEAM = 12; // a kind past the palette: the faint light pillar over a shard
 
@@ -504,6 +506,94 @@ function place(id, view) {
   };
 }
 
+// ---------------- the way out ----------------
+// the УАЗ as you find it in the yard: a front wheel gone (its hub on a stump), the hood up over an empty bay
+function uazRoot(mat, stripped = true) {
+  const C = buildForestCar();
+  const car = new THREE.Group();
+  const m = (arr, parent = car) => {
+    const x = new THREE.Mesh(geometryFrom(arr), mat);
+    x.frustumCulled = false;
+    parent.add(x);
+    return x;
+  };
+  m(C.body);
+  const wg = geometryFrom(C.wheel);
+  WHEELS.forEach(([x, y, z], i) => {
+    if (stripped && i === MISSING) return;
+    const w = new THREE.Mesh(wg, mat);
+    w.frustumCulled = false;
+    w.position.set(x, y, z);
+    w.rotation.set(Math.PI / 2, 0, 0);
+    car.add(w);
+  });
+  const hood = new THREE.Group();
+  hood.position.set(...HOOD_HINGE);
+  hood.rotation.z = stripped ? HOOD_OPEN : 0;
+  car.add(hood);
+  m(C.hood, hood);
+  const st = m(C.steering);
+  st.position.set(-0.42, 1.24, 0.42);
+  st.rotation.set(0, 0, -0.45);
+  return car;
+}
+
+function uaz(mat) {
+  const root = new THREE.Group();
+  root.add(uazRoot(mat, true));
+  return still(root, 0.3, { yaw: 2.35, pitch: 0.3, fit: 0.86, focus: [-0.2, 0.8, 0] });
+}
+
+// one of the four parts, resting the way it lies on the ground
+function carPart(key, view) {
+  return (mat) => {
+    const def = PARTS.find((p) => p.key === key);
+    const b = buildPart(key);
+    const mesh = meshOf(b, mat);
+    mesh.position.y = def.half[1];
+    const root = new THREE.Group();
+    root.add(mesh);
+    return still(root, 0.32, view);
+  };
+}
+
+// the yard itself: its fence and booth on a flat patch, the gate half open, the back gate chained, the car
+function yard(mat) {
+  const props = [];
+  const fake = {
+    terrain: { height: () => 0, rawHeight: () => 0 },
+    col: { add() { return 0; }, circle() { return 0; }, addDynamic() { return 0; }, setSeg() {} },
+    addProp: (x, z, fn) => props.push(fn),
+  };
+  buildYard(fake, { x: 0, z: 0 });
+  const b = new MeshBuilder(65536);
+  for (const fn of props) {
+    b.identity();
+    fn(b);
+  }
+  const root = new THREE.Group();
+  root.add(meshOf(b, mat));
+  const gb = new MeshBuilder(4096);
+  buildGateLeaf(gb);
+  const gate = meshOf(gb, mat);
+  gate.position.set(GATE.x0 + GATE.travel * 0.55, 0, GATE.z);
+  root.add(gate);
+  for (const [lock, s] of [[false, -1], [true, 1]]) {
+    const lb = new MeshBuilder(2048);
+    buildBackLeaf(lb, lock);
+    const leaf = meshOf(lb, mat);
+    leaf.position.set(s * BACK.half, 0, BACK.z);
+    leaf.rotation.y = s < 0 ? 0 : Math.PI;
+    root.add(leaf);
+  }
+  const car = uazRoot(mat, true);
+  car.position.set(CAR_AT.x, 0.08, CAR_AT.z);
+  car.rotation.y = Math.PI / 2;
+  root.add(car);
+  const a = Math.atan2(CAR_AT.x - LAMP_AT.x, CAR_AT.z - LAMP_AT.z);
+  return still(root, 0.3, { yaw: 0.75, pitch: 0.62, fit: 0.98 }, { lamp: { x: LAMP_AT.x + Math.sin(a) * 0.3, y: LAMP_AT.h - 0.35, z: LAMP_AT.z + Math.cos(a) * 0.3, r: 12, s: 0.6 } });
+}
+
 // ---------------- registry ----------------
 const MODELS = {
   listener, crawler, watcher, howler, shade,
@@ -515,6 +605,11 @@ const MODELS = {
   tower: place('tower', { yaw: 0.6, pitch: 0.16, fit: 1.0 }),
   stones: place('stones', { yaw: 0.4, pitch: 0.5, fit: 0.92 }),
   wreck: place('wreck', { yaw: 1.9, pitch: 0.42, fit: 0.5, focus: [0, 1.0, 0] }),
+  yard, uaz,
+  wheel: carPart('wheel', { yaw: 0.6, pitch: 0.55 }),
+  carbattery: carPart('battery', { yaw: 0.8, pitch: 0.3 }),
+  carb: carPart('carb', { yaw: 0.9, pitch: 0.35 }),
+  jerrycan: carPart('can', { yaw: 1.1, pitch: 0.2 }),
 };
 
 export function buildModel(key, mat, ctx = {}) {

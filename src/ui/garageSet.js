@@ -46,12 +46,13 @@ function quad(b, p0, p1, p2, p3, kind, hide = 0) {
   b.identity();
   b.quad(p0, p1, p2, p3, kind, hide);
 }
-// a flat ring (annulus) around +y at height y
-function ring(b, r0, r1, y, segs, kind) {
+// a flat ring (annulus) around +y at height y, facing +y (down = facing −y)
+function ring(b, r0, r1, y, segs, kind, down = false) {
   for (let i = 0; i < segs; i++) {
     const a0 = (i / segs) * PI * 2, a1 = ((i + 1) / segs) * PI * 2;
     const c0 = Math.cos(a0), s0 = Math.sin(a0), c1 = Math.cos(a1), s1 = Math.sin(a1);
-    b.quad([c0 * r0, y, s0 * r0], [c1 * r0, y, s1 * r0], [c1 * r1, y, s1 * r1], [c0 * r1, y, s0 * r1], kind, 0);
+    if (down) b.quad([c0 * r1, y, s0 * r1], [c1 * r1, y, s1 * r1], [c1 * r0, y, s1 * r0], [c0 * r0, y, s0 * r0], kind, 0);
+    else b.quad([c0 * r0, y, s0 * r0], [c1 * r0, y, s1 * r0], [c1 * r1, y, s1 * r1], [c0 * r1, y, s0 * r1], kind, 0);
   }
 }
 // a tyre lying on its side (axis +y): tread, sidewalls, the hole
@@ -60,7 +61,7 @@ export function tyre(b, r, w, kind, segs = 12, treads = true) {
   b.cylinder(segs, r, r, w, kind, { y0: -w / 2, capTop: false });
   b.cylinder(segs, ri, ri, w, kind, { y0: -w / 2, capTop: false });
   ring(b, ri, r, w / 2, segs, kind);
-  ring(b, ri, r, -w / 2, segs, kind);
+  ring(b, ri, r, -w / 2, segs, kind, true); // (the other sidewall faces the other way)
   if (!treads) return;
   const m = b.m.clone();
   for (let i = 0; i < segs; i++) {

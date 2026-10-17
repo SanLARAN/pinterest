@@ -56,6 +56,15 @@ export function mountSfxPanel(audio) {
     ['друг: пульс (ровный / слабый / нет)', () => { audio.pulseFelt(1); setTimeout(() => audio.pulseFelt(0.3), 2800); setTimeout(() => audio.pulseFelt(0), 4800); }],
     ['друг: поднять, положить на койку', () => { audio.bodyLift(0, 0, 0, true); setTimeout(() => audio.bodyDrop(...at(1.2, 0.3, -0.8), true), 1600); }],
     ['койка: вернуть к жизни', () => { for (let i = 0; i < 6; i++) setTimeout(() => audio.cprPush(...at(1, 0.4, -0.9)), i * 550); setTimeout(() => audio.reviveGasp(...at(1, 0.4, -0.6)), 3500); }],
+    ['лесхоз: сирена + ворота едут', () => { const s = audio.gateSiren(...at(18, -6, 1.2), 8.5); setTimeout(() => audio.gateMotor(...at(12, -3, 0.4), 7.5), 1600); setTimeout(() => audio.gateClunk(...at(12, 2, 0.4)), 9100); void s; }],
+    ['лесхоз: сирена издалека', () => audio.gateFar(...[at(200, -80)[0], at(200, -80)[2]])],
+    ['деталь: поднять (колесо / аккумулятор / карбюратор / канистра)', () => ['wheel', 'battery', 'carb', 'can'].forEach((k, i) => setTimeout(() => audio.partPick(0, 0, 0, k, true), i * 900))],
+    ['деталь: упала (колесо / аккумулятор / карбюратор / канистра)', () => ['wheel', 'battery', 'carb', 'can'].forEach((k, i) => setTimeout(() => audio.partLand(...at(4, i - 1.5, -1.4), k, 0.8, k === 'wheel'), i * 900))],
+    ['УАЗ: ставим детали', () => ['wheel', 'battery', 'carb', 'can'].forEach((k, i) => { for (let j = 0; j < 3; j++) setTimeout(() => audio.partWork(...at(1.5, 0.5, -0.6), k), i * 2200 + j * 600); setTimeout(() => audio.partFitted(...at(1.5, 0.5, -0.6), k), i * 2200 + 1900); })],
+    ['УАЗ: стартер без аккумулятора / без бензина', () => { audio.uazCrank(...at(3, 1, 0.5), false); setTimeout(() => { const c = audio.uazCrank(...at(3, 1, 0.5), true); setTimeout(() => c && c.stop(), 2800); }, 1400); }],
+    ['УАЗ: завёлся, газует, уехал', () => { const c = audio.uazCrank(...at(3, 1, 0.5), true); setTimeout(() => { if (c) c.stop(0.05); const e = audio.uazStart(...at(3, 1, 0.5)); if (!e) return; setTimeout(() => e.rev(0.6), 3200); setTimeout(() => e.rev(1), 4600); setTimeout(() => e.stop(2), 6500); }, 2100); }],
+    ['УАЗ: дверь, капот, ворота на таран', () => { audio.carDoor(...at(1.5, 1, 0), true); setTimeout(() => audio.hoodSlam(...at(2.5, 0, 0)), 1100); setTimeout(() => audio.gateCrash(...at(6, 0, 0.5)), 2200); }],
+    ['шоссе: машина мимо · аккорд', () => { audio.carPass(...at(60, -40, 0), 1, 22); setTimeout(() => audio.escapeChord(), 2500); }],
     ['напряжение: 0', (b) => {
       tension = tension >= 1 ? 0 : tension + 0.5;
       audio.startAmbience();

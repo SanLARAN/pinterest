@@ -263,7 +263,8 @@ const STR = {
     // how to
     howtoBody: `
 <p><b>Утро. Лагерь, гудит генератор, поют птицы.</b> А потом свет гаснет разом — и ты в огромном тёмном лесу, где ничего не видно. Любой звук — эхолокатор: волна расходится от тебя и на секунды проявляет деревья, камни… и <span class="red">их</span>. Первые 45 секунд ночи лес ещё спит — осмотрись и найди дорогу, пока никого нет.</p>
-<p><b>Цель — запустить пять генераторов.</b> У каждого лежит тело того, кто пытался раньше: обыщи его (удерживай E) — там деталь и записка, где искать следующий. Генератор, о котором ты знаешь, пищит рацией — иди на звук. Починка шумит: стук, искры, рёв мотора при запуске. Запустил — уходи. Вокруг работающего генератора горит лампа: в её свете видно тварей.</p>
+<p><b>Сначала — пять генераторов.</b> У каждого лежит тело того, кто пытался раньше: обыщи его (удерживай E) — там деталь и записка, где искать следующий. Генератор, о котором ты знаешь, пищит рацией — иди на звук. Починка шумит: стук, искры, рёв мотора при запуске. Запустил — уходи. Вокруг работающего генератора горит лампа: в её свете видно тварей, и стены отбрасывают от неё тени.</p>
+<p><b>Потом — прочь из леса.</b> Пять генераторов дают ток на <b>площадку лесхоза</b> у северного края: воет сирена, откатные ворота едут сами. Внутри — <b>УАЗ</b>, разобранный: нет колеса, аккумулятора, карбюратора и бензина. Где они, сказано в журнале на будке сторожа. Детали настоящие: подними (E) и неси в руках — медленно, без бега, руки заняты; R — положить, F — бросить (колесо покатится). У машины поставь каждую на место (удерживай E). Потом — за руль и держи E: мотор заведётся с рёвом на весь лес. E ещё раз — и все, кто в машине (раненых можно уложить назад, R), уезжают по просеке на шоссе.</p>
 <p><b>Микрофон:</b> щёлкни языком, хлопни, скажи «эй». Громче звук — дальше видно. Но <span class="red">и они слышат дальше</span>: обычную речь — за пару шагов, громкий голос — издалека. Крик (кольцо вокруг точки стало красным) — мгновенная охота. <b>Без микрофона:</b> ПРОБЕЛ — щелчок, удерживай — громче.</p>
 <p><b>Слушатели и Ползуны</b> идут туда, где был звук. Пискнул — уходи. Камень (ПКМ / F) уводит их в сторону. Позже приходят двое других, по одному на лес: <b>Наблюдатель</b> глух, но двигается, только пока на него не падает свет, — свети на него; лампы он обходит. <b>Ревун</b> почти не слышит, но иногда набирает воздух и воет: всё, что движется в этой волне, он видит. Услышал вдох — замри.</p>
 <p><b>Ракетница.</b> У одного из тел (каждую ночь у другого) лежит ракетница — два заряда. Q — ракета уходит вверх, раскрывает парашют и секунд пятнадцать заливает лес красным светом: видно всё и всех. Но <span class="red">на свет сходятся все твари с округи</span> — стреляй подальше от себя. <b>Охотничья избушка</b>: дверь закрывается (E). Бродячие твари не сразу её откроют — навалятся, и она со скрипом подастся; а та, что охотится за тобой, выбьет её в три удара.</p>
@@ -275,10 +276,10 @@ const STR = {
 <tr><td>WASD · стрелки</td><td>движение и поворот</td></tr>
 <tr><td>Мышь</td><td>обзор (клик — захват курсора)</td></tr>
 <tr><td>ПРОБЕЛ</td><td>эхо: тап — щелчок, удерживай — громко</td></tr>
-<tr><td>E (удерживать)</td><td>обыскать тело · чинить генератор · дверь · пульс друга</td></tr>
-<tr><td>ПКМ / F</td><td>бросить камень</td></tr>
+<tr><td>E (удерживать)</td><td>обыскать тело · чинить генератор · дверь · пульс друга · поднять / поставить деталь · сесть в УАЗ, завести</td></tr>
+<tr><td>ПКМ / F</td><td>бросить камень (с деталью в руках — бросить её)</td></tr>
 <tr><td>G</td><td>светящаяся палочка: переломить · бросить</td></tr>
-<tr><td>R</td><td>нести упавшего друга · положить (на койку)</td></tr>
+<tr><td>R</td><td>нести упавшего друга · положить (на койку, в машину) · положить деталь · выйти из машины</td></tr>
 <tr><td>Q</td><td>сигнальная ракета (если нашёл)</td></tr>
 <tr><td>Shift / C</td><td>бег / красться</td></tr>
 <tr><td>Tab</td><td>время, генераторы, задача</td></tr>
@@ -626,7 +627,8 @@ const STR = {
     off: 'off',
     howtoBody: `
 <p><b>Morning. A camp, a humming generator, birdsong.</b> Then the light dies all at once — and you are in a vast dark forest where you cannot see. Every sound is sonar: a wave spreads out from you and for a few seconds reveals trees, rocks… and <span class="red">them</span>. For the first 45 seconds of the night the forest is still asleep — look around and find your way while nothing is out there.</p>
-<p><b>The goal: start five generators.</b> By each one lies the body of someone who tried before you: search it (hold E) for the part and a note about where the next one is. A generator you know about beeps on its radio — follow the sound. Repairs are noisy: clanks, sparks, the engine roaring to life. Got it running? Leave. A running generator lights a lamp, and in its light you can see them.</p>
+<p><b>First: five generators.</b> By each one lies the body of someone who tried before you: search it (hold E) for the part and a note about where the next one is. A generator you know about beeps on its radio — follow the sound. Repairs are noisy: clanks, sparks, the engine roaring to life. Got it running? Leave. A running generator lights a lamp: in its light you can see them, and walls throw shadows from it.</p>
+<p><b>Then: out of the woods.</b> Five generators bring the power back to the <b>forestry yard</b> by the north edge: a siren howls and its sliding gate rolls open. Inside stands the <b>UAZ</b>, stripped: no wheel, no battery, no carburettor, no fuel. The guard's log on his booth says where they went. The parts are real: pick one up (E) and carry it in your arms — slowly, no running, hands full; R puts it down, F throws it (the wheel rolls). Fit each one at the car (hold E). Then get behind the wheel and hold E: the engine catches with a roar the whole forest hears. E again — and everyone in the car (lay the wounded in the back, R) drives out down the cut to the highway.</p>
 <p><b>Microphone:</b> click your tongue, clap, say “hey”. Louder sound — you see further. But <span class="red">they hear further too</span>: normal talk from a couple of steps, a raised voice from far away. A scream (the ring around the dot turns red) means an instant hunt. <b>No mic:</b> SPACE — a click, hold for louder.</p>
 <p><b>Listeners and Crawlers</b> walk to where the sound was. Made a noise? Move. A stone (RMB / F) lures them away. Later two others arrive, one of each per forest: <b>the Watcher</b> is deaf but moves only while no light is on it — keep it lit; it won't enter a lamp. <b>The Howler</b> barely hears, but now and then it fills its chest and howls: whatever moves inside that wave, it sees. Hear the breath — freeze.</p>
 <p><b>The flare gun.</b> One of the bodies (a different one every night) has a flare gun with two shots. Q — the flare climbs, opens its parachute and floods the forest with red light for about fifteen seconds: you see everything, and everyone. But <span class="red">every creature around comes to the light</span> — fire it away from yourself. <b>The hunting cabin</b>: its door closes (E). Wanderers won't get it open at once — they lean on it until it creaks open; the one hunting you breaks it down in three blows.</p>
@@ -638,10 +640,10 @@ const STR = {
 <tr><td>WASD · arrows</td><td>move &amp; turn</td></tr>
 <tr><td>Mouse</td><td>look (click to lock cursor)</td></tr>
 <tr><td>SPACE</td><td>echo: tap = click, hold = loud</td></tr>
-<tr><td>E (hold)</td><td>search a body · repair a generator · door · a friend's pulse</td></tr>
-<tr><td>RMB / F</td><td>throw stone</td></tr>
+<tr><td>E (hold)</td><td>search a body · repair a generator · door · a friend's pulse · pick up / fit a part · get in the UAZ, start it</td></tr>
+<tr><td>RMB / F</td><td>throw stone (with a part in your arms — throw that)</td></tr>
 <tr><td>G</td><td>glow stick: crack · throw</td></tr>
-<tr><td>R</td><td>carry a fallen friend · put down (on the cot)</td></tr>
+<tr><td>R</td><td>carry a fallen friend · put down (on the cot, in the car) · put a part down · get out of the car</td></tr>
 <tr><td>Q</td><td>signal flare (once you've found the gun)</td></tr>
 <tr><td>Shift / C</td><td>run / sneak</td></tr>
 <tr><td>Tab</td><td>time, generators, task</td></tr>
