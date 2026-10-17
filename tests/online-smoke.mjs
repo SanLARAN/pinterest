@@ -321,13 +321,14 @@ try {
       g.noise = (...args) => { if (args[3] === 'tape') window.__tapeNoise = true; return noise(...args); };
     });
     await B.page.evaluate(() => { const k = window.__hush.game.tools; k.askT = 0; k.play(); });
+    // Its three-second delay uses GAME time; busy software-WebGL runners can take much longer.
     const heard = await until(() => A.page.evaluate(() => {
       const it = window.__hush.game.tools.items[0];
       return it.state === 'playing' && it.charges === 1 && it.clip?.length === 16000 && it.buffer?.duration === 2 && !!it.sound && window.__tapeNoise;
-    }), 30000);
+    }), 90000);
     return heard ? 'ok' : await A.page.evaluate(() => {
       const it = window.__hush.game.tools.items[0];
-      return `state ${it.state}, charges ${it.charges}, clip ${it.clip?.length}, PCM ${it.buffer?.duration}, sound ${!!it.sound}, noise ${window.__tapeNoise}`;
+      return `state ${it.state}, charges ${it.charges}, clip ${it.clip?.length}, PCM ${it.buffer?.duration}, sound ${!!it.sound}, noise ${window.__tapeNoise}, clock ${window.__hush.game.time.toFixed(2)}, start ${it.start}`;
     });
   })();
   check("B's recorded voice reaches A's cassette playback and the host's hearing", tapeOk === 'ok', tapeOk);
