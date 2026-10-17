@@ -1,8 +1,10 @@
 // In-game co-op traffic.
 //
 //  everyone → everyone  'ps'  own state, 15/s: position, look, speed, flags, loudness, score
-//                       'ev'  things that happened: pulses, stones, shards, repair sounds, found parts
-//                       'ob'  the objectives (generators, bodies) — merged monotonically, see Objectives
+//                       'ev'  things that happened: pulses, stones, shards, repair sounds, found parts,
+//                             a flare fired, a door swung (newest swing wins, see Doors)
+//                       'ob'  the objectives (generators, bodies) — merged monotonically, see Objectives —
+//                             and the doors
 //  guest → host         'nz'  a noise the guest made (voice, ping, steps, repairs): the host's monsters hear it
 //                       'sk'  "skip the morning"
 //  host → everyone      'sn'  monster snapshot, 10/s
@@ -12,7 +14,7 @@ import { PF } from './remote.js';
 
 const PS_HZ = 15;
 const SNAP_HZ = 10;
-export const NOISE_SRC = ['voice', 'ping', 'step', 'bump', 'breath', 'repair'];
+export const NOISE_SRC = ['voice', 'ping', 'step', 'bump', 'breath', 'repair', 'door', 'flare'];
 const r2 = (v) => Math.round(v * 100) / 100;
 const r3 = (v) => Math.round(v * 1000) / 1000;
 
@@ -97,7 +99,7 @@ export class NetSync {
       this.obT = 0.15;
       this.obBeat = 3;
       ob.dirty = false;
-      this.send('ob', ob.netState());
+      this.send('ob', { ...ob.netState(), d: g.doors.netState() });
     }
   }
 
@@ -135,7 +137,10 @@ export class NetSync {
         if (!this.host && isHostMsg && d && Array.isArray(d.m)) this.applySnap(d);
         break;
       case 'ob':
-        if (d) g.objectives.netMerge(d, g.remotes.get(pid));
+        if (d) {
+          g.objectives.netMerge(d, g.remotes.get(pid));
+          g.doors.netMerge(d.d);
+        }
         break;
       case 'nz': {
         if (!this.host || !Array.isArray(d)) break;
@@ -177,6 +182,15 @@ export class NetSync {
       case 'fd':
         if (r) g.fxMateFound(r, b | 0);
         break;
+      case 'fg':
+        if (r) g.fxMateFlare(r);
+        break;
+      case 'fl':
+        if (r && [a, b, c, e, f, d[6]].every((v) => Number.isFinite(+v))) g.remoteFlare(r, +a, +b, +c, +e, +f, +d[6]);
+        break;
+      case 'dr': // a door swung (a player — or, from the host, a monster)
+        g.doors.netSet(a, b, c, e, f | 0);
+        break;
       // ---- from the host only ----
       default: {
         if (!isHostMsg || this.host) break;
@@ -192,6 +206,7 @@ export class NetSync {
           case 'ar': g.fxArrive(a); break;
           case 'wk': g.fxWake(); break;
           case 'ki': g.netKill(a, b, c, +e, +f); break;
+          case 'dk': g.doors.netKnock(a, b); break;
           case 'dn': if (g.state === 'play') g.startDawn(); break;
           case 'en': g.endOnline(false); break;
         }

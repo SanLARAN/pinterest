@@ -293,6 +293,11 @@ body.radar-on #radar { display: block; }
 #stones.show { opacity: 0.8; transition: opacity 0.2s; }
 #stones i { width: 4px; height: 4px; border-radius: 50%; border: 1px solid rgba(214, 205, 192, 0.35); }
 #stones i.on { background: var(--bone); border-color: var(--bone); }
+/* flare cartridges: two red pips under the stones, once you have the gun */
+#flares { position: absolute; left: 50%; top: calc(50% + 40px); transform: translateX(-50%); display: flex; gap: 6px; opacity: 0; transition: opacity 1s; }
+#flares.show { opacity: 0.9; transition: opacity 0.2s; }
+#flares i { width: 4px; height: 9px; border-radius: 2px; border: 1px solid rgba(224, 54, 44, 0.45); }
+#flares i.on { background: var(--red); border-color: var(--red); box-shadow: 0 0 6px rgba(224, 54, 44, 0.7); }
 
 /* alerts: quiet, letter-spaced, a red ghost of the word behind it */
 #alert {
@@ -400,6 +405,8 @@ body.touch.playing #touch { display: block; }
 #tCrouch { right: calc(40px + var(--safe-r)); bottom: calc(132px + var(--safe-b)); width: 56px; height: 56px; }
 #tUse { display: none; right: calc(136px + var(--safe-r)); bottom: calc(102px + var(--safe-b)); width: 70px; height: 70px; border-color: rgba(214, 160, 76, 0.5); color: var(--amber); }
 body.can-use #tUse { display: grid; }
+#tFlare { display: none; right: calc(40px + var(--safe-r)); bottom: calc(200px + var(--safe-b)); width: 56px; height: 56px; border-color: rgba(224, 54, 44, 0.5); color: rgba(255, 128, 108, 0.9); }
+body.has-flare #tFlare { display: grid; }
 #tSkip { display: none; left: 50%; bottom: calc(18px + var(--safe-b)); transform: translateX(-50%); width: auto; height: 34px; padding: 0 18px; border-radius: 17px; color: rgba(40, 30, 20, 0.8); border-color: rgba(40, 30, 20, 0.35); background: rgba(255, 245, 230, 0.25); }
 #tSkip.down { transform: translateX(-50%) scale(0.94); }
 body.morning #tSkip { display: grid; }
@@ -411,6 +418,7 @@ body.touch #popups { top: calc(50% + 40px); }
 @media (orientation: portrait) {
   body.touch #note { top: calc(112px + var(--safe-t)); bottom: auto; width: calc(100vw - 28px - var(--safe-l) - var(--safe-r)); }
   body.touch #tCrouch { bottom: calc(146px + var(--safe-b)); }
+  body.touch #tFlare { bottom: calc(214px + var(--safe-b)); }
   body.touch #hint { bottom: auto; top: calc(118px + var(--safe-t)); max-width: 80vw; }
 }
 

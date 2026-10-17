@@ -18,6 +18,9 @@ export const shared = {
   // work lamps of running generators: xyz + intensity (0 = off)
   uLamp: { value: Array.from({ length: 5 }, () => new THREE.Vector4(0, -100, 0, 0)) },
   uLampR: { value: CFG.LAMP_R },
+  // burning signal flares (the two brightest): xyz + intensity (0 = none)
+  uFlare: { value: Array.from({ length: 2 }, () => new THREE.Vector4(0, -100, 0, 0)) },
+  uFlareR: { value: CFG.FLARE.radius },
 };
 
 const PULSE_GLSL = /* glsl */ `
@@ -33,6 +36,25 @@ uniform float uFear;
 uniform vec3 uSun;
 uniform vec4 uLamp[5];
 uniform float uLampR;
+uniform vec4 uFlare[2];
+uniform float uFlareR;
+
+// a signal flare: hard red light from above, over a whole stretch of forest. surfaces turned away
+// from it stay dark (it's the only thing out here that casts a direction)
+vec3 flareLight(vec3 P, vec3 Nrm) {
+  vec3 acc = vec3(0.0);
+  for (int i = 0; i < 2; i++) {
+    vec4 Fl = uFlare[i];
+    if (Fl.w <= 0.001) continue;
+    vec3 dv = Fl.xyz - P;
+    float d = length(dv);
+    if (d > uFlareR) continue;
+    float fall = 1.0 - smoothstep(uFlareR * 0.12, uFlareR, d);
+    float facing = dot(Nrm, Nrm) > 0.5 ? 0.16 + 0.84 * max(dot(Nrm, dv / max(d, 0.001)), 0.0) : 1.0;
+    acc += vec3(1.0, 0.27, 0.17) * Fl.w * fall * facing;
+  }
+  return acc;
+}
 
 // steady warm light pooled under the work lamps of running generators
 vec3 lampLight(vec3 P, vec3 Nrm) {
@@ -163,7 +185,8 @@ void main() {
   float ring;
   vec3 L = sonarLight(vWorld, Nrm, ring);
   vec3 lamp = lampLight(vWorld, Nrm);
-  L += lamp;
+  vec3 flare = flareLight(vWorld, Nrm);
+  L += lamp + flare;
 
   float edge = edgeFactor(vBary, k == 0 ? 0.75 : 1.0);
   float distEdge = 1.0 - smoothstep(14.0, 90.0, camD) * 0.82;
@@ -185,6 +208,7 @@ void main() {
 
   vec3 col = base * L * (face + edge * edgeGain);
   col += base * lamp * (0.17 + 0.12 * st); // a lamp fills surfaces, not just their edges
+  col += base * flare * (0.26 + 0.2 * st); // ...and so does a flare, red, everywhere it reaches
   col += vec3(0.78, 0.85, 0.9) * ring * edge * 0.42;
   // rare sparkles on the wavefront
   float sp = step(0.993, hash13(floor(vWorld * 11.0) + floor(uTime * 14.0)));
@@ -343,7 +367,7 @@ void main() {
   vec3 halfB = vec3(uBox * 0.5, 6.0, uBox * 0.5);
   vec3 wp = uCam + mod(p - uCam + halfB, vec3(uBox, 12.0, uBox)) - halfB;
   float ring;
-  vec3 L = sonarLight(wp, vec3(0.0), ring) + lampLight(wp, vec3(0.0)) * 1.6;
+  vec3 L = sonarLight(wp, vec3(0.0), ring) + lampLight(wp, vec3(0.0)) * 1.6 + flareLight(wp, vec3(0.0)) * 1.2;
   vCol = (L * 0.3 + ring * vec3(0.7, 0.76, 0.8) * 0.38) * (0.3 + aSeed.w);
   vec4 mv = viewMatrix * vec4(wp, 1.0);
   gl_Position = projectionMatrix * mv;

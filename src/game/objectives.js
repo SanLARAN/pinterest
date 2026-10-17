@@ -82,6 +82,42 @@ export function buildToolBag(b, P, i, hx, hz) {
   b.limb([0, 0.12, 0], [0.1, 0, 0], 0.012, 0.012, A, 3);
 }
 
+// the flare gun someone brought and never fired: a fat-barrelled pistol lying on its side, and its two
+// cartridges. M = matrix of the spot on the ground (x along the barrel); shared with the atlas plate
+export function buildFlareGun(b, M) {
+  const A = KIND.SHARD, Mt = KIND.METAL;
+  const G = new THREE.Matrix4().multiplyMatrices(M, new THREE.Matrix4().makeRotationX(Math.PI / 2)); // on its side
+  G.multiply(new THREE.Matrix4().makeTranslation(0, 0, -0.035));
+  const at = (m, ox, oy, oz, rx = 0, ry = 0, rz = 0) => {
+    _e.set(rx, ry, rz, 'YXZ');
+    _l.compose(_p.set(ox, oy, oz), _q.setFromEuler(_e), _s.set(1, 1, 1));
+    _m.multiplyMatrices(m, _l);
+    b.setMatrix(_m);
+  };
+  at(G, 0.02, 0, 0, 0, 0, -Math.PI / 2);
+  b.cylinder(8, 0.03, 0.03, 0.2, A); // 26 mm: more drainpipe than gun barrel
+  at(G, 0.2, 0, 0, 0, 0, -Math.PI / 2);
+  b.cylinder(8, 0.035, 0.035, 0.026, Mt);
+  at(G, -0.012, -0.004, 0);
+  b.box(0.075, 0.072, 0.052, A); // the breech
+  at(G, -0.042, -0.08, 0, 0, 0, 0.32);
+  b.box(0.048, 0.125, 0.042, A); // the grip
+  at(G, -0.05, 0.036, 0, 0, 0, 0.5);
+  b.box(0.016, 0.032, 0.014, Mt); // hammer
+  at(G, 0, 0, 0);
+  b.limb([0.042, -0.034, 0], [0.036, -0.078, 0], 0.006, 0.006, Mt, 3); // trigger guard
+  b.limb([0.036, -0.078, 0], [-0.006, -0.084, 0], 0.006, 0.006, Mt, 3);
+  // two cartridges: red paper, brass rims
+  for (const [ox, oz, yaw] of [[0.06, 0.15, 0.4], [0.17, 0.12, -0.7]]) {
+    const C = new THREE.Matrix4().multiplyMatrices(M, new THREE.Matrix4().makeTranslation(ox, 0.03, oz));
+    C.multiply(new THREE.Matrix4().makeRotationY(yaw)).multiply(new THREE.Matrix4().makeRotationX(Math.PI / 2));
+    at(C, 0, -0.05, 0);
+    b.cylinder(7, 0.028, 0.028, 0.09, KIND.FLESH);
+    at(C, 0, 0.04, 0);
+    b.cylinder(7, 0.033, 0.033, 0.012, Mt);
+  }
+}
+
 let _glowTex = null;
 function glowTexture() {
   if (_glowTex) return _glowTex;
@@ -167,6 +203,7 @@ export class Objectives {
       if (mask & (1 << i) && !body.searched) {
         body.searched = true;
         body.item.visible = false;
+        if (body.gun) body.gun.visible = false;
         if (this.target && this.target.obj === body) this.searchT = 0;
       }
     });
@@ -206,8 +243,21 @@ export class Objectives {
     const item = new THREE.Mesh(b.toGeometry(), this.g.world.material);
     item.matrixAutoUpdate = false;
     this.g.scene.add(item);
+    // one of the four out there also had a flare gun (which one changes every night)
+    let gun = null;
+    if (i > 0) {
+      b.reset();
+      _e.set(0, c.yaw, 0, 'YXZ');
+      const base = new THREE.Matrix4().compose(new THREE.Vector3(c.x, y, c.z), new THREE.Quaternion().setFromEuler(_e), new THREE.Vector3(1, 1, 1));
+      const spot = new THREE.Matrix4().makeTranslation(hx + 0.34, 0, hz - 0.3).multiply(new THREE.Matrix4().makeRotationY(2.2 + i));
+      buildFlareGun(b, base.multiply(spot));
+      gun = new THREE.Mesh(b.toGeometry(), this.g.world.material);
+      gun.matrixAutoUpdate = false;
+      gun.visible = false;
+      this.g.scene.add(gun);
+    }
     // world position of the body's centre (for distances / sounds)
-    return { site, x: c.x, z: c.z, y, mesh, item, k: -1, searched: false, revealed: false, flies: null };
+    return { site, x: c.x, z: c.z, y, mesh, item, gun, k: -1, searched: false, revealed: false, flies: null };
   }
 
   _buildGlow(scene, site) {
@@ -246,6 +296,11 @@ export class Objectives {
     }
     this.bodies[0].mesh.visible = false; // it wasn't there this morning
     this.bodies[0].item.visible = false;
+    // the flare gun lies by one of the four bodies out in the forest (the seed is shared: co-op agrees)
+    this.flareBody = 1 + Math.floor(rng.next() * 4);
+    this.bodies.forEach((body, i) => {
+      if (body.gun) body.gun.visible = i === this.flareBody;
+    });
     this.morningOn = false;
     this.target = null;
     this.searchT = 0;
@@ -454,6 +509,7 @@ export class Objectives {
     };
     for (const body of this.bodies) if (!body.searched && body.mesh.visible) consider(body, body.x, body.z, USE_R_BODY, 'body');
     for (const g of this.gens) if (!g.running) consider(g, g.x, g.z, USE_R_GEN, 'gen');
+    if (game.doors) game.doors.consider(consider);
     if (best && this.target && best.obj !== this.target.obj) this.searchT = 0;
     this.target = best;
 
@@ -468,6 +524,12 @@ export class Objectives {
     }
     const o = best.obj;
     const T = (key) => t(input.touch ? key + 'T' : key); // touch has no E key: name the button instead
+    if (best.kind === 'door') {
+      this.searchT = 0;
+      hud.setUse(T(game.doors.prompt(o)), 0, true);
+      if (pressed) game.doors.use(o);
+      return;
+    }
     if (best.kind === 'body') {
       if (held && still) this.searchT += dt;
       else this.searchT = Math.max(0, this.searchT - dt * 2);
@@ -501,6 +563,8 @@ export class Objectives {
     const game = this.g;
     body.searched = true;
     body.item.visible = false;
+    const gun = !!body.gun && body.gun.visible;
+    if (body.gun) body.gun.visible = false;
     const k = body.k;
     const g = this.gens[k];
     g.hasPart = true;
@@ -515,7 +579,8 @@ export class Objectives {
     game.onCorpseSearched(body, k);
     const nextSite = next ? this.siteAt(next.site) : '';
     const text = t('notes')[k].replace('{next}', nextSite);
-    this.openNote(`${t('noteKicker')} · ${t('parts')[g.spec.part]}`, text);
+    this.openNote(`${t('noteKicker')} · ${t('parts')[g.spec.part]}${gun ? ` + ${t('flareGun')}` : ''}`, text);
+    if (gun) game.onFlareFound();
   }
 
   openNote(kicker, text) {

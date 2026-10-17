@@ -62,6 +62,7 @@ export class World {
     this.lake = null;
     this.spawn = { x: 0, z: 0, yaw: 0 };
     this.effigies = [];
+    this.doors = []; // cabin doors (the game hangs and swings them)
   }
 
   generate() {
@@ -340,9 +341,7 @@ export class World {
       b.box(r2 - l2, H, T, KIND.WOOD);
       localPlace(b, base, 1.2, H - 0.3, D / 2);
       b.box(1.4, 0.6, T, KIND.WOOD);
-      // open door
-      localPlace(b, base, 1.9, H * 0.42, D / 2 + 0.6, 0, -1.1, 0);
-      b.box(1.3, H * 0.82, 0.08, KIND.WOOD);
+      // (the door itself is its own mesh: it swings — see game/doors.js)
       // gable roof, both sides visible
       const ov = 0.5, ridge = H + 1.5;
       const p = [
@@ -386,6 +385,9 @@ export class World {
     seg(1.9, D / 2, W / 2, D / 2);
     seg(-2.3, -1.4, -0.9, -1.4);
     seg(2.3, -2.4, 2.3, -0.8);
+    // a plank door on strap hinges at the right jamb, swinging either way. hinge (hx, hz) and everything
+    // else in cabin-local metres
+    if (this.doors) this.doors.push({ id: L.id, x: L.x, z: L.z, y: y + 0.21, ry, hx: 1.92, hz: D / 2, w: 1.42, h: 1.95, W, D, gap: [0.5, 1.9] });
   }
 
   lm_tower(L, rng) {

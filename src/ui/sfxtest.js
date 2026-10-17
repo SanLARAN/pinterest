@@ -48,6 +48,10 @@ export function mountSfxPanel(audio) {
     ['Наблюдатель: суставы + появление', () => { for (let i = 0; i < 5; i++) setTimeout(() => audio.crack(...at(6 - i, 3, 1.5), 0.7), i * 420); setTimeout(() => audio.watcherSting(), 2300); }],
     ['Ревун: вдох и вой', () => { audio.howlerInhale(...at(25, -12, 1.8)); setTimeout(() => audio.howlerHowl(...at(25, -12, 2.2)), 1800); }],
     ['Ревун: рявк', () => audio.howlerBark(...at(9, 3, 1.8))],
+    ['дверь: открыть / закрыть', () => { audio.doorCreak(...at(2.5, 1, 1.2), 0.62, 1, 0.42); setTimeout(() => audio.doorCreak(...at(2.5, 1, 1.2), 0.42, 1.12, 0.42), 1400); setTimeout(() => audio.doorShut(...at(2.5, 1, 1.1), 0.7), 1850); }],
+    ['дверь: сама открывается', () => audio.doorCreak(...at(4, -2, 1.2), 1.9, 0.78, 0.55)],
+    ['дверь: выбивают', () => { audio.doorBash(...at(3, 0.5, 1.1)); setTimeout(() => audio.doorBash(...at(3, 0.5, 1.1)), 560); setTimeout(() => audio.doorBash(...at(3, 0.5, 1.1), true), 1120); }],
+    ['ракетница: выстрел и горение', () => { audio.flareShot(...at(0.5, 0, 0), true); setTimeout(() => audio.flarePop(...at(30, 6, 30)), 1500); setTimeout(() => audio.flareHiss(...at(30, 6, 29), 4), 1550); }],
     ['напряжение: 0', (b) => {
       tension = tension >= 1 ? 0 : tension + 0.5;
       audio.startAmbience();

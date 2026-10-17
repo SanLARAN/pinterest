@@ -1776,6 +1776,190 @@ export class AudioEngine {
     this._tone(t + 0.19, { type: 'square', f: 987.8, a: 0.003, d: 0.08, hold: 0.04, gain: 0.12, dest: pn });
   }
 
+  // ---------- cabin doors ----------
+  // a dry hinge: the leaf sticks and slips, and every slip rings through the planks. dur s, pitch ~1
+  doorCreak(x, y, z, dur = 0.6, pitch = 1, gain = 0.45) {
+    if (!this.ready) return;
+    const t = this.now;
+    const pn = this._panner(x, y, z, 3, 1.0);
+    pn.connect(this.sfx);
+    const rs = this._gain(0.4); pn.connect(rs); rs.connect(this.revSend);
+    const steps = Math.max(3, Math.round(dur * 6));
+    // stick-slip: a buzzing pulse train whose rate wanders as the hinge binds and frees
+    const o = this._osc('sawtooth', 62 * pitch);
+    for (let i = 1; i <= steps; i++) o.frequency.linearRampToValueAtTime((42 + Math.random() * 64) * pitch, t + (dur * i) / steps);
+    const am = this._gain(0.5);
+    const lfo = this._osc('square', 19 + Math.random() * 12);
+    const lg = this._gain(0.5);
+    lfo.connect(lg).connect(am.gain);
+    o.connect(am);
+    const env = this._gain(0);
+    // the wood's voice: three resonances, the top one the squeal
+    [[540, 5, 1.0], [1180, 9, 2.5], [2480, 12, 1.8]].forEach(([f, q, g]) => {
+      const bp = this._filter('bandpass', f * pitch * (0.94 + Math.random() * 0.12), q);
+      const gg = this._gain(g);
+      am.connect(bp).connect(gg).connect(env);
+    });
+    env.connect(pn);
+    const p = env.gain;
+    p.setValueAtTime(0.0001, t);
+    p.linearRampToValueAtTime(gain, t + 0.05);
+    for (let i = 1; i < steps; i++) p.linearRampToValueAtTime(gain * (0.35 + Math.random() * 0.65), t + (dur * i) / steps);
+    p.linearRampToValueAtTime(0.0001, t + dur + 0.1);
+    o.start(t); lfo.start(t);
+    o.stop(t + dur + 0.2); lfo.stop(t + dur + 0.2);
+    // and the soft rub of the leaf moving through the air
+    this._noiseBurst(t, { buf: this.pink, type: 'bandpass', f: 420, q: 1.1, a: 0.1, d: dur * 0.6, hold: dur * 0.3, gain: gain * 0.3, dest: pn });
+  }
+
+  // the leaf meets the frame (or the stop out front): a thump, a knock, the latch
+  doorShut(x, y, z, hard = 0.6) {
+    if (!this.ready) return;
+    const t = this.now;
+    const pn = this._panner(x, y, z, 3.5, 1.0);
+    pn.connect(this.sfx);
+    const rs = this._gain(0.55); pn.connect(rs); rs.connect(this.revSend);
+    this._tone(t, { f: 96, fEnd: 46, a: 0.002, d: 0.24, gain: 0.9 * hard, dest: pn });
+    this._noiseBurst(t, { buf: this.brown, type: 'lowpass', f: 720, a: 0.001, d: 0.13, gain: 1.6 * hard, dest: pn });
+    this._noiseBurst(t, { type: 'bandpass', f: 430, q: 2.4, a: 0.001, d: 0.08, gain: 0.9 * hard, dest: pn });
+    this._noiseBurst(t + 0.05, { type: 'highpass', f: 3200, a: 0.0005, d: 0.016, gain: 0.45 * hard, dest: pn });
+    this._noiseBurst(t + 0.078, { type: 'bandpass', f: 2300, q: 4, a: 0.0005, d: 0.03, gain: 0.3 * hard, dest: pn });
+  }
+
+  // something heavy hitting the door from the other side. final: it gives
+  doorBash(x, y, z, final = false) {
+    if (!this.ready) return;
+    const t = this.now;
+    const pn = this._panner(x, y, z, 5, 0.85);
+    pn.connect(this.sfx);
+    const rs = this._gain(0.9); pn.connect(rs); rs.connect(this.revSend);
+    const k = final ? 1.25 : 1;
+    this._tone(t, { f: 74, fEnd: 36, a: 0.002, d: 0.42, gain: 1.15 * k, dest: pn }); // the whole door booms
+    this._noiseBurst(t, { buf: this.brown, type: 'lowpass', f: 950, a: 0.001, d: 0.24, gain: 2.2 * k, dest: pn });
+    this._noiseBurst(t, { type: 'bandpass', f: 300, q: 1.5, a: 0.001, d: 0.17, gain: 1.3 * k, dest: pn });
+    for (let i = 0; i < 4; i++) {
+      // the frame and the hinges rattle
+      this._noiseBurst(t + 0.05 + i * 0.045, { type: 'bandpass', f: 1400 + Math.random() * 1100, q: 5, a: 0.001, d: 0.026, gain: 0.5 * (1 - i / 5), dest: pn });
+    }
+    this._tone(t + 0.02, { type: 'square', f: 650, fEnd: 590, a: 0.001, d: 0.09, gain: 0.04, dest: pn });
+    if (final) {
+      // wood splits; the leaf slams round into the wall
+      for (let i = 0; i < 8; i++) {
+        this._noiseBurst(t + 0.015 + i * (0.018 + Math.random() * 0.03), { type: 'bandpass', f: 1700 + Math.random() * 2800, q: 3, a: 0.0006, d: 0.03 + Math.random() * 0.05, gain: 0.85, dest: pn });
+      }
+      this._noiseBurst(t + 0.26, { buf: this.brown, type: 'lowpass', f: 620, a: 0.002, d: 0.32, gain: 1.7, dest: pn });
+      this._tone(t + 0.26, { f: 62, fEnd: 33, a: 0.002, d: 0.42, gain: 0.95, dest: pn });
+    }
+  }
+
+  // ---------- the flare gun ----------
+  // a big bore at low pressure: more of a hollow thoonk than a bang. local = your own gun (in your hands)
+  flareShot(x, y, z, local = false) {
+    if (!this.ready) return;
+    const t = this.now;
+    let dest = this.sfx;
+    if (!local) {
+      const pn = this._panner(x, y, z, 6, 0.8);
+      pn.connect(this.sfx);
+      dest = pn;
+    }
+    this._tone(t, { f: 170, fEnd: 52, a: 0.001, d: 0.22, gain: 1.0, dest, rev: 0.5 });
+    this._noiseBurst(t, { buf: this.brown, type: 'lowpass', f: 1300, a: 0.001, d: 0.16, gain: 2.4, dest, rev: 0.7 });
+    this._noiseBurst(t, { type: 'bandpass', f: 760, q: 1.2, a: 0.001, d: 0.08, gain: 1.1, dest });
+    this._noiseBurst(t + 0.006, { type: 'highpass', f: 4200, a: 0.0005, d: 0.03, gain: 0.5, dest }); // the breech
+  }
+
+  // the star bursting out at the top of the arc
+  flarePop(x, y, z) {
+    if (!this.ready) return;
+    const t = this.now;
+    const pn = this._panner(x, y, z, 10, 0.7);
+    pn.connect(this.sfx);
+    const rs = this._gain(1.0); pn.connect(rs); rs.connect(this.revSend);
+    this._noiseBurst(t, { type: 'bandpass', f: 1700, q: 0.8, a: 0.0008, d: 0.06, gain: 1.7, dest: pn });
+    this._tone(t, { f: 220, fEnd: 70, a: 0.001, d: 0.26, gain: 0.6, dest: pn });
+    this._noiseBurst(t + 0.02, { buf: this.brown, type: 'lowpass', f: 520, a: 0.004, d: 0.55, gain: 1.1, dest: pn });
+  }
+
+  // a flare burning: magnesium fizz with a roar under it, never even. returns { setPos, level, crackle, stop }
+  flareBurn(x, y, z) {
+    if (!this.ready) return null;
+    const t = this.now;
+    const pn = this._panner(x, y, z, 7, 0.75);
+    pn.connect(this.sfx);
+    const rs = this._gain(0.45); pn.connect(rs); rs.connect(this.revSend);
+    const out = this._gain(0);
+    out.connect(pn);
+    const n = this._noise(this.white);
+    const hp = this._filter('highpass', 2600, 0.7);
+    const fz = this._gain(0.42);
+    n.connect(hp).connect(fz).connect(out);
+    const n2 = this._noise(this.pink);
+    const bp = this._filter('bandpass', 850, 0.6);
+    const rg = this._gain(0.4);
+    n2.connect(bp).connect(rg).connect(out);
+    const lfo = this._osc('sawtooth', 8.5);
+    const lg = this._gain(0.2);
+    lfo.connect(lg).connect(fz.gain);
+    n.start(t, Math.random()); n2.start(t, Math.random()); lfo.start(t);
+    const self = this;
+    let dead = false;
+    return {
+      setPos(px, py, pz) {
+        if (dead) return;
+        const now = self.now;
+        if (pn.positionX) {
+          pn.positionX.setTargetAtTime(px, now, 0.05);
+          pn.positionY.setTargetAtTime(py, now, 0.05);
+          pn.positionZ.setTargetAtTime(pz, now, 0.05);
+        } else pn.setPosition(px, py, pz);
+      },
+      level(v, tc = 0.08) {
+        if (!dead) out.gain.setTargetAtTime(v * 0.5, self.now, tc);
+      },
+      crackle() {
+        if (dead) return;
+        self._noiseBurst(self.now, { type: 'bandpass', f: 2200 + Math.random() * 3600, q: 3, a: 0.0005, d: 0.008 + Math.random() * 0.02, gain: 0.25 + Math.random() * 0.35, dest: pn });
+      },
+      stop(fade = 0.4) {
+        if (dead) return;
+        dead = true;
+        const now = self.now;
+        out.gain.cancelScheduledValues(now);
+        out.gain.setTargetAtTime(0, now, Math.max(0.02, fade / 3));
+        [n, n2, lfo].forEach((q) => { try { q.stop(now + fade + 0.6); } catch { /* */ } });
+      },
+    };
+  }
+
+  // the atlas page: a couple of seconds of a flare burning, self-contained
+  flareHiss(x, y, z, dur = 2.4) {
+    const s = this.flareBurn(x, y, z);
+    if (!s) return;
+    s.level(0.9, 0.04);
+    for (let i = 0; i < Math.round(dur * 10); i++) setTimeout(() => s.crackle(), 40 + Math.random() * dur * 1000);
+    setTimeout(() => s.stop(0.7), dur * 1000);
+  }
+
+  // a flare into the lake: one angry hiss and it's gone
+  flareDrown(x, y, z) {
+    if (!this.ready) return;
+    const t = this.now;
+    const pn = this._panner(x, y, z, 5, 0.9);
+    pn.connect(this.sfx);
+    this._noiseBurst(t, { type: 'highpass', f: 3000, fEnd: 1200, a: 0.004, d: 0.9, gain: 0.7, dest: pn, rev: 0.4 });
+    this._noiseBurst(t, { buf: this.pink, type: 'lowpass', f: 900, a: 0.01, d: 0.4, gain: 0.5, dest: pn });
+  }
+
+  // you picked up the flare gun: a heavy click, cartridges rattling in a pocket
+  flareFound() {
+    if (!this.ready) return;
+    const t = this.now;
+    this._noiseBurst(t, { type: 'bandpass', f: 2600, q: 3, a: 0.0006, d: 0.02, gain: 0.5, dest: this.body });
+    this._tone(t, { f: 1200, fEnd: 700, a: 0.001, d: 0.05, gain: 0.08, dest: this.body });
+    [0.16, 0.24].forEach((d) => this._noiseBurst(t + d, { type: 'bandpass', f: 3400, q: 5, a: 0.0006, d: 0.025, gain: 0.25, dest: this.body }));
+  }
+
   // flies over a body: returns { stop() }
   flies(x, y, z) {
     if (!this.ready) return null;

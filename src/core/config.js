@@ -44,7 +44,13 @@ export const CFG = {
   // loudness (0..1) -> what the player sees / what monsters hear
   revealRadius: (loud) => 12 + 54 * loud,
   hearRadius: (loud) => 3 + 72 * Math.pow(Math.max(loud, 0), 1.35),
+  // your own voice (the microphone) has a curve of its own: ordinary talking (loudness up to ~0.3) carries
+  // a few metres, so you can talk to the friend next to you; raised voices carry much further, and a scream
+  // as far as a scream does anywhere
+  voiceHearRadius: (loud) => (loud >= 0.78 ? 54.5 + ((loud - 0.78) / 0.22) * 20.5 : 2.5 + 52 * Math.pow(Math.max(0, loud - 0.1) / 0.68, 1.8)),
+  voiceRevealRadius: (loud) => 14 + 54 * Math.pow(Math.max(loud, 0), 0.8),
   SCREAM: 0.78, // loudness at/above which it's a scream (instant hunt)
+  TALK: 0.3, // loudness of ordinary talking into the microphone (its upper end)
 
   MONSTER: {
     listener: { wander: 1.05, investigate: 2.1, hunt: 4.7, hearing: 1.0, lock: 6.0, radius: 0.45 },
@@ -68,6 +74,21 @@ export const CFG = {
   ],
   GEN_SITES: ['cabin', 'tower', 'stones', 'wreck'], // the camp is always the first one
   LAMP_R: 10, // radius of warm light around a running generator
+
+  // the flare gun: one per night, lying by one of the bodies (never the camp's). Two shots.
+  FLARE: {
+    charges: 2,
+    speed: 33, // m/s out of the barrel
+    gravity: 9.8,
+    burn: 15, // seconds of light once it catches
+    radius: 115, // how far its light reaches (m) — hanging 30 m up, it lights ~80 m of forest around
+    light: 1.8, // brightness (a work lamp is 1.15)
+    lure: 140, // monsters this far from it come to see
+    lureEvery: 2.6, // ...and keep being called while it burns
+    launchLoud: 0.5, // the pistol's pop, where you stand
+  },
+  // cabin doors: how loud they are, and how long a shut one holds
+  DOOR: { loud: 0.12, shutLoud: 0.2, bashes: 3, bashEvery: 0.55, calmPush: 1.1 },
 
   SCORE: {
     perSecond: 10,

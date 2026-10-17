@@ -26,8 +26,9 @@ export class Mic {
     this.state = 'off'; // off | pending | on | denied | blocked | unsupported
     this.db = -100;
     this.floor = -58;
-    this.trig = -45;
-    this.screamDb = -18;
+    this.trig = -40;
+    this.talkDb = -28;
+    this.screamDb = -13; // the scream line (the meter reads 1 here)
     this.loud = 0; // 0..1 (0 = below trigger)
     this.meter = 0; // smoothed 0..1.2 for UI
     this.peakLoud = 0;
@@ -308,22 +309,35 @@ export class Mic {
     }
 
     const sens = settings.micSens;
-    const margin = lerp(21, 7, sens);
-    let trig = clamp(this.floor + margin, -66, -26);
+    // a sound starts to count once it stands well clear of the room — far enough that a quiet word to
+    // the friend next to you stays under it
+    const margin = lerp(27, 11, sens);
+    let trig = clamp(this.floor + margin, -62, -24);
     const gate = outDb + this.leak;
     const selfPlaying = this.selfUntil && performance.now() < this.selfUntil;
     if (selfPlaying) trig = Math.max(trig, -22);
     trig = Math.max(trig, gate);
-    const span = lerp(34, 26, sens);
-    const screamDb = Math.max(trig + span, -20 + (0.55 - sens) * 10);
+    // how loud is loud is pinned to the signal itself, not to the room: a headset at your lips and a laptop
+    // across the desk see the same voice ~10 dB apart, but nobody talks at the level of a shout.
+    //   trig → talkDb: talking (up to loudness TALK) · talkDb → screamDb: raised voice up to the scream line
+    //   (SCREAM) · 6 dB past it: everything you've got (1.0)
+    const talkDb = Math.max(trig + 5, -21 - 12 * sens);
+    const screamDb = Math.max(talkDb + 9, -6 - 12 * sens);
     this.trig = trig;
+    this.talkDb = talkDb;
     this.screamDb = screamDb;
 
-    const loud = db > trig ? clamp((db - trig) / (screamDb - trig), 0.02, 1) : 0;
+    let loud = 0;
+    if (db > trig) {
+      if (db <= talkDb) loud = 0.02 + ((db - trig) / (talkDb - trig)) * (CFG.TALK - 0.02);
+      else if (db <= screamDb) loud = CFG.TALK + ((db - talkDb) / (screamDb - talkDb)) * (CFG.SCREAM - CFG.TALK);
+      else loud = Math.min(1, CFG.SCREAM + ((db - screamDb) / 6) * (1 - CFG.SCREAM));
+    }
 
     // noise floor follows the room: falls fast, rises slowly (and only while quiet)
+    // (talking under the trigger isn't the room: near-floor sounds pull it up, louder ones barely do)
     if (db < this.floor) this.floor += (db - this.floor) * Math.min(1, dt * 3);
-    else if (loud === 0) this.floor += (db - this.floor) * Math.min(1, dt * 0.06);
+    else if (loud === 0) this.floor += (db - this.floor) * Math.min(1, dt * (db < this.floor + margin * 0.5 ? 0.06 : 0.012));
     this.floor = clamp(this.floor, -88, -38);
 
     this.loud = loud;

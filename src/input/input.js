@@ -3,7 +3,7 @@ import { settings } from '../core/storage.js';
 
 const GAME_KEYS = new Set([
   'KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space',
-  'ShiftLeft', 'ShiftRight', 'KeyC', 'KeyF', 'KeyM', 'KeyP', 'KeyR', 'KeyE', 'Tab', 'Enter',
+  'ShiftLeft', 'ShiftRight', 'KeyC', 'KeyF', 'KeyQ', 'KeyM', 'KeyP', 'KeyR', 'KeyE', 'Tab', 'Enter',
 ]);
 
 export class Input {
@@ -57,6 +57,9 @@ export class Input {
           break;
         case 'KeyF':
           this.emit('throw');
+          break;
+        case 'KeyQ':
+          this.emit('flare');
           break;
         case 'KeyE':
           this.useHeld = true;
@@ -309,6 +312,7 @@ export class Input {
       }
     });
     btn('#tStone', () => this.emit('throw'));
+    btn('#tFlare', () => this.emit('flare'));
     const peekZone = el.querySelector('#peekZone');
     if (peekZone) {
       peekZone.addEventListener('pointerdown', (e) => {

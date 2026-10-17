@@ -1,6 +1,5 @@
 // Optional sonar radar (Settings → Radar, off by default): rotates with the player, shows echo
 // blips, live pulse rings and your noise radius. Drawn in the same ash palette as the forest.
-import { CFG } from '../core/config.js';
 
 export class Radar {
   constructor(canvas) {
@@ -34,7 +33,8 @@ export class Radar {
     this.blips.push({ x, z, type, t: this.t, hunting });
   }
 
-  draw(dt, px, pz, yaw, pulses, loud, scream) {
+  // noise = how far you can be heard right now (m)
+  draw(dt, px, pz, yaw, pulses, noise, scream) {
     this.t += dt;
     this.sweep += dt * 2.4;
     const ctx = this.ctx;
@@ -108,7 +108,7 @@ export class Radar {
     }
 
     // your noise radius (who can hear you right now)
-    const targetR = loud > 0 ? CFG.hearRadius(loud) : 0;
+    const targetR = noise > 0 ? noise : 0;
     this.noiseR = targetR > this.noiseR ? targetR : Math.max(0, this.noiseR - dt * 40);
     if (this.noiseR > 0.5) {
       ctx.fillStyle = scream ? 'rgba(255,40,40,0.16)' : 'rgba(255,170,90,0.08)';

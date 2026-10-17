@@ -11,7 +11,8 @@ import { MeshBuilder, KIND } from '../world/builder.js';
 import { RNG, clamp, lerp, angleDiff } from '../core/rng.js';
 import { World, LANDMARKS } from '../world/world.js';
 import { buildListener, buildCrawler, buildWatcher, buildHowler, buildShade, ANIMS } from '../game/monsters.js';
-import { placer, buildCorpse, buildToolBag } from '../game/objectives.js';
+import { placer, buildCorpse, buildToolBag, buildFlareGun } from '../game/objectives.js';
+import { buildDoorLeaf } from '../game/doors.js';
 
 const BEAM = 12; // a kind past the palette: the faint light pillar over a shard
 
@@ -417,6 +418,15 @@ function stone(mat) {
   return still(root, 0.32, { yaw: 0.5, pitch: 0.42 });
 }
 
+// the flare gun and its two cartridges, as they lie by one of the bodies
+function flare(mat) {
+  const b = new MeshBuilder(1024);
+  buildFlareGun(b, new THREE.Matrix4().makeRotationY(0.5));
+  const root = new THREE.Group();
+  root.add(meshOf(b, mat));
+  return still(root, 0.32, { yaw: 0.55, pitch: 0.5 });
+}
+
 // ---------------- places ----------------
 // the landmark builders run against a stand-in world: flat ground, no colliders. Drawing the first five
 // landmarks in order with the forest's own seed reproduces exactly the random bits you meet in the game.
@@ -428,9 +438,10 @@ function placeGeometry(id, world) {
     for (const L of LANDMARKS.slice(0, 5)) {
       const kind = L.id.replace(/\d+$/, '');
       const props = [];
-      const fake = { terrain: { height: () => 0, flats: [] }, col: { add() {}, circle() {} }, addProp: (x, z, fn) => props.push(fn), spawn: null, lake: null, effigies: [] };
+      const fake = { terrain: { height: () => 0, flats: [] }, col: { add() {}, circle() {} }, addProp: (x, z, fn) => props.push(fn), spawn: null, lake: null, effigies: [], doors: [] };
       World.prototype['lm_' + kind].call(fake, { ...L, x: 0, z: 0 }, rng);
       _places[L.id] = props;
+      props.doors = fake.doors;
     }
   }
   const b = new MeshBuilder(16384);
@@ -456,6 +467,16 @@ function place(id, view) {
   return (mat, ctx) => {
     const root = new THREE.Group();
     root.add(meshOf(placeGeometry(id, ctx.world), mat));
+    // a cabin's door hangs on its own hinges — drawn ajar, the way you find it at night in your worst guess
+    for (const d of _places[id].doors || []) {
+      const b = new MeshBuilder(512);
+      buildDoorLeaf(b, d.w, d.h);
+      const leaf = meshOf(b, mat);
+      const c = Math.cos(d.ry), s = Math.sin(d.ry);
+      leaf.position.set(d.x + d.hx * c + d.hz * s, d.y, d.z - d.hx * s + d.hz * c);
+      leaf.rotation.y = d.ry + 0.7;
+      root.add(leaf);
+    }
     return still(root, 0.3, view);
   };
 }
@@ -464,7 +485,7 @@ function place(id, view) {
 const MODELS = {
   listener, crawler, watcher, howler, shade,
   generator: (mat) => generator(mat, true),
-  corpse, fuel, plug, fuses, belt, battery, shard, stone,
+  corpse, fuel, plug, fuses, belt, battery, shard, stone, flare,
   camp: place('camp', { yaw: 2.6, pitch: 0.62, fit: 0.78 }),
   cabin: place('cabin', { yaw: 0.9, pitch: 0.34, fit: 0.95 }),
   tower: place('tower', { yaw: 0.6, pitch: 0.16, fit: 1.0 }),

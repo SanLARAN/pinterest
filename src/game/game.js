@@ -11,6 +11,8 @@ import { Objectives } from './objectives.js';
 import { Player } from './player.js';
 import { Shards } from './shards.js';
 import { Stones } from './stones.js';
+import { Doors } from './doors.js';
+import { Flares } from './flares.js';
 import { Dread } from './dread.js';
 import { CAP } from '../world/world.js';
 import { shared } from '../render/sonar.js';
@@ -23,7 +25,7 @@ const HOWL = [1.0, 0.36, 0.1];
 const LAMPC = [1.0, 0.74, 0.42];
 const MORNING_LIGHT = 0.95;
 const NO_LOOK = { dx: 0, dy: 0 };
-const SRC_SELF = new Set(['voice', 'ping', 'step', 'bump', 'breath', 'repair']);
+const SRC_SELF = new Set(['voice', 'ping', 'step', 'bump', 'breath', 'repair', 'door', 'flare']);
 const _v = new THREE.Vector3();
 const escHtml = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -36,6 +38,8 @@ export class Game {
     this.stones = new Stones();
     this.shade = new ShadeRig();
     this.objectives = new Objectives(this);
+    this.doors = new Doors(this);
+    this.flares = new Flares(this);
     this.hud.onNoteClose = () => this.objectives.closeNote();
     this.events = [];
     this.monsters = [];
@@ -166,7 +170,7 @@ export class Game {
     this.time = 0;
     this.score = 0;
     this.mult = 1;
-    this.stats = { shards: 0, close: 0, escapes: 0, loudest: 0, hunts: 0, gens: 0, bodies: 0, thrown: 0, seen: {} }; // seen: creatures that showed themselves (the atlas)
+    this.stats = { shards: 0, close: 0, escapes: 0, loudest: 0, hunts: 0, gens: 0, bodies: 0, thrown: 0, flares: 0, seen: {} }; // seen: creatures that showed themselves (the atlas)
     this.state = 'morning';
     this.grace = true;
     this.fx = this._fxDefaults();
@@ -183,11 +187,14 @@ export class Game {
     this.ghosts.clear();
     this.particles.clear();
     this.stones.clear();
+    this.flares.clear();
+    this.doors.reset();
     this.radar.clear();
     for (const m of this.monsters) m.dispose();
     this.monsters = [];
     this.shards.reset(this.world, this.rng);
     this.objectives.reset(this.rng);
+    this.setFlares(0, false);
     this.objectives.setMorning(true);
     this.charge = { active: false, t: 0 };
     this.pingCD = 0;
@@ -279,6 +286,7 @@ export class Game {
     }
     hud.setHint(hint);
     this.objectives.update(dt, false);
+    this.doors.update(dt);
     this.pulses.update(this.time);
     this.audio.morningTick();
     this.fx.danger = 0;
@@ -319,6 +327,7 @@ export class Game {
       this.fx.shockAmp = 0.7;
     }
     this.objectives.update(dt, false);
+    this.doors.update(dt);
     this.pulses.update(this.time);
     this._commonFx(dt);
     if (k >= CFG.DUSK_SECONDS) this.startNight();
@@ -464,7 +473,7 @@ export class Game {
   emitPlayerPulse(loud, fromMic) {
     const p = this.player;
     const e = this.eyePos();
-    let R = CFG.revealRadius(loud);
+    let R = fromMic ? CFG.voiceRevealRadius(loud) : CFG.revealRadius(loud);
     const first = this.firstPingT < 0;
     if (first) {
       R = Math.max(R, 52);
@@ -570,10 +579,79 @@ export class Game {
     this.noise(h.x, h.z, h.water ? 0.5 : 0.46, 'stone', false, owner ?? this.player.id); // every machine simulates every stone; only the host's monsters listen
   }
 
+  // ---------------- the flare gun ----------------
+  setFlares(n, has = n > 0) {
+    const p = this.player;
+    p.flares = n;
+    p.hasFlare = has;
+    document.body.classList.toggle('has-flare', n > 0);
+  }
+
+  // it was lying by the body you just searched
+  onFlareFound() {
+    this.setFlares(CFG.FLARE.charges);
+    this.hud.popup(`+ ${t('flareGun')} · ${t('flareCharges').replace('{n}', CFG.FLARE.charges)}`, 'amber');
+    this.hud.flashFlares();
+    this.audio.flareFound();
+    if (this.sync) this.sync.ev('fg');
+    if (!this.hinted.flare) {
+      this.hinted.flare = true;
+      this.timeline.push({ at: this.time + 1.2, fn: () => this.hud.setHint(t(this.input.touch ? 'hintFlareTouch' : 'hintFlare')) });
+      this.timeline.push({ at: this.time + 8.5, fn: () => this.hud.setHint(null) });
+    }
+  }
+
+  // a teammate found it
+  fxMateFlare(r) {
+    this.hud.popup(t('mateFlare').replace('{name}', r.name), 'amber');
+    for (const b of this.objectives.bodies) if (b.gun) b.gun.visible = false;
+  }
+
+  // Q: up it goes. it lights the forest red for a quarter of a minute — and calls everything in it
+  fireFlare() {
+    const p = this.player;
+    if (!p.alive || this.state !== 'play') return;
+    if (p.flares <= 0) {
+      this.hud.popup(t(p.hasFlare ? 'aNoFlares' : 'aNoFlareGun'), 'dim');
+      if (p.hasFlare) this.hud.flashFlares();
+      return;
+    }
+    this.setFlares(p.flares - 1, true);
+    this.stats.flares++;
+    this.hud.flashFlares();
+    // where you look, a touch higher (you fire a flare up, not at things)
+    const pitch = clamp(p.pitch + 0.12, -0.6, 1.5);
+    const cp = Math.cos(pitch);
+    const dx = -Math.sin(p.yaw) * cp, dz = -Math.cos(p.yaw) * cp, dy = Math.sin(pitch);
+    const e = this.eyePos();
+    const x = e.x + dx * 0.5, y = e.y - 0.1 + dy * 0.5, z = e.z + dz * 0.5;
+    this.flares.launch(x, y, z, dx, dy, dz, p.id);
+    if (this.sync) this.sync.ev('fl', +x.toFixed(2), +y.toFixed(2), +z.toFixed(2), +dx.toFixed(3), +dy.toFixed(3), +dz.toFixed(3));
+    this.audio.flareShot(x, y, z, true);
+    this.addTrauma(0.16);
+    this.fx.fovKick = Math.max(this.fx.fovKick, 4);
+    this.fx.white = Math.max(this.fx.white, 0.1);
+    this.particles.burst(x, y, z, 16, { color: [1, 0.55, 0.35], speed: 4, life: 0.4, size: 0.05, gravity: -4, drag: 2, dir: { x: dx, y: dy, z: dz }, cone: 0.35 });
+    this.playerNoise(p.x, p.z, CFG.FLARE.launchLoud, 'flare');
+    if (!this.hinted.flareLure) {
+      this.hinted.flareLure = true;
+      this.timeline.push({ at: this.time + 2.2, fn: () => this.hud.setHint(`<span class="red">${t('hintFlareLure')}</span>`) });
+      this.timeline.push({ at: this.time + 7.5, fn: () => this.hud.setHint(null) });
+    }
+  }
+
+  // a teammate fired one: it flies here too
+  remoteFlare(r, x, y, z, dx, dy, dz) {
+    this.flares.launch(x, y, z, dx, dy, dz, r.id);
+    this.audio.flareShot(x, y, z, false);
+    const near = Math.max(0, 1 - this.distToEars(x, z) / 30);
+    if (near > 0) this.addTrauma(0.1 * near);
+  }
+
   // a teammate made a sound: you see their wave (tinted with their colour) and hear their click / clap / shout
   remotePulse(r, x, y, z, loud, fromMic) {
     loud = Math.max(0, Math.min(1, loud));
-    let R = CFG.revealRadius(loud);
+    let R = fromMic ? CFG.voiceRevealRadius(loud) : CFG.revealRadius(loud);
     const first = this.firstPingT < 0;
     if (first) R = Math.max(R, 52);
     const c = r.hex;
@@ -1228,7 +1306,7 @@ export class Game {
       // the dead are heard only by the dead
       this.audio.voiceSet(r.id, r.x, r.y + (r.alive ? r.eyeCur : 0.35), r.z, r.alive || !meAlive ? 1 : 0);
       const watching = this.spectate && this.spectate.target === r;
-      const lit = watching ? 0 : day ? 1 : this.objectives.lampAt(r.x, r.z);
+      const lit = watching ? 0 : day ? 1 : this.glowAt(r.x, r.y + 1.2, r.z);
       if (lit > 0.06) {
         const str = day ? 0.62 : Math.min(0.8, 0.22 + lit * 1.2);
         if (!r.liveGhost) r.liveGhost = this.ghosts.spawn(r.rig, this.time, { sticky: true, strength: str, full: day ? 0.7 : 0.3, color: r.alive ? r.hex : 0x8a9396, jitter: 0.25, dyeK: r.alive ? 1 : 0.3 });
@@ -1256,6 +1334,8 @@ export class Game {
     if (this.state === 'dying') {
       this._updateEars();
       this.updateDying(dt);
+      this.doors.update(dt);
+      this.flares.update(dt);
       this.time += dt;
       this._commonFx(dt);
       return;
@@ -1263,6 +1343,8 @@ export class Game {
     if (this.state === 'dawn') {
       this.netFrame(dt);
       this.updateDawn(dt);
+      this.doors.update(dt);
+      this.flares.update(dt);
       this.time += dt;
       if (this.player.alive) this.player.update(dt, input, look, this.inputMuted);
       this._commonFx(dt);
@@ -1294,6 +1376,7 @@ export class Game {
         this.charge.t = 0;
       } else if (e === 'pingUp') this.pingRelease();
       else if (e === 'throw') this.throwStone();
+      else if (e === 'flare') this.fireFlare();
     }
     // E puts a note away
     if (this.objectives.note && raw.events.includes('useDown')) {
@@ -1359,6 +1442,8 @@ export class Game {
     // ---- world ----
     this.pulses.update(this.time);
     this.stones.update(dt, this);
+    this.doors.update(dt);
+    this.flares.update(dt);
     const nearest = this.updateMonsters(dt);
     if (this.state !== 'play') return; // killed this frame
     if (!this.player.alive) return; // co-op: caught this frame — the death plays from the next one
@@ -1421,6 +1506,8 @@ export class Game {
     this.mic.update(dt, this.audio.outputDb()); // keeps the meter honest; the dead make no noise
     this.pulses.update(this.time);
     this.stones.update(dt, this);
+    this.doors.update(dt);
+    this.flares.update(dt);
     const nearest = this.updateMonsters(dt);
     if (this.state !== 'play') return;
     this.objectives.update(dt, true);
@@ -1462,9 +1549,14 @@ export class Game {
     return danger;
   }
 
-  // standing in a lamp's light, a monster can simply be seen — a live afterimage that follows it
+  // steady light at a spot: a running generator's lamp, or a burning flare (0..1)
+  glowAt(x, y, z) {
+    return Math.max(this.objectives.lampAt(x, z), this.flares.lightAt(x, y, z));
+  }
+
+  // standing in a lamp's (or a flare's) light, a monster can simply be seen — a live afterimage that follows it
   lampGhost(m) {
-    const lit = m.state === 'lurk' ? 0 : this.objectives.lampAt(m.x, m.z);
+    const lit = m.state === 'lurk' ? 0 : this.glowAt(m.x, m.y + 1.5, m.z);
     if (lit > 0.06) {
       const str = Math.min(0.85, 0.22 + lit * 1.3);
       if (!m.lampGhost) {
@@ -1665,7 +1757,9 @@ export class Game {
     u.uShockAmp.value = fx.shockAmp * Math.max(0, 1 - fx.shockT * 1.3);
     u.uFade.value = fx.fade;
     u.uWarm.value = shared.uDawn.value;
-    u.uAsh.value = 0.62 * (1 - Math.min(1, shared.uDawn.value * 1.4));
+    // under a burning flare the world gets its colour back: red
+    const flareK = this.flares.lightAt(camera.position.x, camera.position.y, camera.position.z);
+    u.uAsh.value = 0.62 * (1 - Math.min(1, shared.uDawn.value * 1.4)) * (1 - 0.7 * flareK);
     const live = this.state === 'play' || this.state === 'dying';
     u.uFlicker.value = this.state === 'play' ? this.dread.flicker : 0;
     shared.uFear.value = live ? smoothstep(0.5, 1.0, fx.danger) : 0;
@@ -1690,10 +1784,10 @@ export class Game {
     const chargeLvl = this.charge.active ? (this.charge.t < 0.18 ? 0.24 : lerp(0.32, 1, clamp((this.charge.t - 0.18) / 0.95, 0, 1))) : 0;
     this.hud.ring(dt, this.mic, this.state === 'play' ? chargeLvl : 0, this.mic.state === 'on');
     if (settings.radar) {
-      const loud = p.alive ? Math.max(this.mic.loud, this.stepNoise, chargeLvl) : 0;
+      const R = p.alive ? Math.max(this.mic.loud > 0 ? CFG.voiceHearRadius(this.mic.loud) : 0, this.stepNoise > 0 ? CFG.hearRadius(this.stepNoise) : 0, chargeLvl > 0 ? CFG.hearRadius(chargeLvl) : 0) : 0;
       const scream = p.alive && (this.mic.screamHeld > 0.1 || chargeLvl >= CFG.SCREAM);
       const c = (sp && sp.target) || p;
-      this.radar.draw(dt, c.x, c.z, c.yaw, this.pulses.slots, loud, scream);
+      this.radar.draw(dt, c.x, c.z, c.yaw, this.pulses.slots, R, scream);
     }
   }
 }

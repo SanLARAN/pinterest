@@ -79,6 +79,12 @@ const STR = {
     useSearchT: 'РУКИ · обыскать',
     useHoldT: 'держи РУКИ · {action}',
     useCordT: 'РУКИ · дёрнуть шнур {n}/{m}',
+    useDoorOpen: 'E · открыть дверь',
+    useDoorClose: 'E · закрыть дверь',
+    useDoorOpenT: 'РУКИ · открыть дверь',
+    useDoorCloseT: 'РУКИ · закрыть дверь',
+    flareGun: 'ракетница',
+    flareCharges: 'зарядов: {n}',
     // alerts
     aHeard: 'ОНО УСЛЫШАЛО',
     aHunt: 'ОХОТА',
@@ -89,6 +95,8 @@ const STR = {
     aWake: 'ЛЕС ПРОСЫПАЕТСЯ',
     aExhausted: 'ты задыхаешься — это слышно',
     aNoStones: 'нет камней',
+    aNoFlares: 'ракеты кончились',
+    aNoFlareGun: 'ракетницы нет — она у одного из тел',
     aMicLost: 'микрофон отключён',
     aFound: 'НАЙДЕНО',
     aGenOn: 'ГЕНЕРАТОР {n}/5',
@@ -99,6 +107,9 @@ const STR = {
     hintWatcher: 'НАБЛЮДАТЕЛЬ — двигается только в темноте. держи его на свету',
     hintHowler: 'глубокий вдох… ЗАМРИ',
     hintHowlerSpot: 'оно увидело движение — уйди с этого места и снова замри',
+    hintFlare: 'Q — ракета: осветит всё вокруг… и все придут на свет',
+    hintFlareTouch: 'РАКЕТА — осветит всё вокруг… и все придут на свет',
+    hintFlareLure: 'они идут на свет',
     // ends
     deadTitle: 'ТЕБЯ НАШЛИ',
     deadScream: 'ТЫ ЗАКРИЧАЛ',
@@ -142,17 +153,19 @@ const STR = {
     howtoBody: `
 <p><b>Утро. Лагерь, гудит генератор, поют птицы.</b> А потом свет гаснет разом — и ты в огромном тёмном лесу, где ничего не видно. Любой звук — эхолокатор: волна расходится от тебя и на секунды проявляет деревья, камни… и <span class="red">их</span>.</p>
 <p><b>Цель — запустить пять генераторов.</b> У каждого лежит тело того, кто пытался раньше: обыщи его (удерживай E) — там деталь и записка, где искать следующий. Генератор, о котором ты знаешь, пищит рацией — иди на звук. Починка шумит: стук, искры, рёв мотора при запуске. Запустил — уходи. Вокруг работающего генератора горит лампа: в её свете видно тварей.</p>
-<p><b>Микрофон:</b> щёлкни языком, хлопни, скажи «эй». Громче звук — дальше видно. Но <span class="red">они слышат так же далеко</span>. Крик (кольцо вокруг точки стало красным) — мгновенная охота. <b>Без микрофона:</b> ПРОБЕЛ — щелчок, удерживай — громче.</p>
+<p><b>Микрофон:</b> щёлкни языком, хлопни, скажи «эй». Громче звук — дальше видно. Но <span class="red">и они слышат дальше</span>: обычную речь — за пару шагов, громкий голос — издалека. Крик (кольцо вокруг точки стало красным) — мгновенная охота. <b>Без микрофона:</b> ПРОБЕЛ — щелчок, удерживай — громче.</p>
 <p><b>Слушатели и Ползуны</b> идут туда, где был звук. Пискнул — уходи. Камень (ПКМ / F) уводит их в сторону. Позже приходят двое других, по одному на лес: <b>Наблюдатель</b> глух, но двигается, только пока на него не падает свет, — свети на него; лампы он обходит. <b>Ревун</b> почти не слышит, но иногда набирает воздух и воет: всё, что движется в этой волне, он видит. Услышал вдох — замри.</p>
+<p><b>Ракетница.</b> У одного из тел (каждую ночь у другого) лежит ракетница — два заряда. Q — ракета уходит вверх, раскрывает парашют и секунд пятнадцать заливает лес красным светом: видно всё и всех. Но <span class="red">на свет сходятся все твари с округи</span> — стреляй подальше от себя. <b>Охотничья избушка</b>: дверь закрывается (E). Бродячие твари не сразу её откроют — навалятся, и она со скрипом подастся; а та, что охотится за тобой, выбьет её в три удара.</p>
 <p><b>Интерфейса почти нет.</b> Кольцо вокруг точки — твоя громкость. Tab — время, генераторы и текущая задача. Полоска сверху заполняется с каждым генератором. Через 30 минут лес просыпается окончательно.</p>
 <p><b>Очки:</b> время × множитель опасности, найденные тела, генераторы, осколки, проходы впритык, отрывы. За победу — бонус, и тем больше, чем быстрее.</p>
-<p><b>С друзьями:</b> «С ДРУЗЬЯМИ» → «СОЗДАТЬ» и отправь ссылку (или код) — до 4 игроков в одном лесу. Голоса слышно с той стороны, где стоит друг, и тише издалека; <span class="red">монстры слышат их так же</span>. Эхо друзей тоже освещает лес. Погибший смотрит глазами живых, и живые его не слышат. Громкость каждого друга — ползунок в лобби и в паузе.</p>
+<p><b>С друзьями:</b> «С ДРУЗЬЯМИ» → «СОЗДАТЬ» и отправь ссылку (или код) — до 4 игроков в одном лесу. Голоса слышно с той стороны, где стоит друг, и тише издалека; <span class="red">монстры слышат их так же</span> — но вполголоса рядом друг с другом говорить можно: такое они слышат только вплотную. Эхо друзей тоже освещает лес. Погибший смотрит глазами живых, и живые его не слышат. Громкость каждого друга — ползунок в лобби и в паузе.</p>
 <table class="keys">
 <tr><td>WASD · стрелки</td><td>движение и поворот</td></tr>
 <tr><td>Мышь</td><td>обзор (клик — захват курсора)</td></tr>
 <tr><td>ПРОБЕЛ</td><td>эхо: тап — щелчок, удерживай — громко</td></tr>
-<tr><td>E (удерживать)</td><td>обыскать тело · чинить генератор</td></tr>
+<tr><td>E (удерживать)</td><td>обыскать тело · чинить генератор · дверь</td></tr>
 <tr><td>ПКМ / F</td><td>бросить камень</td></tr>
+<tr><td>Q</td><td>сигнальная ракета (если нашёл)</td></tr>
 <tr><td>Shift / C</td><td>бег / красться</td></tr>
 <tr><td>Tab</td><td>время, генераторы, задача</td></tr>
 <tr><td>Enter</td><td>пропустить утро</td></tr>
@@ -160,6 +173,7 @@ const STR = {
 </table>`,
     touchPing: 'ЭХО',
     touchStone: 'КАМЕНЬ',
+    touchFlare: 'РАКЕТА',
     clickToLook: 'кликни, чтобы управлять взглядом',
     dragToLook: 'зажми ЛКМ и тяни, чтобы смотреть',
     touchCrouch: 'ТИХО',
@@ -209,6 +223,7 @@ const STR = {
     mateDied: '{name} погиб',
     mateLeft: '{name} отключился',
     mateFound: '{name}: {part}',
+    mateFlare: '{name} нашёл ракетницу',
     mateStarted: '{name} запустил генератор',
     spectating: 'ты мёртв · глазами: <b>{name}</b>',
     spectNext: 'ПРОБЕЛ / клик — следующий',
@@ -307,6 +322,12 @@ const STR = {
     useSearchT: 'HANDS · search',
     useHoldT: 'hold HANDS · {action}',
     useCordT: 'HANDS · pull the cord {n}/{m}',
+    useDoorOpen: 'E · open the door',
+    useDoorClose: 'E · close the door',
+    useDoorOpenT: 'HANDS · open the door',
+    useDoorCloseT: 'HANDS · close the door',
+    flareGun: 'flare gun',
+    flareCharges: '{n} shots',
     aHeard: 'IT HEARD THAT',
     aHunt: 'HUNTED',
     aEscaped: 'ESCAPED',
@@ -316,6 +337,8 @@ const STR = {
     aWake: 'THE FOREST STIRS',
     aExhausted: 'you are gasping — they can hear it',
     aNoStones: 'no stones',
+    aNoFlares: 'out of flares',
+    aNoFlareGun: 'no flare gun — one of the bodies has it',
     aMicLost: 'microphone disconnected',
     aFound: 'FOUND',
     aGenOn: 'GENERATOR {n}/5',
@@ -326,6 +349,9 @@ const STR = {
     hintWatcher: 'THE WATCHER — moves only in the dark. keep it lit',
     hintHowler: 'a deep breath… FREEZE',
     hintHowlerSpot: 'it saw you move — get off this spot, then freeze again',
+    hintFlare: 'Q — flare: lights everything up… and everything comes to the light',
+    hintFlareTouch: 'FLARE — lights everything up… and everything comes to the light',
+    hintFlareLure: 'they are coming to the light',
     deadTitle: 'IT FOUND YOU',
     deadScream: 'YOU SCREAMED',
     deadCrawler: 'IT CRAWLED TO YOU',
@@ -366,17 +392,19 @@ const STR = {
     howtoBody: `
 <p><b>Morning. A camp, a humming generator, birdsong.</b> Then the light dies all at once — and you are in a vast dark forest where you cannot see. Every sound is sonar: a wave spreads out from you and for a few seconds reveals trees, rocks… and <span class="red">them</span>.</p>
 <p><b>The goal: start five generators.</b> By each one lies the body of someone who tried before you: search it (hold E) for the part and a note about where the next one is. A generator you know about beeps on its radio — follow the sound. Repairs are noisy: clanks, sparks, the engine roaring to life. Got it running? Leave. A running generator lights a lamp, and in its light you can see them.</p>
-<p><b>Microphone:</b> click your tongue, clap, say “hey”. Louder sound — you see further. But <span class="red">they hear just as far</span>. A scream (the ring around the dot turns red) means an instant hunt. <b>No mic:</b> SPACE — a click, hold for louder.</p>
+<p><b>Microphone:</b> click your tongue, clap, say “hey”. Louder sound — you see further. But <span class="red">they hear further too</span>: normal talk from a couple of steps, a raised voice from far away. A scream (the ring around the dot turns red) means an instant hunt. <b>No mic:</b> SPACE — a click, hold for louder.</p>
 <p><b>Listeners and Crawlers</b> walk to where the sound was. Made a noise? Move. A stone (RMB / F) lures them away. Later two others arrive, one of each per forest: <b>the Watcher</b> is deaf but moves only while no light is on it — keep it lit; it won't enter a lamp. <b>The Howler</b> barely hears, but now and then it fills its chest and howls: whatever moves inside that wave, it sees. Hear the breath — freeze.</p>
+<p><b>The flare gun.</b> One of the bodies (a different one every night) has a flare gun with two shots. Q — the flare climbs, opens its parachute and floods the forest with red light for about fifteen seconds: you see everything, and everyone. But <span class="red">every creature around comes to the light</span> — fire it away from yourself. <b>The hunting cabin</b>: its door closes (E). Wanderers won't get it open at once — they lean on it until it creaks open; the one hunting you breaks it down in three blows.</p>
 <p><b>There is almost no interface.</b> The ring around the dot is your loudness. Tab shows time, generators and the current task. The hairline at the top fills with each generator. After 30 minutes the forest wakes up for good.</p>
 <p><b>Score:</b> time × danger multiplier, bodies found, generators, shards, close calls, escapes. Winning gives a bonus — bigger the faster you are.</p>
-<p><b>With friends:</b> WITH FRIENDS → CREATE and send the link (or code) — up to 4 players in one forest. Voices come from where your friends stand and fade with distance; <span class="red">the monsters hear them just as well</span>. Their echoes light the forest too. The dead watch through the eyes of the living — and the living can't hear them. Each friend's volume has its own slider in the lobby and the pause menu.</p>
+<p><b>With friends:</b> WITH FRIENDS → CREATE and send the link (or code) — up to 4 players in one forest. Voices come from where your friends stand and fade with distance; <span class="red">the monsters hear them just as well</span> — but talking quietly side by side is fine: they only hear that from up close. Their echoes light the forest too. The dead watch through the eyes of the living — and the living can't hear them. Each friend's volume has its own slider in the lobby and the pause menu.</p>
 <table class="keys">
 <tr><td>WASD · arrows</td><td>move &amp; turn</td></tr>
 <tr><td>Mouse</td><td>look (click to lock cursor)</td></tr>
 <tr><td>SPACE</td><td>echo: tap = click, hold = loud</td></tr>
-<tr><td>E (hold)</td><td>search a body · repair a generator</td></tr>
+<tr><td>E (hold)</td><td>search a body · repair a generator · door</td></tr>
 <tr><td>RMB / F</td><td>throw stone</td></tr>
+<tr><td>Q</td><td>signal flare (once you've found the gun)</td></tr>
 <tr><td>Shift / C</td><td>run / sneak</td></tr>
 <tr><td>Tab</td><td>time, generators, task</td></tr>
 <tr><td>Enter</td><td>skip the morning</td></tr>
@@ -384,6 +412,7 @@ const STR = {
 </table>`,
     touchPing: 'ECHO',
     touchStone: 'STONE',
+    touchFlare: 'FLARE',
     clickToLook: 'click to control the camera',
     dragToLook: 'hold LMB and drag to look around',
     touchCrouch: 'SNEAK',
@@ -433,6 +462,7 @@ const STR = {
     mateDied: '{name} is dead',
     mateLeft: '{name} disconnected',
     mateFound: '{name}: {part}',
+    mateFlare: '{name} found a flare gun',
     mateStarted: '{name} started a generator',
     spectating: "you're dead · watching: <b>{name}</b>",
     spectNext: 'SPACE / click — next',

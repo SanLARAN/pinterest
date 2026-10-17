@@ -538,6 +538,12 @@ export class Atlas {
         later(620, () => A.impact(...at(1.5, -1.4, 7)));
         dur = 1.6;
         break;
+      case 'flare':
+        A.flareShot(...at(-0.4, -0.3, 0.8), true);
+        later(1300, () => A.flarePop(...at(-3, 9, 14)));
+        later(1350, () => A.flareHiss(...at(-3, 8.5, 14), 2.6));
+        dur = 4.2;
+        break;
       default:
         return;
     }

@@ -7,7 +7,7 @@
 
 export const CHAPTERS = [
   { id: 'beasts', num: 'I', entries: ['listener', 'crawler', 'watcher', 'howler', 'shade'] },
-  { id: 'tasks', num: 'II', entries: ['generator', 'corpse', 'fuel', 'plug', 'fuses', 'belt', 'battery', 'shard', 'stone'] },
+  { id: 'tasks', num: 'II', entries: ['generator', 'corpse', 'fuel', 'plug', 'fuses', 'belt', 'battery', 'shard', 'stone', 'flare'] },
   { id: 'places', num: 'III', entries: ['camp', 'cabin', 'tower', 'stones', 'wreck'] },
 ];
 
@@ -26,6 +26,7 @@ export const ENTRIES = {
   battery: { model: 'battery', sound: 'battery', kind: 'task', gen: 5, rate: [5, 5], log: [['fitted', 'part:4']] },
   shard: { model: 'shard', sound: 'shard', kind: 'thing', log: [['found', 'shards']] },
   stone: { model: 'stone', sound: 'stone', kind: 'thing', log: [['thrown', 'stones']] },
+  flare: { model: 'flare', sound: 'flare', kind: 'thing', log: [['fired', 'flares']] },
   camp: { model: 'camp', kind: 'place', log: [['startedHere', 'site:camp']] },
   cabin: { model: 'cabin', kind: 'place', log: [['startedHere', 'site:cabin']] },
   tower: { model: 'tower', kind: 'place', log: [['startedHere', 'site:tower']] },
@@ -68,7 +69,7 @@ const TEXT = {
     rate: { beast: ['слух', 'чутьё', 'скорость', 'угроза'], task: ['шум', 'время'] },
     log: {
       seen: 'ночей рядом', killed: 'убил тебя', appeared: 'являлась', started: 'запущено при тебе', wins: 'побед',
-      searched: 'обыскано тел', fitted: 'поставлено', found: 'найдено', thrown: 'брошено', startedHere: 'запущено здесь',
+      searched: 'обыскано тел', fitted: 'поставлено', found: 'найдено', thrown: 'брошено', fired: 'выпущено', startedHere: 'запущено здесь',
       nights: 'ночей', best: 'дольше всего', deaths: 'смертей', screams: 'закричал', gens: 'генераторов',
     },
     entries: {
@@ -237,6 +238,16 @@ const TEXT = {
         facts: [['с собой', 'до 3'], ['новый', '~55 с'], ['ещё', '+1 за осколок']],
         quote: 'Камень уводит их в сторону: брось подальше — и иди.',
       },
+      flare: {
+        name: 'Ракетница', latin: 'одна на ночь · два заряда',
+        text: [
+          'Сигнальный пистолет с толстым стволом и два патрона к нему. Каждую ночь он лежит у другого тела — у одного из четырёх в лесу. Обыщешь — заберёшь.',
+          'Q (на телефоне — кнопка РАКЕТА) — выстрел. Ракета уходит туда, куда смотришь, чуть выше, хлопает в верхней точке и медленно опускается на парашюте, секунд пятнадцать заливая лес красным. В этом свете видно всё — и всех.',
+          'Но смотришь на него не ты один. На свет сходятся все твари с округи — бегом.',
+        ],
+        tips: ['Стреляй подальше от себя: пусть идут туда, а ты — в другую сторону.', 'Наблюдатель в её свете замирает: пока ракета горит, ему не подойти.', 'Попадёт в дерево — упадёт и догорит у корней. В озеро — погаснет.'],
+        facts: [['заряды', '2'], ['горит', '~15 с'], ['свет', 'на ~80 м вокруг'], ['зовёт', 'на ~140 м']],
+      },
       camp: {
         name: 'Лагерь', latin: 'старая просека · генератор №1',
         text: [
@@ -249,11 +260,11 @@ const TEXT = {
       cabin: {
         name: 'Охотничья избушка', latin: 'генератор №2–5',
         text: [
-          'Бревенчатый сруб под двускатной крышей, дверь распахнута. Внутри — стол и нары, у крыльца — столбы и остатки забора.',
+          'Бревенчатый сруб под двускатной крышей. Дверь из толстых досок на кованых петлях — её можно закрыть (E). Внутри — стол и нары, у крыльца — столбы и остатки забора.',
           'Генератор стоит где-то у сруба, тело — рядом с ним.',
         ],
-        tips: ['В лесу есть и вторая избушка. Генератор — только у одной.'],
-        facts: [['генератор', 'один из №2–5 · каждую ночь по-новому'], ['размер', '{len}']],
+        tips: ['В лесу есть и вторая избушка. Генератор — только у одной.', 'Закрытая дверь задержит тварь: бродячая навалится, и дверь со скрипом подастся; та, что охотится, выбьет её в три удара — ты услышишь.'],
+        facts: [['генератор', 'один из №2–5 · каждую ночь по-новому'], ['дверь', 'закрывается · E'], ['размер', '{len}']],
       },
       tower: {
         name: 'Старая вышка', latin: 'генератор №2–5',
@@ -319,7 +330,7 @@ const TEXT = {
     rate: { beast: ['hearing', 'senses', 'speed', 'threat'], task: ['noise', 'time'] },
     log: {
       seen: 'nights near it', killed: 'killed you', appeared: 'appeared', started: 'started with you', wins: 'wins',
-      searched: 'bodies searched', fitted: 'fitted', found: 'found', thrown: 'thrown', startedHere: 'started here',
+      searched: 'bodies searched', fitted: 'fitted', found: 'found', thrown: 'thrown', fired: 'fired', startedHere: 'started here',
       nights: 'nights', best: 'longest', deaths: 'deaths', screams: 'screamed', gens: 'generators',
     },
     entries: {
@@ -488,6 +499,16 @@ const TEXT = {
         facts: [['carry', 'up to 3'], ['new one', '~55 s'], ['also', '+1 per shard']],
         quote: 'A stone pulls them away: throw it far, then walk.',
       },
+      flare: {
+        name: 'Flare gun', latin: 'one a night · two shots',
+        text: [
+          'A fat-barrelled signal pistol and two cartridges for it. Every night it lies by a different body — one of the four out in the forest. Search the body and it is yours.',
+          'Q (on a phone — the FLARE button) fires. The flare goes where you look, a little higher, pops at the top of its arc and sinks slowly under a parachute, flooding the forest with red for about fifteen seconds. In that light you see everything — and everyone.',
+          'But you are not the only one looking at it. Every creature around comes to the light — at a run.',
+        ],
+        tips: ['Fire it away from yourself: let them go there while you go the other way.', 'The Watcher freezes in its light: while the flare burns it cannot come for you.', 'Into a tree — it drops and burns out among the roots. Into the lake — it drowns.'],
+        facts: [['shots', '2'], ['burns', '~15 s'], ['light', '~80 m around'], ['calls', 'from ~140 m']],
+      },
       camp: {
         name: 'The camp', latin: 'an old clearing · generator #1',
         text: [
@@ -500,11 +521,11 @@ const TEXT = {
       cabin: {
         name: 'Hunting cabin', latin: 'generator #2–5',
         text: [
-          'A log cabin under a gable roof, its door hanging open. Inside, a table and a bunk; by the porch, posts and what is left of a fence.',
+          'A log cabin under a gable roof. A door of thick planks on strap hinges — it closes (E). Inside, a table and a bunk; by the porch, posts and what is left of a fence.',
           'The generator stands somewhere by the cabin, the body beside it.',
         ],
-        tips: ['There is a second cabin in the forest. Only one has a generator.'],
-        facts: [['generator', 'one of #2–5 · reshuffled every night'], ['size', '{len}']],
+        tips: ['There is a second cabin in the forest. Only one has a generator.', 'A shut door holds them for a while: a wanderer leans on it until it creaks open; the one hunting you breaks it down in three blows — you will hear it.'],
+        facts: [['generator', 'one of #2–5 · reshuffled every night'], ['door', 'closes · E'], ['size', '{len}']],
       },
       tower: {
         name: 'Old tower', latin: 'generator #2–5',

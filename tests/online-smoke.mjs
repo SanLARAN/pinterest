@@ -190,6 +190,28 @@ try {
   const pa = await A.page.evaluate(() => { const p = window.__hush.game.player; return [p.x, p.z]; });
   const pb = await B.page.evaluate(() => { const r = [...window.__hush.game.remotes.values()][0]; return r ? [r.x, r.z] : [NaN, NaN]; });
   check('movement syncs', Math.hypot(pa[0] - pb[0], pa[1] - pb[1]) < 0.5, `A (${pa.map((v) => v.toFixed(2))}) seen by B at (${pb.map((v) => v.toFixed(2))})`);
+
+  // a cabin door: B swings it open from outside (it opens away from B: inward); the host sees the same
+  const bDoor = await B.page.evaluate(() => {
+    const g = window.__hush.game, d = g.doors.list[0], p = g.player;
+    p.x = d.out.x; p.z = d.out.z;
+    g.doors.use(d);
+    return `${d.dir}/${d.seq}`;
+  });
+  const aDoor = await until(() => A.page.evaluate(() => { const d = window.__hush.game.doors.list[0]; return d.open ? `${d.dir}/${d.seq}` : null; }), 20000);
+  check("B's door swing reaches the host", aDoor === bDoor, `${aDoor} vs ${bDoor}`);
+  // the flare gun: B fires; the flare flies on the host's machine too (owned by B)
+  await B.page.evaluate(() => {
+    const g = window.__hush.game, was = g.state;
+    g.state = 'play'; // (it can only be fired at night; the shot itself is what we're after)
+    g.setFlares(2, true);
+    g.player.pitch = 0.8;
+    g.fireFlare();
+    g.state = was;
+  });
+  const aFlare = await until(() => A.page.evaluate(() => { const g = window.__hush.game, f = g.flares.list[0]; return f ? (f.owner === g.remotes.keys().next().value ? 'B' : 'someone else') : null; }), 20000);
+  check("B's flare flies on the host's machine", aFlare === 'B', String(aFlare));
+  facts.push(`door ${aDoor === bDoor ? 'synced' : 'NOT synced'} · flare ${aFlare === 'B' ? 'synced' : 'NOT synced'}`);
   check('no page errors', A.page.errors.length === 0 && B.page.errors.length === 0);
 } catch (e) {
   log('ERROR', e.message);

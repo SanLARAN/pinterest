@@ -44,6 +44,7 @@ export class HUD {
       if (this.onNoteClose) this.onNoteClose();
     });
     this.stones = $('stones');
+    this.flares = $('flares');
     this.stamWrap = $('stam');
     this.stam = $('stamFill');
     this.cross = $('crosshair');
@@ -67,6 +68,7 @@ export class HUD {
     this.clock = 0;
     this.peekUntil = 0;
     this.stonesUntil = 0;
+    this.flaresUntil = 0;
     this.lastMinute = -1;
     this.ringU = 0;
     this.taskUntil = 0;
@@ -137,6 +139,14 @@ export class HUD {
       [...this.stones.children].forEach((c, i) => c.classList.toggle('on', i < st));
     }
     this._cls('stones', this.stones, 'show', show || this.clock < this.stonesUntil);
+    // flare cartridges: the same, once you've found the gun
+    const fl = g.player.flares | 0;
+    if (this.cache.flares !== fl) {
+      if (this.cache.flares !== undefined) this.flaresUntil = this.clock + 3;
+      this.cache.flares = fl;
+      [...this.flares.children].forEach((c, i) => c.classList.toggle('on', i < fl));
+    }
+    this._cls('flares', this.flares, 'show', !!g.player.hasFlare && (show || this.clock < this.flaresUntil));
 
     // stamina: only while it isn't full
     const sp = g.player.stamina;
@@ -212,13 +222,17 @@ export class HUD {
     this.stonesUntil = this.clock + 2.4;
   }
 
+  flashFlares() {
+    this.flaresUntil = this.clock + 3;
+  }
+
   // loudness ring. u-space: 0 = silence, uT = where sound starts to echo, uS = scream.
   ring(dt, mic, chargeLoud, micOn) {
     let uT = 0.3;
     if (micOn && mic.screamDb > mic.floor) uT = Math.min(0.8, Math.max(0.05, (mic.trig - mic.floor) / (mic.screamDb - mic.floor)));
-    const uS = uT + CFG.SCREAM * (1 - uT);
+    const uS = 1; // the mic meter reads 1 at the scream line; a held SPACE reaches it at loudness SCREAM
     let u = micOn ? mic.meter : 0;
-    if (chargeLoud > 0) u = Math.max(u, uT + chargeLoud * (1 - uT));
+    if (chargeLoud > 0) u = Math.max(u, chargeLoud <= CFG.SCREAM ? uT + (chargeLoud / CFG.SCREAM) * (1 - uT) : 1 + ((chargeLoud - CFG.SCREAM) / (1 - CFG.SCREAM)) * 0.12);
     this.ringU = u > this.ringU ? u : Math.max(u, this.ringU - dt * 2.4);
     const v = this.ringU;
     const r = ringR(v).toFixed(1);

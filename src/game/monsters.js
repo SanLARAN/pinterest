@@ -635,7 +635,7 @@ export class Monster {
     const dx = nx - this.x, dz = nz - this.z;
     const d = Math.hypot(dx, dz);
     const mult = source === 'step' && this.cfg.stepHearing ? this.cfg.stepHearing : 1;
-    const R = CFG.hearRadius(loud) * this.hearingMult * mult;
+    const R = (source === 'voice' ? CFG.voiceHearRadius(loud) : CFG.hearRadius(loud)) * this.hearingMult * mult;
     if (d > R) return null;
     const g = this.game;
     const fromPlayer = source !== 'stone' && source !== 'scare';
@@ -692,6 +692,18 @@ export class Monster {
       this.detourT -= dt;
       tx = this.dtx;
       tz = this.dtz;
+    } else if (g.doors) {
+      // into (or out of) a cabin: by the door. a shut one gets leaned on — or broken down
+      const rt = g.doors.route(this.x, this.z, tx, tz);
+      if (rt) {
+        tx = rt.x;
+        tz = rt.z;
+        if (rt.shut) {
+          speed = Math.min(speed, 0.6);
+          g.doors.push(rt.door, this, dt);
+          this.stuckT = 0;
+        }
+      }
     }
 
     // ---- steering ----
@@ -709,7 +721,7 @@ export class Monster {
     this.x += Math.sin(this.yaw) * this.speedCur * dt;
     this.z += Math.cos(this.yaw) * this.speedCur * dt;
     const pos = { x: this.x, z: this.z };
-    g.world.col.resolve(pos, cfg.radius);
+    g.world.col.resolve(pos, g.doors ? g.doors.squeeze(this.x, this.z, cfg.radius) : cfg.radius);
     if (g.world.lake) {
       const L = g.world.lake;
       const lx = pos.x - L.x, lz = pos.z - L.z, ld = Math.hypot(lx, lz);
@@ -792,6 +804,11 @@ export class Monster {
       }
       case 'investigate': {
         speed = this.slowInvestigate ? cfg.wander * 1.25 : cfg.investigate;
+        if (this.rushT > 0) {
+          // a flare went up: it comes at a lope to see what's burning
+          this.rushT -= dt;
+          speed = cfg.investigate * 1.6;
+        }
         const still = p.speed < 0.3;
         if (Math.hypot(tx - this.x, tz - this.z) < 1.6 || this.stateT > 30 || (still && pd < 2.1)) {
           this.setState('search');
@@ -835,6 +852,7 @@ export class Monster {
               }
             }
           }
+          if (victim && g.doors && g.doors.blocks(this.x, this.z, victim.x, victim.z)) victim = null; // not through a wall or a shut door
           if (victim) {
             g.kill(this, victim);
             return;
@@ -1014,6 +1032,7 @@ export class Watcher extends Monster {
       if (L && Math.hypot(x - L.x, z - L.z) < L.r + 3) continue;
       if (g.objectives.lampAt(x, z) > 0.005) continue;
       if (g.lightAt(x, g.world.terrain.height(x, z) + 1.8, z) > 0.02) continue;
+      if (g.flares && g.flares.lightAt(x, g.world.terrain.height(x, z) + 1.8, z) > 0.02) continue; // nor under a flare
       if (g.livePlayers().some((q) => Math.hypot(q.x - x, q.z - z) < dmin * 0.7)) continue; // not right next to someone else
       this.spawn(x, z, 'stalk');
       this.tgt = p;
@@ -1064,7 +1083,7 @@ export class Watcher extends Monster {
     const p = this.pickTarget() || FAR;
     const pdx = p.x - this.x, pdz = p.z - this.z;
     const pd = this.tgtDist;
-    const lampL = g.objectives.lampAt(this.x, this.z);
+    const lampL = Math.max(g.objectives.lampAt(this.x, this.z), g.flares ? g.flares.lightAt(this.x, this.y + 1.8, this.z) : 0);
     const lit = g.lightAt(this.x, this.y + 1.8, this.z) > cfg.litThreshold || lampL > 0.08;
     this.lit = lit;
     this.state = lit ? 'frozen' : 'stalk';
@@ -1084,7 +1103,8 @@ export class Watcher extends Monster {
       speed = cfg.stalk * g.speedScale * (pd < 4 ? 0.8 : 1);
       // it will not step into a lamp's light
       const la = Math.min(1.2, speed * 0.4);
-      if (g.objectives.lampAt(this.x + Math.sin(this.yaw) * la, this.z + Math.cos(this.yaw) * la) > 0.05) speed = 0;
+      const ax = this.x + Math.sin(this.yaw) * la, az = this.z + Math.cos(this.yaw) * la;
+      if (g.objectives.lampAt(ax, az) > 0.05 || (g.flares && g.flares.lightAt(ax, this.y + 1.8, az) > 0.05)) speed = 0;
     }
     if (speed > 0) {
       this._steer(dt, p.x, p.z, speed, 3.2);
@@ -1102,6 +1122,7 @@ export class Watcher extends Monster {
           victim = q;
         }
       }
+      if (victim && g.doors && g.doors.blocks(this.x, this.z, victim.x, victim.z)) victim = null;
       if (victim) {
         g.kill(this, victim);
         return;

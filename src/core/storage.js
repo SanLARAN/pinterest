@@ -77,7 +77,7 @@ function freshAtlas() {
     nights: 0, wins: 0, best: 0, // best = longest night survived (s)
     seen: {}, // creature -> nights it showed itself to you
     kills: {}, // cause -> times it got you ('scream' too)
-    gens: 0, bodies: 0, shards: 0, stones: 0,
+    gens: 0, bodies: 0, shards: 0, stones: 0, flares: 0,
     parts: [0, 0, 0, 0, 0], // generator #k started (fuel, plug, fuses, belt, battery)
     sites: {}, // site id -> generators started there
     read: {}, // atlas entries you've opened
@@ -114,6 +114,7 @@ export function recordNight(stats, res, started = []) {
   a.bodies += stats.bodies | 0;
   a.shards += stats.shards | 0;
   a.stones += stats.thrown | 0;
+  a.flares += stats.flares | 0;
   for (const g of started) {
     a.gens++;
     if (g.k >= 0 && g.k < 5) a.parts[g.k]++;

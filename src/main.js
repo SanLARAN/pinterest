@@ -483,6 +483,7 @@ function toMenu(keepRoom = false) {
     game.monsters = [];
     game.state = 'idle';
     game.objectives.silence();
+    game.flares.clear();
     audio.setMorning(false);
     game.inputMuted = false;
     if (game.online) game.teardownOnline();
@@ -543,6 +544,7 @@ function onEnd(res) {
     console.warn('[atlas] could not record the night', e);
   }
   const { rank, list } = submitScore({ name: settings.name || '???', score: game.score, time: stats.time, won: res.won, shards: stats.shards, gens: stats.gens, coop: online ? Math.max(team.length, game.teamSize || 1) : 0 });
+  game.flares.clear(); // (a burning flare would hiss on behind the end screen)
   menus.showOver(res, stats, rank, list, team);
   menus.renderScores();
   if (online) {

@@ -35,6 +35,22 @@ export class Collision {
     return this.add(x, z, x, z, r, h, kind);
   }
 
+  // a capsule that moves (a door on its hinge): filed into every cell it can ever reach — anywhere
+  // within `reach` of (x, z) — so queries find it wherever it is. Move it with setSeg().
+  addDynamic(x, z, reach, r, h = 6, kind = 0) {
+    const idx = this.add(x - reach, z - reach, x + reach, z + reach, r, h, kind);
+    this.setSeg(idx, x, z, x, z);
+    return idx;
+  }
+
+  setSeg(idx, ax, az, bx, bz) {
+    const c = this.caps[idx];
+    c.ax = ax;
+    c.az = az;
+    c.bx = bx;
+    c.bz = bz;
+  }
+
   query(x, z, r) {
     const out = this._out;
     out.length = 0;
