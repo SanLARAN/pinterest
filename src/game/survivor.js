@@ -318,7 +318,7 @@ const BODY = {
       b.place(0, -0.065, 0); b.box(0.31, 0.16, 0.21, BA);
       for (let i = 0; i < 10; i++) { // fur at the waist
         const a = (i / 10) * PI * 2 + 0.3;
-        tuft(b, Math.cos(a) * 0.15, 0.0, Math.sin(a) * 0.1, PI / 2 - a, 2.5, 0.045, 0.05, BA);
+        tuft(b, Math.cos(a) * 0.15, 0.0, Math.sin(a) * 0.1, a + PI / 2, 2.5, 0.045, 0.05, BA);
       }
     });
     part(R, n.chest, (b) => {
@@ -326,7 +326,7 @@ const BODY = {
       // the ruff: a ring of soft tufts at the neck, out and down
       for (let i = 0; i < 14; i++) {
         const a = (i / 14) * PI * 2;
-        tuft(b, Math.cos(a) * 0.12, 0.53, Math.sin(a) * 0.09, PI / 2 - a, 2.0 + 0.2 * (i % 2), 0.06, 0.075 + 0.02 * (i % 3), BA);
+        tuft(b, Math.cos(a) * 0.12, 0.53, Math.sin(a) * 0.09, a + PI / 2, 2.0 + 0.2 * (i % 2), 0.06, 0.075 + 0.02 * (i % 3), BA);
       }
       // tufts on the shoulders
       for (const sd of [-1, 1]) for (const [x, z] of [[0.19, 0.04], [0.21, -0.05]]) tuft(b, sd * x, 0.55, z, sd * (PI / 2), 0.9, 0.05, 0.05, BA);
@@ -343,7 +343,7 @@ const BODY = {
       b.identity(); b.limb([0, 0, 0], [0, 0.11, -0.04], 0.056, 0.03, BA, 6);
       for (let i = 0; i < 6; i++) { // a fluffy end
         const a = (i / 6) * PI * 2;
-        tuft(b, Math.cos(a) * 0.03, 0.08, -0.03 + Math.sin(a) * 0.03, -a, 0.6, 0.045, 0.07, BA);
+        tuft(b, Math.cos(a) * 0.03, 0.08, -0.03 + Math.sin(a) * 0.03, a + PI / 2, 0.6, 0.045, 0.07, BA);
       }
     });
     limbs(R, {
@@ -352,7 +352,7 @@ const BODY = {
         b.identity(); b.limb([0, 0, 0], FORE, 0.052, 0.045, BA, 6);
         for (let i = 0; i < 7; i++) { // fluffy cuffs
           const a = (i / 7) * PI * 2;
-          tuft(b, Math.cos(a) * 0.045, -0.235, 0.055 + Math.sin(a) * 0.045, PI / 2 - a, 2.1, 0.038, 0.045, BA);
+          tuft(b, Math.cos(a) * 0.045, -0.235, 0.055 + Math.sin(a) * 0.045, a + PI / 2, 2.1, 0.038, 0.045, BA);
         }
       },
       thigh: (b) => { b.identity(); b.limb([0, 0, 0], THIGH, 0.08, 0.064, BA, 6); },
@@ -360,7 +360,7 @@ const BODY = {
         b.identity(); b.limb([0, 0, 0], SHIN, 0.064, 0.05, BA, 6);
         for (let i = 0; i < 7; i++) { // tufts at the ankle
           const a = (i / 7) * PI * 2;
-          tuft(b, Math.cos(a) * 0.05, -0.34, Math.sin(a) * 0.05, PI / 2 - a, 2.2, 0.04, 0.05, BA);
+          tuft(b, Math.cos(a) * 0.05, -0.34, Math.sin(a) * 0.05, a + PI / 2, 2.2, 0.04, 0.05, BA);
         }
         b.place(0, -0.43, 0.045, 0, 0, 0, 1, 0.7, 1.35); b.octa(0.07, 0.07, BA); // a paw
         b.place(0, -0.46, 0.12, 0.6, 0, 0, 1, 0.5, 1); b.octa(0.03, 0.02, BB); // its toe bean
@@ -381,7 +381,7 @@ const BODY = {
   ghillie(R) {
     const n = R.nodes;
     const rnd = new RNG(4207);
-    const rag = (b, x, y, z, a, len, r = 0.03) => spike(b, x, y, z, PI / 2 - a, PI - 0.22 - rnd.next() * 0.18, r, len * (0.8 + rnd.next() * 0.4), BA, 4);
+    const rag = (b, x, y, z, a, len, r = 0.03) => spike(b, x, y, z, a + PI / 2, PI - 0.22 - rnd.next() * 0.18, r, len * (0.8 + rnd.next() * 0.4), BA, 4);
     part(R, n.hips, (b) => {
       b.place(0, -0.06, 0); b.box(0.33, 0.17, 0.22, BA);
       b.place(0, 0.03, 0, 0, PI / 9, 0, 1, 1, 0.68); b.cylinder(9, 0.205, 0.205, 0.04, KIND.WOOD); // a rope belt
@@ -823,16 +823,17 @@ export function poseSurvivor(rig, phase, speed, crouch, dead) {
   const amp = clamp(speed / 3.2, 0, 1.4);
   const s = Math.sin(phase);
   n.hips.position.y = crouch ? 0.62 : 0.94 - Math.abs(Math.cos(phase)) * 0.03 * amp;
-  n.chest.rotation.x = crouch ? 0.55 : 0.08 * amp;
+  n.chest.rotation.set(crouch ? 0.55 : 0.08 * amp, 0, 0); // (all three: whatever leans it on top starts from here)
   n.head.rotation.set(crouch ? -0.35 : 0, 0, 0);
   n.thL.rotation.set(s * 0.55 * amp - (crouch ? 1.1 : 0), 0, 0);
   n.thR.rotation.set(-s * 0.55 * amp - (crouch ? 1.1 : 0), 0, 0);
-  n.knL.rotation.x = Math.max(0, -s) * 0.7 * amp + (crouch ? 1.6 : 0);
-  n.knR.rotation.x = Math.max(0, s) * 0.7 * amp + (crouch ? 1.6 : 0);
+  n.knL.rotation.set(Math.max(0, -s) * 0.7 * amp + (crouch ? 1.6 : 0), 0, 0);
+  n.knR.rotation.set(Math.max(0, s) * 0.7 * amp + (crouch ? 1.6 : 0), 0, 0);
   n.shL.rotation.set(-s * 0.45 * amp, 0, -0.06);
   n.shR.rotation.set(s * 0.45 * amp, 0, 0.06);
-  n.elL.rotation.x = -0.25 - amp * 0.2;
-  n.elR.rotation.x = -0.25 - amp * 0.2;
+  // (whole rotations: a reach that turned an elbow round mustn't leave the forearm twisted afterwards)
+  n.elL.rotation.set(-0.25 - amp * 0.2, 0, 0);
+  n.elR.rotation.set(-0.25 - amp * 0.2, 0, 0);
 }
 
 // slung over a friend's shoulder (a fireman's carry): folded at the waist on their shoulder — legs hanging
