@@ -114,7 +114,7 @@ export class SelfBody {
     root.rotation.set(0, p.yaw + PI, 0); // (the rig faces +z; you look down -z)
     root.translateZ(-this._clear(n.chest.rotation.x));
     // hands busy with something drawn up close: those arms step aside
-    this._arms(!(carrying || part || (g.torch && g.torch.on)), !(carrying || part || !!g.glows.held));
+    this._arms(!(carrying || part || g.fieldView.left.visible && g.fieldView.root.visible), !(carrying || part || g.fieldView.right.visible && g.fieldView.root.visible));
   }
 
   // how far back the body goes: the top of your collar, wherever the chest's lean puts it, stays behind your eyes

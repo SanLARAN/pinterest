@@ -3,7 +3,9 @@
 // simply see, in their own clothes, wherever real light falls on them; footsteps you can hear; and the 3D
 // position their voice comes from. Down, they lie where they fell — or over someone's shoulder, or on the
 // first-aid hut's cot (see Rescue).
+import * as THREE from 'three';
 import { CFG } from '../core/config.js';
+import { BAG_KINDS } from './backpackData.js';
 import { clamp, lerp, angleDiff } from '../core/rng.js';
 import { buildSurvivor, poseSurvivor, poseCarrier, poseGlowHand, poseTorchHand, poseFur } from './survivor.js';
 import { cleanFit } from './outfit.js';
@@ -84,6 +86,8 @@ export class RemotePlayer {
     this.buf.push({ t: now, x: +a[0], y: +a[1], z: +a[2], yaw: +a[3], pitch: +a[4], speed: +a[5], f });
     if (this.buf.length > 10) this.buf.shift();
     this.loud = +a[7] || 0;
+    this.equipped = BAG_KINDS[a[10]] || null;
+    this.gearPose = a[11] === 1 || a[11] === 2 ? a[11] : 0;
     // a flashlight on (its light is drawn from where they are: see Torches.lightSources)
     this.torchOn = !!(f & PF.torch);
     this.torchDip = !!(f & PF.dip); // its flat battery's moment of dark
@@ -149,15 +153,32 @@ export class RemotePlayer {
       if (es && es.poseRemote(this)) return; // in a seat of the УАЗ (or: a part in their arms, posed there)
       if (this.carrying) poseCarrier(this.rig);
       const gs = this.game.glows;
-      if (gs && gs.heldBy(this.id)) poseGlowHand(this.rig);
-      if (this.torchOn) poseTorchHand(this.rig);
+      if (gs && gs.heldBy(this.id) && this.equipped === 'glow' && !this.gearPose) poseGlowHand(this.rig);
+      if (this.equipped && !this.gearPose) poseTorchHand(this.rig);
+      const n = this.rig.nodes;
+      if (this.gearPose === 1) { n.shR.rotation.set(-2.4, .15, -.25); n.elR.rotation.x = -1.7; n.shL.rotation.set(-.8,0,-.25); }
+      if (this.gearPose === 2) { n.shL.rotation.set(-1.25, .2, -.4); n.elL.rotation.set(-1.6,0,-.6); }
     } else {
       if (es && es.poseRemote(this)) return; // laid in the back of the УАЗ
       const rs = this.game.rescue;
       if (rs && rs.poseBody(this)) return; // over someone's shoulder, or on the cot
     }
+    this._equipment();
     r.position.set(this.x, this.y + (this.alive ? 0 : 0.2), this.z);
     r.rotation.set(this.alive ? 0 : -Math.PI / 2, this.yaw + Math.PI, 0); // the rig faces +z, players look down -z
+  }
+
+  _equipment() {
+    const g=this.game,kind=this.equipped;
+    this.kitMeshes ||= new Map();
+    for(const m of this.kitMeshes.values()) m.visible=false;
+    if(!this.alive || this.carrying || this.gearPose || !kind || kind==='glow') return;
+    let m=this.kitMeshes.get(kind);
+    const geo=g.inventory.geo[kind] || g.tools.geo[kind];
+    if(!geo) return;
+    if(!m) { m=new THREE.Mesh(geo,g.world.material);this.rig.nodes.elR.add(m);this.kitMeshes.set(kind,m); }
+    m.position.set(0,-.3,.09);m.rotation.set(kind==='crowbar'?-.5:Math.PI/2,kind==='flare'?-Math.PI/2:0,.1);
+    m.scale.setScalar(kind==='tape'?.65:kind==='stones'?.7:1);m.visible=true;
   }
 
   die(x, z) {

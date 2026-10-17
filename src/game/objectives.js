@@ -205,7 +205,6 @@ export class Objectives {
       if (mask & (1 << i) && !body.searched) {
         body.searched = true;
         body.item.visible = false;
-        if (body.gun) body.gun.visible = false;
         if (this.target && this.target.obj === body) this.searchT = 0;
       }
     });
@@ -519,6 +518,7 @@ export class Objectives {
     const game = this.g;
     const p = game.player;
     const input = game.input;
+    if (game.inventory?.active) { this.target = null; this.searchT = 0; game.hud.setUse(null); return; }
     if (game.expedition?.onTower) {
       this.target = null;
       this.searchT = 0;
@@ -548,6 +548,8 @@ export class Objectives {
       if (game.glows) game.glows.consider(consider);
       if (game.torch) game.torch.consider(consider);
       if (game.tools) game.tools.consider(consider);
+      game.inventory?.consider(consider);
+      for (const body of this.bodies) if (body.searched && body.gun?.visible) consider(body, body.x, body.z, USE_R_BODY, 'bodyGun');
       if (game.expedition) game.expedition.consider(consider);
     }
     if (es && !doorsOnly) es.consider(consider);
@@ -578,6 +580,14 @@ export class Objectives {
       return;
     }
     const o = best.obj;
+    if (best.kind === 'bagDrop') { this.searchT = 0; game.inventory.interact(o, pressed, T); return; }
+    if (best.kind === 'bodyGun') {
+      this.searchT = 0;
+      const ok = game.inventory.canReceive('flare',false,true);
+      hud.setUse(ok ? `${T('useTake')} ${t('flareGun')}` : t('bagFull'), 0, ok);
+      if (pressed && ok) game.onFlareFound(false, o);
+      return;
+    }
     if (best.kind === 'fieldTool') {
       this.searchT = 0;
       game.tools.interact(best, pressed, T);
@@ -655,7 +665,6 @@ export class Objectives {
     body.searched = true;
     body.item.visible = false;
     const gun = !!body.gun && body.gun.visible;
-    if (body.gun) body.gun.visible = false;
     const k = body.k;
     const g = this.gens[k];
     g.hasPart = true;
@@ -671,7 +680,7 @@ export class Objectives {
     const nextSite = next ? this.siteAt(next.site) : '';
     const text = t('notes')[k].replace('{next}', nextSite);
     this.openNote(`${t('noteKicker')} · ${t('parts')[g.spec.part]}${gun ? ` + ${t('flareGun')}` : ''}`, text);
-    if (gun) game.onFlareFound();
+    if (gun) game.onFlareFound(false, body);
   }
 
   openNote(kicker, text) {

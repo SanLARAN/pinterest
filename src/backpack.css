@@ -1,0 +1,89 @@
+/* A battered four-pocket field pack, not a hotbar. The world and its audio keep running. */
+#backpack[hidden], #backpack [hidden] { display: none !important; }
+#backpack { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; color: #c2bca6; font: 12px/1.4 'JetBrains Mono', monospace; isolation: isolate; }
+.bag-shade { position: absolute; inset: 0; z-index: -1; background: radial-gradient(ellipse at 50% 60%, #03070515, #020403b8); opacity: 0; transition: opacity .6s; }
+#backpack.ready .bag-shade { opacity: 1; }
+.bag-wrap { position: relative; width: min(440px, calc(100vw - 64px)); margin-top: 22px; opacity: 0; transform: translateY(120px) rotate(-7deg) scale(.87); transition: opacity .3s, transform .5s cubic-bezier(.2,.8,.2,1); pointer-events: none; }
+#backpack.ready .bag-wrap { opacity: 1; transform: translateY(0) rotate(-1deg); pointer-events: auto; }
+.bag-shell { position: relative; border-radius: 55px 55px 37px 37px / 70px 70px 30px 30px; padding: 146px 24px 18px; border: 2px solid #4a4b36; box-shadow: inset 0 0 0 5px #25291b, inset 0 0 0 7px #5a594340, inset 7px -12px 35px #000a, 0 24px 90px #000c; background-color: #333827; background-image: repeating-linear-gradient(0deg,#0002 0 1px,transparent 1px 3px), repeating-linear-gradient(90deg,#a9ac7d09 0 1px,transparent 1px 3px),radial-gradient(ellipse at 35% 0,#73755524,transparent 80%); }
+.bag-handle { position: absolute; top: -25px; left: 37%; width: 26%; height: 45px; border: 12px solid #24291d; border-radius: 25px 25px 0 0; box-shadow: inset 0 0 0 2px #50523d, 0 0 0 1px #41432f; }
+.bag-strap { position: absolute; top: 100px; bottom: 30px; width: 34px; background: repeating-linear-gradient(0deg,#44463055 0 2px,#252a1a 2px 4px); border: 2px solid #494b34; border-radius: 24px; z-index: -1; }
+.bag-strap.a { left: -17px; transform: rotate(6deg); }
+.bag-strap.b { right: -17px; transform: rotate(-6deg); }
+.bag-flap { position: absolute; top: -4px; left: -3px; right: -3px; height: 126px; border: 2px solid #555641; border-bottom-color: #1e2418; border-radius: 60px 60px 32px 32px; text-align: center; box-shadow: inset 0 0 0 5px #363c2b, inset 0 0 0 6px #71715840, 0 12px 18px #0006; background: repeating-linear-gradient(20deg,#8c907007 0 1px,transparent 1px 3px),linear-gradient(170deg,#4a503b,#303627); }
+.bag-flap h2 { display: inline-block; margin: 7px 0 3px; padding: 1px 15px; border: 1px solid #72715b5c; font-size: 22px; font-weight: 700; letter-spacing: .16em; color: #cbc4ab; background: #1a211b80; text-shadow: 1px 2px #14190f; }
+.bag-stamp, .bag-serial { display: block; font-size: 8px; letter-spacing: .16em; color: #9b9e7c; }
+.bag-stamp { margin-top: 18px; }
+.bag-serial { opacity: .55; }
+.bag-buckle { position: absolute; width: 26px; height: 70px; bottom: -22px; background: repeating-linear-gradient(0deg,#171c15 0 2px,#343b29 2px 4px); border: 1px solid #596047; border-radius: 3px; box-shadow: 2px 3px 6px #0006; }
+.bag-buckle::after { content: ''; position: absolute; left: -5px; top: 23px; width: 34px; height: 19px; border: 5px solid #323831; border-bottom-color: #171c18; border-top-color: #767969; border-radius: 4px; }
+.bag-buckle.a { left: 36px; }.bag-buckle.b { right: 36px; }
+.bag-pockets { display: grid; grid-template-columns: 1fr 1fr; gap: 13px; }
+.bag-pocket { position: relative; min-height: 132px; padding: 14px 8px 10px; border: 2px solid #55563d; border-radius: 7px 7px 19px 19px; color: #a5ac8d; text-align: center; text-transform: none; background: repeating-linear-gradient(0deg,#b6bc7c08 0 1px,transparent 1px 3px),linear-gradient(125deg,#3b412d,#293020); box-shadow: inset 0 0 0 4px #303824, inset 0 0 0 5px #72745444, inset -4px -6px 16px #0004, 0 5px 7px #0004; transition: border-color .15s,color .15s; cursor: context-menu; }
+.bag-pocket::before { content: ''; position: absolute; top: 8px; left: 8px; right: 8px; height: 2px; border-top: 2px dashed #b3b18555; border-bottom: 2px solid #1c211666; }
+.bag-pocket:hover, .bag-pocket:focus-visible { color: #e0d2aa; border-color: #ada67a; outline: none; }
+.bag-pocket.equipped { border-color: #a8ae86; box-shadow: inset 0 0 0 4px #303824, inset 0 0 0 5px #a3ae6b55, 0 0 12px #c0cf8010; }
+.bag-pocket.empty { color: #8a947866; }
+.bag-num { position: absolute; top: 16px; left: 14px; font-size: 9px; color: #b4b18c88; }
+.bag-item { display: block; height: 67px; }
+.bag-item svg { display: inline-block; width: 64px; height: 64px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transform: rotate(-12deg); filter: drop-shadow(2px 3px 2px #0008); }
+.bag-item i { display: block; font: 26px/65px monospace; font-style: normal; }
+.bag-item-name { display: block; font-size: 11px; letter-spacing: .025em; }
+.bag-item-count { display: block; min-height: 16px; font-size: 8px; padding-top: 3px; color: #b3b58c; }
+.bag-tip { margin: 16px -3px 10px; font-size: 9px; text-align: center; color: #a0a384; }
+.bag-bottom { display: flex; align-items: center; justify-content: space-between; padding: 10px 2px 0; border-top: 1px dashed #81876a66; gap: 8px; }
+.bag-capacity { font-size: 10px; opacity: .8; }
+.bag-close { padding: 7px 0 7px 6px; background: none; color: #b5b99c; border: none; font: inherit; font-size: 9px; cursor: pointer; letter-spacing: .04em; }
+.bag-close:hover, .bag-close:focus-visible { color: #f3e1b2; outline: none; }
+.bag-world { margin: 17px 8px 0; color: #a2a593; opacity: .7; font-size: 9px; text-align: center; line-height: 1.7; text-shadow: 0 2px 4px #000; }
+.bag-menu { position: fixed; z-index: 2; width: 218px; padding: 10px 5px 5px; background: #131b17f5; border: 1px solid #7b8166; border-radius: 3px; box-shadow: 0 9px 40px #000b; }
+.bag-menu > span { display: block; padding: 3px 10px 9px; color: #828c7b; font-size: 9px; border-bottom: 1px solid #747c5644; }
+.bag-menu button { display: block; border: 0; width: 100%; padding: 12px 10px; text-align: left; font: inherit; font-size: 11px; letter-spacing: .01em; color: #d1d5be; background: transparent; cursor: pointer; }
+.bag-menu button:hover, .bag-menu button:focus-visible { outline: none; background: #4e5b3d6b; color: #e9e3c0; }
+.bag-menu button[data-action="drop"] { color: #c59077; }
+body.bag-open #crosshair, body.bag-open #use, body.bag-open #hint, body.bag-open #touch, body.bag-open #lockHint { visibility: hidden; }
+/* All TAB data and ammunition now live on the wrist or in a pocket. Only sensory feedback remains. */
+#peek, #fieldKit, #stones, #flares, #glows, #torchBat { display: none !important; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+#tBag { right: calc(132px + var(--safe-r)); bottom: calc(22px + var(--safe-b)); width: 65px; height: 65px; color: #c8c7ae; border-color: #8a8d6e80; font-size: 8px; }
+#tItem { display: none; right: calc(136px + var(--safe-r)); bottom: calc(104px + var(--safe-b)); width: 68px; height: 68px; font-size: 9px; color: #c8c7ae; }
+body.item-equipped #tItem, body.holding #tItem { display: grid; }
+body.can-use #tItem { right: calc(215px + var(--safe-r)); }
+#tAlt { display: none; right: calc(215px + var(--safe-r)); bottom: calc(20px + var(--safe-b)); width: 57px; height: 57px; font-size: 8px; color: #d2b590; }
+body.equipped-tape #tAlt { display: grid; }
+body.qte #tBag, body.qte #tItem, body.qte #tAlt, body.spectating #tBag, body.spectating #tItem, body.spectating #tAlt, body.on-tower #tBag, body.on-tower #tItem, body.on-tower #tAlt, body.in-car #tBag, body.in-car #tItem, body.in-car #tAlt { display: none !important; }
+body.can-use.item-equipped #tCarry { right: calc(218px + var(--safe-r)); bottom: calc(183px + var(--safe-b)); }
+@media (max-height: 690px) {
+  .bag-wrap { width: min(370px,calc(100vw - 50px)); margin-top: 14px; }
+  .bag-shell { padding: 112px 20px 12px; }
+  .bag-flap { height: 98px; }.bag-stamp { margin-top: 12px; }.bag-flap h2 { font-size: 18px; margin-top: 5px; }.bag-buckle { height: 55px; bottom: -21px; }
+  .bag-buckle::after { top: 14px; }.bag-pocket { min-height: 110px; padding-top: 13px; }.bag-item { height: 52px; }.bag-item svg { width: 50px; height: 50px; }.bag-item i { line-height: 50px; }
+  .bag-pockets { gap: 10px; }.bag-tip { margin: 13px 0 6px; font-size: 8px; }.bag-world { margin-top: 10px; font-size: 8px; }
+}
+@media (max-height: 470px) and (min-width: 500px) {
+  .bag-wrap { width: 470px; margin-top: 0; }.bag-shell { padding: 82px 18px 10px; border-radius: 42px; }.bag-flap { height: 71px; }.bag-stamp { margin-top: 7px; font-size: 7px; }.bag-flap h2 { font-size: 15px; margin: 4px 0 0; }.bag-serial { display: none; }.bag-buckle { height: 33px; bottom: -14px; }.bag-buckle::after { top: 4px; }.bag-pockets { grid-template-columns: repeat(4,1fr); gap: 8px; }.bag-pocket { min-height: 130px; }.bag-num { font-size: 7px; left: 10px; }.bag-item-name { font-size: 9px; }.bag-item-count { font-size: 7px; }.bag-world { max-width: 470px; }.bag-tip { font-size: 8px; }
+}
+@media (prefers-reduced-motion: reduce) { .bag-wrap { transition: opacity .15s; transform: none; } }
+body.bag-open #intro { visibility: hidden; }
+body.watch-up #tItem, body.watch-up #tAlt { visibility: hidden; }
+@media (max-height: 380px) and (min-width: 500px) { .bag-world { display: none; } }
+/* A transparent accessible hit target follows the physical poster on the garage wall. */
+#btnGarageRules[hidden], #lobbyRules[hidden] { display: none !important; }
+#btnGarageRules { position: fixed; z-index: 2; border: 1px solid transparent; background: transparent; cursor: pointer; padding: 0; }
+#btnGarageRules > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+#btnGarageRules:hover, #btnGarageRules:focus-visible { border: 1px solid #bebc8b90; box-shadow: 0 0 18px #c0b68028; outline: none; }
+#btnGarageRules.poster-fallback { border-color: #989e7366; background: #19221aeb; color: #c3c4a5; font-size: 10px; letter-spacing: .06em; }
+#btnGarageRules.poster-fallback > span { position: static; width: auto; height: auto; clip-path: none; }
+#lobbyRules { position: fixed; inset: 0; z-index: 25; display: grid; place-items: center; color: #bcbfad; font-family: 'JetBrains Mono',monospace; }
+.lobby-rules-backdrop { position: absolute; inset: 0; background: #020504bf; }
+.lobby-rules-card { position: relative; width: min(520px,calc(100vw - 40px)); padding: 32px; border: 1px solid #68715a; border-radius: 3px; background: repeating-linear-gradient(0deg,#8d9d7305 0 1px,transparent 1px 4px),#172019; box-shadow: 0 20px 90px #000c; }
+.rules-kicker { color: #858c70; letter-spacing: .18em; font-size: 9px; }
+.lobby-rules-card h2 { color: #d0ceaf; font-size: clamp(16px,3vw,22px); letter-spacing: .1em; margin: 12px 0 10px; }
+.rule-authority { font-size: 10px; color: #7c8c79; line-height: 1.7; margin-bottom: 30px; }
+.rules-line { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 19px 0; border-top: 1px solid #6f7a5255; border-bottom: 1px solid #6f7a5255; font-size: 12px; }
+.rule-choices { display: flex; gap: 5px; }
+.rule-choices button { border: 1px solid #5f6a4d; border-radius: 2px; background: #111b15; color: #818e72; font: inherit; font-size: 11px; padding: 12px 14px; cursor: pointer; }
+.rule-choices button[aria-pressed="true"] { background: #59634566; color: #d8ddb5; border-color: #a3ae7d; box-shadow: inset 0 -2px #adb98766; }
+.rule-choices button:disabled { cursor: default; }.rule-choices button:focus-visible { outline: 2px solid #c8cc9c; outline-offset: 2px; }
+.rules-explain { font-size: 10px; color: #8d9982; line-height: 1.9; margin: 23px 0; }
+.rules-close { display: block; margin-left: auto; border: 1px solid #667158; padding: 12px 16px; color: #c1c7aa; background: #233122; font: inherit; font-size: 10px; cursor: pointer; }

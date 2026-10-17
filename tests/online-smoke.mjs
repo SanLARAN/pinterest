@@ -166,6 +166,12 @@ try {
   check("B's volume slider for the host silences it", chain.slider && chain.off != null && chain.off < -90, JSON.stringify(chain));
   facts.push(`voice bus ${chain.on} dBFS (auto-level ${chain.agc > 0 ? '+' : ''}${chain.agc} dB) · slider 0% → ${chain.off} dBFS`);
 
+  await A.page.evaluate(() => window.__hush.coop.setHideNames(true));
+  const rulesOk = await until(() => B.page.evaluate(() => {
+    const h=window.__hush;
+    return h.coop.rules.hideNames && h.coop.setHideNames(false)===false && !h.lobby.rulesButton.hidden;
+  }), 15000);
+  check('host lobby rule reaches the guest; guest cannot overwrite it', !!rulesOk);
   // the wardrobe: B dresses up in the lobby (through the real panel); the host must see it on the roster...
   const fitB = await B.page.evaluate(() => {
     const w = window.__hush.wardrobe;
@@ -223,39 +229,45 @@ try {
   const aDoor = await until(() => A.page.evaluate(() => { const d = window.__hush.game.doors.list[0]; return d.open ? `${d.dir}/${d.seq}` : null; }), 20000);
   check("B's door swing reaches the host", aDoor === bDoor, `${aDoor} vs ${bDoor}`);
   // a cupboard: B opens the cabin's low one and takes something out; the host sees the same
-  const bCab = await B.page.evaluate(() => {
-    const g = window.__hush.game, cb = g.cabinets, c = cb.list.find((q) => q.kind === 'cupboard');
-    cb.open(c);
-    const k = c.items.findIndex((q) => !q.taken && q.kind !== 'nuts');
-    if (k >= 0) cb.take(c, k);
-    return `${c.i}:${c.items.map((q) => (q.taken ? 1 : 0)).join('')}`;
+  const cab = await B.page.evaluate(() => {
+    const g=window.__hush.game,c=g.cabinets.list.find(q=>q.kind==='cupboard'),p=g.player;
+    p.x=c.front.x;p.z=c.front.z;p.y=g.tools.groundHeight(p.x,p.z);p.vx=p.vz=0;
+    g.cabinets.open(c);
+    return {i:c.i,k:c.items.findIndex(q=>!q.taken&&q.kind!=='nuts')};
   });
-  const aCab = await until(() => A.page.evaluate((want) => {
-    const c = window.__hush.game.cabinets.list[+want.split(':')[0]];
-    const s = `${c.i}:${c.items.map((q) => (q.taken ? 1 : 0)).join('')}`;
-    return c.opened && s === want ? s : null;
-  }, bCab), 20000);
-  check("B's cupboard (opened, a thing taken) reaches the host", aCab === bCab, `${aCab} vs ${bCab}`);
+  await until(() => A.page.evaluate(i=>{
+    const g=window.__hush.game,c=g.cabinets.list[i],r=[...g.remotes.values()][0];
+    return c.opened&&r&&Math.hypot(r.x-c.front.x,r.z-c.front.z)<2;
+  },cab.i),20000);
+  if(cab.k>=0) await B.page.evaluate(({i,k})=>window.__hush.game.cabinets.take(window.__hush.game.cabinets.list[i],k),cab);
+  const cabinetOk=await until(()=>A.page.evaluate(({i,k})=>{
+    const c=window.__hush.game.cabinets.list[i];return c.opened&&(k<0||c.items[k].taken);
+  },cab),20000);
+  check("B's cupboard pickup is awarded once by the host",!!cabinetOk,JSON.stringify(cab));
   // the flare gun: B fires; the flare flies on the host's machine too (owned by B)
   await B.page.evaluate(() => {
     const g = window.__hush.game, was = g.state;
     g.state = 'play'; // (it can only be fired at night; the shot itself is what we're after)
     g.setFlares(2, true);
+    g.inventory.reconcile();g.inventory.equipped='flare';g.inventory.equipT=0;
     g.player.pitch = 0.8;
-    g.fireFlare();
+    g.inventory.primary();
     g.state = was;
   });
   const aFlare = await until(() => A.page.evaluate(() => { const g = window.__hush.game, f = g.flares.list[0]; return f ? (f.owner === g.remotes.keys().next().value ? 'B' : 'someone else') : null; }), 20000);
   check("B's flare flies on the host's machine", aFlare === 'B', String(aFlare));
-  facts.push(`door ${aDoor === bDoor ? 'synced' : 'NOT synced'} · cupboard ${aCab === bCab ? 'synced' : 'NOT synced'} · flare ${aFlare === 'B' ? 'synced' : 'NOT synced'}`);
+  facts.push(`door ${aDoor === bDoor ? 'synced' : 'NOT synced'} · cupboard ${cabinetOk ? 'synced' : 'NOT synced'} · flare ${aFlare === 'B' ? 'synced' : 'NOT synced'}`);
   // the night, and one of the UAZ's parts: B asks for it (the host decides), throws it; it lands for the host too
   await A.page.evaluate(() => window.__hush.game.startDusk());
   const night = await until(async () => (await A.page.evaluate(() => window.__hush.game.state)) === 'play' && (await B.page.evaluate(() => window.__hush.game.state)) === 'play', 90000);
   check('the night falls for both', !!night);
+  const runRules=await B.page.evaluate(()=>window.__hush.game.roomRules.hideNames);
+  check('hideNames is copied into the run, not just the roster',runRules);
+  for(const P of[A,B])await P.page.evaluate(()=>{window.__hush.game.voiceMimic.wait=1e9});
   // the host's flashlight: B sees it on (and taken); a shard the host picks up pays B as well
   const torch = await (async () => {
     const hostId = await B.page.evaluate(() => window.__hush.coop.hostId);
-    await A.page.evaluate(() => { const g = window.__hush.game; const it = g.torch.items[0]; g.torch.take(it); g.torch.toggle(); });
+    await A.page.evaluate(() => { const g=window.__hush.game,it=g.torch.items[0],p=g.player;p.x=it.x;p.z=it.z;p.y=g.tools.groundHeight(p.x,p.z);p.vx=p.vz=0;g.torch.take(it);g.inventory.equipped='torch';g.inventory.equipT=0;g.inventory.primary(); });
     const seen = await until(() => B.page.evaluate((id) => { const g = window.__hush.game, r = g.remotes.get(id); return !!(r && r.torchOn && g.torch.items[0].taken); }, hostId), 20000);
     await A.page.evaluate(() => { const g = window.__hush.game; if (g.torch.on) g.torch.toggle(); });
     return seen ? 'ok' : `B: ${await B.page.evaluate((id) => { const g = window.__hush.game, r = g.remotes.get(id); return `torchOn ${r && r.torchOn}, taken ${g.torch.items[0] && g.torch.items[0].taken}`; }, hostId)}`;
@@ -288,7 +300,7 @@ try {
     if (!spot) return 'no clear spot near B';
     // (B has to know it's there first: the host's monster snapshots)
     await until(() => B.page.evaluate(() => { const g = window.__hush.game, p = g.player; return g.monsters.some((m) => Math.hypot(m.x - p.x, m.z - p.z) < 20); }), 15000);
-    await B.page.evaluate(() => { const T = window.__hush.game.torch; T.has = true; T.charge = 1; T.on = true; T.noiseT = 0; T.beaconT = 0; });
+    await B.page.evaluate(() => { const g=window.__hush.game,T=g.torch;g.setFlares(0,false);g.inventory.cells=0;g.inventory.reconcile();T.has=true;T.charge=1;g.inventory.reconcile();g.inventory.equipped='torch';g.inventory.equipT=0;T.on=true;T.noiseT=0;T.beaconT=0; });
     const heard = await until(() => A.page.evaluate(() => (window.__litHeard && ['investigate', 'hunt'].includes(window.__litM.state) ? 'ok' : null)), 30000);
     await B.page.evaluate(() => { window.__hush.game.torch.on = false; });
     const why = heard || (await A.page.evaluate(() => `heard ${window.__litHeard}, monster ${window.__litM.state}`));
@@ -311,7 +323,7 @@ try {
     if (!near) return 'host never saw B at the recorder';
     await B.page.evaluate(() => { const k = window.__hush.game.tools; k.askT = 0; k.request('take', 0); });
     if (!(await until(() => B.page.evaluate(() => !!window.__hush.game.tools.tapeHeld), 10000))) return 'recorder not granted';
-    await B.page.evaluate(() => window.__hush.game.tools.record());
+    await B.page.evaluate(() => { const g=window.__hush.game;g.inventory.equipped='tape';g.inventory.equipT=0;g.inventory.secondary(); });
     if (!(await until(() => B.page.evaluate(() => window.__hush.game.tools.tapeHeld?.clip?.length === 16000), 12000))) return 'no microphone clip';
     await A.page.evaluate(() => {
       const g = window.__hush.game, C = g.world.zarya, p = g.player;
@@ -320,7 +332,7 @@ try {
       const noise = g.noise.bind(g);
       g.noise = (...args) => { if (args[3] === 'tape') window.__tapeNoise = true; return noise(...args); };
     });
-    await B.page.evaluate(() => { const k = window.__hush.game.tools; k.askT = 0; k.play(); });
+    await B.page.evaluate(() => { const g=window.__hush.game;g.tools.askT=0;g.inventory.primary(); });
     // Its three-second delay uses GAME time; busy software-WebGL runners can take much longer.
     const heard = await until(() => A.page.evaluate(() => {
       const it = window.__hush.game.tools.items[0];
@@ -346,6 +358,7 @@ try {
     const ci = await B.page.evaluate(() => {
       const g = window.__hush.game, c = g.cabinets.list.find((c) => c.locked), p = g.player;
       p.x = c.front.x; p.z = c.front.z; p.y = g.world.terrain.height(p.x, p.z); p.yaw = c.spec.yaw + Math.PI;
+      g.inventory.equipped='crowbar';g.inventory.equipT=0;
       p.vx = p.vz = p.speed = 0; window.__hush.input.useHeld = true;
       return c.i;
     });

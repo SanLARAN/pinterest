@@ -164,19 +164,7 @@ export class Torches {
 
   take(it) {
     if (!it || it.taken) return;
-    this._taken(it);
-    const g = this.g;
-    if (g.sync) g.sync.ev('tq', it.i);
-    const had = this.has;
-    this.has = true;
-    this.charge = Math.min(1, (had ? this.charge + 0.5 : TORCH.found) + this.spare);
-    this.spare = 0;
-    if (g.audio.ready) {
-      if (g.audio.cabinetItem) g.audio.cabinetItem('flare');
-      this._click(true);
-    }
-    g.hud.popup(had ? t('torchMore') : t(g.input.touch ? 'torchGotT' : 'torchGot'), 'amber');
-    g.stats.torch = 1;
+    return this.g.inventory.claim('torch', it.i);
   }
 
   // someone else took it
@@ -313,9 +301,9 @@ export class Torches {
   // in your left hand, while it's on
   placeView(camera, show) {
     const m = this.view;
-    m.visible = !!show && this.on;
+    m.visible = !!show && this.has;
     if (!m.visible) return;
-    _off.set(-0.2, -0.2, -0.4).applyMatrix4(camera.matrixWorld);
+    _off.set(0.2, -0.2, -0.4).applyMatrix4(camera.matrixWorld);
     m.position.copy(_off);
     m.quaternion.copy(camera.quaternion).multiply(_q.setFromAxisAngle(_ax.set(0.25, 1, 0).normalize(), -0.22));
   }

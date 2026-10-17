@@ -108,7 +108,7 @@ const TEXT = {
       crawler: {
         name: 'Ползун', latin: 'Reptans hexapus',
         text: [
-          'Низкий, на шести тонких лапах, голова у самой земли. Голоса он слышит хуже Слушателя, зато шаги — лучше всех: чувствует их через землю.',
+          'Сломанный человеческий силуэт: открытая клетка рёбер, низко висящий череп и шесть длинных рук с пальцами вместо лап. Голоса он слышит хуже Слушателя, зато шаги — лучше всех: чувствует их через землю.',
           'Он быстрее тебя, и по прямой от него не убежать. Зато погоню бросает быстро — стоит тебе затихнуть.',
         ],
         tips: [
@@ -165,11 +165,11 @@ const TEXT = {
         name: 'Тень', latin: 'Umbra incerta',
         text: [
           'Силуэт на краю взгляда: длинные волосы, руки ниже колен. Обернёшься — пусто. Подашь звук — она уже ближе. Или нет.',
-          'Её видели многие. Никто не может сказать, что ей нужно.',
+          'Теперь она запоминает целые фразы любого игрока и повторяет их без изменения голоса и интонации. Иногда принимает облик того, чей голос украла. Голос друга вдалеке — ещё не сам друг.',
         ],
         tips: [
           'Не кричи. Что бы ты ни увидел.',
-          'Иногда лес повторяет твой голос. Не иди на него.',
+          'Переспроси то, чего она ещё не слышала. Не иди на голос без ответа.',
         ],
         facts: [['рост', '{h}'], ['слух', '?'], ['скорость', '?'], ['приходит', 'когда не ждёшь']],
         quote: 'Я видел её у костра. Утром там ничего не было.',
@@ -265,7 +265,7 @@ const TEXT = {
         name: 'Камень', latin: 'оружие против их слуха',
         text: [
           'Камни не ранят тварей. Они обманывают их слух: где камень упадёт, там будет стук и эхо — туда и пойдут те, кто рядом.',
-          'ПКМ или F — бросок (на телефоне — кнопка КАМЕНЬ). Больше трёх не унести; новый находишь сам примерно раз в минуту.',
+          'I — рюкзак; ПКМ по гайкам — взять в руки; ЛКМ — бросить. До трёх в кармане. Новые — в шкафах и с осколками; сами в рюкзаке не появляются.',
         ],
         tips: ['В погоне камень сработает, если ты затих, а он упал ближе к твари, чем ты.', 'Брось подальше — и иди в другую сторону.'],
         facts: [['с собой', 'до 3'], ['новый', '~55 с'], ['ещё', '+1 за осколок']],
@@ -275,7 +275,7 @@ const TEXT = {
         name: 'Ракетница', latin: 'одна на ночь · два заряда',
         text: [
           'Сигнальный пистолет с толстым стволом и два патрона к нему. Каждую ночь он лежит у другого тела — у одного из четырёх в лесу. Обыщешь — заберёшь.',
-          'Q (на телефоне — кнопка РАКЕТА) — выстрел. Ракета уходит туда, куда смотришь, чуть выше, хлопает в верхней точке и медленно опускается на парашюте, секунд пятнадцать заливая лес красным. В этом свете видно всё — и всех.',
+          'Возьми в руки через рюкзак (I), ЛКМ — выстрел. Ракета уходит туда, куда смотришь, чуть выше, хлопает в верхней точке и медленно опускается на парашюте, секунд пятнадцать заливая лес красным. В этом свете видно всё — и всех.',
           'Но смотришь на него не ты один. На свет сходятся все твари с округи — бегом.',
         ],
         tips: ['Стреляй подальше от себя: пусть идут туда, а ты — в другую сторону.', 'Наблюдатель в её свете замирает: пока ракета горит, ему не подойти.', 'Попадёт в дерево — упадёт и догорит у корней. В озеро — погаснет.'],
@@ -289,7 +289,7 @@ const TEXT = {
           "Это не способ перестать быть слепым. Найдёшь с половиной заряда: тридцать секунд. Свет — маяк; тому, кто видит тебя, даже не обязательно попасть в луч."
         ],
         "tips": [
-          "T — включить или выключить. Лучше быстро глянуть и погасить.",
+          "Возьми в руки из рюкзака; ЛКМ — включить или выключить. Лучше быстро глянуть и погасить.",
           "Запасные батарейки редки, бывают в шкафчиках: +18 секунд света.",
           "На последней четверти фонарь гаснет на мгновения. Наблюдатель в эти провалы делает рывок."
         ],
@@ -321,7 +321,7 @@ const TEXT = {
         "name": "Кассетный магнитофон",
         "latin": "Vox relicta",
         "text": [
-          "Остался в столовой «Зорьки»; ещё один у пожарной вышки. Запиши две секунды своего голоса (V), потом поставь на землю (B). Три секунды тишины — и кассета повторяет тебя двадцать секунд.",
+          "Остался в столовой «Зорьки»; ещё один у пожарной вышки. Возьми в руки из рюкзака (I); запиши две секунды своего голоса (ПКМ), потом поставь на землю (ЛКМ). Три секунды тишины — и кассета повторяет тебя двадцать секунд.",
           "Для тварей голос из динамика — чужой звук в том месте, а не знание, где ты. Без нового шума с твоей стороны он может увести и погоню. Наблюдатель глух."
         ],
         "tips": [
@@ -349,7 +349,7 @@ const TEXT = {
           ],
           [
             "управление",
-            "V — запись · B — поставить · E — забрать"
+            "ПКМ — запись · ЛКМ — поставить · E — забрать"
           ]
         ],
         "quote": "Если услышишь мой голос из столовой — я уже не там."
@@ -482,7 +482,7 @@ const TEXT = {
         name: 'Светящаяся палочка', latin: 'одна на ночь · у каждого',
         text: [
           'Химический источник света: пластиковая трубка, внутри — стеклянная ампула. Переломишь — жидкости смешаются, и палочка загорится ровным зелёным светом. Никакого огня, никакого звука, кроме щелчка.',
-          'G — переломить, и она светит у тебя в руке. G ещё раз — бросить вперёд: пусть светит там. Горящую палочку можно подобрать с земли (E).',
+          'I — возьми в руки; ЛКМ — переломить, и она светит у тебя в руке. ЛКМ ещё раз — бросить вперёд: пусть светит там. Горящую палочку можно подобрать с земли (E).',
           'В её свете, как под лампой генератора, лес виден таким, какой он есть, — понятно, где ты и куда идти. А тварь в нём видна живым силуэтом.',
         ],
         tips: ['Утром она не нужна — прибереги до темноты.', 'Наблюдатель в её свет не шагнёт: брось её между собой и им.', 'Под конец она тускнеет и мигает — значит, осталось секунд пятнадцать.', 'Если упадёшь, палочка выпадет из руки и будет светить там, где ты лежишь, — друзьям проще тебя найти.'],
@@ -568,7 +568,7 @@ const TEXT = {
         name: 'Колесо', latin: 'запаска УАЗа · ~30 кг',
         text: [
           'Колесо в сборе: шина на диске. Тяжёлое и неудобное — его несут перед собой, обеими руками.',
-          'Брошенное (F) встаёт на ребро и катится, виляя, пока не завалится набок. От дерева отскакивает назад.',
+          'Брошенное (ЛКМ) встаёт на ребро и катится, виляя, пока не завалится набок. От дерева отскакивает назад.',
           'На машине — ключом: каждая гайка — громкий лязг.',
         ],
         tips: ['Катить быстрее, чем нести, — но громче: каждый удар о землю слышно.', 'Ставится на ступицу спереди слева, где машина стоит на чурбаке.'],
@@ -664,7 +664,7 @@ const TEXT = {
       crawler: {
         name: 'Crawler', latin: 'Reptans hexapus',
         text: [
-          'Low, on six thin legs, its head almost on the ground. It hears voices worse than the Listener, but footsteps better than anything: it feels them through the earth.',
+          'A broken human silhouette: an open cage of ribs, a low-hanging skull and six long, fingered arms instead of legs. It hears voices worse than the Listener, but footsteps better than anything: it feels them through the earth.',
           'It is faster than you, and you will not outrun it in a straight line. But it gives up quickly — as soon as you go quiet.',
         ],
         tips: [
@@ -721,11 +721,11 @@ const TEXT = {
         name: 'Shade', latin: 'Umbra incerta',
         text: [
           'A silhouette at the edge of your sight: long hair, arms below the knees. Turn around — nothing. Make a sound — it is closer. Or not.',
-          'Many have seen it. Nobody can say what it wants.',
+          'Now it remembers whole phrases from any player and repeats them with the same voice and intonation. Sometimes it wears the speaker’s appearance. Your friend’s voice in the distance is not proof your friend is there.',
         ],
         tips: [
           "Don't scream. Whatever you see.",
-          "Sometimes the forest repeats your voice. Don't follow it.",
+          "Ask something it has not heard before. Do not follow a voice that cannot answer.",
         ],
         facts: [['height', '{h}'], ['hearing', '?'], ['speed', '?'], ['arrives', "when you don't expect it"]],
         quote: 'I saw it by the fire. In the morning there was nothing there.',
@@ -821,7 +821,7 @@ const TEXT = {
         name: 'Stone', latin: 'a weapon against their hearing',
         text: [
           "Stones don't hurt the creatures. They fool their hearing: where a stone lands there is a knock and an echo — and whatever is near goes there.",
-          'RMB or F to throw (on a phone — the STONE button). You can carry three at most; you find a new one by yourself about once a minute.',
+          'I opens the backpack; RMB on nuts equips them; LMB throws. Three per pocket. Find more in cabinets and with shards; they no longer appear in your bag by themselves.',
         ],
         tips: ["In a chase a stone works if you've gone quiet and it lands closer to the creature than you are.", 'Throw it far — then walk the other way.'],
         facts: [['carry', 'up to 3'], ['new one', '~55 s'], ['also', '+1 per shard']],
@@ -831,7 +831,7 @@ const TEXT = {
         name: 'Flare gun', latin: 'one a night · two shots',
         text: [
           'A fat-barrelled signal pistol and two cartridges for it. Every night it lies by a different body — one of the four out in the forest. Search the body and it is yours.',
-          'Q (on a phone — the FLARE button) fires. The flare goes where you look, a little higher, pops at the top of its arc and sinks slowly under a parachute, flooding the forest with red for about fifteen seconds. In that light you see everything — and everyone.',
+          'Equip it from the backpack (I); LMB fires. The flare goes where you look, a little higher, pops at the top of its arc and sinks slowly under a parachute, flooding the forest with red for about fifteen seconds. In that light you see everything — and everyone.',
           'But you are not the only one looking at it. Every creature around comes to the light — at a run.',
         ],
         tips: ['Fire it away from yourself: let them go there while you go the other way.', 'The Watcher freezes in its light: while the flare burns it cannot come for you.', 'Into a tree — it drops and burns out among the roots. Into the lake — it drowns.'],
@@ -845,7 +845,7 @@ const TEXT = {
           "Not an escape from blindness. Found half charged: thirty seconds. Its light is a beacon, even to things outside the beam."
         ],
         "tips": [
-          "T — on or off. Take a quick look, then kill the light.",
+          "Equip from the backpack; LMB — on or off. Take a quick look, then kill the light.",
           "Rare spare batteries in cupboards give 18 more seconds.",
           "In the last quarter it goes dark for moments. The Watcher lunges in those moments."
         ],
@@ -877,7 +877,7 @@ const TEXT = {
         "name": "Cassette recorder",
         "latin": "Vox relicta",
         "text": [
-          "One in Zarya’s dining hall, another at the fire lookout. Record two seconds of your voice (V), then set it down (B). Three quiet seconds — then the tape loops you for twenty.",
+          "One in Zarya’s dining hall, another at the fire lookout. Equip it from the backpack (I); record two seconds of your voice (RMB), then set it down (LMB). Three quiet seconds — then the tape loops you for twenty.",
           "The things hear a sound there, not knowledge of where you went. If you keep quiet it can even pull them off a chase. The Watcher is deaf."
         ],
         "tips": [
@@ -905,7 +905,7 @@ const TEXT = {
           ],
           [
             "controls",
-            "V — record · B — place · E — retrieve"
+            "RMB — record · LMB — place · E — retrieve"
           ]
         ],
         "quote": "If you hear me from the dining hall, I’m no longer there."
@@ -1038,7 +1038,7 @@ const TEXT = {
         name: 'Glow stick', latin: 'one each · one a night',
         text: [
           'A chemical light: a plastic tube with a glass vial inside. Bend it till the vial snaps, the liquids mix and it glows a steady green. No flame, no sound but the snap.',
-          'G — crack it, and it glows in your hand. G again — throw it ahead and let it glow there. A lit stick can be picked up off the ground (E).',
+          'I to equip; LMB — crack it, and it glows in your hand. LMB again — throw it ahead and let it glow there. A lit stick can be picked up off the ground (E).',
           "In its light, as under a generator's lamp, the forest looks the way it really is — you can tell where you are and where to go. A creature in it shows as a living silhouette.",
         ],
         tips: ["You won't need it in the morning — save it for the dark.", "The Watcher won't step into its light: throw it between you and it.", 'Near the end it dims and flickers — fifteen seconds or so left.', "If you go down it falls from your hand and keeps glowing where you lie — easier for your friends to find you."],
@@ -1124,7 +1124,7 @@ const TEXT = {
         name: 'The wheel', latin: 'the UAZ\'s spare · ~30 kg',
         text: [
           'A whole wheel: tyre on rim. Heavy and awkward — you carry it in front of you, both arms round it.',
-          'Thrown (F), it lands on its tread and rolls, wobbling, until it falls over. Off a tree it bounces back.',
+          'Thrown (LMB), it lands on its tread and rolls, wobbling, until it falls over. Off a tree it bounces back.',
           'On the car it goes on with a wheel brace: every nut a loud clang.',
         ],
         tips: ['Rolling it is quicker than carrying it — and louder: every bump carries.', 'It goes on the front left hub, where the car sits on a stump.'],

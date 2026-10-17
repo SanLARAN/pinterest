@@ -39,7 +39,7 @@ export class Dread {
     n.getWorldPosition(_v);
     const yaw = m.yaw + (m.headYaw || 0);
     const fwd = m.type === 'crawler' ? 0.16 : m.type === 'howler' ? 0.24 : 0.09;
-    const up = m.type === 'crawler' ? 0.07 : m.type === 'howler' ? 0.08 : 0.06;
+    const up = m.type === 'crawler' ? 0.012 : m.type === 'howler' ? 0.08 : 0.06;
     return { x: _v.x + Math.sin(yaw) * fwd, y: _v.y + up, z: _v.z + Math.cos(yaw) * fwd, yaw };
   }
 
@@ -47,7 +47,7 @@ export class Dread {
     const e = this.eyePos(m);
     this.eyes.add(e.x, e.y, e.z, e.yaw, {
       time: this.g.time, life, intensity, blink,
-      spacing: m.type === 'crawler' ? 0.2 : m.type === 'howler' ? 0.18 : 0.26,
+      spacing: m.type === 'crawler' ? 0.174 : m.type === 'howler' ? 0.18 : 0.26,
       size: m.type === 'crawler' || m.type === 'howler' ? 0.13 : 0.16,
       color: EYE_RED,
     });

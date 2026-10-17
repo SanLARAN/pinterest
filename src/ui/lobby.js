@@ -38,6 +38,26 @@ export class Lobby {
     this.starting = false;
     this.openVol = null; // the friend whose volume popover is open
     this.inviteCopied = 0;
+    this.rulesOpen=false;
+    this.rulesButton=document.createElement('button');this.rulesButton.id='btnGarageRules';this.rulesButton.type='button';
+    this.rulesButton.innerHTML='<span></span>';this.rulesButton.hidden=true;this.el.append(this.rulesButton);
+    this.rulesPanel=document.createElement('section');this.rulesPanel.id='lobbyRules';this.rulesPanel.hidden=true;
+    this.rulesPanel.setAttribute('role','dialog');this.rulesPanel.setAttribute('aria-modal','true');this.rulesPanel.setAttribute('aria-labelledby','lobbyRulesTitle');
+    this.rulesPanel.innerHTML='<div class="lobby-rules-backdrop"></div><div class="lobby-rules-card"><div class="rules-kicker">HUSH / GARAGE</div><h2 id="lobbyRulesTitle"></h2><p class="rule-authority"></p><div class="rules-line"><span></span><div class="rule-choices"><button type="button" data-hide="yes"></button><button type="button" data-hide="no"></button></div></div><p class="rules-explain"></p><button type="button" class="rules-close"></button></div>';
+    this.el.append(this.rulesPanel);
+    this.rulesPanel.addEventListener('keydown',e=>{
+      if(!this.rulesOpen) return;
+      if(e.code==='Escape') { e.preventDefault();e.stopPropagation();this.closeRules(); }
+      if(e.code==='Tab') {
+        e.preventDefault();e.stopPropagation();
+        const buttons=[...this.rulesPanel.querySelectorAll('button:not(:disabled)')],i=buttons.indexOf(document.activeElement),dir=e.shiftKey?-1:1;
+        buttons[(i+dir+buttons.length)%buttons.length]?.focus();
+      }
+    });
+    this.rulesButton.addEventListener('click',()=>this.openRules());
+    this.rulesPanel.querySelector('.rules-close').addEventListener('click',()=>this.closeRules());
+    this.rulesPanel.querySelector('.lobby-rules-backdrop').addEventListener('click',()=>this.closeRules());
+    for(const button of this.rulesPanel.querySelectorAll('[data-hide]')) button.addEventListener('click',()=>{this.coop.setHideNames(button.dataset.hide==='yes');this.renderRules();});
     this._bind();
   }
 
@@ -57,6 +77,7 @@ export class Lobby {
 
   close() {
     if (this.starting) return; // the engine's running: we're going
+    this.closeRules(false);
     this.el.classList.remove('show');
     document.body.classList.remove('in-lobby');
     clearInterval(this.timer);
@@ -68,6 +89,7 @@ export class Lobby {
 
   // the car is starting: nothing to press, nowhere to go
   setStarting(on) {
+    this.closeRules(false);
     this.starting = !!on;
     this.el.classList.toggle('starting', this.starting);
     this.openVol = null;
@@ -156,6 +178,7 @@ export class Lobby {
     });
     this.el.addEventListener('click', (e) => {
       if (!this.garage || !this._inRoom() || this.starting || !bare(e)) return;
+      if(this.garage.hitRules(e.clientX,e.clientY)) { this.openRules(); return; }
       const s = this.garage.hit(e.clientX, e.clientY);
       const me = this.coop.me();
       if (s < 0) {
@@ -170,6 +193,37 @@ export class Lobby {
         if (p) this._toggleVol(p.id);
       }
     });
+  }
+
+  openRules() {
+    if(!this._inRoom() || this.starting) return;
+    this.rulesOpen=true;this.rulesPanel.hidden=false;this.renderRules();this.openVol=null;
+    this.rulesPanel.querySelector('.rules-close').focus();if(this.uiSound) this.uiSound('click');
+  }
+  closeRules(focus=true) {
+    const had=this.rulesOpen;this.rulesOpen=false;this.rulesPanel.hidden=true;
+    if(had && focus && this.isOpen()) this.rulesButton.focus({preventScroll:true});
+  }
+  renderRules() {
+    const c=this.coop,r=c.rules||{hideNames:false},host=c.isHost&&c.phase==='lobby'&&!this.starting;
+    this.rulesButton.hidden=!this._inRoom()||this.starting;
+    this.rulesButton.setAttribute('aria-label',t('lobbySettings'));this.rulesButton.title=t('lobbySettings');
+    this.rulesButton.firstChild.textContent=t('lobbySettings');
+    this.garage?.setRules(r);
+    this.rulesPanel.querySelector('h2').textContent=t('lobbyRulesTitle');
+    this.rulesPanel.querySelector('.rule-authority').textContent=t(host?'ruleHost':'ruleGuest');
+    this.rulesPanel.querySelector('.rules-line > span').textContent=t('ruleHideNames');
+    this.rulesPanel.querySelector('.rules-explain').textContent=t('ruleExplain');
+    this.rulesPanel.querySelector('.rules-close').textContent=`${t('bagClose')} [ ESC ]`;
+    for(const b of this.rulesPanel.querySelectorAll('[data-hide]')) { const yes=b.dataset.hide==='yes';b.textContent=t(yes?'ruleYes':'ruleNo');b.disabled=!host;b.setAttribute('aria-pressed',String(r.hideNames===yes)); }
+  }
+  placeRules() {
+    if(!this._inRoom() || !this.garage || this.starting) return;
+    const r=this.garage.rulesRect();const visible=r && r.x>4 && r.y>30 && r.x+r.w<innerWidth-4 && r.y+r.h<innerHeight-40 && r.w>60;
+    this.rulesButton.classList.toggle('poster-fallback',!visible);
+    const b=this.rulesButton.style;
+    if(visible) { b.left=`${r.x}px`;b.top=`${r.y}px`;b.width=`${Math.max(48,r.w)}px`;b.height=`${Math.max(48,r.h)}px`; }
+    else { b.left='18px';b.top=`${Math.max(80,innerHeight-(this.garage.safe.bottom||160)-55)}px`;b.width='145px';b.height='36px'; }
   }
 
   _inRoom() {
@@ -232,6 +286,7 @@ export class Lobby {
   render() {
     const c = this.coop;
     this.menuLabel();
+    this.renderRules();
     const inRoom = this._inRoom();
     this.el.classList.toggle('room', inRoom);
     this.el.classList.toggle('home', !inRoom);
@@ -392,6 +447,7 @@ export class Lobby {
 
   // every frame while the garage is drawn: hang each tag over its place (CSS px from garage.anchors())
   place(anchors) {
+    this.placeRules();
     if (!this._inRoom() || !anchors || !anchors.length) return;
     const W = innerWidth, H = innerHeight;
     const top = this.garage ? this.garage.safe.top - 26 : 60;

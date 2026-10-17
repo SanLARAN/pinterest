@@ -632,6 +632,31 @@ export class AudioEngine {
   }
 
   // your volume for one friend (linear gain; 0 = muted). Remembered even before their voice connects.
+  cleanImitation(id, buffer, x, y, z) {
+    if (!this.ready || !buffer) return null;
+    const ctx = this.ctx, source = ctx.createBufferSource();
+    source.buffer = buffer; source.playbackRate.value = 1; source.detune.value = 0;
+    const samples = buffer.getChannelData(0);
+    let sum = 0; for (const v of samples) sum += v * v;
+    // A constant volume match, not compression or distortion: all dynamics/timing stay intact.
+    const base = Math.max(0.5, Math.min(8, 0.13 / Math.sqrt(sum / samples.length + 1e-9)));
+    const user = ctx.createGain(); user.gain.value = base * (this.voiceGains.get(id) ?? 1);
+    const pn = this._panner(x, y, z, VOICE.ref, VOICE.roll);
+    source.connect(user).connect(pn).connect(this.voiceBus);
+    let ended = false;
+    const sound = {
+      source, buffer, owner: id,
+      gain: (value) => { if (!ended) user.gain.setTargetAtTime(base * Math.max(0, value), ctx.currentTime, 0.03); },
+      stop: () => {
+        if (ended) return; ended = true;
+        try { source.stop(); } catch { /* already finished */ }
+        source.disconnect(); user.disconnect(); pn.disconnect();
+      },
+    };
+    source.onended = () => sound.stop(); source.start();
+    return sound;
+  }
+
   voiceVolume(id, gain) {
     this.voiceGains.set(id, gain);
     const v = this.voices.get(id);

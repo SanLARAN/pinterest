@@ -7,6 +7,31 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v: '1.11', date: '2026-10-18',
+    ru: {
+      title: 'Не верь знакомому голосу',
+      items: [
+        'Ползун полностью перестроен: человеческий череп, разомкнутая челюсть, открытые рёбра и шесть длинных рук с пальцами. Рваная походка, новая поза охоты и скример',
+        'I — настоящий рюкзак на четыре кармана, с движением рук и застёжки. ПКМ по предмету — взять в руки или выбросить. ЛКМ использует то, что держишь; предметных горячих клавиш больше нет',
+        'Выброшенное остаётся в лесу: напарник может подобрать. Заряд фонаря и запись магнитофона сохраняются. Полный рюкзак не уничтожает находку; батарейки теперь отдельный предмет',
+        'Тень повторяет целые фразы любого игрока без смены тембра, высоты и скорости — и может выглядеть как этот игрок. Только память текущей игры, не запись в меню; громкость и заглушение друзей учитываются',
+        'TAB — поднять левую руку и взглянуть на цифровые часы: время, задача, генераторы, детали УАЗ, очки и команда. Прежняя всплывающая сводка убрана',
+        'На стене гаража плакат «Настройки». Хозяин комнаты выбирает, скрывать ли имена игроков в лесу; правило одинаково у всех',
+      ],
+    },
+    en: {
+      title: 'Do not trust a familiar voice',
+      items: [
+        'A rebuilt Crawler: a human skull, broken jaw, exposed rib cage and six long, fingered arms. A ragged gait, new hunting pose and kill animation',
+        'I opens a real four-pocket backpack with a shoulder reach and flap animation. RMB on an item: equip or drop. LMB uses the equipped item; per-item hotkeys are gone',
+        'Dropped items stay in the woods for a teammate to pick up. Flashlight charge and recorder contents survive. A full bag never destroys loot; batteries are a separate item',
+        'The Shade repeats complete phrases from any player without changing their voice, pitch or speed — and can wear their appearance. In-memory for this game only, never in the menu; friend volume and mute apply',
+        'TAB raises your left wrist to a digital watch: time, objective, generators, UAZ parts, score and team. The old floating summary is gone',
+        'A Settings poster on the garage wall lets the host hide player names in the woods. One rule for the entire room',
+      ],
+    },
+  },
+  {
     v: '1.10', date: '2026-10-17',
     ru: {
       title: '«Зорька» и пожарная вышка',

@@ -1,22 +1,70 @@
 // RU / EN strings. Russian is the default.
 const STR = {
   ru: {
+    lobbySettings: "Настройки",
+    lobbyRulesTitle: "НАСТРОЙКИ ЛОББИ",
+    ruleHideNames: "Скрыть имена игроков в игре",
+    ruleYes: "ДА",
+    ruleNo: "НЕТ",
+    ruleHost: "Правила задаёт хозяин комнаты · общие для всей команды",
+    ruleGuest: "Меняет хозяин комнаты перед началом ночи",
+    ruleExplain: "Имена над головами, в уведомлениях и при наблюдении будут скрыты у всех. Имена в гараже и настройках громкости останутся. Правило начнёт действовать в следующей игре.",
+    rulePosterNames: "СКРЫВАТЬ ИМЕНА В ЛЕСУ?",
+    rulePosterPress: "НАЖМИ НА ПЛАКАТ",
+    anonymousPlayer: "Выживший {n}",
+
+    bagCartridges: "патроны к ракетнице",
+    bagTitle: "РЮКЗАК",
+    bagStones: "гайки",
+    bagGlow: "химсвет",
+    bagBattery: "батарейки",
+    bagEmpty: "пустой карман",
+    bagEquip: "Взять в руки",
+    bagStow: "Убрать из рук",
+    bagDrop: "Выбросить",
+    bagClose: "ЗАКРЫТЬ",
+    bagSlots: "карманы",
+    bagInHands: "в руках",
+    bagLit: "горит",
+    bagFull: "Рюкзак полон · I — освободить карман",
+    bagTip: "ПКМ по предмету → взять в руки / выбросить",
+    bagTipT: "Коснись предмета → взять в руки / выбросить",
+    bagWorld: "Лес не ждёт. Детали УАЗ — в обеих руках; записки и детали генераторов общие для отряда.",
+    bagBatteryNoTorch: "Сначала найди фонарь",
+    bagBatteryFull: "Фонарь уже заряжен",
+    bagPryHint: "С ломом в руках удерживай E у замка",
+    touchBag: "РЮКЗАК",
+    touchItem: "ПРЕДМЕТ",
+    touchAlt: "ЗАПИСЬ",
+    watchInfo: "Информация на наручных часах",
+    watchFind: "Проверь генератор у костра",
+    watchTime: "ВРЕМЯ",
+    watchDay: "ДЕНЬ",
+    watchNight: "НОЧЬ",
+    watchGens: "ГЕН",
+    watchCar: "УАЗ",
+    watchAlive: "ЖИВЫ",
+    watchScore: "ОЧКИ",
+    watchCalm: "ТИШИНА",
+    watchBat: "ФОНАРЬ",
+    watchBag: "РЮКЗАК",
+
     // Field kit and the two optional destinations.
     fieldMetres: "м",
     tapeName: "магнитофон",
     crowbarName: "лом",
-    tapeGot: "магнитофон · V — записать 2 с · B — поставить приманку",
-    tapeGotT: "магнитофон · ЗАПИСЬ — 2 с · КАССЕТА — поставить приманку",
-    crowbarGot: "лом · удерживай E у запертого шкафчика — будет громко",
-    tapeKeys: "V — запись · B — поставить",
-    tapeKeysT: "ЗАПИСЬ · КАССЕТА — поставить",
-    tapeRecorded: "записано · B — поставить; запись услышат друзья в этой игре",
+    tapeGot: "магнитофон в рюкзаке · I → ПКМ → взять в руки",
+    tapeGotT: "магнитофон в рюкзаке · выбери его кнопкой РЮКЗАК",
+    crowbarGot: "лом в рюкзаке · возьми в руки через I; удерживай E у замка",
+    tapeKeys: "ПКМ — запись · ЛКМ — поставить",
+    tapeKeysT: "ЗАПИСЬ · ПРЕДМЕТ — поставить",
+    tapeRecorded: "записано · ЛКМ — поставить; запись услышат друзья в этой игре",
     tapeSilent: "слишком тихо — старая кассета осталась",
     tapeNoMic: "нет записи с микрофона — на кассете стук; M — включить микрофон",
     tapeRecordWarn: "REC · 2 секунды — говори; твари слышат тебя и сейчас",
     tapePlaced: "магнитофон: пауза 3 с, затем 20 с звука — уходи",
     tapeFlat: "батарейки магнитофона сели — он останется на земле",
-    pryNeed: "заперто · нужен лом (у входа в «Зорьку» или у пожарной вышки)",
+    pryNeed: "заперто · возьми лом в руки через рюкзак (I)",
     usePry: "УДЕРЖИВАЙ E — ВЗЛОМАТЬ · ШУМНО",
     usePryT: "УДЕРЖИВАЙ РУКИ — ВЗЛОМАТЬ · ШУМНО",
     useLookout: "УДЕРЖИВАЙ E — НАВЕРХ",
@@ -105,10 +153,10 @@ const STR = {
     itHears: 'оно тебя слышит',
     tutMove: 'уходи тихо — WASD · Shift бег (шумно) · C красться',
     tutMoveTouch: 'уходи тихо — левый стик · до упора = бег (шумно)',
-    tutStone: 'ПКМ / F — бросить камень и отвлечь их',
-    tutStoneTouch: 'КАМЕНЬ — бросить и отвлечь их',
-    tutUse: 'у генератора лежит тело — подойди и удерживай E · Tab — что делать дальше',
-    tutUseTouch: 'у генератора лежит тело — подойди, появится кнопка РУКИ · тап по верху — задача',
+    tutStone: "I — рюкзак · ПКМ по гайкам → взять в руки · ЛКМ — бросить",
+    tutStoneTouch: "РЮКЗАК → гайки → взять в руки · ПРЕДМЕТ — бросить",
+    tutUse: "у генератора лежит тело — удерживай E · Tab — взглянуть на часы",
+    tutUseTouch: "у тела — удерживай РУКИ · тап по верху — взглянуть на часы",
     tutScream: 'и что бы ни случилось — не кричи',
     // morning
     morningBig: 'утро',
@@ -156,15 +204,15 @@ const STR = {
     touchGlow: 'СВЕТ',
     aGlowDay: 'прибереги палочку до темноты',
     aNoGlow: 'палочек больше нет',
-    hintGlow: 'G — бросить палочку · E — подобрать её снова',
-    hintGlowTouch: 'СВЕТ — бросить палочку · РУКИ — подобрать её снова',
+    hintGlow: "ЛКМ — бросить палочку · E — подобрать · I — убрать в рюкзак",
+    hintGlowTouch: "ПРЕДМЕТ — бросить палочку · РУКИ — подобрать",
     useGlowPick: 'E · подобрать палочку',
     useGlowPickT: 'РУКИ · подобрать палочку',
     useTorch: 'E · взять фонарик',
     useTorchT: 'РУКИ · взять фонарик',
     touchTorch: 'ФОНАРЬ',
-    torchGot: 'фонарик · T — включить (батарейка не вечная)',
-    torchGotT: 'фонарик · ФОНАРЬ — включить (батарейка не вечная)',
+    torchGot: "фонарик в рюкзаке · I → взять в руки · ЛКМ — вкл/выкл",
+    torchGotT: "фонарик в рюкзаке · выбери его, затем ПРЕДМЕТ — вкл/выкл",
     torchMore: 'ещё фонарик — его батарейка в твой',
     torchNone: 'фонарика нет — поищи у разбитой машины, у вышки, у могил',
     torchDead: 'батарейка села',
@@ -256,8 +304,8 @@ const STR = {
     taskGo: 'мотор работает — все в машину, и уезжаем',
     usePart: 'E · поднять:',
     usePartT: 'РУКИ · поднять:',
-    usePartHeld: 'F · бросить · R · положить',
-    usePartHeldT: 'БРОСИТЬ · ПОЛОЖИТЬ',
+    usePartHeld: "R — ПОЛОЖИТЬ · ЛКМ — БРОСИТЬ",
+    usePartHeldT: "НЕСТИ — ПОЛОЖИТЬ · ПРЕДМЕТ — БРОСИТЬ",
     useFit: 'держи E · поставить: {part}',
     useFitT: 'держи РУКИ · поставить: {part}',
     useRead: 'E · читать',
@@ -279,7 +327,7 @@ const STR = {
     crankDead: 'тишина — нет аккумулятора',
     crankDry: 'крутит, но не схватывает — бак сухой',
     crankNoCarb: 'крутит, но не схватывает — нет карбюратора',
-    hintPart: 'тяжело — бежать не выйдет · неси к УАЗу · F — бросить, R — положить',
+    hintPart: 'тяжело — бежать не выйдет · неси к УАЗу · ЛКМ — бросить, R — положить',
     hintPartTouch: 'тяжело — бежать не выйдет · неси к УАЗу · БРОСИТЬ / ПОЛОЖИТЬ',
     hintDrive: 'за руль (E) — и держи E: заводи',
     hintDriveTouch: 'за руль (РУКИ) — и держи РУКИ: заводи',
@@ -329,8 +377,8 @@ const STR = {
     hintWatcher: 'НАБЛЮДАТЕЛЬ — двигается только в темноте. держи его на свету',
     hintHowler: 'глубокий вдох… ЗАМРИ',
     hintHowlerSpot: 'оно увидело движение — уйди с этого места и снова замри',
-    hintFlare: 'Q — ракета: осветит всё вокруг… и все придут на свет',
-    hintFlareTouch: 'РАКЕТА — осветит всё вокруг… и все придут на свет',
+    hintFlare: "ракетница в рюкзаке · I → взять в руки · ЛКМ — выстрел",
+    hintFlareTouch: "ракетница в рюкзаке · выбери её, затем ПРЕДМЕТ — выстрел",
     hintFlareLure: 'они идут на свет',
     // ends
     deadTitle: 'ТЕБЯ НАШЛИ',
@@ -377,16 +425,19 @@ const STR = {
     off: 'выкл',
     // how to
     howtoBody: `
+<p><b>Рюкзак — I.</b> Герой снимает его с плеча; четыре кармана. ПКМ по предмету — «взять в руки» или «выбросить» (на телефоне — коснись предмета). ЛКМ использует то, что в руках: бросок гаек, химсвет, фонарь, ракетница, батарейки или магнитофон. ПКМ с магнитофоном — записать. Держи лом в руках, чтобы ломать замки. Крупные детали УАЗ несутся отдельно, записки и детали генераторов общие у команды. Пока роешься в рюкзаке, лес не стоит на паузе.</p>
+<p><b>TAB — часы на левой руке.</b> Удерживай, чтобы поднять руку: время, генераторы, детали УАЗ, очки, множитель, живые игроки и задача. На телефоне — тап по верху экрана.</p>
+<p><b>Тень теперь говорит голосами команды.</b> С включённым микрофоном игра запоминает целые фразы (до 30 секунд, не обрезая их) и может повторить их из другой точки леса, с прежним голосом, скоростью и интонацией. Тень может даже выглядеть как тот, чей голос украла. Две последние фразы каждого игрока хранятся только в памяти этой игры и передаются напрямую участникам; при выходе всё удаляется. В меню и гараже запись не ведётся. Заглушённый у тебя игрок остаётся заглушённым и в подражании. На стене гаража плакат «Настройки»: хозяин комнаты может скрыть имена у всей команды.</p>
 <p><b>Утро. Лагерь, гудит генератор, поют птицы.</b> А потом свет гаснет разом — и ты в огромном тёмном лесу, где ничего не видно. Любой звук — эхолокатор: волна расходится от тебя и на секунды проявляет деревья, камни… и <span class="red">их</span>. Первые 45 секунд ночи лес ещё спит — осмотрись и найди дорогу, пока никого нет.</p>
 <p><b>Сначала — пять генераторов.</b> У каждого лежит тело того, кто пытался раньше: обыщи его (удерживай E) — там деталь и записка, где искать следующий. Генератор, о котором ты знаешь, пищит рацией — иди на звук. Починка шумит: стук, искры, рёв мотора при запуске. Запустил — уходи. Вокруг работающего генератора горит лампа: в её свете видно тварей, и стены отбрасывают от неё тени.</p>
-<p><b>Потом — прочь из леса.</b> Пять генераторов дают ток на <b>площадку лесхоза</b> у северного края: воет сирена, откатные ворота едут сами. Внутри — <b>УАЗ</b>, разобранный: нет колеса, аккумулятора, карбюратора и бензина. Где они, сказано в журнале на будке сторожа. Детали настоящие: подними (E) и неси в руках — медленно, без бега, руки заняты; R — положить, F — бросить (колесо покатится). У машины поставь каждую на место (удерживай E). Потом — за руль и держи E: мотор заведётся с рёвом на весь лес. E ещё раз — и все, кто в машине (раненых можно уложить назад, R), уезжают по просеке на шоссе.</p>
+<p><b>Потом — прочь из леса.</b> Пять генераторов дают ток на <b>площадку лесхоза</b> у северного края: воет сирена, откатные ворота едут сами. Внутри — <b>УАЗ</b>, разобранный: нет колеса, аккумулятора, карбюратора и бензина. Где они, сказано в журнале на будке сторожа. Детали настоящие: подними (E) и неси в руках — медленно, без бега, руки заняты; R — положить, ЛКМ — бросить (колесо покатится). У машины поставь каждую на место (удерживай E). Потом — за руль и держи E: мотор заведётся с рёвом на весь лес. E ещё раз — и все, кто в машине (раненых можно уложить назад, R), уезжают по просеке на шоссе.</p>
 <p><b>Микрофон:</b> щёлкни языком, хлопни, скажи «эй». Громче звук — дальше видно. Но <span class="red">и они слышат дальше</span>: обычную речь — за пару шагов, громкий голос — издалека. Крик (кольцо вокруг точки стало красным) — мгновенная охота. <b>Без микрофона:</b> ПРОБЕЛ — щелчок, удерживай — громче.</p>
-<p><b>Слушатели и Ползуны</b> идут туда, где был звук. Пискнул — уходи. Камень (ПКМ / F) уводит их в сторону. Позже приходят двое других, по одному на лес: <b>Наблюдатель</b> глух, но двигается, только пока на него не падает свет, — свети на него; лампы он обходит. <b>Ревун</b> почти не слышит, но иногда набирает воздух и воет: всё, что движется в этой волне, он видит. Услышал вдох — замри.</p>
-<p><b>Ракетница.</b> У одного из тел (каждую ночь у другого) лежит ракетница — два заряда. Q — ракета уходит вверх, раскрывает парашют и секунд пятнадцать заливает лес красным светом: видно всё и всех. Но <span class="red">на свет сходятся все твари с округи</span> — стреляй подальше от себя. <b>Охотничья избушка</b>: дверь закрывается (E). Бродячие твари не сразу её откроют — навалятся, и она со скрипом подастся; а та, что охотится за тобой, выбьет её в три удара.</p>
-<p><b>Фонарик</b> лежит где-то в лесу — у разбитой машины, у вышки, у могил, — ещё включённый: его слабый луч видно издалека. T — включить: конус настоящего света туда, куда смотришь. Он не для того, чтобы ходить со светом, а чтобы быстро глянуть: батарейки хватает на минуту (найдёшь его полуразряженным, запасные в шкафах редки), а <span class="red">включённый фонарь видно издалека</span> — тварь, попавшая в луч, и любая тварь поблизости, которой ничто тебя не загораживает, идёт на свет. Когда батарейка почти села, фонарь мигает и гаснет на мгновения — <b>в эти мгновения Наблюдатель двигается</b>.</p>
+<p><b>Слушатели и Ползуны</b> идут туда, где был звук. Пискнул — уходи. Гайки из рюкзака (I → ПКМ → взять в руки, ЛКМ — бросить) уводят их в сторону. Позже приходят двое других, по одному на лес: <b>Наблюдатель</b> глух, но двигается, только пока на него не падает свет, — свети на него; лампы он обходит. <b>Ревун</b> почти не слышит, но иногда набирает воздух и воет: всё, что движется в этой волне, он видит. Услышал вдох — замри.</p>
+<p><b>Ракетница.</b> У одного из тел (каждую ночь у другого) лежит ракетница — два заряда. Возьми её в руки через I; ЛКМ — ракета уходит вверх, раскрывает парашют и секунд пятнадцать заливает лес красным светом: видно всё и всех. Но <span class="red">на свет сходятся все твари с округи</span> — стреляй подальше от себя. <b>Охотничья избушка</b>: дверь закрывается (E). Бродячие твари не сразу её откроют — навалятся, и она со скрипом подастся; а та, что охотится за тобой, выбьет её в три удара.</p>
+<p><b>Фонарик</b> лежит где-то в лесу — у разбитой машины, у вышки, у могил, — ещё включённый: его слабый луч видно издалека. Возьми в руки из рюкзака; ЛКМ — включить: конус настоящего света туда, куда смотришь. Он не для того, чтобы ходить со светом, а чтобы быстро глянуть: батарейки хватает на минуту (найдёшь его полуразряженным, запасные в шкафах редки), а <span class="red">включённый фонарь видно издалека</span> — тварь, попавшая в луч, и любая тварь поблизости, которой ничто тебя не загораживает, идёт на свет. Когда батарейка почти села, фонарь мигает и гаснет на мгновения — <b>в эти мгновения Наблюдатель двигается</b>.</p>
 <p><b>Пожарная вышка</b> стоит на северо-западе: держи E пять секунд, чтобы подняться по скрипучей лестнице. Наверху E — бинокль на 10 секунд (затем 25 секунд остывания), R — спуститься. Он показывает настоящий лес, огни генераторов и движение тварей, но не светит на них и не останавливает Наблюдателя. Стены и деревья остаются непрозрачными.</p>
-<p><b>Пионерлагерь «Зорька»</b> на юго-западе: два спальных корпуса и столовая, в шкафчиках вещи. <b>Лом</b> лежит у лагерных ворот и у пожарной вышки: удерживай E у замка 2,8 секунды; взлом слышно далеко. В столовой и у вышки есть <b>кассетный магнитофон</b>: V — записать 2 секунды с микрофона, B — оставить на земле. Через 3 секунды он 20 секунд повторяет запись и отвлекает тварей; E — забрать (две прокрутки на батарейках). Без микрофона на нём стук. Запись хранится только до конца этой игры и передаётся друзьям напрямую, когда ставишь приманку. Громкоговоритель на лагерной площади включается кнопкой E, играет 35 секунд один раз за ночь — уходи до того, как все соберутся.</p>
-<p><b>Светящаяся палочка</b> — у каждого одна на ночь. G — переломить: пару минут она светит зелёным у тебя в руке, G ещё раз — бросить вперёд (E — подобрать с земли). В её свете, как и под лампой генератора, лес виден таким, какой он есть, — легко понять, где ты. Наблюдатель в такой свет не шагнёт.</p>
+<p><b>Пионерлагерь «Зорька»</b> на юго-западе: два спальных корпуса и столовая, в шкафчиках вещи. <b>Лом</b> лежит у лагерных ворот и у пожарной вышки: удерживай E у замка 2,8 секунды; взлом слышно далеко. В столовой и у вышки есть <b>кассетный магнитофон</b>: возьми его в руки через I, ПКМ — записать 2 секунды с микрофона, ЛКМ — оставить на земле. Через 3 секунды он 20 секунд повторяет запись и отвлекает тварей; E — забрать (две прокрутки на батарейках). Без микрофона на нём стук. Запись хранится только до конца этой игры и передаётся друзьям напрямую, когда ставишь приманку. Громкоговоритель на лагерной площади включается кнопкой E, играет 35 секунд один раз за ночь — уходи до того, как все соберутся.</p>
+<p><b>Светящаяся палочка</b> — у каждого одна на ночь. ЛКМ с палочкой в руках — переломить: пару минут она светит зелёным у тебя в руке, ЛКМ ещё раз — бросить вперёд (E — подобрать с земли). В её свете, как и под лампой генератора, лес виден таким, какой он есть, — легко понять, где ты. Наблюдатель в такой свет не шагнёт.</p>
 <p><b>Интерфейса почти нет.</b> Кольцо вокруг точки — твоя громкость. Tab — время, генераторы и текущая задача. Полоска сверху заполняется с каждым генератором. Через 45 минут лес просыпается окончательно.</p>
 <p><b>Очки:</b> время × множитель опасности, найденные тела, генераторы, осколки, проходы впритык, отрывы. За победу — бонус, и тем больше, чем быстрее.</p>
 <p><b>С друзьями:</b> «С ДРУЗЬЯМИ» › «СОЗДАТЬ» и отправь ссылку (или код) — до 4 игроков в одном лесу. Голоса слышно с той стороны, где стоит друг, и тише издалека; <span class="red">монстры слышат их так же</span> — но вполголоса рядом друг с другом говорить можно: такое они слышат только вплотную. Эхо друзей тоже освещает лес. Пойманный друг не умирает сразу — он падает и медленно истекает кровью. Подойди и проверь пульс (удерживай E): узнаешь, сколько ему осталось, — и каждый раз придётся проверять заново. Подними его на плечо (R) — бежать с ним нельзя, шаги тяжёлые — и неси в <b>заброшенную мед-хижину скаутов</b> у лагеря: только на её койке (R) и только руками (удерживай E) его можно вернуть. Упавший смотрит глазами живых, и живые его не слышат. Лобби — гараж: у каждого своё место (клик по своей фигуре — гардероб, по другу — его громкость), а когда хост жмёт НАЧАТЬ, заводится машина.</p>
@@ -395,14 +446,12 @@ const STR = {
 <tr><td>Мышь</td><td>обзор (клик — захват курсора)</td></tr>
 <tr><td>ПРОБЕЛ</td><td>эхо: тап — щелчок, удерживай — громко (после каждого — короткая перезарядка)</td></tr>
 <tr><td>E (удерживать)</td><td>обыскать тело · чинить генератор · дверь · пульс друга · поднять / поставить деталь · сесть в УАЗ, завести</td></tr>
-<tr><td>ПКМ / F</td><td>бросить камень (с деталью в руках — бросить её)</td></tr>
-<tr><td>G</td><td>светящаяся палочка: переломить · бросить</td></tr>
-<tr><td>V / B</td><td>магнитофон: записать / поставить приманку</td></tr>
-<tr><td>T</td><td>фонарик (если нашёл): включить · выключить</td></tr>
+<tr><td>I</td><td>рюкзак · четыре слота</td></tr>
+<tr><td>ПКМ</td><td>меню предмета в рюкзаке · запись магнитофона в руках</td></tr>
+<tr><td>ЛКМ</td><td>использовать предмет в руках · бросить тяжёлую деталь</td></tr>
 <tr><td>R</td><td>нести упавшего друга · положить (на койку, в машину) · положить деталь · выйти из машины</td></tr>
-<tr><td>Q</td><td>сигнальная ракета (если нашёл)</td></tr>
 <tr><td>Shift / C</td><td>бег / красться</td></tr>
-<tr><td>Tab</td><td>время, генераторы, задача</td></tr>
+<tr><td>Tab (удерживать)</td><td>поднять левую руку · цифровые часы</td></tr>
 <tr><td>Enter</td><td>пропустить утро</td></tr>
 <tr><td>M · Esc / P</td><td>микрофон · пауза</td></tr>
 </table>`,
@@ -500,22 +549,70 @@ const STR = {
     stDead: 'мёртв',
   },
   en: {
+    lobbySettings: "Settings",
+    lobbyRulesTitle: "LOBBY SETTINGS",
+    ruleHideNames: "Hide player names in the game",
+    ruleYes: "YES",
+    ruleNo: "NO",
+    ruleHost: "The room host sets the rules for the entire team",
+    ruleGuest: "Only the host can change this before the night",
+    ruleExplain: "Names above heads, in notifications and while spectating are hidden for everyone. Garage names and voice-volume controls stay visible. Applies to the next game.",
+    rulePosterNames: "HIDE NAMES IN THE FOREST?",
+    rulePosterPress: "CLICK THE POSTER",
+    anonymousPlayer: "Survivor {n}",
+
+    bagCartridges: "flare cartridges",
+    bagTitle: "BACKPACK",
+    bagStones: "nuts",
+    bagGlow: "glow stick",
+    bagBattery: "batteries",
+    bagEmpty: "empty pocket",
+    bagEquip: "Equip in hands",
+    bagStow: "Put away",
+    bagDrop: "Drop",
+    bagClose: "CLOSE",
+    bagSlots: "pockets",
+    bagInHands: "in hands",
+    bagLit: "lit",
+    bagFull: "Backpack full · I — free a pocket",
+    bagTip: "RMB on an item → equip / drop",
+    bagTipT: "Tap an item → equip / drop",
+    bagWorld: "The forest does not wait. UAZ parts need both hands; notes and generator parts are shared by the team.",
+    bagBatteryNoTorch: "Find a flashlight first",
+    bagBatteryFull: "The flashlight is already charged",
+    bagPryHint: "With the crowbar equipped, hold E at a lock",
+    touchBag: "BAG",
+    touchItem: "ITEM",
+    touchAlt: "RECORD",
+    watchInfo: "Wristwatch information",
+    watchFind: "Check the generator by the fire",
+    watchTime: "TIME",
+    watchDay: "DAY",
+    watchNight: "NIGHT",
+    watchGens: "GEN",
+    watchCar: "UAZ",
+    watchAlive: "ALIVE",
+    watchScore: "SCORE",
+    watchCalm: "QUIET",
+    watchBat: "LIGHT",
+    watchBag: "BAG",
+
     // Field kit and the two optional destinations.
     fieldMetres: "m",
     tapeName: "cassette recorder",
     crowbarName: "crowbar",
-    tapeGot: "recorder · V — record 2 s · B — place a lure",
-    tapeGotT: "recorder · RECORD — 2 s · TAPE — place a lure",
-    crowbarGot: "crowbar · hold E at a locked cupboard — it will be loud",
-    tapeKeys: "V — record · B — place",
-    tapeKeysT: "RECORD · TAPE — place",
-    tapeRecorded: "recorded · B — place; friends in this game will hear your clip",
+    tapeGot: "recorder in backpack · I → RMB → equip",
+    tapeGotT: "recorder in backpack · choose it with BAG",
+    crowbarGot: "crowbar in backpack · equip with I; hold E at a lock",
+    tapeKeys: "RMB — record · LMB — place",
+    tapeKeysT: "RECORD · ITEM — place",
+    tapeRecorded: "recorded · LMB to place; friends in this game can hear the clip",
     tapeSilent: "too quiet — the old tape is still there",
     tapeNoMic: "no mic recording — the tape has knocks; M — enable microphone",
     tapeRecordWarn: "REC · 2 seconds — speak; the things can hear you right now too",
     tapePlaced: "recorder: 3 s delay, then 20 s of sound — leave",
     tapeFlat: "the recorder is flat — it will stay on the ground",
-    pryNeed: "locked · need a crowbar (Zarya entrance or the fire lookout)",
+    pryNeed: "locked · equip the crowbar from the backpack (I)",
     usePry: "HOLD E — PRY OPEN · LOUD",
     usePryT: "HOLD HANDS — PRY OPEN · LOUD",
     useLookout: "HOLD E — CLIMB",
@@ -603,10 +700,10 @@ const STR = {
     itHears: 'it can hear you',
     tutMove: 'move away quietly — WASD · Shift run (loud) · C sneak',
     tutMoveTouch: 'move away quietly — left stick · push fully to run (loud)',
-    tutStone: 'RMB / F — throw a stone to distract them',
-    tutStoneTouch: 'STONE — throw it to distract them',
-    tutUse: 'there is a body by the generator — walk up and hold E · Tab — what to do next',
-    tutUseTouch: 'there is a body by the generator — walk up, a HANDS button appears · tap the top — task',
+    tutStone: "I — backpack · RMB on nuts → equip · LMB — throw",
+    tutStoneTouch: "BAG → nuts → equip · ITEM — throw",
+    tutUse: "there is a body by the generator — hold E · Tab — check your watch",
+    tutUseTouch: "at the body — hold HANDS · tap the top — check your watch",
     tutScream: 'and whatever happens — do not scream',
     morningBig: 'morning',
     morningSmall: 'camp at the old clearing',
@@ -650,15 +747,15 @@ const STR = {
     touchGlow: 'LIGHT',
     aGlowDay: 'save the glow stick for the dark',
     aNoGlow: 'no glow sticks left',
-    hintGlow: 'G — throw the stick · E — pick it up again',
-    hintGlowTouch: 'LIGHT — throw the stick · HANDS — pick it up again',
+    hintGlow: "LMB — throw stick · E — pick up · I — put in backpack",
+    hintGlowTouch: "ITEM — throw stick · HANDS — pick up",
     useGlowPick: 'E · pick up the glow stick',
     useGlowPickT: 'HANDS · pick up the glow stick',
     useTorch: 'E · take the flashlight',
     useTorchT: 'HANDS · take the flashlight',
     touchTorch: 'TORCH',
-    torchGot: "flashlight · T to switch it on (the battery won't last)",
-    torchGotT: "flashlight · TORCH to switch it on (the battery won't last)",
+    torchGot: "flashlight in backpack · I → equip · LMB — on/off",
+    torchGotT: "flashlight in backpack · equip it, then ITEM — on/off",
     torchMore: 'another flashlight — its battery goes into yours',
     torchNone: 'no flashlight — look by a wrecked car, a tower, the graves',
     torchDead: 'the battery is flat',
@@ -750,8 +847,8 @@ const STR = {
     taskGo: 'the engine is running — everyone in, and go',
     usePart: 'E · pick up',
     usePartT: 'HANDS · pick up',
-    usePartHeld: 'F · throw · R · put down',
-    usePartHeldT: 'THROW · PUT DOWN',
+    usePartHeld: "R — PUT DOWN · LMB — THROW",
+    usePartHeldT: "CARRY — PUT DOWN · ITEM — THROW",
     useFit: 'hold E · fit {part}',
     useFitT: 'hold HANDS · fit {part}',
     useRead: 'E · read',
@@ -773,7 +870,7 @@ const STR = {
     crankDead: 'nothing — no battery',
     crankDry: 'it turns, but won\'t catch — the tank is dry',
     crankNoCarb: 'it turns, but won\'t catch — no carburettor',
-    hintPart: 'heavy — no running · take it to the UAZ · F — throw, R — put down',
+    hintPart: 'heavy — no running · take it to the UAZ · LMB — throw, R — put down',
     hintPartTouch: 'heavy — no running · take it to the UAZ · THROW / PUT DOWN',
     hintDrive: 'behind the wheel (E) — and hold E to start it',
     hintDriveTouch: 'behind the wheel (HANDS) — and hold HANDS to start it',
@@ -822,8 +919,8 @@ const STR = {
     hintWatcher: 'THE WATCHER — moves only in the dark. keep it lit',
     hintHowler: 'a deep breath… FREEZE',
     hintHowlerSpot: 'it saw you move — get off this spot, then freeze again',
-    hintFlare: 'Q — flare: lights everything up… and everything comes to the light',
-    hintFlareTouch: 'FLARE — lights everything up… and everything comes to the light',
+    hintFlare: "flare gun in backpack · I → equip · LMB — fire",
+    hintFlareTouch: "flare gun in backpack · equip it, then ITEM — fire",
     hintFlareLure: 'they are coming to the light',
     deadTitle: 'IT FOUND YOU',
     deadScream: 'YOU SCREAMED',
@@ -867,16 +964,19 @@ const STR = {
     on: 'on',
     off: 'off',
     howtoBody: `
+<p><b>Backpack — I.</b> Reach over your shoulder to open four pockets. RMB on an item offers equip or drop (tap it on a phone). LMB uses the equipped nuts, glow stick, flashlight, flare gun, batteries or recorder. RMB with the recorder records. Equip the crowbar to pry locks. Heavy UAZ parts are carried separately; notes and generator parts belong to the team. The forest does not pause while you search your bag.</p>
+<p><b>TAB — your left-wrist watch.</b> Hold to raise it: time, generators, UAZ parts, score, multiplier, living players and current task. On touch, tap the top of the screen.</p>
+<p><b>The Shade speaks with your team's voices.</b> With a microphone enabled, the game remembers complete phrases (up to 30 seconds, never cut short) and may repeat them elsewhere in the woods with their original voice, speed and intonation. It can even wear the speaker's appearance. Only two recent phrases per player are kept in this game's memory and sent directly to its participants; leaving deletes them. The menu and garage never record phrases. Muted players stay muted when imitated. A Settings poster on the garage wall lets the host hide names for the whole team.</p>
 <p><b>Morning. A camp, a humming generator, birdsong.</b> Then the light dies all at once — and you are in a vast dark forest where you cannot see. Every sound is sonar: a wave spreads out from you and for a few seconds reveals trees, rocks… and <span class="red">them</span>. For the first 45 seconds of the night the forest is still asleep — look around and find your way while nothing is out there.</p>
 <p><b>First: five generators.</b> By each one lies the body of someone who tried before you: search it (hold E) for the part and a note about where the next one is. A generator you know about beeps on its radio — follow the sound. Repairs are noisy: clanks, sparks, the engine roaring to life. Got it running? Leave. A running generator lights a lamp: in its light you can see them, and walls throw shadows from it.</p>
-<p><b>Then: out of the woods.</b> Five generators bring the power back to the <b>forestry yard</b> by the north edge: a siren howls and its sliding gate rolls open. Inside stands the <b>UAZ</b>, stripped: no wheel, no battery, no carburettor, no fuel. The guard's log on his booth says where they went. The parts are real: pick one up (E) and carry it in your arms — slowly, no running, hands full; R puts it down, F throws it (the wheel rolls). Fit each one at the car (hold E). Then get behind the wheel and hold E: the engine catches with a roar the whole forest hears. E again — and everyone in the car (lay the wounded in the back, R) drives out down the cut to the highway.</p>
+<p><b>Then: out of the woods.</b> Five generators bring the power back to the <b>forestry yard</b> by the north edge: a siren howls and its sliding gate rolls open. Inside stands the <b>UAZ</b>, stripped: no wheel, no battery, no carburettor, no fuel. The guard's log on his booth says where they went. The parts are real: pick one up (E) and carry it in your arms — slowly, no running, hands full; R puts it down, LMB throws it (the wheel rolls). Fit each one at the car (hold E). Then get behind the wheel and hold E: the engine catches with a roar the whole forest hears. E again — and everyone in the car (lay the wounded in the back, R) drives out down the cut to the highway.</p>
 <p><b>Microphone:</b> click your tongue, clap, say “hey”. Louder sound — you see further. But <span class="red">they hear further too</span>: normal talk from a couple of steps, a raised voice from far away. A scream (the ring around the dot turns red) means an instant hunt. <b>No mic:</b> SPACE — a click, hold for louder.</p>
-<p><b>Listeners and Crawlers</b> walk to where the sound was. Made a noise? Move. A stone (RMB / F) lures them away. Later two others arrive, one of each per forest: <b>the Watcher</b> is deaf but moves only while no light is on it — keep it lit; it won't enter a lamp. <b>The Howler</b> barely hears, but now and then it fills its chest and howls: whatever moves inside that wave, it sees. Hear the breath — freeze.</p>
-<p><b>The flare gun.</b> One of the bodies (a different one every night) has a flare gun with two shots. Q — the flare climbs, opens its parachute and floods the forest with red light for about fifteen seconds: you see everything, and everyone. But <span class="red">every creature around comes to the light</span> — fire it away from yourself. <b>The hunting cabin</b>: its door closes (E). Wanderers won't get it open at once — they lean on it until it creaks open; the one hunting you breaks it down in three blows.</p>
-<p><b>The flashlight</b> lies somewhere in the forest — by a wrecked car, a tower, the graves — still switched on: you can see its weak beam from far off. T switches it: a cone of real light where you look. It isn't for walking with the light on — it's for a quick look: the battery lasts a minute (you find it half flat, and spares are rare in the cupboards), and <span class="red">a lit flashlight is seen from far off</span> — whatever the beam falls on, and anything near with nothing between you, comes to the light. When the battery is nearly flat, it flickers and goes out for moments — <b>the Watcher moves in those moments</b>.</p>
+<p><b>Listeners and Crawlers</b> walk to where the sound was. Made a noise? Move. Nuts from the backpack (I → RMB → equip, LMB to throw) lure them away. Later two others arrive, one of each per forest: <b>the Watcher</b> is deaf but moves only while no light is on it — keep it lit; it won't enter a lamp. <b>The Howler</b> barely hears, but now and then it fills its chest and howls: whatever moves inside that wave, it sees. Hear the breath — freeze.</p>
+<p><b>The flare gun.</b> One of the bodies (a different one every night) has a flare gun with two shots. Equip it from I; LMB — the flare climbs, opens its parachute and floods the forest with red light for about fifteen seconds: you see everything, and everyone. But <span class="red">every creature around comes to the light</span> — fire it away from yourself. <b>The hunting cabin</b>: its door closes (E). Wanderers won't get it open at once — they lean on it until it creaks open; the one hunting you breaks it down in three blows.</p>
+<p><b>The flashlight</b> lies somewhere in the forest — by a wrecked car, a tower, the graves — still switched on: you can see its weak beam from far off. Equip it from the backpack; LMB switches it: a cone of real light where you look. It isn't for walking with the light on — it's for a quick look: the battery lasts a minute (you find it half flat, and spares are rare in the cupboards), and <span class="red">a lit flashlight is seen from far off</span> — whatever the beam falls on, and anything near with nothing between you, comes to the light. When the battery is nearly flat, it flickers and goes out for moments — <b>the Watcher moves in those moments</b>.</p>
 <p><b>The fire lookout</b> stands in the northwest: hold E for five seconds to climb the creaking ladder. At the top, E — binoculars for 10 seconds (then 25 seconds to cool), R — down. They show the real forest, generator lights and moving creatures, but cast no light and do not freeze the Watcher. Trees and walls still block the view.</p>
-<p><b>Zarya pioneer camp</b> in the southwest: two dormitories and a dining hall, cupboards with supplies. A <b>crowbar</b> lies at its gate and by the lookout: hold E at a padlock for 2.8 seconds; prying is loud. A <b>cassette recorder</b> is in the dining hall and by the lookout: V — record 2 seconds from your mic, B — place it. After 3 seconds it loops for 20 seconds, luring creatures; E — retrieve it (two playbacks per battery). No mic? The tape has knocks. Recordings live only for this game and go directly to friends when you place a lure. E at the square’s loudspeaker switch starts a 35-second assembly call, once per night — leave before the guests arrive.</p>
-<p><b>The glow stick</b> — one each per night. G — crack it: for a couple of minutes it glows green in your hand; G again — throw it ahead (E — pick it up off the ground). In its light, as under a generator's lamp, the forest looks the way it really is — easy to tell where you are. The Watcher won't step into that light.</p>
+<p><b>Zarya pioneer camp</b> in the southwest: two dormitories and a dining hall, cupboards with supplies. A <b>crowbar</b> lies at its gate and by the lookout: hold E at a padlock for 2.8 seconds; prying is loud. A <b>cassette recorder</b> is in the dining hall and by the lookout: equip from I, RMB — record 2 seconds from your mic, LMB — place it. After 3 seconds it loops for 20 seconds, luring creatures; E — retrieve it (two playbacks per battery). No mic? The tape has knocks. Recordings live only for this game and go directly to friends when you place a lure. E at the square’s loudspeaker switch starts a 35-second assembly call, once per night — leave before the guests arrive.</p>
+<p><b>The glow stick</b> — one each per night. LMB with it equipped — crack it: for a couple of minutes it glows green in your hand; LMB again — throw it ahead (E — pick it up off the ground). In its light, as under a generator's lamp, the forest looks the way it really is — easy to tell where you are. The Watcher won't step into that light.</p>
 <p><b>There is almost no interface.</b> The ring around the dot is your loudness. Tab shows time, generators and the current task. The hairline at the top fills with each generator. After 45 minutes the forest wakes up for good.</p>
 <p><b>Score:</b> time × danger multiplier, bodies found, generators, shards, close calls, escapes. Winning gives a bonus — bigger the faster you are.</p>
 <p><b>With friends:</b> WITH FRIENDS › CREATE and send the link (or code) — up to 4 players in one forest. Voices come from where your friends stand and fade with distance; <span class="red">the monsters hear them just as well</span> — but talking quietly side by side is fine: they only hear that from up close. Their echoes light the forest too. A friend who gets caught doesn't die at once — they go down and slowly bleed out. Kneel and feel for a pulse (hold E): you'll know how long they have left — and you'll have to check again to know again. Lift them onto your shoulder (R) — no running with them, heavy steps — and carry them to <b>the scouts' abandoned first-aid hut</b> by the camp: only on its cot (R) and only by hand (hold E) can they be brought back. The fallen watch through the eyes of the living — and the living can't hear them. The lobby is a garage: everyone has their own place (click yourself for the wardrobe, a friend for their volume), and when the host presses START, the car starts.</p>
@@ -885,14 +985,12 @@ const STR = {
 <tr><td>Mouse</td><td>look (click to lock cursor)</td></tr>
 <tr><td>SPACE</td><td>echo: tap = click, hold = loud (a short cooldown after each)</td></tr>
 <tr><td>E (hold)</td><td>search a body · repair a generator · door · a friend's pulse · pick up / fit a part · get in the UAZ, start it</td></tr>
-<tr><td>RMB / F</td><td>throw stone (with a part in your arms — throw that)</td></tr>
-<tr><td>G</td><td>glow stick: crack · throw</td></tr>
-<tr><td>V / B</td><td>recorder: record / place a lure</td></tr>
-<tr><td>T</td><td>flashlight (once you've found it): on · off</td></tr>
+<tr><td>I</td><td>backpack · four pockets</td></tr>
+<tr><td>RMB</td><td>backpack item menu · record with recorder equipped</td></tr>
+<tr><td>LMB</td><td>use equipped item · throw a carried car part</td></tr>
 <tr><td>R</td><td>carry a fallen friend · put down (on the cot, in the car) · put a part down · get out of the car</td></tr>
-<tr><td>Q</td><td>signal flare (once you've found the gun)</td></tr>
 <tr><td>Shift / C</td><td>run / sneak</td></tr>
-<tr><td>Tab</td><td>time, generators, task</td></tr>
+<tr><td>Tab (hold)</td><td>raise left wrist · digital watch</td></tr>
 <tr><td>Enter</td><td>skip the morning</td></tr>
 <tr><td>M · Esc / P</td><td>mic · pause</td></tr>
 </table>`,

@@ -237,14 +237,19 @@ export class GlowSticks {
   // E on a stick lying on the ground: it's yours now
   pick(s) {
     const g = this.g;
-    if (this.held) return;
-    this._take(s, g.player.id);
-    if (g.sync) g.sync.ev('gp', s.id);
-    g.audio.glowPick();
+    if (this.held || !g.inventory.canReceive('glow', true)) return;
+    if(g.auth) return this.hostPick(g.player.id,s.id);
+    g.coop.toHost('gq',s.id);
+  }
+  hostPick(pid,id) {
+    const g=this.g,p=g.playerById(pid),s=this.find(id);
+    if(!g.auth || !p?.alive || !s || s.state!=='ground' || s.left<=0 || this.heldBy(pid) || p.carrying || g.escape.load(pid) || g.escape.seatOf(pid)>=0 || g.cabinets.locked(pid)) return false;
+    if(Math.hypot(p.x-s.x,p.z-s.z)>2.2 || Math.abs(p.y-s.y)>1.8 || g.world.losBlocked(p.x,p.y+p.eyeCur,p.z,s.x,s.y+.04,s.z,.18) || !g.inventory.reserve(pid,'glow')) return false;
+    this.remotePick(pid,id); if(g.sync) g.sync.ev('ga',id,pid); return true;
   }
   remotePick(pid, id) {
     const s = this.find(id);
-    if (s) this._take(s, pid);
+    if (s) { this._take(s, pid); if(pid===this.g.player.id) { this.g.inventory.reconcile(); if(this.g.audio.ready) this.g.audio.glowPick(); } }
   }
   _take(s, pid) {
     const had = this.heldBy(pid);
@@ -284,6 +289,8 @@ export class GlowSticks {
   // ---------------- per frame ----------------
   _holdPos(s, holder) {
     const g = this.g;
+    const equipped = holder === g.player ? g.inventory?.equipped : holder.equipped;
+    if (equipped !== 'glow') { const f = holder.forward(); s.x = holder.x - f.x * .15; s.y = holder.y + 1.1; s.z = holder.z - f.z * .15; return; }
     if (holder === g.player) {
       // low in your right hand, a little ahead — but never further out than your own elbows reach
       // (inside the circle you take up: up against a wall, the light stays on your side of it)
@@ -386,7 +393,9 @@ export class GlowSticks {
   _place(s) {
     if (!s.mesh) return;
     const k = this.power(s);
-    const on = s.y > -50;
+    const holder = s.state === 'held' && this.g.playerById(s.owner);
+    const packed = holder && (holder === this.g.player ? this.g.inventory.equipped : holder.equipped) !== 'glow';
+    const on = s.y > -50 && !packed;
     s.mesh.visible = s.halo.visible = on;
     s.mesh.position.set(s.x, s.y, s.z);
     if (s.state === 'ground') s.mesh.rotation.set(Math.PI / 2, s.spin, 0, 'YXZ');
@@ -421,7 +430,9 @@ export class GlowSticks {
     const me = this.g.player.id;
     for (const s of this.list) {
       if (s.y < -50) continue;
-      const I = G.light * this.power(s);
+      const holder = s.state === 'held' && this.g.playerById(s.owner);
+      const packed = holder && (holder === this.g.player ? this.g.inventory.equipped : holder.equipped) !== 'glow';
+      const I = G.light * this.power(s) * (packed ? .08 : 1);
       if (I <= 0.001) continue;
       // (lying on the ground its light is lifted a little: from right at the ground it would only graze it)
       out.push({ x: s.x, y: s.y + (s.state === 'ground' ? 0.35 : 0.1), z: s.z, I, c: G.color, R: G.radius, prio: s.state === 'held' && s.owner === me ? 2 : 0, near: 0.1, id: s });

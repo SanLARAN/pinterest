@@ -113,51 +113,76 @@ export function buildListener() {
   return R;
 }
 
-// ---------------- Crawler: low, fast, many limbs ----------------
+// ---------------- Crawler: a human silhouette broken into a low, six-handed gait ----------------
 export function buildCrawler() {
   const R = makeRig('crawler');
   const N = (name, parent, x, y, z) => node(R, name, parent, x, y, z);
-  const body = N('body', null, 0, 0.62, 0);
+  const body = N('body', null, 0, 0.66, 0);
   part(R, body, (b) => {
-    b.place(0, 0, -0.6, Math.PI / 2, 0, 0);
-    b.taper(0.34, 0.26, 0.46, 0.32, 1.3, KIND.FLESH, 0.02);
-    for (let k = 0; k < 7; k++) {
-      b.place(0, 0.17, -0.5 + k * 0.17, -0.5, 0, 0);
-      b.cone(4, 0.04, 0.18, KIND.BONE);
-    }
-  });
-  const head = N('head', body, 0, 0.06, 0.72);
-  part(R, head, (b) => {
-    b.place(0, 0.02, -0.05, Math.PI / 2 - 0.1, 0, 0);
-    b.taper(0.3, 0.24, 0.14, 0.12, 0.42, KIND.BONE);
-    for (let e = 0; e < 4; e++) {
-      b.place((e % 2 ? 1 : -1) * (0.05 + (e > 1 ? 0.06 : 0)), 0.09 - (e > 1 ? 0.03 : 0), 0.16 + (e > 1 ? -0.05 : 0));
-      b.octa(0.022, 0.022, KIND.EYE);
-    }
-  });
-  const jaw = N('jaw', head, 0, -0.07, 0.0);
-  part(R, jaw, (b) => {
-    b.place(0, 0, -0.02, Math.PI / 2 + 0.25, 0, 0);
-    b.taper(0.26, 0.06, 0.1, 0.04, 0.38, KIND.BONE);
-    for (let k = 0; k < 6; k++) {
+    // A narrow, twisted pelvis; the chest is mostly negative space between the ribs.
+    b.place(0, -0.02, -0.52, 0.24, 0.12, 0.1); b.taper(0.29, 0.19, 0.38, 0.23, 0.34, KIND.FLESH);
+    b.identity();
+    b.limb([0, 0.08, -0.65], [0.04, 0.31, -0.08], 0.07, 0.055, KIND.BONE, 4);
+    b.limb([0.04, 0.31, -0.08], [0, 0.08, 0.51], 0.055, 0.075, KIND.FLESH, 4);
+    for (let k = 0; k < 5; k++) {
+      const z = -0.35 + k * 0.18, y = 0.25 + Math.sin(k / 4 * Math.PI) * 0.07;
+      b.place(0.025, y + 0.04, z, 0.1, 0, (k % 2 ? 1 : -1) * 0.14); b.box(0.11, 0.09, 0.11, KIND.BONE);
       for (const s of [-1, 1]) {
-        b.place(s * (0.1 - k * 0.012), 0.02 - k * 0.02, 0.06 + k * 0.05, 0, 0, 0);
-        b.cone(3, 0.012, 0.05, KIND.BONE);
+        b.identity();
+        b.limb([0.02, y, z], [s * (0.27 + k * 0.015), y - 0.12, z + 0.04], 0.019, 0.013, KIND.BONE, 3);
+        b.limb([s * (0.27 + k * 0.015), y - 0.12, z + 0.04], [s * 0.17, -0.16, z + 0.07], 0.013, 0.007, KIND.BONE, 3);
       }
     }
+    // Two mismatched shoulder blades, a dangling sternum and a neck held much too low.
+    for (const s of [-1, 1]) {
+      b.place(s * 0.22, 0.07, 0.34, 0.35, s * 0.45, s * 0.3); b.octa(0.16, 0.23, KIND.FLESH);
+    }
+    b.identity(); b.limb([0, -0.13, -0.1], [0, -0.24, 0.47], 0.023, 0.015, KIND.BONE, 3);
+    b.limb([0, 0.02, 0.48], [0, -0.11, 0.73], 0.095, 0.075, KIND.FLESH, 4);
   });
-  const legs = [
-    ['FL', -0.2, 0.42, 1], ['FR', 0.2, 0.42, 1],
-    ['ML', -0.22, -0.05, 0], ['MR', 0.22, -0.05, 0],
-    ['BL', -0.2, -0.5, -1], ['BR', 0.2, -0.5, -1],
-  ];
-  for (const [name, x, z, fb] of legs) {
-    const s = x < 0 ? -1 : 1;
+  const head = N('head', body, 0, -0.04, 0.76);
+  part(R, head, (b) => {
+    b.place(0, 0.03, -0.025, 0, 0, 0.16); b.rock(0.2, mulberry(73), KIND.BONE, 0.09, 0.82);
+    // Heavy orbital ridges above empty sockets; the eyes are buried, not a row of insect LEDs.
+    for (const s of [-1, 1]) {
+      b.place(s * 0.092, 0.065, 0.135, -0.08, s * -0.16, s * -0.13); b.box(0.14, 0.07, 0.12, KIND.FLESH);
+      b.place(s * 0.085, 0.006, 0.154); b.octa(0.065, 0.05, KIND.EFFIGY);
+      b.place(s * 0.087, 0.012, 0.185); b.octa(0.014, 0.01, KIND.EYE);
+      b.identity(); b.limb([s * 0.15, 0.02, 0.05], [s * 0.18, -0.105, 0.2], 0.022, 0.014, KIND.BONE, 3);
+    }
+    b.place(0, -0.07, 0.175); b.octa(0.046, 0.048, KIND.EFFIGY);
+    b.place(0, -0.1, 0.15); b.box(0.25, 0.06, 0.1, KIND.BONE);
+    for (let k = 0; k < 5; k++) {
+      b.place((k - 2) * 0.042, -0.12, 0.205, Math.PI, 0, 0); b.cone(3, 0.013, 0.045 + (k % 2) * 0.02, KIND.BONE);
+    }
+  });
+  const jaw = N('jaw', head, 0, -0.1, 0.01);
+  part(R, jaw, (b) => {
+    b.identity();
+    for (const s of [-1, 1]) {
+      b.limb([s * 0.16, 0, 0.04], [s * 0.145, -0.09, 0.21], 0.027, 0.018, KIND.BONE, 3);
+      b.limb([s * 0.145, -0.09, 0.21], [s * 0.035, -0.11, 0.27], 0.018, 0.012, KIND.BONE, 3);
+    }
+    for (let k = 0; k < 4; k++) { b.place((k - 1.5) * 0.055, -0.085, 0.22); b.cone(3, 0.012, 0.055, KIND.BONE); }
+    b.identity(); b.limb([0, -0.08, 0.11], [0.018, -0.17, 0.23], 0.032, 0.009, KIND.FLESH, 3);
+  });
+  for (const [name, x, z, fb] of [['FL',-.21,.4,1],['FR',.21,.4,1],['ML',-.21,-.03,0],['MR',.21,-.03,0],['BL',-.18,-.48,-1],['BR',.18,-.48,-1]]) {
+    const s = x < 0 ? -1 : 1, kx = s * 0.43, ky = 0.27, kz = fb * 0.23;
     const hip = N('hip' + name, body, x, 0, z);
-    const kx = s * 0.55, ky = 0.42, kz = fb * 0.25;
-    part(R, hip, (b) => { b.identity(); b.limb([0, 0, 0], [kx, ky, kz], 0.05, 0.035, KIND.FLESH); });
+    part(R, hip, (b) => {
+      b.identity(); b.limb([0,0,0], [kx,ky,kz], 0.062, 0.033, KIND.FLESH, 4);
+      b.place(kx,ky,kz); b.octa(0.05,0.065,KIND.BONE);
+    });
     const kn = N('kn' + name, hip, kx, ky, kz);
-    part(R, kn, (b) => { b.identity(); b.limb([0, 0, 0], [s * 0.32, -1.02, fb * 0.2], 0.035, 0.012, KIND.BONE, 4); });
+    const end = [s * .32, -.79, fb * .18];
+    part(R, kn, (b) => { b.identity(); b.limb([0,0,0],end,.032,.019,KIND.BONE,4); });
+    const hand = N('palm' + name, kn, ...end);
+    part(R, hand, (b) => {
+      b.place(0,-.015,.055,0,s*.18,0); b.box(.12,.055,.16,KIND.FLESH);
+      b.identity();
+      for(let f=0;f<4;f++) { const xx=(f-1.5)*.032; b.limb([xx,-.015,.1],[xx*1.45,-.09,.23+(.02*(1-Math.abs(f-1.5)))],.012,.004,KIND.BONE,3); }
+      b.limb([s*.055,-.01,.045],[s*.13,-.075,.14],.016,.005,KIND.BONE,3);
+    });
   }
   return R;
 }
@@ -354,21 +379,21 @@ function animListener(m, dt, t) {
 }
 
 function animCrawler(m, dt, t) {
-  const n = m.rig.nodes;
-  const amp = clamp(m.speedCur / 2.5, 0, 1.2);
-  const p = m.phase;
-  const names = ['FL', 'FR', 'ML', 'MR', 'BL', 'BR'];
-  for (let i = 0; i < 6; i++) {
-    const ph = p + (i % 2 ? Math.PI : 0) + (i >> 1) * 0.9;
-    const s = Math.sin(ph);
-    n['hip' + names[i]].rotation.y = s * 0.45 * amp;
-    n['hip' + names[i]].rotation.z = (i % 2 ? -1 : 1) * Math.max(0, Math.cos(ph)) * 0.35 * amp;
+  const n = m.rig.nodes, hunt = m.state === 'hunt';
+  const amp = clamp(m.speedCur / 2.5, 0, 1.25), p = m.phase;
+  const names = ['FL','FR','ML','MR','BL','BR'];
+  for(let i=0;i<6;i++) {
+    const ph = p + (i % 2 ? Math.PI : 0) + (i >> 1) * 1.25;
+    const step = Math.sin(ph), lift = Math.max(0, Math.cos(ph));
+    n['hip'+names[i]].rotation.set(step*.15*amp, step*.3*amp, (i%2?-1:1)*lift*.18*amp);
+    n['kn'+names[i]].rotation.set(-lift*.16*amp, 0, (i%2?1:-1)*lift*.12*amp);
+    n['palm'+names[i]].rotation.set(-lift*.3*amp, step*.14*amp, Math.sin(t*8+i)*.025);
   }
-  n.body.position.y = 0.62 + Math.abs(Math.sin(p * 2)) * 0.05 * amp + (m.state === 'hunt' ? -0.1 : 0);
-  n.body.rotation.z = Math.sin(p) * 0.06 * amp;
-  n.head.rotation.y = clamp(m.headYaw, -0.7, 0.7) + Math.sin(t * 13) * 0.05 * (m.state === 'hunt' ? 1 : 0.2);
-  n.head.rotation.z = m.state === 'search' ? Math.sin(t * 3 + m.seed) * 0.5 : 0;
-  n.jaw.rotation.x = m.state === 'hunt' ? 0.5 + Math.sin(t * 30) * 0.15 : 0.08;
+  n.body.position.y = .66 + Math.abs(Math.sin(p*2))*.035*amp - (hunt?.08:0);
+  n.body.rotation.set(Math.sin(p)*.03*amp, Math.sin(p*.5)*.035*amp, Math.sin(p)*.055*amp);
+  n.head.rotation.set(hunt?-.12:Math.sin(t*.9+m.seed)*.06, clamp(m.headYaw,-.8,.8),
+    (hunt?.08:.22) + Math.sin(t*(m.state==='search'?2.6:.55)+m.seed)*(m.state==='search'?.24:.045));
+  n.jaw.rotation.set(hunt?.58+Math.max(0,Math.sin(t*19))*.18:.14+Math.max(0,Math.sin(t*1.4))*.1, 0, Math.sin(t*3)*.025);
 }
 
 // it walks like something imitating walking: long slow strides, arms dragging behind

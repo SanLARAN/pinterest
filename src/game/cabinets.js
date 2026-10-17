@@ -518,7 +518,7 @@ export class Cabinets {
   interact(best, dt, held, pressed, T) {
     const g = this.g, hud = g.hud, o = best.obj;
     if (best.kind === 'cabinet' && o.locked) {
-      if (!g.tools?.hasCrowbar) {
+      if (!g.tools?.hasCrowbar || g.inventory.equipped !== 'crowbar') {
         this.pry = null;
         hud.setUse(t('pryNeed'), 0, false, true);
         return;
@@ -615,17 +615,9 @@ export class Cabinets {
   }
 
   take(c, k) {
-    const g = this.g, p = g.player;
     const it = c.items[k];
     if (!it || it.taken || !c.opened || c.locked) return;
-    // nuts only fit if your pockets have room for them
-    if (it.kind === 'nuts' && p.stones >= CFG.PLAYER.maxStones) {
-      g.hud.popup(t('aPocketsFull'), 'dim');
-      return;
-    }
-    this._taken(c, k);
-    if (g.sync) g.sync.ev('ct', c.i, k);
-    this._give(it.kind);
+    return this.g.inventory.claim('cabinet', c.i, k);
   }
 
   netTake(i, k) {
@@ -661,11 +653,12 @@ export class Cabinets {
       g.stats.shards++;
       const pts = Math.round(CFG.SCORE.shard * g.mult);
       g.score += pts;
-      if (p.stones < CFG.PLAYER.maxStones) p.stones++;
+      if (p.stones < CFG.PLAYER.maxStones && g.inventory.canReceive('stones')) p.stones++;
       if (a.ready) a.shardPickup(g.stats.shards);
       g.hud.popup(`+${pts} ${t('aShard')}`, 'amber');
     } else if (kind === 'battery') {
-      if (g.torch) g.torch.addBattery();
+      g.inventory.cells = Math.min(3, g.inventory.cells + 1);
+      g.hud.popup(`+ ${t('bagBattery')}`, 'amber');
       if (a.ready && a.cabinetItem) a.cabinetItem('nuts');
     } else {
       g.setFlares((p.flares | 0) + 1, !!p.hasFlare);
@@ -719,7 +712,7 @@ export class Cabinets {
       this.ui.show(true, t(g.online ? 'qteVictim' : 'qteSelf'));
     } else {
       const who = g.playerById(victimId);
-      if (who) g.hud.flashAlert(t('aShkafMate').replace('{name}', who.name), 'danger', 2.6);
+      if (who) g.hud.flashAlert(t('aShkafMate').replace('{name}', g.nameOf(who.id)), 'danger', 2.6);
       const near = Math.max(0, 1 - g.distToEars(c.front.x, c.front.z) / 25);
       g.addTrauma(0.3 * near);
       if (g.player.alive && !this.hintedHelp) {
@@ -957,7 +950,7 @@ export class Cabinets {
         g.addTrauma(0.45);
       } else {
         const who = g.playerById(tr.victim);
-        if (who) g.hud.popup(t('mateFreed').replace('{name}', who.name), 'cyan');
+        if (who) g.hud.popup(t('mateFreed').replace('{name}', g.nameOf(who.id)), 'cyan');
       }
     } else {
       if (a.ready && a.trapKill) a.trapKill(p.x, p.y + 1, p.z, tr.victim === me.id);

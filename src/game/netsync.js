@@ -14,6 +14,7 @@
 //                             who lifted whom, who is back, who bled out
 import { createMonster, STATES, TYPES } from './monsters.js';
 import { PF } from './remote.js';
+import { kindIndex } from './backpackData.js';
 
 const PS_HZ = 15;
 const SNAP_HZ = 10;
@@ -76,7 +77,7 @@ export class NetSync {
       if (g.torch && g.torch.on) f |= PF.torch;
       if (g.torch && g.torch.on && g.torch.dip) f |= PF.dip;
       const loud = g.mic.state === 'on' ? g.mic.loud : 0;
-      this.send('ps', [r2(p.x), r2(p.y), r2(p.z), r3(p.yaw), r3(p.pitch), r2(p.speed), f, r2(loud), Math.floor(g.score), g.torch ? r2(g.torch.charge) : 0]);
+      this.send('ps', [r2(p.x), r2(p.y), r2(p.z), r3(p.yaw), r3(p.pitch), r2(p.speed), f, r2(loud), Math.floor(g.score), g.torch ? r2(g.torch.charge) : 0, kindIndex(g.inventory.equipped), g.inventory.active ? 1 : g.fieldView.watch > 0.2 ? 2 : 0]);
     }
     // batched voice noise → host
     if (!this.host) {
@@ -104,7 +105,7 @@ export class NetSync {
       this.obT = 0.15;
       this.obBeat = 3;
       ob.dirty = false;
-      this.send('ob', { ...ob.netState(), d: g.doors.netState(), e: g.escape.netState(), k: g.cabinets.netState(), it: g.tools.netState(), ex: g.expedition.netState() });
+      this.send('ob', { ...ob.netState(), d: g.doors.netState(), e: g.escape.netState(), k: g.cabinets.netState(), it: g.tools.netState(), ex: g.expedition.netState(), bag: this.host ? g.inventory.netState() : null });
     }
   }
 
@@ -147,7 +148,7 @@ export class NetSync {
           g.doors.netMerge(d.d);
           g.escape.netMerge(d.e, isHostMsg);
           g.cabinets.netMerge(d.k, isHostMsg);
-          if (!this.host && isHostMsg) { g.tools.netMerge(d.it); g.expedition.netMerge(d.ex); }
+          if (!this.host && isHostMsg) { g.tools.netMerge(d.it); g.expedition.netMerge(d.ex); g.inventory.netMerge(d.bag); }
         }
         break;
       case 'nz': {
@@ -186,6 +187,13 @@ export class NetSync {
       case 'zp':
         if (this.host && Array.isArray(d)) g.cabinets.hostPress(pid, d[0] | 0, d[1] | 0, d[2] | 0);
         break;
+      case 'vp': if (this.host && Array.isArray(d)) g.voiceMimic.accept(pid, d[0], d[1]); break;
+      case 'ip': g.inventory.receiveSlots(pid, d); break;
+      case 'gq': if(this.host && typeof d==='string') g.glows.hostPick(pid,d); break;
+      case 'ibc': if (this.host && Array.isArray(d)) g.inventory.hostClaim(pid, d[0], d[1], d[2]); break;
+      case 'ibd': if (this.host && Array.isArray(d)) g.inventory.hostDrop(pid, d[0], d[1], !!d[2]); break;
+      case 'ibq': if (this.host && typeof d === 'string') g.inventory.hostPick(pid, d); break;
+      case 'ibr': if (isHostMsg && typeof d === 'string') g.inventory.reject(g.player.id, d); break;
       case 'it':
         if (this.host && Array.isArray(d) && typeof d[0] === 'string') g.tools.grant(d[0], d[1], pid, d[2]);
         break;
@@ -207,6 +215,10 @@ export class NetSync {
     const r = g.remotes.get(pid);
     switch (name) {
       // ---- from any player ----
+      case 've': if (isHostMsg) g.voiceMimic.hear(a); break;
+      case 'ibp': if (isHostMsg) g.inventory.applyParcel(a); break;
+      case 'ibg': if (isHostMsg) g.inventory.applyClaim(a); break;
+      case 'gd': if (r && typeof a === 'string') { const s = g.glows.find(a); if (s?.owner === pid && s.state === 'held') g.glows.dropFor(pid, +b, +c); } break;
       case 'pu':
         if (r) g.remotePulse(r, +a, +b, +c, +e, !!f);
         break;
@@ -240,8 +252,8 @@ export class NetSync {
       case 'gt': // ...thrown
         if (r && typeof a === 'string' && [b, c, e, f, d[6], d[7]].every((v) => Number.isFinite(+v))) g.glows.remoteThrow(pid, a, +b, +c, +e, +f, +d[6], +d[7], +d[8]);
         break;
-      case 'gp': // ...picked up off the ground
-        if (r && typeof a === 'string') g.glows.remotePick(pid, a);
+      case 'ga': // the host awards a lit stick to exactly one backpack
+        if (isHostMsg && typeof a === 'string' && typeof b === 'string') g.glows.remotePick(b, a);
         break;
       case 'cd': // the one carrying someone put them down (here, or on the cot)
         if (r && typeof a === 'string') g.rescue.netPlace(pid, a, +b, +c, !!e);

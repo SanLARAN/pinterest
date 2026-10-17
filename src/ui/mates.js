@@ -18,6 +18,7 @@ export class Mates {
   }
 
   update(game, camera, peek) {
+    if (game.roomRules?.hideNames) { this.clear(); return; }
     const seen = new Set();
     const W = innerWidth, H = innerHeight;
     for (const r of game.remotes.values()) {

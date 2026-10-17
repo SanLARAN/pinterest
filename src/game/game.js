@@ -25,6 +25,9 @@ import { Cabinets } from './cabinets.js';
 import { Torches } from './torch.js';
 import { ForestTools } from './tools.js';
 import { Expedition } from './expedition.js';
+import { Backpack } from './inventory.js';
+import { FieldView } from './fieldView.js';
+import { VoiceMimic } from './voiceMimic.js';
 import { Dread } from './dread.js';
 import { CAP } from '../world/world.js';
 import { shared } from '../render/sonar.js';
@@ -86,6 +89,10 @@ export class Game {
     this.netT = 0; // the host's night clock (guests)
     this.scareRigs = {};
     this._ears = { x: 0, y: 0, z: 0 };
+    this.roomRules = { hideNames: false };
+    this.inventory = new Backpack(this);
+    this.fieldView = new FieldView(this);
+    this.voiceMimic = new VoiceMimic(this);
   }
 
   // ---------------- co-op: who is where ----------------
@@ -108,6 +115,10 @@ export class Game {
   playerById(id) {
     if (id === this.player.id) return this.player;
     return this.remotes.get(id) || null;
+  }
+  nameOf(player) {
+    const p = typeof player === 'string' ? this.playerById(player) : player;
+    return this.roomRules.hideNames ? t('anonymousPlayer').replace('{n}', (p?.slot || 0) + 1) : p?.name || '???';
   }
   localAlive() {
     return this.player.alive;
@@ -135,6 +146,7 @@ export class Game {
   // join a co-op night: players = [{ id, name, slot }] from the host's start message
   setupOnline(coop, players) {
     this.coop = coop;
+    this.roomRules = { hideNames: !!coop.rules?.hideNames };
     this.role = coop.isHost ? 'host' : 'client';
     this.sync = new NetSync(this, coop);
     this.player.id = coop.selfId;
@@ -184,11 +196,13 @@ export class Game {
     this.glows.dropFor(r.id, r.x, r.z);
     this.escape.dropFor(r.id, r.x, r.z);
     this.tools.dropFor(r.id, r.x, r.z);
+    this.voiceMimic.forget(id);
+    this.inventory.remoteSlots.delete(id);
     this.remotes.delete(id);
     r.dispose();
     this.escape.left(id);
     this.cabinets.left(id);
-    if (this.state !== 'over') this.hud.popup(t('mateLeft').replace('{name}', r.name), 'dim');
+    if (this.state !== 'over') this.hud.popup(t('mateLeft').replace('{name}', this.nameOf(r)), 'dim');
     if (this.spectate && this.spectate.target === r) this.nextSpectate();
     if (this.auth) this.checkTeam();
   }
@@ -237,6 +251,10 @@ export class Game {
     this.tools.reset();
     this.expedition.reset();
     this.setFlares(0, false);
+    this.inventory.reset();
+    this.fieldView.reset();
+    this.voiceMimic.reset();
+    this.roomRules = { hideNames: this.online ? !!this.coop.rules?.hideNames : !!settings.lobbyHideNames };
     this.objectives.setMorning(true);
     this.charge = { active: false, t: 0 };
     this.pingCD = 0;
@@ -301,10 +319,10 @@ export class Game {
           return;
         }
         this.coop.toHost('sk', 1); // a guest asks; the host's word starts the dusk for everyone
-      } else if (e === 'glow') this.glows.use(); // (save it for the dark)
+      }
     }
     if (this.state !== 'morning') return;
-    const pev = p.update(dt, this.input, this.inputMuted ? NO_LOOK : raw.look, this.inputMuted);
+    const pev = p.update(dt, this.input, this.inputMuted || this.inventory.active ? NO_LOOK : raw.look, this.inputMuted || this.inventory.active);
     if (pev.step) this.audio.footstep(pev.step.intensity * 0.8);
     if (pev.bump) {
       this.audio.bump();
@@ -747,12 +765,13 @@ export class Game {
   }
 
   // it was lying by the body you just searched
-  onFlareFound() {
-    this.setFlares(CFG.FLARE.charges + (this.player.flares | 0)); // (+ any cartridges you found in cupboards)
+  onFlareFound(granted = false, body = this.objectives.bodies[this.objectives.flareBody]) {
+    if (!granted) return this.inventory.claim('gun', this.objectives.bodies.indexOf(body));
+    this.setFlares(Math.min(6, CFG.FLARE.charges + (this.player.flares | 0)), true); // upgrade an existing ammo pocket
     this.hud.popup(`+ ${t('flareGun')} · ${t('flareCharges').replace('{n}', CFG.FLARE.charges)}`, 'amber');
     this.hud.flashFlares();
     this.audio.flareFound();
-    if (this.sync) this.sync.ev('fg');
+    this.inventory.reconcile();
     if (!this.hinted.flare) {
       this.hinted.flare = true;
       this.timeline.push({ at: this.time + 1.2, fn: () => this.hud.setHint(t(this.input.touch ? 'hintFlareTouch' : 'hintFlare')) });
@@ -762,7 +781,7 @@ export class Game {
 
   // a teammate found it
   fxMateFlare(r) {
-    this.hud.popup(t('mateFlare').replace('{name}', r.name), 'amber');
+    this.hud.popup(t('mateFlare').replace('{name}', this.nameOf(r)), 'amber');
     for (const b of this.objectives.bodies) if (b.gun) b.gun.visible = false;
   }
 
@@ -854,7 +873,7 @@ export class Game {
 
   onMateShard(r) {
     this.earnShards(EARN.shard);
-    if (r) this.hud.popup(t('mateShard').replace('{name}', r.name), 'amber');
+    if (r) this.hud.popup(t('mateShard').replace('{name}', this.nameOf(r)), 'amber');
   }
 
   onShard(s, i) {
@@ -870,7 +889,7 @@ export class Game {
     this.fx.white = Math.max(this.fx.white, 0.06);
     this.addTrauma(0.08);
     const p = this.player;
-    if (p.stones < CFG.PLAYER.maxStones) p.stones++;
+    if (p.stones < CFG.PLAYER.maxStones && this.inventory.canReceive('stones')) p.stones++;
     // a little amber pulse of light
     this.pulses.emit(s.x, s.y, s.z, this.time, { radius: 7, strength: 0.6, decay: 1.4, color: [1.0, 0.72, 0.35], kind: 'shard' });
   }
@@ -1046,7 +1065,7 @@ export class Game {
   fxMateFound(r, k) {
     const spec = CFG.GENERATORS[k];
     if (!spec) return;
-    this.hud.popup(t('mateFound').replace('{name}', r.name).replace('{part}', t('parts')[spec.part]), 'amber');
+    this.hud.popup(t('mateFound').replace('{name}', this.nameOf(r)).replace('{part}', t('parts')[spec.part]), 'amber');
   }
 
   onSpark(g, remote = false) {
@@ -1072,7 +1091,7 @@ export class Game {
     this.stats.gens = count;
     const pts = CFG.SCORE.generator * this.mult;
     this.score += pts;
-    this.hud.popup(by ? `+${Math.round(pts)} · ${t('mateStarted').replace('{name}', by.name)}` : `+${Math.round(pts)}`, 'amber');
+    this.hud.popup(by ? `+${Math.round(pts)} · ${t('mateStarted').replace('{name}', this.nameOf(by))}` : `+${Math.round(pts)}`, 'amber');
     this.hud.flashAlert(t('aGenOn').replace('{n}', count), 'dawn', 2.6);
     this.hud.peek(4);
     // the light coming back: a warm wave rolls out from the lamp
@@ -1200,7 +1219,7 @@ export class Game {
     r.carriedBy = null;
     const near = this.distToEars(r.x, r.z) < 30;
     this.audio.mateDeath(r.x, r.y + 1.2, r.z, near);
-    this.hud.flashAlert(t('mateShkafDied').replace('{name}', r.name), 'danger', 2.8);
+    this.hud.flashAlert(t('mateShkafDied').replace('{name}', this.nameOf(r)), 'danger', 2.8);
     this.addTrauma(near ? 0.4 : 0.15);
     this.fx.red = Math.max(this.fx.red, near ? 0.4 : 0.15);
     if (this.spectate && this.spectate.target === r) this.timeline.push({ at: this.time + 1.6, fn: () => this.nextSpectate() });
@@ -1229,7 +1248,7 @@ export class Game {
     }
     this.audio.mateDeath(r.x, r.y + 1.4, r.z, near);
     if (m && m.x !== undefined) this.pulses.emit(r.x, r.y + 1.2, r.z, this.time, { radius: near ? 18 : 12, strength: 0.9, decay: 0.8, color: RED, kind: 'monster' });
-    this.hud.flashAlert(t('mateDied').replace('{name}', r.name), 'danger', 2.4);
+    this.hud.flashAlert(t('mateDied').replace('{name}', this.nameOf(r)), 'danger', 2.4);
     this.addTrauma(near ? 0.4 : 0.15);
     this.fx.red = Math.max(this.fx.red, near ? 0.35 : 0.15);
     if (this.spectate && this.spectate.target === r) this.timeline.push({ at: this.time + 1.6, fn: () => this.nextSpectate() });
@@ -1357,9 +1376,13 @@ export class Game {
       n.shoulderL.rotation.x = -1.6; n.shoulderR.rotation.x = -1.6;
       n.shoulderL.rotation.z = -0.9; n.shoulderR.rotation.z = 0.9;
     } else {
-      n.head.rotation.z = Math.sin(tt * 50) * 0.2;
-      n.jaw.rotation.x = 0.9 + Math.sin(tt * 40) * 0.2;
-      n.body.rotation.x = -0.6;
+      n.head.rotation.set(-.18+Math.sin(tt*38)*.06,Math.sin(tt*23)*.12,Math.sin(tt*50)*.13);
+      n.jaw.rotation.x = .95 + Math.sin(tt * 40) * .2;
+      n.body.rotation.x = -.42-.2*smoothstep(0,.6,tt);
+      // Front palms lunge around the skull instead of leaving six motionless spider legs.
+      n.hipFL.rotation.set(-.75,.28,.6); n.hipFR.rotation.set(-.75,-.28,-.6);
+      n.knFL.rotation.x=-.7+Math.sin(tt*31)*.12; n.knFR.rotation.x=-.7-Math.sin(tt*31)*.12;
+      n.palmFL.rotation.x=.8; n.palmFR.rotation.x=.8;
     }
     const camY = p.y + p.eyeCur;
     const fx = -Math.sin(p.yaw), fz = -Math.cos(p.yaw);
@@ -1475,7 +1498,7 @@ export class Game {
   // ---------------- scares ----------------
   scare() {
     const opts = ['apparition', 'snap', 'whisper', 'runner'];
-    if (this.mic.snippets.length) opts.push('mimic', 'mimic');
+    if (this.auth && this.voiceMimic.available) opts.push('mimic', 'mimic');
     let kind = this.rng.pick(opts);
     if (this.scareCount === 0) kind = 'snap';
     this.scareCount++;
@@ -1567,21 +1590,7 @@ export class Game {
   }
 
   scare_mimic() {
-    const p = this.player;
-    const a = this.rng.float(0, Math.PI * 2), d = this.rng.float(12, 20);
-    const x = p.x + Math.cos(a) * d, z = p.z + Math.sin(a) * d;
-    const y = this.world.terrain.height(x, z);
-    if (!this.mic.mimic(x, y + 1.7, z, 0.9)) return this.scare_snap();
-    this.radar.blip(x, z, 'unknown');
-    this.timeline.push({
-      at: this.time + 0.9,
-      fn: () => {
-        this.pulses.emit(x, y + 1.5, z, this.time, { radius: 8, strength: 0.6, decay: 1.2, color: RED, kind: 'scare' });
-        this.shade.place(x, y, z, Math.atan2(p.x - x, p.z - z));
-        this.stats.seen.shade = 1;
-        this.ghosts.spawn(this.shade.rig, this.time, { strength: 1.1, life: 2.0, decay: 1.0, color: 0xff3a2a });
-      },
-    });
+    if (!this.voiceMimic.replay()) this.scare_snap();
   }
 
   // ---------------- per-frame ----------------
@@ -1617,6 +1626,10 @@ export class Game {
     const fx = this.fx;
     const input = this.input;
     if (this.inputMuted) raw = { look: NO_LOOK, events: [] };
+    this.inventory.update(dt);
+    this.fieldView.update(dt);
+    this.voiceMimic.update(dt);
+    if (this.inventory.active) raw = { look: NO_LOOK, events: [] };
     let look = raw.look;
     this.events = raw.events;
     this.tools.update(dt);
@@ -1663,7 +1676,8 @@ export class Game {
       this.rescue.update(dt);
       for (const e of this.inputMuted ? [] : raw.events) {
         if (e === 'carry') this.rescue.carryKey();
-        else if (e === 'torch') this.torch.toggle();
+        else if (e === 'primary') this.inventory.primary();
+        else if (e === 'secondary') this.inventory.secondary();
       }
       this.time += dt;
       if (this.player.alive) this.player.update(dt, input, look, this.inputMuted);
@@ -1698,19 +1712,9 @@ export class Game {
         this.charge.active = true;
         this.charge.t = 0;
       } else if (e === 'pingUp') this.pingRelease();
-      else if (e === 'throw') {
-        if (es.held) es.throwHeld(); // with a part in your arms, F throws that
-        else this.throwStone();
-      } else if (e === 'flare') {
-        if (es.held) this.handsFull();
-        else this.fireFlare();
-      } else if (e === 'glow') {
-        if (es.held && !this.glows.held) this.handsFull();
-        else this.glows.use();
-      } else if (e === 'carry') this.carryKey();
-      else if (e === 'torch') this.torch.toggle();
-      else if (e === 'record') this.tools.record();
-      else if (e === 'tape') this.tools.play();
+      else if (e === 'primary') this.inventory.primary();
+      else if (e === 'secondary') this.inventory.secondary();
+      else if (e === 'carry') this.carryKey();
     }
     // E puts a note away
     if (this.objectives.note && raw.events.includes('useDown')) {
@@ -1731,7 +1735,7 @@ export class Game {
     // ---- player ----
     const p = this.player;
     // (in the УАЗ you sit still and look about: see Escape._seated)
-    const pev = es.mySeat >= 0 || caught || this.expedition.onTower ? this.seatedLook(look) : p.update(dt, input, look, this.inputMuted, es.load(p.id));
+    const pev = es.mySeat >= 0 || caught || this.expedition.onTower ? this.seatedLook(look) : p.update(dt, input, look, this.inputMuted || this.inventory.active, es.load(p.id));
     if (pev.step) {
       const s = pev.step;
       this.audio.footstep(s.intensity);
@@ -1943,6 +1947,7 @@ export class Game {
 
   updateFronts() {
     for (const s of this.pulses.fronts()) {
+      this.voiceMimic.reveal(s);
       for (const m of this.monsters) {
         const d = Math.hypot(m.x - s.x, m.y + 1.4 - s.y, m.z - s.z);
         if (d > s.prevR && d <= s.curR && d <= s.radius) {
@@ -2134,11 +2139,14 @@ export class Game {
     this.audio.setListener(camera.position.x, camera.position.y, camera.position.z, _v.x, _v.y, _v.z);
     this.expedition.applyView(camera);
     const hands = !cutCam && !sp && !this.expedition.onTower && this.player.alive && (this.state === 'play' || this.state === 'dawn');
-    this.glows.placeView(camera, hands && !this.cabinets.busy);
+    const gear = hands && !this.cabinets.busy && !this.inventory.active && this.inventory.equipT <= 0 && this.fieldView.watch < 0.1 && !this.escape.held && !this.player.carrying;
+    const active = this.inventory.equipped;
+    this.glows.placeView(camera, gear && active === 'glow');
     this.escape.placeView(camera, hands);
     this.cabinets.placeView(camera, hands);
-    this.torch.placeView(camera, hands && !this.cabinets.busy);
-    this.tools.placeView(camera, hands && !this.cabinets.busy && !this.escape.held && !this.player.carrying);
+    this.torch.placeView(camera, gear && active === 'torch');
+    this.tools.placeView(camera, gear && (active === 'tape' || active === 'crowbar'));
+    this.fieldView.place(camera, !cutCam && !sp && this.player.alive && !this.cabinets.busy && !this.expedition.onTower && ['play','morning','dawn'].includes(this.state));
     // your own body, under your eyes
     const st = this.state;
     this.selfBody.place(!cutCam && !sp && this.player.alive && !this.cabinets.busy && !this.expedition.onTower && (st === 'play' || st === 'dawn' || st === 'morning' || st === 'dusk'));
@@ -2174,7 +2182,7 @@ export class Game {
       const el = document.getElementById('spect');
       if (sp) {
         el.style.setProperty('--c', sp.target ? sp.target.color : '#fff');
-        const name = sp.target ? escHtml(sp.target.name) : '';
+        const name = sp.target ? escHtml(this.nameOf(sp.target)) : '';
         const next = `<small>${t(this.input.touch ? 'spectNextTouch' : 'spectNext')}</small>`;
         if (self === 'carried' && sp.target) el.innerHTML = t('spectCarried').replace('{name}', name);
         else if (self === 'cot') el.innerHTML = sp.target ? `${t('spectCot')}<small>${t('spectWatching').replace('{name}', name)}</small>` : t('spectCot');

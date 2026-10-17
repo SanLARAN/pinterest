@@ -138,7 +138,14 @@ export class ForestTools {
       if (it.state === 'held' || Math.hypot(p.x - it.x, p.z - it.z) > 2.6 || Math.abs(it.y - p.y) > 2) return false;
       if (this.items.some((q) => q.kind === it.kind && q.state === 'held' && q.owner === pid)) return false;
       if (g.world.losBlocked(p.x, p.y + p.eyeCur, p.z, it.x, it.y + 0.12, it.z, 0.25)) return false;
+      if (g.inventory && !g.inventory.reserve(pid, it.kind)) { if (pid === g.player.id) g.inventory.full(); return false; }
       it.state = 'held'; it.owner = pid;
+    } else if (action === 'drop') {
+      if (it.state !== 'held' || it.owner !== pid) return false;
+      if (it.kind === 'tape' && validClip(clip)) { this.setClip(it.i, clip); if (g.sync) g.sync.ev('itape', it.i, clip); }
+      const f = p.forward();
+      it.x = p.x + f.x * 0.4; it.z = p.z + f.z * 0.4; it.y = this.groundHeight(it.x, it.z) + 0.025;
+      it.yaw = p.yaw; it.state = 'ground'; it.owner = null; it.start = it.end = 0;
     } else if (action === 'play') {
       if (it.kind !== 'tape' || it.state !== 'held' || it.owner !== pid) return false;
       const f = p.forward();
@@ -184,6 +191,7 @@ export class ForestTools {
     const g = this.g;
     if (g.audio.ready) g.audio.cabinetItem('nuts');
     g.hud.popup(t(it.kind === 'crowbar' ? 'crowbarGot' : g.input.touch ? 'tapeGotT' : 'tapeGot'), 'amber');
+    if (g.inventory) g.inventory.reconcile();
     g.stats[it.kind === 'crowbar' ? 'crowbars' : 'tapes'] = (g.stats[it.kind === 'crowbar' ? 'crowbars' : 'tapes'] | 0) + 1;
   }
   netState() { return this.items.map((it) => this.pack(it)); }
@@ -266,13 +274,13 @@ export class ForestTools {
     document.body.classList.toggle('has-tape', !!held && g.player.alive && g.state === 'play');
     document.body.classList.toggle('recording', !!this.recording);
     this.recEl.textContent = this.recording ? `● REC  ${Math.min(TAPE.seconds, (performance.now() - this.recording.at) / 1000).toFixed(1)} / ${TAPE.seconds} s` : '';
-    this.kitEl.textContent = g.player.alive && g.input.peekHeld ? [this.hasCrowbar ? t('crowbarName') : '', held ? `${t('tapeName')} · ${held.charges}/2 · ${t(g.input.touch ? 'tapeKeysT' : 'tapeKeys')}` : ''].filter(Boolean).join('  /  ') : '';
+    this.kitEl.textContent = ''; // equipment lives in the backpack, never a parallel hotkey HUD
   }
 
   placeView(camera, show) {
     const g = this.g, tape = this.views.tape, bar = this.views.crowbar;
-    tape.visible = !!show && !!this.tapeHeld;
-    bar.visible = !!show && !!g.cabinets.pry && this.hasCrowbar;
+    tape.visible = !!show && !!this.tapeHeld && g.inventory.equipped === 'tape';
+    bar.visible = !!show && this.hasCrowbar && g.inventory.equipped === 'crowbar';
     if (tape.visible) {
       _v.set(0.23, -0.25, -0.48).applyMatrix4(camera.matrixWorld);
       tape.position.copy(_v);
@@ -280,7 +288,7 @@ export class ForestTools {
       tape.scale.setScalar(0.8);
     }
     if (bar.visible) {
-      const k = g.cabinets.pry.t;
+      const k = g.cabinets.pry?.t || 0;
       _v.set(0.2, -0.2 + Math.sin(k * 10) * 0.025, -0.48).applyMatrix4(camera.matrixWorld);
       bar.position.copy(_v);
       bar.quaternion.copy(camera.quaternion).multiply(_q.setFromEuler(_e.set(-0.25 + Math.sin(k * 10) * 0.15, -0.35, -0.3)));

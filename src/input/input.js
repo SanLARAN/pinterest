@@ -3,7 +3,7 @@ import { settings } from '../core/storage.js';
 
 const GAME_KEYS = new Set([
   'KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space',
-  'ShiftLeft', 'ShiftRight', 'KeyC', 'KeyF', 'KeyQ', 'KeyM', 'KeyP', 'KeyR', 'KeyE', 'KeyG', 'KeyT', 'KeyB', 'KeyV', 'Tab', 'Enter',
+  'ShiftLeft', 'ShiftRight', 'KeyC', 'KeyI', 'KeyM', 'KeyP', 'KeyR', 'KeyE', 'Tab', 'Enter',
 ]);
 const QTE_KEYS = { KeyW: 'qU', ArrowUp: 'qU', KeyA: 'qL', ArrowLeft: 'qL', KeyS: 'qD', ArrowDown: 'qD', KeyD: 'qR', ArrowRight: 'qR' };
 
@@ -25,6 +25,7 @@ export class Input {
     this.locked = false;
     this.lockFailed = false;
     this.touch = false;
+    this.uiMode = false; // the live backpack: a cursor, no movement or accidental use
     this.gameActive = false; // true while a run is being played (not paused)
     this.joy = { id: -1, ox: 0, oy: 0, x: 0, y: 0, mag: 0 };
     this.look = { id: -1, x: 0, y: 0 };
@@ -57,23 +58,8 @@ export class Input {
           this.pingHeld = true;
           this.emit('pingDown');
           break;
-        case 'KeyF':
-          this.emit('throw');
-          break;
-        case 'KeyQ':
-          this.emit('flare');
-          break;
-        case 'KeyT':
-          this.emit('torch');
-          break;
-        case 'KeyB':
-          this.emit('tape');
-          break;
-        case 'KeyV':
-          this.emit('record');
-          break;
-        case 'KeyG':
-          this.emit('glow');
+        case 'KeyI':
+          this.emit('bag');
           break;
         case 'KeyE':
           this.useHeld = true;
@@ -128,7 +114,7 @@ export class Input {
     c.addEventListener('contextmenu', (e) => e.preventDefault());
     c.addEventListener('mousedown', (e) => {
       if (this.touch) return;
-      if (!this.gameActive) return;
+      if (!this.gameActive || this.uiMode) return;
       if (!this.locked && !this.lockFailed) {
         this.requestLock(true);
         return;
@@ -138,7 +124,7 @@ export class Input {
       if (e.button === 0) {
         if (this.locked) this.emit('primary');
         else this.mouseDrag = { down: true, x: e.clientX, y: e.clientY, moved: 0, t: performance.now() };
-      } else if (e.button === 2) this.emit('throw');
+      } else if (e.button === 2) this.emit('secondary');
     });
     window.addEventListener('mouseup', (e) => {
       if (e.button !== 0 || !this.mouseDrag.down) return;
@@ -165,13 +151,18 @@ export class Input {
     document.addEventListener('pointerlockchange', () => {
       const was = this.locked;
       this.locked = document.pointerLockElement === this.canvas;
-      if (this.locked) this.lockFails = 0;
+      if (this.locked) {
+        this.lockFails = 0;
+        // A previous lock request may resolve after the backpack has already opened.
+        if (this.uiMode) { this.exitLock(); return; }
+      }
       if (was && !this.locked) {
         if (this.pingHeld) {
           this.pingHeld = false;
           this.emit('pingUp');
         }
-        this.emit('unlock');
+        if (!this._intentionalUnlock) this.emit('unlock');
+        this._intentionalUnlock = false;
       }
     });
     document.addEventListener('pointerlockerror', () => {
@@ -187,7 +178,7 @@ export class Input {
   }
 
   requestLock(fromClick = false) {
-    if (this.touch || this.locked) return;
+    if (this.touch || this.locked || this.uiMode) return;
     const c = this.canvas;
     this._reqFromClick = fromClick;
     if (!c.requestPointerLock) {
@@ -222,7 +213,7 @@ export class Input {
   }
 
   exitLock() {
-    if (document.pointerLockElement) document.exitPointerLock();
+    if (document.pointerLockElement) { this._intentionalUnlock = true; document.exitPointerLock(); }
   }
 
   setTouch(on) {
@@ -326,13 +317,10 @@ export class Input {
         this.emit('pingUp');
       }
     });
-    btn('#tStone', () => this.emit('throw'));
-    btn('#tFlare', () => this.emit('flare'));
+    btn('#tBag', () => this.emit('bag'));
+    btn('#tItem', () => this.emit('primary'));
+    btn('#tAlt', () => this.emit('secondary'));
     btn('#tCarry', () => this.emit('carry'));
-    btn('#tGlow', () => this.emit('glow'));
-    btn('#tTorch', () => this.emit('torch'));
-    btn('#tTape', () => this.emit('tape'));
-    btn('#tRecord', () => this.emit('record'));
     btn('#tDescend', () => this.emit('carry'));
     btn('#tPull', () => this.emit('qX')); // (touch: one button for the beat — only the timing counts)
     const peekZone = el.querySelector('#peekZone');
@@ -384,6 +372,7 @@ export class Input {
     const dx = this.lookDX, dy = this.lookDY;
     this.lookDX = 0;
     this.lookDY = 0;
+    if (this.uiMode) { this.move.x = this.move.y = this.turn = 0; this.sprint = false; return { dx: 0, dy: 0 }; }
     const s = 0.0022 * settings.mouseSens;
     return { dx: dx * s, dy: dy * s * (settings.invertY ? -1 : 1) };
   }

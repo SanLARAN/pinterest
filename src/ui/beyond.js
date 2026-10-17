@@ -36,6 +36,7 @@ export class Beyond {
     const me = game.coop && game.coop.me ? game.coop.me() : null;
     const list = [{ id: p.id, name: me ? me.name : '', color: PLAYER_COLORS[me ? me.slot % 4 : 0], self: true, gone: !!p.gone, slot: me ? me.slot : 0 }];
     for (const r of game.remotes.values()) if (!r.alive) list.push({ id: r.id, name: r.name, color: r.color, self: false, gone: !!r.gone, slot: r.slot });
+    if (game.roomRules.hideNames) for (const it of list) it.name = game.nameOf(it);
     list.sort((a, b) => (a.self ? -1 : b.self ? 1 : a.slot - b.slot));
     const micOf = (it) => (it.self ? mic.state === 'on' : audio.voices.has(it.id));
     const key = list.map((it) => `${it.id}:${it.name}:${it.gone ? 1 : 0}:${micOf(it) ? 1 : 0}`).join('|') + `|${t('beyondTitle')}`;

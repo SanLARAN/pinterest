@@ -91,7 +91,7 @@ function crawler(mat) {
   const root = rigMeshes(rig, mat);
   const m = puppet(rig, 4.1);
   return {
-    root, base: 0.3, view: { yaw: 0.85, pitch: 0.36 },
+    root, base: 0.3, view: { yaw: 0.7, pitch: 0.19 },
     poses: [() => { setState(m, 'hunt'); ANIMS.crawler(m, 0, 0); }, () => { setState(m, 'idle'); ANIMS.crawler(m, 0, 0); }],
     tick(S) {
       m.stateT += S.dt;

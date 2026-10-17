@@ -1,3 +1,4 @@
+import './backpack.css';
 // ТИШЕ / HUSH — entry point: renderer, boot, menu attract mode, state machine, main loop.
 import '@fontsource/rubik-wet-paint/cyrillic-400.css';
 import '@fontsource/rubik-wet-paint/latin-400.css';
@@ -535,15 +536,15 @@ function restartRun() {
 }
 
 function pause() {
+  game?.inventory.close(false);
   if (state !== 'playing' || !game || !['play', 'morning', 'dusk'].includes(game.state)) return;
   state = 'paused';
   setBodyState();
   game.tools.cancelRecord();
   game.expedition.closeView();
-  if (game.online) {
-    game.inputMuted = true;
-    input.reset();
-  } else audio.setPaused(true);
+  game.inputMuted = true; // also prevents automatic phrase capture behind the solo pause menu
+  input.reset();
+  if (!game.online) audio.setPaused(true);
   input.exitLock();
   const night = game.state === 'play';
   $('pauseStats').innerHTML = night
@@ -591,6 +592,9 @@ function toMenu(keepRoom = false) {
     game.objectives.silence();
     game.escape.silence();
     game.cabinets.silence();
+    game.inventory.close(false);
+    game.fieldView.reset();
+    game.voiceMimic.clear();
     game.tools.silence(true);
     game.expedition.silence();
     game.flares.clear();
@@ -633,8 +637,8 @@ function toMenu(keepRoom = false) {
 
 function teamSummary() {
   const me = coop.me();
-  const out = [{ name: myName(), color: PLAYER_COLORS[me ? me.slot % 4 : 0], alive: game.player.alive, score: game.score, self: true, slot: me ? me.slot : 0 }];
-  for (const r of game.remotes.values()) out.push({ name: r.name, color: r.color, alive: r.alive, score: r.score, slot: r.slot });
+  const out = [{ name: game.roomRules.hideNames ? game.nameOf({slot: me?.slot||0}) : myName(), color: PLAYER_COLORS[me ? me.slot % 4 : 0], alive: game.player.alive, score: game.score, self: true, slot: me ? me.slot : 0 }];
+  for (const r of game.remotes.values()) out.push({ name: game.nameOf(r), color: r.color, alive: r.alive, score: r.score, slot: r.slot });
   return out.sort((a, b) => a.slot - b.slot);
 }
 
@@ -665,6 +669,9 @@ function onEnd(res) {
     console.warn('[atlas] could not record the night', e);
   }
   const { rank, list } = submitScore({ name: settings.name || '???', score: game.score, time: stats.time, won: res.won, shards: stats.shards, gens: stats.gens, coop: online ? Math.max(team.length, game.teamSize || 1) : 0 });
+  game.inventory.close(false);
+  game.fieldView.reset();
+  game.voiceMimic.clear();
   game.tools.silence(true); // stop lures and discard this night's recorded voice
   game.expedition.silence();
   game.flares.clear(); // (a burning flare would hiss on behind the end screen)
@@ -699,9 +706,14 @@ function onEnd(res) {
 function handleEvents(events) {
   for (const e of events) {
     switch (e) {
+      case 'bag':
+        if (state === 'playing') game.inventory.toggle();
+        break;
       case 'pause':
+        if (state === 'playing' && game?.inventory.opened) { game.inventory.close(); break; }
         if (atlas.isOpen()) atlas.close();
         else if (wardrobe.isOpen()) wardrobe.close();
+        else if (lobby.rulesOpen) lobby.closeRules();
         else if (lobby.isOpen()) {
           if (!lobby.starting) lobby.close();
         } else if (menus.isOpen('settingsPanel')) menus.closeSettings();
@@ -711,6 +723,9 @@ function handleEvents(events) {
         else if (state === 'paused') resume();
         break;
       case 'unlock':
+        if (game?.inventory.active) break; // intentionally unlocked to reach into the backpack
+        if (state === 'playing' && !input.touch) pause();
+        break;
       case 'blur':
         if (state === 'playing' && !input.touch) pause();
         break;
@@ -727,7 +742,7 @@ function handleEvents(events) {
         toggleMic();
         break;
       case 'peek':
-        if (state === 'playing') hud.peek(3.5);
+        if (state === 'playing') input.peekTouchUntil = performance.now() < input.peekTouchUntil ? 0 : performance.now() + 5000;
         break;
     }
   }
@@ -783,7 +798,7 @@ function step(now, render) {
       game.applyView(camera, now / 1000);
       shared.uCam.value.copy(camera.position);
       game.hudUpdate(rawDt);
-      if (runOnline) mates.update(game, camera, input.peekHeld || hud.clock < hud.peekUntil);
+      if (runOnline) mates.update(game, camera, false);
       if (state === 'paused' && runOnline) {
         pauseVoices.tick();
         perf.voicesT = (perf.voicesT || 0) + rawDt;

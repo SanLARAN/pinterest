@@ -10,6 +10,7 @@ import * as THREE from 'three';
 import { EDGE_GLSL } from '../render/sonar.js';
 import { Particles } from '../render/particles.js';
 import { clamp, lerp, damp } from '../core/rng.js';
+import { t } from '../core/i18n.js';
 import { buildSurvivor, dyeColors, poseFur } from '../game/survivor.js';
 import { cleanFit, shapeKey, item } from '../game/outfit.js';
 import {
@@ -572,11 +573,57 @@ export class Garage {
     return m;
   }
 
+  _buildRulesPoster() {
+    this.rulesCanvas=document.createElement('canvas');this.rulesCanvas.width=768;this.rulesCanvas.height=684;
+    this.rulesTexture=new THREE.CanvasTexture(this.rulesCanvas);
+    this.rulesMaterial=new THREE.ShaderMaterial({uniforms:{map:{value:this.rulesTexture},hover:{value:0}},
+      vertexShader:'varying vec2 vUv; void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
+      fragmentShader:'uniform sampler2D map; uniform float hover; varying vec2 vUv; void main(){gl_FragColor=vec4(texture2D(map,vUv).rgb*(.9+hover*.1),0.);}'});
+    this.rulesPoster=new THREE.Mesh(new THREE.PlaneGeometry(1.12,.99),this.rulesMaterial);
+    this.rulesPoster.position.set(-3.6,2.15,ROOM.Z0+.04);this.rulesPoster.rotation.z=-.035;
+    this.scene.add(this.rulesPoster);this.rulesRay=new THREE.Raycaster();this.setRules({hideNames:false});
+  }
+  setRules(rules) {
+    if(!this.rulesCanvas) return;
+    const key=t('lobbySettings')+!!rules?.hideNames;if(key===this.rulesKey) return;this.rulesKey=key;
+    const c=this.rulesCanvas.getContext('2d');c.fillStyle='#96917a';c.fillRect(0,0,768,684);
+    c.fillStyle='#bcb69e';c.fillRect(6,6,756,672);
+    // Deterministic foxing and faded print, no downloaded textures.
+    for(let i=0;i<160;i++){c.globalAlpha=.04+(i%5)*.008;c.fillStyle=i%2?'#534d31':'#e3dcc1';c.fillRect((i*227)%764,(i*173)%680,3+(i%19),2+(i%13));}c.globalAlpha=1;
+    c.strokeStyle='#575f4a';c.lineWidth=4;c.strokeRect(29,27,710,627);c.strokeRect(39,37,690,607);
+    c.textAlign='center';c.fillStyle='#545949';c.font='bold 21px monospace';c.fillText('HUSH / FIELD DEPARTMENT',384,84);
+    c.fillStyle='#30392c';c.font='bold 96px monospace';c.fillText(t('lobbySettings'),384,177,650);
+    c.fillStyle='#696b53';c.fillRect(95,207,578,3);
+    c.strokeStyle='#4b5547';c.lineWidth=10;c.beginPath();c.arc(384,319,58,0,Math.PI*2);c.stroke();c.beginPath();c.arc(384,319,19,0,Math.PI*2);c.stroke();
+    for(let i=0;i<8;i++){const a=i*Math.PI/4;c.beginPath();c.moveTo(384+Math.cos(a)*55,319+Math.sin(a)*55);c.lineTo(384+Math.cos(a)*80,319+Math.sin(a)*80);c.stroke();}
+    c.font='bold 32px monospace';c.fillStyle='#424b3c';c.fillText(t('rulePosterNames'),384,453);
+    c.font='bold 30px monospace';c.fillText(`${rules?.hideNames?'[x]':'[ ]'} ${t('ruleYes')}     ${rules?.hideNames?'[ ]':'[x]'} ${t('ruleNo')}`,384,510);
+    c.font='23px monospace';c.fillStyle='#744638';c.fillText(t('rulePosterPress'),384,589);
+    c.fillStyle='#464b3c';for(const x of [53,715]) {c.beginPath();c.arc(x,54,6,0,Math.PI*2);c.fill();}
+    this.rulesTexture.needsUpdate=true;
+  }
+  hitRules(x,y) {
+    this.rulesRay.setFromCamera(new THREE.Vector2(x/this.w*2-1,1-y/this.h*2),this.camera);
+    return this.rulesRay.intersectObject(this.rulesPoster).length>0;
+  }
+  rulesRect() {
+    if(!this.rulesPoster) return null;
+    this.rulesPoster.updateMatrixWorld(true);const corners=[];
+    for(const x of [-.56,.56]) for(const y of [-.495,.495]) {
+      const v=new THREE.Vector3(x,y,.005);this.rulesPoster.localToWorld(v);v.project(this.camera);
+      if(v.z>1 || v.z< -1) return null;
+      corners.push({x:(v.x*.5+.5)*this.w,y:(.5-v.y*.5)*this.h});
+    }
+    const x=Math.min(...corners.map(v=>v.x)),y=Math.min(...corners.map(v=>v.y));
+    return {x,y,w:Math.max(...corners.map(v=>v.x))-x,h:Math.max(...corners.map(v=>v.y))-y};
+  }
+
   _build() {
     const S = this.scene;
     this._mesh(buildRoom());
     this.ceiling = this._mesh(buildCeiling());
     this._mesh(buildProps());
+    this._buildRulesPoster();
     // the wicket door, ajar, swaying in the draught
     this.wicket = this._mesh(buildWicket());
     this.wicket.position.set(ROOM.X0 - 0.05, GATE.wy0 + 0.01, GATE.wz1 - 0.01);

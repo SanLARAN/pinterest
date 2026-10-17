@@ -442,7 +442,7 @@ export class Rescue {
     if (b === g.player) g.reviveLocal(x, z, yaw);
     else {
       b.revive(x, z, yaw);
-      g.hud.popup(t('mateRevived').replace('{name}', b.name), 'cyan');
+      g.hud.popup(t('mateRevived').replace('{name}', g.nameOf(b.id)), 'cyan');
     }
     if (reviverId === g.player.id && b !== g.player) {
       const pts = Math.round(CFG.SCORE.revive * g.mult);

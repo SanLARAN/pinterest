@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { createGhostMaterial } from './sonar.js';
 
 export class Ghosts {
-  constructor(scene, capacity = 56, maxVerts = 3200) {
+  constructor(scene, capacity = 56, maxVerts = 4096) {
     this.list = [];
     this.maxVerts = maxVerts;
     for (let i = 0; i < capacity; i++) {

@@ -126,7 +126,7 @@ export class HUD {
       if (this.lastMinute >= 0) this.peek(3.2);
       this.lastMinute = minute;
     }
-    const show = night && (peekHeld || this.clock < this.peekUntil);
+    const show = false; // TAB is the animated wristwatch now; no automatic floating stats overlay.
     if (show) {
       this._set('pt', this.peekTime, fmtTime(g.time));
       const team = g.online ? ` · ${t('teamAlive').replace('{n}', g.livePlayers().length).replace('{m}', g.remotes.size + 1)}` : '';

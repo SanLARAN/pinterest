@@ -13,6 +13,7 @@ const DEFAULTS = {
   voiceEcho: true,
   scares: 'full',
   quality: 'auto',
+  lobbyHideNames: false, // host's preferred rule for newly created rooms
   radar: false, // minimal HUD by default; the radar is an opt-in assist
   name: '',
   tutorialDone: false,

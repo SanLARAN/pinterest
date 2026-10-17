@@ -1,5 +1,5 @@
 // Microphone input: loudness metering, adaptive noise floor, onset detection,
-// in-game voice echo, and short voice snippets the forest can "mimic" back at you.
+// in-game voice echo, and raw PCM for complete phrases learned by the Shade.
 import { settings } from '../core/storage.js';
 import { clamp, lerp } from '../core/rng.js';
 import { CFG } from '../core/config.js';
@@ -41,10 +41,7 @@ export class Mic {
     this.screamHeld = 0;
     this.calib = [];
     this.calibrated = false;
-    this.snippets = [];
-    this.ring = null;
-    this.ringPos = 0;
-    this.capStart = -1;
+    this.onPCM = null; // the current run, never the menu or the garage
     this.enabledEcho = settings.voiceEcho;
     this.lostFlag = false;
   }
@@ -131,13 +128,12 @@ export class Mic {
     this.echoOut.connect(rsRev);
     rsRev.connect(engine.revSend);
 
-    // --- recorder for mimic snippets ---
+    // --- raw worklet capture: complete Shade phrases and explicit tape recording ---
     try {
       if (ctx.audioWorklet) {
         const url = URL.createObjectURL(new Blob([WORKLET_SRC], { type: 'application/javascript' }));
-        await ctx.audioWorklet.addModule(url);
+        try { await ctx.audioWorklet.addModule(url); } finally { URL.revokeObjectURL(url); }
         this.rec = new AudioWorkletNode(ctx, 'hush-recorder', { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [1] });
-        this.ring = new Float32Array(Math.floor(ctx.sampleRate * 3));
         this.rec.port.onmessage = (ev) => this._push(ev.data);
         const mute = ctx.createGain();
         mute.gain.value = 0;
@@ -161,6 +157,7 @@ export class Mic {
   }
 
   stop() {
+    if (this.onPCM) this.onPCM(null, 0);
     this.cancelTape();
     if (this.stream) this.stream.getTracks().forEach((t) => t.stop());
     try {
@@ -184,7 +181,7 @@ export class Mic {
     this.calibrated = false;
   }
 
-  // Explicitly requested by V, not the automatic horror snippets. Only RAM until the recorder is placed.
+  // Explicitly requested with RMB on the equipped recorder, not the automatic Shade phrases. Only RAM until the recorder is placed.
   beginTape(seconds, done) {
     if (this.state !== 'on' || !this.rec || !this.engine?.ready) return false;
     this.tapeCapture = { samples: new Float32Array(Math.floor(this.engine.ctx.sampleRate * Math.min(2, seconds))), n: 0, done };
@@ -193,6 +190,7 @@ export class Mic {
   cancelTape() { this.tapeCapture = null; }
 
   _push(chunk) {
+    if (this.onPCM) this.onPCM(chunk, this.engine.ctx.sampleRate);
     const cap = this.tapeCapture;
     if (cap) {
       const n = Math.min(chunk.length, cap.samples.length - cap.n);
@@ -203,101 +201,6 @@ export class Mic {
         cap.done(cap.samples, this.engine.ctx.sampleRate);
       }
     }
-    const r = this.ring;
-    if (!r) return;
-    for (let i = 0; i < chunk.length; i++) {
-      r[this.ringPos] = chunk[i];
-      this.ringPos = (this.ringPos + 1) % r.length;
-    }
-  }
-
-  _captureBegin() {
-    if (!this.ring) return;
-    const pre = Math.floor(this.engine.ctx.sampleRate * 0.12);
-    this.capStart = (this.ringPos - pre + this.ring.length) % this.ring.length;
-  }
-
-  _captureEnd() {
-    if (!this.ring || this.capStart < 0) return;
-    const r = this.ring;
-    let len = (this.ringPos - this.capStart + r.length) % r.length;
-    const sr = this.engine.ctx.sampleRate;
-    len = Math.min(len + Math.floor(sr * 0.1), Math.floor(sr * 1.8));
-    if (len < sr * 0.15) { this.capStart = -1; return; }
-    const ab = this.engine.ctx.createBuffer(1, len, sr);
-    const d = ab.getChannelData(0);
-    let peak = 0;
-    for (let i = 0; i < len; i++) {
-      const v = r[(this.capStart + i) % r.length];
-      d[i] = v;
-      if (Math.abs(v) > peak) peak = Math.abs(v);
-    }
-    // normalize + fade edges
-    const k = peak > 0.001 ? 0.7 / peak : 1;
-    const fade = Math.floor(sr * 0.03);
-    for (let i = 0; i < len; i++) {
-      let w = 1;
-      if (i < fade) w = i / fade;
-      else if (i > len - fade) w = (len - i) / fade;
-      d[i] *= k * w;
-    }
-    this.snippets.push(ab);
-    if (this.snippets.length > 5) this.snippets.shift();
-    this.capStart = -1;
-  }
-
-  // play one of the player's own sounds back from the forest, slowed and wrong
-  mimic(x, y, z, gain = 0.8) {
-    const e = this.engine;
-    if (!e || !e.ready || !this.snippets.length) return false;
-    const ctx = e.ctx;
-    const t = e.now;
-    const buf = this.snippets[Math.floor(Math.random() * this.snippets.length)];
-    const rate = 0.72 + Math.random() * 0.1;
-    // your voice, dragged slower and sinking in pitch...
-    const s = ctx.createBufferSource();
-    s.buffer = buf;
-    s.playbackRate.value = rate;
-    s.detune.setValueAtTime(0, t);
-    s.detune.linearRampToValueAtTime(-250, t + buf.duration * 1.3);
-    const lp = ctx.createBiquadFilter();
-    lp.type = 'lowpass';
-    lp.frequency.value = 2400;
-    const sh = ctx.createWaveShaper();
-    sh.curve = e.distSoft;
-    const g = ctx.createGain();
-    g.gain.value = gain;
-    const pn = e._panner(x, y, z, 3, 0.9);
-    s.connect(lp).connect(sh).connect(g).connect(pn);
-    pn.connect(e.sfx);
-    const rv = ctx.createGain();
-    rv.gain.value = 0.7;
-    g.connect(rv);
-    rv.connect(e.revSend);
-    s.start(t);
-    // ...with a second, wrong throat underneath: lower still, ring-modulated, a hair late
-    const s2 = ctx.createBufferSource();
-    s2.buffer = buf;
-    s2.playbackRate.value = rate * 0.8;
-    s2.detune.setValueAtTime(0, t);
-    s2.detune.linearRampToValueAtTime(-400, t + buf.duration * 1.6);
-    const rm = ctx.createGain();
-    rm.gain.value = 0;
-    const mo = ctx.createOscillator();
-    mo.frequency.value = 38 + Math.random() * 12;
-    mo.connect(rm.gain);
-    const lp2 = ctx.createBiquadFilter();
-    lp2.type = 'lowpass';
-    lp2.frequency.value = 1500;
-    const g2 = ctx.createGain();
-    g2.gain.value = gain * 0.55;
-    s2.connect(rm).connect(lp2).connect(g2).connect(pn);
-    s2.start(t + 0.035);
-    mo.start(t);
-    mo.stop(t + 0.1 + buf.duration * 1.8);
-    // keep the self-gate from treating our own playback as player noise
-    this.selfUntil = performance.now() + buf.duration * 1500 + 300;
-    return true;
   }
 
   // the input level right now (dBFS), with no side effects: the 15-second setup listens through this
@@ -405,7 +308,6 @@ export class Mic {
         this.pending = true;
         this.onsetT = 0;
         this.windowMax = loud;
-        this._captureBegin();
       }
       this.windowMax = Math.max(this.windowMax, loud);
       this.onsetT += dt;
@@ -430,7 +332,6 @@ export class Mic {
         if (this.pending && this.windowMax > 0) ev.pulse = this.windowMax;
         this.active = false;
         this.pending = false;
-        this._captureEnd();
         if (this.gate) this.gate.gain.setTargetAtTime(0, this.engine.now, 0.06);
       }
     }

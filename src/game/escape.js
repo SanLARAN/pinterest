@@ -916,7 +916,7 @@ export class Escape {
       g.stats.parts = (g.stats.parts | 0) + 1;
       (g.stats.carFit ||= [0, 0, 0, 0])[i]++;
       g.hud.popup(`+${pts} · ${t('carParts')[p.key]}`, 'amber');
-    } else if (who) g.hud.popup(t('mateFitted').replace('{name}', who.name).replace('{part}', t('carParts')[p.key]), 'amber');
+    } else if (who) g.hud.popup(t('mateFitted').replace('{name}', g.nameOf(who.id)).replace('{part}', t('carParts')[p.key]), 'amber');
     g.hud.flashAlert(t('aCarParts').replace('{n}', this.count), 'dawn', 2.2);
     g.hud.peek(4);
     if (this.ready) {

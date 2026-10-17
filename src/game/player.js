@@ -128,15 +128,6 @@ export class Player {
       }
     } else this.breathT = 0.3;
 
-    // stones regen
-    if (this.stones < P.maxStones) {
-      this.stoneTimer += dt;
-      if (this.stoneTimer >= P.stoneRegen) {
-        this.stones++;
-        this.stoneTimer = 0;
-      }
-    } else this.stoneTimer = 0;
-
     // eye height / bob / footsteps
     const eyeTarget = this.crouching ? P.crouchEye : P.eye;
     this.eyeCur = damp(this.eyeCur, eyeTarget, 10, dt);

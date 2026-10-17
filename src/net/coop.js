@@ -7,6 +7,7 @@ import { Net, PROTOCOL, MAX_PLAYERS, makeCode, cleanCode } from './net.js';
 import { settings, saveSettings } from '../core/storage.js';
 import { t } from '../core/i18n.js';
 import { myFit, cleanFit } from '../game/outfit.js';
+import { cleanLobbyRules } from './lobbyRules.js';
 
 const LOBBY_TYPES = new Set(['hi', 'roster', 'full', 'start', 'bye', 'nm', 'lobby']);
 
@@ -32,6 +33,7 @@ export class Coop {
     this.code = null;
     this.hostId = null;
     this.roster = new Map(); // id -> { id, name, slot, host, mic, inRun, self, fit }
+    this.rules = cleanLobbyRules({ hideNames: settings.lobbyHideNames });
     this.phase = 'lobby'; // lobby | game  (as the host sees it)
     this.status = 'idle'; // idle | joining | waiting | searching | ready | full | version | hostLost | error
     this.joinedAt = 0;
@@ -86,6 +88,7 @@ export class Coop {
     await this.leave();
     this.code = code;
     this.isHost = host;
+    this.rules = cleanLobbyRules(host ? { hideNames: settings.lobbyHideNames } : null);
     this.active = true;
     this.phase = 'lobby';
     this.status = 'joining';
@@ -171,7 +174,7 @@ export class Coop {
         this._onHello(pid, d);
         break;
       case 'roster':
-        if (!this.isHost && d && d.host === pid) this._onRoster(d);
+        if (!this.isHost && d && d.host === pid && (!this.hostId || this.hostId === pid)) this._onRoster(d);
         break;
       case 'full':
         if (!this.isHost && pid === this.hostId) {
@@ -239,14 +242,22 @@ export class Coop {
     this.emit('change');
   }
 
+  setHideNames(value) {
+    if (!this.active || !this.isHost || this.phase !== 'lobby' || typeof value !== 'boolean') return false;
+    this.rules = cleanLobbyRules({ hideNames: value });
+    settings.lobbyHideNames = value; saveSettings();
+    this._broadcastRoster(); this.emit('change'); return true;
+  }
+
   _broadcastRoster() {
     if (!this.isHost) return;
     const list = this.players().map((p) => ({ id: p.id, name: p.name, slot: p.slot, host: !!p.host, mic: !!p.mic, inRun: !!p.inRun, fit: p.fit }));
-    this.net.send('roster', { host: this.selfId, phase: this.phase, list });
+    this.net.send('roster', { host: this.selfId, phase: this.phase, list, rules: this.rules });
   }
 
   _onRoster(d) {
     this.hostId = d.host;
+    this.rules = cleanLobbyRules(d.rules);
     this.phase = d.phase === 'game' ? 'game' : 'lobby';
     const keep = new Set([this.selfId]);
     for (const e of d.list || []) {
@@ -306,7 +317,7 @@ export class Coop {
     const list = this.players();
     for (const p of list) p.inRun = true;
     this.phase = 'game';
-    const msg = { seed: (Math.random() * 2 ** 31) >>> 0, players: list.map((p) => ({ id: p.id, name: p.name, slot: p.slot, fit: p.self ? myFit() : p.fit })), cut: cut ? 1 : 0 };
+    const msg = { seed: (Math.random() * 2 ** 31) >>> 0, players: list.map((p) => ({ id: p.id, name: p.name, slot: p.slot, fit: p.self ? myFit() : p.fit })), cut: cut ? 1 : 0, rules: cleanLobbyRules(this.rules) };
     this.net.send('start', msg);
     this._broadcastRoster();
     this._onStart(msg);
@@ -316,6 +327,7 @@ export class Coop {
   _onStart(d) {
     if (!Array.isArray(d.players) || !d.players.some((p) => p.id === this.selfId)) return; // not seated this time
     this.phase = 'game';
+    this.rules = cleanLobbyRules(d.rules);
     for (const p of d.players) {
       const r = this.roster.get(p.id);
       if (r) {
