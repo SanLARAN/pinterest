@@ -7,8 +7,8 @@
 
 export const CHAPTERS = [
   { id: 'beasts', num: 'I', entries: ['listener', 'crawler', 'watcher', 'howler', 'shkaf', 'shade'] },
-  { id: 'tasks', num: 'II', entries: ['generator', 'corpse', 'fuel', 'plug', 'fuses', 'belt', 'battery', 'shard', 'stone', 'flare', 'glowstick'] },
-  { id: 'places', num: 'III', entries: ['camp', 'medhut', 'cabin', 'tower', 'stones', 'wreck'] },
+  { id: 'tasks', num: 'II', entries: ['generator', 'corpse', 'fuel', 'plug', 'fuses', 'belt', 'battery', 'shard', 'stone', 'flare', 'glowstick', 'flashlight', 'tape', 'crowbar', 'binoculars'] },
+  { id: 'places', num: 'III', entries: ['camp', 'medhut', 'cabin', 'tower', 'stones', 'wreck', 'firetower', 'zarya'] },
   { id: 'way', num: 'IV', entries: ['yard', 'uaz', 'wheel', 'carbattery', 'carb', 'jerrycan'] },
 ];
 
@@ -30,6 +30,12 @@ export const ENTRIES = {
   stone: { model: 'stone', sound: 'stone', kind: 'thing', log: [['thrown', 'stones']] },
   flare: { model: 'flare', sound: 'flare', kind: 'thing', log: [['fired', 'flares']] },
   glowstick: { model: 'glowstick', sound: 'glowstick', kind: 'thing', log: [['cracked', 'glows']] },
+  flashlight: { model: 'flashlight', sound: 'flashlight', kind: 'thing', log: [['found', 'torches']] },
+  tape: { model: 'tape', sound: 'tape', kind: 'thing', log: [['found', 'tapes']] },
+  crowbar: { model: 'crowbar', sound: 'crowbar', kind: 'thing', log: [['found', 'crowbars'], ['pried', 'pried']] },
+  binoculars: { model: 'binoculars', kind: 'thing', log: [['surveyed', 'surveys']] },
+  firetower: { model: 'firetower', kind: 'place', log: [['visited', 'lookouts']] },
+  zarya: { model: 'zarya', sound: 'speaker', kind: 'place', log: [['visited', 'camps']] },
   camp: { model: 'camp', kind: 'place', log: [['startedHere', 'site:camp']] },
   medhut: { model: 'medhut', kind: 'place', log: [['revived', 'revives']] },
   cabin: { model: 'cabin', kind: 'place', log: [['startedHere', 'site:cabin']] },
@@ -80,6 +86,7 @@ const TEXT = {
     log: {
       seen: 'ночей рядом', killed: 'убил тебя', appeared: 'являлась', started: 'запущено при тебе', wins: 'побед',
       searched: 'обыскано тел', fitted: 'поставлено', found: 'найдено', thrown: 'брошено', fired: 'выпущено', startedHere: 'запущено здесь',
+      visited: 'посещений', surveyed: 'осмотров', pried: 'взломано замков',
       cracked: 'зажжено', revived: 'вернул к жизни', escaped: 'уехал отсюда', fittedCar: 'деталей поставил',
       nights: 'ночей', best: 'дольше всего', deaths: 'смертей', screams: 'закричал', gens: 'генераторов',
     },
@@ -274,6 +281,203 @@ const TEXT = {
         tips: ['Стреляй подальше от себя: пусть идут туда, а ты — в другую сторону.', 'Наблюдатель в её свете замирает: пока ракета горит, ему не подойти.', 'Попадёт в дерево — упадёт и догорит у корней. В озеро — погаснет.'],
         facts: [['заряды', '2'], ['горит', '~15 с'], ['свет', 'на ~80 м вокруг'], ['зовёт', 'на ~140 м']],
       },
+      flashlight: {
+        "name": "Фонарик",
+        "latin": "Lumen breve",
+        "text": [
+          "Лежит ещё включённый у развалин, вышек или могил. В одиночной ночи один, в кооперативе два. Подними (E): в руке он даст узкий конус настоящего тёплого света.",
+          "Это не способ перестать быть слепым. Найдёшь с половиной заряда: тридцать секунд. Свет — маяк; тому, кто видит тебя, даже не обязательно попасть в луч."
+        ],
+        "tips": [
+          "T — включить или выключить. Лучше быстро глянуть и погасить.",
+          "Запасные батарейки редки, бывают в шкафчиках: +18 секунд света.",
+          "На последней четверти фонарь гаснет на мгновения. Наблюдатель в эти провалы делает рывок."
+        ],
+        "facts": [
+          [
+            "луч",
+            "14 м · полуугол ~28°"
+          ],
+          [
+            "полный заряд",
+            "60 с"
+          ],
+          [
+            "найденный заряд",
+            "50 % · 30 с"
+          ],
+          [
+            "маяк",
+            "до 25 м при прямой видимости"
+          ],
+          [
+            "батарейка",
+            "+30 % заряда"
+          ]
+        ],
+        "quote": "Он делает лес видимым. И тебя — тоже."
+      },
+      tape: {
+        "name": "Кассетный магнитофон",
+        "latin": "Vox relicta",
+        "text": [
+          "Остался в столовой «Зорьки»; ещё один у пожарной вышки. Запиши две секунды своего голоса (V), потом поставь на землю (B). Три секунды тишины — и кассета повторяет тебя двадцать секунд.",
+          "Для тварей голос из динамика — чужой звук в том месте, а не знание, где ты. Без нового шума с твоей стороны он может увести и погоню. Наблюдатель глух."
+        ],
+        "tips": [
+          "Без микрофона на кассете старый стук: приманка работает всё равно.",
+          "E — подобрать и переставить. Батареек на две прокрутки, вторая уже последняя.",
+          "Сначала запиши, потом отойди и поставь. Пока говоришь в микрофон, твари слышат и тебя настоящего.",
+          "Запись только в памяти этой игры; при установке её услышат друзья напрямую через кооператив. На сайт она не загружается."
+        ],
+        "facts": [
+          [
+            "запись",
+            "2 с"
+          ],
+          [
+            "пауза перед звуком",
+            "3 с"
+          ],
+          [
+            "прокрутка",
+            "20 с × 2"
+          ],
+          [
+            "слышимость Слушателем",
+            "~43 м"
+          ],
+          [
+            "управление",
+            "V — запись · B — поставить · E — забрать"
+          ]
+        ],
+        "quote": "Если услышишь мой голос из столовой — я уже не там."
+      },
+      crowbar: {
+        "name": "Лом",
+        "latin": "Clavis ferrea",
+        "text": [
+          "Ржавый шестигранный прут с загнутой лапой. Один лежит у лагерных ворот «Зорьки», другой — у пожарной вышки. E — забрать.",
+          "У запертого шкафчика держи E и стой на месте. Металл поддаётся не сразу, и каждый скрежет слышен далеко. В запертых шкафах припасы не случайны: туда положили то, что стоило запереть."
+        ],
+        "tips": [
+          "Вскрытие — 2,8 секунды. Отпустил кнопку или отошёл — начинаешь заново.",
+          "Лучше сначала оставить магнитофон подальше: пока скрежещешь, они идут к тебе.",
+          "Лом не оружие. Отбиться им от тварей нельзя."
+        ],
+        "facts": [
+          [
+            "длина",
+            "{len}"
+          ],
+          [
+            "вскрытие",
+            "2,8 с неподвижно"
+          ],
+          [
+            "слышимость",
+            "~38 м"
+          ],
+          [
+            "запертых шкафов",
+            "3 в «Зорьке»"
+          ]
+        ],
+        "quote": "Он заменяет ключ. Но ключ не слышен за сорок метров."
+      },
+      binoculars: {
+        "name": "Полевой бинокль",
+        "latin": "Oculi alieni",
+        "text": [
+          "Старый светосильный прибор на площадке пожарной вышки. Поднимись по лестнице, потом E — смотреть. Слабое остаточное свечение становится зелёным изображением настоящего леса.",
+          "Видны генераторы и движение тварей — в той стороне, куда смотришь, не сквозь стволы и стены. Это усиление изображения, не фонарь: Наблюдателя оно не останавливает."
+        ],
+        "tips": [
+          "Через десять секунд прибор гаснет; двадцать пять секунд нужно остывать.",
+          "E — опустить раньше, R — спуститься. Снизу могут ждать те, кто слышал лестницу.",
+          "Замеченные генераторы появляются в твоих полевых ориентирах."
+        ],
+        "facts": [
+          [
+            "обзор",
+            "10 с"
+          ],
+          [
+            "остывание",
+            "25 с"
+          ],
+          [
+            "дальняя граница",
+            "390 м"
+          ],
+          [
+            "свет для тварей",
+            "нет"
+          ]
+        ],
+        "quote": "Сверху видно, куда не стоит спускаться."
+      },
+      firetower: {
+        "name": "Пожарная вышка",
+        "latin": "Turris ignis",
+        "text": [
+          "Отдельная деревянная каланча на северо-западе — не старая ржавая вышка с генератором. Шестнадцать метров до настила, подпорки крест-накрест, наверху крыша и бинокль.",
+          "У подножия шкафчик с припасами, магнитофон и лом. Лестница скрипит: сверху тварям не дотянуться, но они могут собраться внизу."
+        ],
+        "tips": [
+          "У лестницы удерживай E пять секунд. Отпустишь раньше — спустишься обратно.",
+          "На площадке E — бинокль; R — вниз. Спуск занимает четыре секунды и тоже шумит.",
+          "Каланча не нужна для генераторов: это добровольный крюк ради обзора и вещей."
+        ],
+        "facts": [
+          [
+            "площадка",
+            "16 м"
+          ],
+          [
+            "подъём / спуск",
+            "5 / 4 с"
+          ],
+          [
+            "сторона леса",
+            "северо-запад"
+          ]
+        ],
+        "quote": "В журнале дежурств последняя запись: «Внизу кто-то есть»."
+      },
+      zarya: {
+        "name": "Пионерлагерь «Зорька»",
+        "latin": "Castra deserta",
+        "text": [
+          "На юго-западе ворота с облезшей надписью. Два спальных корпуса, столовая, пустые качели и линейка с флагштоком. Восемь шкафчиков: припасы остались даже там, где всё остальное унесли.",
+          "Три шкафчика заперты — нужен лом. В столовой магнитофон, у ворот сам лом. На площади выключатель громкоговорителя: тридцать пять секунд старого горна, один раз за ночь. Он уводит тварей издалека — только сам на линейке не стой."
+        ],
+        "tips": [
+          "Корпуса открыты, шкафчики в глубине. В запертых гарантированы припасы.",
+          "Громкоговоритель включается E у флагштока; там же его можно выключить раньше, но уже не запустить второй раз.",
+          "Это не новый обязательный генератор: приходи за лутом или сделай здесь шумную приманку."
+        ],
+        "facts": [
+          [
+            "строения",
+            "2 корпуса + столовая"
+          ],
+          [
+            "шкафчики",
+            "8 · 3 заперты"
+          ],
+          [
+            "громкоговоритель",
+            "35 с · один запуск"
+          ],
+          [
+            "слышимость Слушателем",
+            "~116 м"
+          ]
+        ],
+        "quote": "Горнист зовёт на линейку. Дети давно ушли."
+      },
       glowstick: {
         name: 'Светящаяся палочка', latin: 'одна на ночь · у каждого',
         text: [
@@ -438,6 +642,7 @@ const TEXT = {
     log: {
       seen: 'nights near it', killed: 'killed you', appeared: 'appeared', started: 'started with you', wins: 'wins',
       searched: 'bodies searched', fitted: 'fitted', found: 'found', thrown: 'thrown', fired: 'fired', startedHere: 'started here',
+      visited: 'visits', surveyed: 'surveys', pried: 'locks broken',
       cracked: 'cracked', revived: 'brought back', escaped: 'drove out', fittedCar: 'parts fitted',
       nights: 'nights', best: 'longest', deaths: 'deaths', screams: 'screamed', gens: 'generators',
     },
@@ -631,6 +836,203 @@ const TEXT = {
         ],
         tips: ['Fire it away from yourself: let them go there while you go the other way.', 'The Watcher freezes in its light: while the flare burns it cannot come for you.', 'Into a tree — it drops and burns out among the roots. Into the lake — it drowns.'],
         facts: [['shots', '2'], ['burns', '~15 s'], ['light', '~80 m around'], ['calls', 'from ~140 m']],
+      },
+      flashlight: {
+        "name": "Flashlight",
+        "latin": "Lumen breve",
+        "text": [
+          "Still switched on by a wreck, a tower or the graves. One per solo night, two in co-op. Pick it up (E): a narrow cone of real warm light.",
+          "Not an escape from blindness. Found half charged: thirty seconds. Its light is a beacon, even to things outside the beam."
+        ],
+        "tips": [
+          "T — on or off. Take a quick look, then kill the light.",
+          "Rare spare batteries in cupboards give 18 more seconds.",
+          "In the last quarter it goes dark for moments. The Watcher lunges in those moments."
+        ],
+        "facts": [
+          [
+            "beam",
+            "14 m · ~28° half angle"
+          ],
+          [
+            "full battery",
+            "60 s"
+          ],
+          [
+            "found charge",
+            "50% · 30 s"
+          ],
+          [
+            "beacon",
+            "up to 25 m, clear line of sight"
+          ],
+          [
+            "spare battery",
+            "+30%"
+          ]
+        ],
+        "quote": "It makes the forest visible. You too."
+      },
+      tape: {
+        "name": "Cassette recorder",
+        "latin": "Vox relicta",
+        "text": [
+          "One in Zarya’s dining hall, another at the fire lookout. Record two seconds of your voice (V), then set it down (B). Three quiet seconds — then the tape loops you for twenty.",
+          "The things hear a sound there, not knowledge of where you went. If you keep quiet it can even pull them off a chase. The Watcher is deaf."
+        ],
+        "tips": [
+          "No mic? The old tape has knocks. It still works as a lure.",
+          "E retrieves it. Enough battery for two playbacks.",
+          "The real you is still heard while recording. Do that first, then move.",
+          "Clips live only in this game’s memory and go directly to friends when placed. No upload to a website."
+        ],
+        "facts": [
+          [
+            "recording",
+            "2 s"
+          ],
+          [
+            "delay",
+            "3 s"
+          ],
+          [
+            "playback",
+            "20 s × 2"
+          ],
+          [
+            "Listener hears",
+            "~43 m"
+          ],
+          [
+            "controls",
+            "V — record · B — place · E — retrieve"
+          ]
+        ],
+        "quote": "If you hear me from the dining hall, I’m no longer there."
+      },
+      crowbar: {
+        "name": "Crowbar",
+        "latin": "Clavis ferrea",
+        "text": [
+          "A rusty hexagonal bar with a hooked claw. One at Zarya’s gate, another by the fire lookout. E picks it up.",
+          "At a padlocked cupboard hold E and stand still. Metal takes time to give, and every scrape carries. The locked cupboards contain supplies worth locking away."
+        ],
+        "tips": [
+          "Prying takes 2.8 seconds. Let go or move and you start again.",
+          "Leave a recorder elsewhere first. The scraping attracts them to you.",
+          "Not a weapon. It will not fend a creature off."
+        ],
+        "facts": [
+          [
+            "length",
+            "{len}"
+          ],
+          [
+            "prying",
+            "2.8 s, stationary"
+          ],
+          [
+            "heard from",
+            "~38 m"
+          ],
+          [
+            "locked cupboards",
+            "3 at Zarya"
+          ]
+        ],
+        "quote": "A substitute for a key. But a key isn’t heard forty metres away."
+      },
+      binoculars: {
+        "name": "Field binoculars",
+        "latin": "Oculi alieni",
+        "text": [
+          "An old light-amplifying instrument on the fire lookout’s platform. Climb up, then E to look. Residual light becomes a green image of the real forest.",
+          "See generators and moving things where you look, not through trees or walls. Image amplification casts no light and does not freeze the Watcher."
+        ],
+        "tips": [
+          "Ten seconds of image, then twenty-five seconds to cool.",
+          "E lowers them early; R climbs down. Things that heard the ladder may be waiting.",
+          "Generators you actually see become known landmarks."
+        ],
+        "facts": [
+          [
+            "view",
+            "10 s"
+          ],
+          [
+            "cooldown",
+            "25 s"
+          ],
+          [
+            "far limit",
+            "390 m"
+          ],
+          [
+            "light on creatures",
+            "none"
+          ]
+        ],
+        "quote": "From up here you see where not to climb down."
+      },
+      firetower: {
+        "name": "Fire lookout",
+        "latin": "Turris ignis",
+        "text": [
+          "A wooden lookout in the northwest — not the old rusty generator tower. Sixteen metres to the platform; crossed struts, a roof and binoculars above.",
+          "At the foot: a supply locker, a recorder and a crowbar. The ladder creaks. Creatures on the ground cannot reach the platform, but can gather below."
+        ],
+        "tips": [
+          "Hold E at the ladder for five seconds. Let go early to climb back down.",
+          "On the platform E — binoculars, R — down. Descending takes four noisy seconds.",
+          "An optional detour for supplies and observation, not another generator."
+        ],
+        "facts": [
+          [
+            "platform",
+            "16 m"
+          ],
+          [
+            "up / down",
+            "5 / 4 s"
+          ],
+          [
+            "forest side",
+            "northwest"
+          ]
+        ],
+        "quote": "The watch log’s last line: “Someone down below.”"
+      },
+      zarya: {
+        "name": "Zarya pioneer camp",
+        "latin": "Castra deserta",
+        "text": [
+          "Faded gates in the southwest. Two dormitories, a dining hall, empty swings and a flagpole on the assembly square. Eight cupboards; supplies even where everything else was taken.",
+          "Three padlocked cupboards need a crowbar. A recorder in the dining hall, a crowbar at the gate. E at the flagpole switch starts thirty-five seconds of an old assembly call, once a night. A lure from far away — don’t stay for roll call."
+        ],
+        "tips": [
+          "Open dormitories, lockers at the back. Locked ones have guaranteed supplies.",
+          "E at the same switch stops the horn early, but it will not restart.",
+          "Not a mandatory new generator: come for loot, or make a diversion."
+        ],
+        "facts": [
+          [
+            "buildings",
+            "2 dormitories + dining hall"
+          ],
+          [
+            "cupboards",
+            "8 · 3 locked"
+          ],
+          [
+            "loudspeaker",
+            "35 s · once per night"
+          ],
+          [
+            "Listener hears",
+            "~116 m"
+          ]
+        ],
+        "quote": "The bugler calls. The children left long ago."
       },
       glowstick: {
         name: 'Glow stick', latin: 'one each · one a night',

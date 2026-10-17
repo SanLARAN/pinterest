@@ -638,7 +638,8 @@ export class Monster {
     const R = (source === 'voice' ? CFG.voiceHearRadius(loud) : CFG.hearRadius(loud)) * this.hearingMult * mult;
     if (d > R) return null;
     const g = this.game;
-    const fromPlayer = source !== 'stone' && source !== 'scare';
+    const lure = source === 'stone' || source === 'tape' || source === 'speaker';
+    const fromPlayer = !lure && source !== 'scare';
     const who = pid != null ? g.playerById(pid) : null;
     if (this.state === 'hunt') {
       if (fromPlayer) {
@@ -656,7 +657,7 @@ export class Monster {
       // a stone can break the chase if you've been quiet for a moment and it lands nearer to it than you are
       const p = this.tgt || FAR;
       const pd = Math.hypot(p.x - this.x, p.z - this.z);
-      if (source === 'stone' && this.lock < this.cfg.lock * 0.75 && d < pd && pd > 3) {
+      if (lure && this.lock < this.cfg.lock * 0.75 && d < pd && pd > 3) {
         this.setState('investigate');
         this.tx = nx;
         this.tz = nz;

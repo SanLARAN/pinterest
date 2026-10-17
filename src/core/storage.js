@@ -81,6 +81,7 @@ function freshAtlas() {
     gens: 0, bodies: 0, shards: 0, stones: 0, flares: 0, glows: 0, revives: 0,
     parts: [0, 0, 0, 0, 0], // generator #k started (fuel, plug, fuses, belt, battery)
     carFit: [0, 0, 0, 0], // the УАЗ's parts you fitted yourself (wheel, battery, carburettor, can)
+    torches: 0, tapes: 0, crowbars: 0, pried: 0, surveys: 0, lookouts: 0, camps: 0,
     carParts: 0, escapes: 0, // ...all of them, and the nights you drove out of the forest
     sites: {}, // site id -> generators started there
     read: {}, // atlas entries you've opened
@@ -120,6 +121,8 @@ export function recordNight(stats, res, started = []) {
   a.flares += stats.flares | 0;
   a.glows += stats.glows | 0;
   a.revives += stats.revives | 0;
+  a.torches += stats.torch | 0;
+  for (const k of ['tapes', 'crowbars', 'pried', 'surveys', 'lookouts', 'camps']) a[k] += stats[k] | 0;
   a.carParts += stats.parts | 0;
   for (let i = 0; i < 4; i++) a.carFit[i] += (stats.carFit && stats.carFit[i]) | 0;
   if (res.escaped && res.won) a.escapes++;

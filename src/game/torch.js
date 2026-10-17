@@ -41,7 +41,7 @@ export const TORCH = {
 const SPOTS = ['wreck2', 'tower2', 'graves', 'graves2', 'stones2', 'wreck', 'tower'];
 const PI = Math.PI;
 
-function torchArrays() {
+export function torchArrays() {
   const b = new MeshBuilder(256);
   b.place(0, 0, 0.09, -PI / 2, 0, 0);
   b.cylinder(8, 0.019, 0.019, 0.15, KIND.ROCK, { capBottom: true }); // the grip

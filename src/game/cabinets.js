@@ -22,6 +22,7 @@ import { geometryOf } from './uaz.js';
 import { createPersonMaterial } from '../render/people.js';
 import { dyeColors, poseGrabbed, poseRescuer, poseSprawled } from './survivor.js';
 import { myFit } from './outfit.js';
+import { buildPadlock } from './toolModels.js';
 
 const PI = Math.PI;
 export const TRAP = { time: 15, lead: 1.4, period: 0.74, window: 0.17, perfect: 0.075, grace: 0.34 };
@@ -30,6 +31,7 @@ const PULL = { sync: 0.27, syncPerfect: 0.05, off: 0.05, single: 0.125, singlePe
 const DIRS = ['U', 'L', 'D', 'R'];
 export const KEY_LABEL = { U: 'W', L: 'A', D: 'S', R: 'D' };
 const OPEN_R = 1.7;
+export const PRY_TIME = 2.8;
 const GRAB_R = 2.4;
 const MIMIC_CHANCE = 0.3;
 const ITEMS = ['glow', 'nuts', 'shard', 'flare', 'battery'];
@@ -349,6 +351,12 @@ export class Cabinets {
         return { pivot, mesh: m, side, ang: 0, vel: 0, target: 0 };
       });
       const c = { i, spec, kind: spec.kind, D, group, body, shelves, doors, items: [], opened: false, mimic: false, spent: false, candidate: !!spec.mimic, tellT: 4 + i };
+      c.locked = !!spec.locked;
+      if (spec.locked) {
+        c.padlock = new THREE.Mesh(geo('padlock', () => buildPadlock().toArrays()), this.mat);
+        c.padlock.position.set(D.w / 2 - 0.14, D.h * 0.5, D.d / 2 + 0.035);
+        group.add(c.padlock);
+      }
       // the machine inside (only built where a big cupboard could be one)
       if (c.candidate) {
         c.grinder = new THREE.Mesh(geo('grinder:' + spec.kind, () => grinderOf(D)), this.mat);
@@ -402,11 +410,14 @@ export class Cabinets {
     const cands = this.list.filter((c) => c.candidate);
     this.nightSeed = (rng.next() * 4294967296) >>> 0; // (the keys of its beat: the same for everyone)
     this.hintedHelp = false;
+    this.pry = null;
     let mimic = null;
     const roll = rng.next(), pick = rng.next();
     if (cands.length && (roll < MIMIC_CHANCE || this.force)) mimic = this.force ? cands[0] : cands[Math.floor(pick * cands.length)];
     for (const c of this.list) {
       c.opened = false;
+      c.locked = !!c.spec.locked;
+      if (c.padlock) c.padlock.visible = c.locked;
       c.spent = false;
       c.mimic = c === mimic;
       c.tellT = 5 + rng.next() * 8;
@@ -426,6 +437,8 @@ export class Cabinets {
       const r = rng.next();
       if (c.kind === 'firstaid') n = r < 0.5 ? 1 : 2;
       else n = r < 0.25 ? 0 : r < 0.6 ? 1 : r < 0.85 ? 2 : 3;
+      n = Math.max(n, c.spec.minLoot || 0);
+      if (c.spec.loot) n = c.spec.loot.length;
       if (c.mimic) n = 0;
       for (let k = 0; k < n; k++) {
         let x = rng.next(), kind = ITEMS[0];
@@ -434,6 +447,7 @@ export class Cabinets {
           x -= ITEM_W[j];
         }
         if (c.kind === 'firstaid' && k === 0) kind = 'glow';
+        if (c.spec.loot?.[k]) kind = c.spec.loot[k];
         const mesh = new THREE.Mesh(this.itemGeo[kind], this.mat);
         const y = SHELF_Y[c.kind][k] + (c.kind === 'firstaid' ? 0 : 0);
         mesh.position.set(SLOT_X[c.kind][k], y, -0.02 + (k % 2) * 0.05);
@@ -446,6 +460,7 @@ export class Cabinets {
   }
 
   silence() {
+    this.pry = null;
     this._endTrap(true);
   }
 
@@ -502,7 +517,30 @@ export class Cabinets {
 
   interact(best, dt, held, pressed, T) {
     const g = this.g, hud = g.hud, o = best.obj;
+    if (best.kind === 'cabinet' && o.locked) {
+      if (!g.tools?.hasCrowbar) {
+        this.pry = null;
+        hud.setUse(t('pryNeed'), 0, false, true);
+        return;
+      }
+      if (!held || g.player.speed > 0.6 || g.inputMuted) this.pry = null;
+      else {
+        if (!this.pry || this.pry.i !== o.i) this.pry = { i: o.i, t: 0, hit: 0 };
+        const pr = this.pry;
+        pr.t += dt; pr.hit -= dt;
+        if (pr.hit <= 0) {
+          pr.hit = 0.65;
+          this.pryFx(o.i);
+          g.playerNoise(g.player.x, g.player.z, 0.58, 'crowbar');
+          if (g.sync) g.sync.ev('pf', o.i);
+        }
+        if (pr.t >= PRY_TIME) g.tools.request('pry', o.i);
+      }
+      hud.setUse(T('usePry'), (this.pry?.t || 0) / PRY_TIME, true);
+      return;
+    }
     if (best.kind === 'cabinet') {
+      this.pry = null;
       hud.setUse(T('useCabinet').replace('{what}', t('cabNames')[o.kind]), 0, true);
       if (pressed) this.open(o);
       return;
@@ -530,6 +568,7 @@ export class Cabinets {
   open(c) {
     const g = this.g, me = g.player;
     if (c.opened || c.spent) return;
+    if (c.locked) { g.hud.popup(t('pryNeed'), 'dim'); return; }
     if (c.mimic && g.state === 'play') {
       // it was never a cupboard
       this.spring(c.i, me.id, true);
@@ -542,7 +581,28 @@ export class Cabinets {
 
   netOpen(i) {
     const c = this.list[i | 0];
-    if (c && !c.opened && !c.spent && !c.mimic) this.openFx(c, false);
+    if (c && !c.opened && !c.spent && !c.mimic && !c.locked) this.openFx(c, false);
+  }
+
+  pryFx(i) {
+    const c = this.list[i | 0];
+    if (!c || !c.locked) return;
+    const p = c.group.position, y = p.y + c.D.h * 0.5;
+    if (this.g.audio.ready) this.g.audio.crowbarHit(p.x, y, p.z);
+    this.g.pulses.emit(p.x, y, p.z, this.g.time, { radius: 12, strength: 0.8, decay: 1.3, color: [0.85, 0.7, 0.5], kind: 'crowbar' });
+  }
+
+  // A host grant (or its heartbeat), never an arbitrary guest's cabinet packet.
+  netUnlock(i) {
+    const c = this.list[i | 0];
+    if (!c || !c.locked) return;
+    c.locked = false;
+    if (c.padlock) c.padlock.visible = false;
+    if (this.pry?.i === c.i) {
+      this.g.stats.pried = (this.g.stats.pried | 0) + 1;
+      this.pry = null;
+    }
+    this.openFx(c, false);
   }
 
   openFx(c, mine) {
@@ -557,7 +617,7 @@ export class Cabinets {
   take(c, k) {
     const g = this.g, p = g.player;
     const it = c.items[k];
-    if (!it || it.taken) return;
+    if (!it || it.taken || !c.opened || c.locked) return;
     // nuts only fit if your pockets have room for them
     if (it.kind === 'nuts' && p.stones >= CFG.PLAYER.maxStones) {
       g.hud.popup(t('aPocketsFull'), 'dim');
@@ -570,7 +630,7 @@ export class Cabinets {
 
   netTake(i, k) {
     const c = this.list[i | 0];
-    if (c) this._taken(c, k | 0);
+    if (c && !c.locked) this._taken(c, k | 0);
   }
 
   _taken(c, k) {
@@ -951,7 +1011,7 @@ export class Cabinets {
   netState() {
     const tr = this.trap;
     return {
-      c: this.list.map((c) => [c.opened ? 1 : 0, c.items.reduce((m, it, k) => m | (it.taken ? 1 << k : 0), 0), c.spent ? 1 : 0]),
+      c: this.list.map((c) => [c.opened ? 1 : 0, c.items.reduce((m, it, k) => m | (it.taken ? 1 << k : 0), 0), c.spent ? 1 : 0, c.spec.locked && !c.locked ? 1 : 0]),
       t: tr && !tr.out && this.g.auth ? [tr.ci, tr.victim, tr.hands[0] || 0, tr.hands[1] || 0, Math.round(tr.progress * 1000) / 1000, Math.round(tr.t * 100) / 100] : null,
     };
   }
@@ -961,6 +1021,8 @@ export class Cabinets {
     s.c.forEach((a, i) => {
       const c = this.list[i];
       if (!c || !Array.isArray(a)) return;
+      if (fromHost && a[3]) this.netUnlock(i);
+      if (c.locked) return;
       if (a[0] && !c.opened && !c.mimic) this.openFx(c, false);
       const m = a[1] | 0;
       c.items.forEach((it, k) => {

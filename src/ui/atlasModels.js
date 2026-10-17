@@ -16,6 +16,9 @@ import { buildDoorLeaf } from '../game/doors.js';
 import { buildForestCar, buildPart, WHEELS, MISSING, HOOD_HINGE, HOOD_OPEN, PARTS } from '../game/uaz.js';
 import { buildYard, buildGateLeaf, buildBackLeaf, GATE, BACK, CAR_AT, LAMP_AT } from '../world/yard.js';
 import { cabinetGroup } from '../game/cabinets.js';
+import { torchArrays } from '../game/torch.js';
+import { buildTape, buildCrowbar } from '../game/toolModels.js';
+import { FIRETOWER, buildBinoculars } from '../world/expedition.js';
 
 const BEAM = 12; // a kind past the palette: the faint light pillar over a shard
 
@@ -449,6 +452,21 @@ function glowstick(mat) {
   return still(root, 0.32, { yaw: 0.5, pitch: 0.55 }, { lamp: { x: 0, y: 0.03, z: 0, r: 0.35, c: [0.5, 1.0, 0.62], core: 0xd8ffe0, halo: 0x60ff90, s: 0.1 } });
 }
 
+function flashlight(mat) {
+  const root = new THREE.Group();
+  const mesh = new THREE.Mesh(geometryFrom(torchArrays()), mat);
+  mesh.position.y = 0.035;
+  mesh.rotation.y = 0.35;
+  root.add(mesh);
+  return still(root, 0.35, { yaw: 1.1, pitch: 0.5 }, { lamp: { x: -0.04, y: 0.035, z: -0.14, r: 0.55, c: [1,0.93,0.8], core: 0xfff1cf, halo: 0xe6cc8e, s: 0.04 } });
+}
+function fieldTool(build, view) {
+  return (mat) => {
+    const root = new THREE.Group(); root.add(meshOf(build(), mat));
+    return still(root, 0.34, view);
+  };
+}
+
 // ---------------- places ----------------
 // the landmark builders run against a stand-in world: flat ground, no colliders. Drawing the first five
 // landmarks in order with the forest's own seed reproduces exactly the random bits you meet in the game.
@@ -457,7 +475,7 @@ function placeGeometry(id, world) {
   if (!_places) {
     _places = {};
     const rng = new RNG(world ? world.seed : 1337);
-    for (const L of [...LANDMARKS.slice(0, 5), LANDMARKS.find((l) => l.id === 'medhut')]) {
+    for (const L of [...LANDMARKS.slice(0, 5), ...['medhut', 'firetower', 'zarya'].map((id) => LANDMARKS.find((l) => l.id === id))]) {
       const kind = L.id.replace(/\d+$/, '');
       const props = [];
       const fake = {
@@ -469,6 +487,7 @@ function placeGeometry(id, world) {
       props.doors = fake.doors;
       props.cabinets = fake.cabinets; // (its cupboards, shut)
       props.hut = fake.medhut; // (the first-aid hut: where its lantern hangs)
+      props.lookout = fake.firetower;
     }
   }
   const b = new MeshBuilder(16384);
@@ -509,6 +528,11 @@ function place(id, view) {
       group.position.set(c.x, c.y + (D.lift || 0), c.z);
       group.rotation.y = c.yaw;
       root.add(group);
+    }
+    if (_places[id].lookout) {
+      const optic = meshOf(buildBinoculars(), mat);
+      optic.position.set(0, FIRETOWER.deck + 1.32, -0.7);
+      root.add(optic);
     }
     // the first-aid hut's lantern still burns
     const hut = _places[id].hut;
@@ -629,7 +653,12 @@ function shkaf(mat) {
 const MODELS = {
   listener, crawler, watcher, howler, shkaf, shade,
   generator: (mat) => generator(mat, true),
-  corpse, fuel, plug, fuses, belt, battery, shard, stone, flare, glowstick,
+  corpse, fuel, plug, fuses, belt, battery, shard, stone, flare, glowstick, flashlight,
+  tape: fieldTool(buildTape, { yaw: 0.6, pitch: 0.35 }),
+  crowbar: fieldTool(buildCrowbar, { yaw: 0.65, pitch: 0.65 }),
+  binoculars: fieldTool(buildBinoculars, { yaw: 0.65, pitch: 0.4 }),
+  firetower: place('firetower', { yaw: 0.55, pitch: 0.12, fit: 1.1, focus: [0, 10, 0] }),
+  zarya: place('zarya', { yaw: 0.3, pitch: 0.7, fit: 0.95 }),
   camp: place('camp', { yaw: 2.6, pitch: 0.62, fit: 0.78 }),
   medhut: place('medhut', { yaw: 3.75, pitch: 0.26, fit: 0.66, focus: [0, 1.5, 0] }),
   cabin: place('cabin', { yaw: 0.9, pitch: 0.34, fit: 0.95 }),

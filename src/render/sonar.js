@@ -18,6 +18,7 @@ export const shared = {
   uPC: { value: Array.from({ length: N }, () => new THREE.Vector4(1, 1, 1, 0)) }, // rgb tint
   uCam: { value: new THREE.Vector3() },
   uDawn: { value: 0 },
+  uSurvey: { value: 0 }, // binocular image amplification only — NOT a real world light
   uMorning: { value: 0 }, // 1 = the calm morning (high sun, blue sky), 0 = the victory dawn
   uFear: { value: 0 }, // 0..1 — when something hunts you, the forest bleeds red
   uSun: { value: new THREE.Vector3(0.5, 0.35, -0.8).normalize() },
@@ -64,6 +65,7 @@ uniform vec4 uPB[MAXP];
 uniform vec4 uPC[MAXP];
 uniform vec3 uCam;
 uniform float uDawn;
+uniform float uSurvey;
 uniform float uMorning;
 uniform float uFear;
 uniform vec3 uSun;
@@ -402,8 +404,16 @@ void main() {
   if (k == 10) seen *= 0.75 + 0.5 * face; // water still moves
   col = mix(col, seen + col * 0.35, nat);
 
-  // the dark eats distance
-  col *= exp(-camD * 0.015);
+  // The lookout's binoculars amplify what is actually in the image; the depth buffer still hides
+  // everything behind walls / trees. This uniform is never consulted by lightAt or the Watcher's AI.
+  if (uSurvey > 0.0) {
+    float daylight = 0.3 + 0.45 * max(Nrm.y, 0.0) + 0.2 * abs(dot(Nrm, normalize(toCam)));
+    vec3 amplified = (vec3(0.12, 0.23, 0.12) + dayC * vec3(0.22, 0.5, 0.21)) * daylight * (0.85 + st * 0.2);
+    col = mix(col, amplified + col * 0.55, uSurvey);
+    nat = max(nat, uSurvey * 0.8);
+  }
+  // the dark eats distance (the amplified image has its own much longer haze)
+  col *= exp(-camD * mix(0.015, 0.002, uSurvey));
 
   // fear: when something is hunting you the forest bleeds
   if (uFear > 0.001) {

@@ -8,7 +8,7 @@
 import { ICE_SERVERS } from './ice.js';
 
 const APP_ID = 'hush-echolocation-horror'; // must stay stable: relay selection is derived from it
-export const PROTOCOL = 8; // 2: doors, flares · 3: the garage (the car starts the night), the calm at the start · 4: going down and the first-aid hut, glow sticks · 5: shadows, the forestry yard, the УАЗ's parts and the way out · 6: cupboards, the шкафандр · 7: flashlights (and batteries in the cupboards), shared shards, the host's car · 8: a weaker flashlight (its dark moments go over the wire; a friend's light draws them too)
+export const PROTOCOL = 9; // 2: doors, flares · 3: the garage (the car starts the night), the calm at the start · 4: going down and the first-aid hut, glow sticks · 5: shadows, the forestry yard, the УАЗ's parts and the way out · 6: cupboards, the шкафандр · 7: flashlights (and batteries in the cupboards), shared shards, the host's car · 8: a weaker flashlight (its dark moments go over the wire; a friend's light draws them too) · 9: Zarya, lookout, physical field kit and locked cupboards
 export const MAX_PLAYERS = 4;
 
 const ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // no 0/O, 1/I/L

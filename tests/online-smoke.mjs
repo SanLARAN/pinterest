@@ -297,6 +297,80 @@ try {
   })();
   check("a thing near B sees B's flashlight (the host's monster comes to look)", lit === 'ok', lit);
   facts.push(`flashlight ${torch === 'ok' ? 'synced' : 'NOT synced'} · guest's light ${lit === 'ok' ? 'seen' : 'NOT seen'} · shared shard ${paid ? 'ok' : 'NOT ok'}`);
+  // New detours: a real two-second worklet recording from B travels to A with the placed device.
+  // The host must be in earshot so this checks decoded PCM playback, not merely a network string.
+  const tapeOk = await (async () => {
+    await B.page.evaluate(() => {
+      const g = window.__hush.game, it = g.tools.items[0], p = g.player;
+      p.x = it.x; p.z = it.z + 1; p.y = g.world.terrain.height(p.x, p.z); p.vx = p.vz = 0;
+    });
+    const near = await until(() => A.page.evaluate(() => {
+      const g = window.__hush.game, r = [...g.remotes.values()][0], it = g.tools.items[0];
+      return r && Math.hypot(r.x - it.x, r.z - it.z) < 2;
+    }), 20000);
+    if (!near) return 'host never saw B at the recorder';
+    await B.page.evaluate(() => { const k = window.__hush.game.tools; k.askT = 0; k.request('take', 0); });
+    if (!(await until(() => B.page.evaluate(() => !!window.__hush.game.tools.tapeHeld), 10000))) return 'recorder not granted';
+    await B.page.evaluate(() => window.__hush.game.tools.record());
+    if (!(await until(() => B.page.evaluate(() => window.__hush.game.tools.tapeHeld?.clip?.length === 16000), 12000))) return 'no microphone clip';
+    await A.page.evaluate(() => {
+      const g = window.__hush.game, C = g.world.zarya, p = g.player;
+      p.x = C.x + 3; p.z = C.z + 6; p.y = g.world.terrain.height(p.x, p.z); p.vx = p.vz = 0;
+      window.__tapeNoise = false;
+      const noise = g.noise.bind(g);
+      g.noise = (...args) => { if (args[3] === 'tape') window.__tapeNoise = true; return noise(...args); };
+    });
+    await B.page.evaluate(() => { const k = window.__hush.game.tools; k.askT = 0; k.play(); });
+    const heard = await until(() => A.page.evaluate(() => {
+      const it = window.__hush.game.tools.items[0];
+      return it.state === 'playing' && it.charges === 1 && it.clip?.length === 16000 && it.buffer?.duration === 2 && !!it.sound && window.__tapeNoise;
+    }), 30000);
+    return heard ? 'ok' : await A.page.evaluate(() => {
+      const it = window.__hush.game.tools.items[0];
+      return `state ${it.state}, charges ${it.charges}, clip ${it.clip?.length}, PCM ${it.buffer?.duration}, sound ${!!it.sound}, noise ${window.__tapeNoise}`;
+    });
+  })();
+  check("B's recorded voice reaches A's cassette playback and the host's hearing", tapeOk === 'ok', tapeOk);
+  const pryOk = await (async () => {
+    await B.page.evaluate(() => {
+      const g = window.__hush.game, it = g.tools.items[1], p = g.player;
+      p.x = it.x; p.z = it.z; p.y = g.world.terrain.height(p.x, p.z); p.vx = p.vz = 0;
+    });
+    if (!(await until(() => A.page.evaluate(() => {
+      const g = window.__hush.game, r = [...g.remotes.values()][0], it = g.tools.items[1];
+      return r && Math.hypot(r.x - it.x, r.z - it.z) < 1;
+    }), 20000))) return 'host never saw B at the crowbar';
+    await B.page.evaluate(() => { const k = window.__hush.game.tools; k.askT = 0; k.request('take', 1); });
+    if (!(await until(() => B.page.evaluate(() => window.__hush.game.tools.hasCrowbar), 10000))) return 'crowbar not granted';
+    const ci = await B.page.evaluate(() => {
+      const g = window.__hush.game, c = g.cabinets.list.find((c) => c.locked), p = g.player;
+      p.x = c.front.x; p.z = c.front.z; p.y = g.world.terrain.height(p.x, p.z); p.yaw = c.spec.yaw + Math.PI;
+      p.vx = p.vz = p.speed = 0; window.__hush.input.useHeld = true;
+      return c.i;
+    });
+    const opened = await until(() => A.page.evaluate((ci) => {
+      const c = window.__hush.game.cabinets.list[ci]; return !c.locked && c.opened;
+    }, ci), 30000);
+    await B.page.evaluate(() => { window.__hush.input.useHeld = false; });
+    return opened ? 'ok' : 'locked cabinet did not open on host';
+  })();
+  check("B's crowbar pries a locked camp cabinet on the host too", pryOk === 'ok', pryOk);
+  const speakerOk = await (async () => {
+    await B.page.evaluate(() => {
+      const g = window.__hush.game, S = g.world.zarya.switch, p = g.player;
+      p.x = S.x; p.z = S.z; p.y = g.world.zarya.y; p.vx = p.vz = 0;
+    });
+    if (!(await until(() => A.page.evaluate(() => {
+      const g = window.__hush.game, r = [...g.remotes.values()][0], S = g.world.zarya.switch;
+      return r && Math.hypot(r.x - S.x, r.z - S.z) < 1;
+    }), 20000))) return 'host never saw B at the switch';
+    await B.page.evaluate(() => window.__hush.coop.toHost('su', 1));
+    const on = await until(() => B.page.evaluate(() => window.__hush.game.expedition.speaker.used && window.__hush.game.expedition.speaker.end > window.__hush.game.netT), 10000);
+    await B.page.evaluate(() => window.__hush.coop.toHost('su', 0));
+    return on ? 'ok' : 'loudspeaker state not received';
+  })();
+  check("B switches the shared one-use loudspeaker", speakerOk === 'ok', speakerOk);
+  facts.push(`cassette PCM ${tapeOk} · crowbar ${pryOk} · camp speaker ${speakerOk}`);
   const partOk = await (async () => {
     const P = await A.page.evaluate(() => { const q = window.__hush.game.escape.parts[2]; return [q.x, q.z]; });
     await B.page.evaluate(([x, z]) => { const g = window.__hush.game; g.player.x = x + 0.8; g.player.z = z; g.player.vx = g.player.vz = 0; }, P);
@@ -326,12 +400,14 @@ try {
       const m = g.spawnMonster('listener', 8, 14);
       if (!m) return false;
       window.__smokeM = m;
-      g.kill(m, [...g.remotes.values()][0]);
+      const victim = [...g.remotes.values()][0];
+      m.x = victim.x; m.z = victim.z; m.y = victim.y; // a strike at the victim's actual height
+      g.kill(m, victim);
       return true;
     });
     if (!spawned) return 'no room for a monster';
     if (!(await until(() => B.page.evaluate(() => !window.__hush.game.player.alive), 20000))) return 'B never went down';
-    await A.page.evaluate(() => { const g = window.__hush.game; g.kill(window.__smokeM, g.player); });
+    await A.page.evaluate(() => { const g = window.__hush.game, m = window.__smokeM; m.x = g.player.x; m.z = g.player.z; m.y = g.player.y; g.kill(m, g.player); });
     const modeOnB = () => B.page.evaluate(() => { const h = window.__hush, v = h.audio.voices.get(h.coop.hostId); return v ? v.mode : 'no voice'; });
     if (!(await until(async () => (await modeOnB()) === 'beyond', 20000))) return `B hears the dead host as '${await modeOnB()}'`;
     const lv = await level(B.page, 'host');

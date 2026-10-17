@@ -519,6 +519,13 @@ export class Objectives {
     const game = this.g;
     const p = game.player;
     const input = game.input;
+    if (game.expedition?.onTower) {
+      this.target = null;
+      this.searchT = 0;
+      game.cabinets.pry = null;
+      game.expedition.towerPrompt();
+      return;
+    }
     const f = p.forward();
     const es = game.escape;
     const seated = !!es && es.mySeat >= 0;
@@ -540,6 +547,8 @@ export class Objectives {
       if (game.rescue) game.rescue.consider(consider);
       if (game.glows) game.glows.consider(consider);
       if (game.torch) game.torch.consider(consider);
+      if (game.tools) game.tools.consider(consider);
+      if (game.expedition) game.expedition.consider(consider);
     }
     if (es && !doorsOnly) es.consider(consider);
     if (game.doors && !seated) game.doors.consider(consider);
@@ -547,6 +556,8 @@ export class Objectives {
     if (game.cabinets && !seated) game.cabinets.consider(consider, !p.carrying && !(es && es.held));
     if (best && this.target && best.obj !== this.target.obj) this.searchT = 0;
     this.target = best;
+    if (!best || best.kind !== 'lookout') game.expedition?.idle();
+    if (!best || best.kind !== 'cabinet' || !best.obj.locked) game.cabinets.pry = null;
 
     const held = input.useHeld;
     const pressed = game.events.includes('useDown');
@@ -567,6 +578,16 @@ export class Objectives {
       return;
     }
     const o = best.obj;
+    if (best.kind === 'fieldTool') {
+      this.searchT = 0;
+      game.tools.interact(best, pressed, T);
+      return;
+    }
+    if (best.kind === 'lookout' || best.kind === 'campSpeaker') {
+      this.searchT = 0;
+      game.expedition.interact(best, dt, held, pressed, T);
+      return;
+    }
     if (escKind) {
       this.searchT = 0;
       es.interact(best, dt, held, pressed, still, T);

@@ -17,7 +17,7 @@ import { PF } from './remote.js';
 
 const PS_HZ = 15;
 const SNAP_HZ = 10;
-export const NOISE_SRC = ['voice', 'ping', 'step', 'bump', 'breath', 'repair', 'door', 'flare', 'glow', 'part', 'engine', 'torch'];
+export const NOISE_SRC = ['voice', 'ping', 'step', 'bump', 'breath', 'repair', 'door', 'flare', 'glow', 'part', 'engine', 'torch', 'crowbar', 'ladder'];
 const r2 = (v) => Math.round(v * 100) / 100;
 const r3 = (v) => Math.round(v * 1000) / 1000;
 
@@ -104,7 +104,7 @@ export class NetSync {
       this.obT = 0.15;
       this.obBeat = 3;
       ob.dirty = false;
-      this.send('ob', { ...ob.netState(), d: g.doors.netState(), e: g.escape.netState(), k: g.cabinets.netState() });
+      this.send('ob', { ...ob.netState(), d: g.doors.netState(), e: g.escape.netState(), k: g.cabinets.netState(), it: g.tools.netState(), ex: g.expedition.netState() });
     }
   }
 
@@ -147,6 +147,7 @@ export class NetSync {
           g.doors.netMerge(d.d);
           g.escape.netMerge(d.e, isHostMsg);
           g.cabinets.netMerge(d.k, isHostMsg);
+          if (!this.host && isHostMsg) { g.tools.netMerge(d.it); g.expedition.netMerge(d.ex); }
         }
         break;
       case 'nz': {
@@ -184,6 +185,12 @@ export class NetSync {
         break;
       case 'zp':
         if (this.host && Array.isArray(d)) g.cabinets.hostPress(pid, d[0] | 0, d[1] | 0, d[2] | 0);
+        break;
+      case 'it':
+        if (this.host && Array.isArray(d) && typeof d[0] === 'string') g.tools.grant(d[0], d[1], pid, d[2]);
+        break;
+      case 'su':
+        if (this.host) g.expedition.switchSpeaker(pid, !!d);
         break;
       case 'ev':
         if (Array.isArray(d)) this.event(d, pid, isHostMsg);
@@ -257,6 +264,12 @@ export class NetSync {
       case 'xe': // it caught
         if (r) g.escape.startEngine(false);
         break;
+      case 'ls': // a friend's rung creaked (the noise to the AI is a separate 'nz')
+        if (r && Number.isFinite(a)) g.expedition.ladderFx(r.x, a, r.z);
+        break;
+      case 'pf':
+        if (r) g.cabinets.pryFx(a);
+        break;
       case 'co': // a cupboard opened
         g.cabinets.netOpen(a);
         break;
@@ -271,6 +284,10 @@ export class NetSync {
         if (!isHostMsg || this.host) break;
         const m = typeof a === 'number' ? g.monsterById(a) : null;
         switch (name) {
+          case 'ix': g.tools.apply(a); break;
+          case 'itape': g.tools.setClip(a, b); break;
+          case 'iu': g.cabinets.netUnlock(a); break;
+          case 'spe': g.expedition.netMerge(a); break;
           case 'du': if (g.state === 'morning') g.startDusk(); break;
           case 'hu': if (m) g.fxHunt(m, b); break;
           case 'in': if (m) g.fxInvestigate(m, +c || 0, b); break;

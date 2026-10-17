@@ -161,6 +161,7 @@ export class Mic {
   }
 
   stop() {
+    this.cancelTape();
     if (this.stream) this.stream.getTracks().forEach((t) => t.stop());
     try {
       this.src && this.src.disconnect();
@@ -183,7 +184,25 @@ export class Mic {
     this.calibrated = false;
   }
 
+  // Explicitly requested by V, not the automatic horror snippets. Only RAM until the recorder is placed.
+  beginTape(seconds, done) {
+    if (this.state !== 'on' || !this.rec || !this.engine?.ready) return false;
+    this.tapeCapture = { samples: new Float32Array(Math.floor(this.engine.ctx.sampleRate * Math.min(2, seconds))), n: 0, done };
+    return true;
+  }
+  cancelTape() { this.tapeCapture = null; }
+
   _push(chunk) {
+    const cap = this.tapeCapture;
+    if (cap) {
+      const n = Math.min(chunk.length, cap.samples.length - cap.n);
+      cap.samples.set(chunk.subarray(0, n), cap.n);
+      cap.n += n;
+      if (cap.n >= cap.samples.length) {
+        this.tapeCapture = null;
+        cap.done(cap.samples, this.engine.ctx.sampleRate);
+      }
+    }
     const r = this.ring;
     if (!r) return;
     for (let i = 0; i < chunk.length; i++) {

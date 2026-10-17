@@ -3518,6 +3518,73 @@ export class AudioEngine {
     }
   }
 
+  // A cassette's narrow-band voice, or the prerecorded knock on an old door. The handle is stopped when
+  // picked up / out of battery / back at the menu. Bounded loops: no setInterval or wall-clock gameplay.
+  tapeLoop(x, y, z, buffer = null, horn = false) {
+    if (!this.ready) return null;
+    const ctx = this.ctx, t = this.now;
+    if (!buffer) {
+      const key = horn ? '_campTape' : '_knockTape';
+      if (!this[key]) {
+        const sr = 12000, dur = horn ? 4 : 2;
+        const buf = ctx.createBuffer(1, sr * dur, sr), a = buf.getChannelData(0);
+        for (let i = 0; i < a.length; i++) {
+          const tt = i / sr;
+          if (horn) {
+            // a worn-out assembly call, three descending notes, breaking up in the horn
+            const k = Math.floor(tt / 0.65), age = tt - k * 0.65;
+            const f = [392, 330, 262, 330, 262, 196][Math.min(5, k)];
+            const env = Math.min(1, age / 0.04) * Math.max(0, 1 - age / 0.56);
+            a[i] = (Math.sin(tt * f * Math.PI * 2) * 0.4 + Math.sin(tt * f * Math.PI * 4) * 0.18 + Math.sin(tt * f * Math.PI * 6) * 0.08) * env;
+          } else {
+            let v = 0;
+            for (const at of [0.1, 0.42, 0.75]) {
+              const age = tt - at;
+              if (age >= 0 && age < 0.22) v += (Math.sin(age * 170 * Math.PI * 2) + Math.sin(age * 311 * Math.PI * 2) * 0.3) * Math.exp(-age * 24) * 0.5;
+            }
+            a[i] = v;
+          }
+        }
+        this[key] = buf;
+      }
+      buffer = this[key];
+    }
+    const pn = this._panner(x, y, z, horn ? 13 : 5, horn ? 0.65 : 0.95);
+    const src = ctx.createBufferSource(); src.buffer = buffer; src.loop = true;
+    const hp = this._filter('highpass', horn ? 350 : 220, 0.7);
+    const lp = this._filter('lowpass', horn ? 2900 : 2400, 0.7);
+    const out = this._gain(horn ? 0.75 : 0.9);
+    src.connect(hp).connect(lp).connect(out).connect(pn); pn.connect(this.sfx);
+    const hiss = this._noise(this.white), hf = this._filter('bandpass', 2100, 0.5), hg = this._gain(horn ? 0.035 : 0.018);
+    hiss.connect(hf).connect(hg).connect(out);
+    src.start(t); hiss.start(t);
+    let stopped = false;
+    src.onended = () => { [src,hp,lp,out,pn,hiss,hf,hg].forEach((n) => { try { n.disconnect(); } catch { /* already gone */ } }); };
+    return { stop: () => {
+      if (stopped) return;
+      stopped = true;
+      const end = this.now + 0.12;
+      out.gain.setTargetAtTime(0, this.now, 0.025);
+      try { src.stop(end); hiss.stop(end); } catch { /* stopped */ }
+    } };
+  }
+  campSpeaker(x, y, z) { return this.tapeLoop(x, y, z, null, true); }
+
+  crowbarHit(x, y, z) {
+    if (!this.ready) return;
+    const pn = this._panner(x, y, z, 4, 0.95); pn.connect(this.sfx);
+    const t = this.now;
+    this._noiseBurst(t, { type: 'bandpass', f: 1700, q: 3, a: 0.002, d: 0.16, gain: 0.55, dest: pn, rev: 0.18 });
+    this._tone(t, { type: 'triangle', f: 730, fEnd: 190, a: 0.005, d: 0.48, gain: 0.16, dest: pn });
+    this._noiseBurst(t + 0.07, { type: 'highpass', f: 3900, a: 0.002, d: 0.045, gain: 0.17, dest: pn });
+  }
+  ladderStep(x, y, z) {
+    if (!this.ready) return;
+    const pn = this._panner(x, y, z, 3, 1.1); pn.connect(this.sfx);
+    this._tone(this.now, { type: 'sawtooth', f: 310, fEnd: 180, a: 0.02, d: 0.26, gain: 0.035, dest: pn });
+    this._noiseBurst(this.now, { type: 'bandpass', f: 700, q: 2, a: 0.004, d: 0.08, gain: 0.16, dest: pn });
+  }
+
   uiClick() {
     if (!this.ready) return;
     const t = this.now;

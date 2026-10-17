@@ -561,6 +561,27 @@ export class Atlas {
         later(1350, () => A.flareHiss(...at(-3, 8.5, 14), 2.6));
         dur = 4.2;
         break;
+      case 'flashlight':
+        A.torchClick(true);
+        later(1000, () => A.torchClick(false));
+        dur = 1.5;
+        break;
+      case 'crowbar':
+        for (let k = 0; k < 3; k++) later(k * 650, () => A.crowbarHit(...at(-0.4, -0.6, 1.6)));
+        dur = 2.1;
+        break;
+      case 'tape': {
+        const h = A.tapeLoop(...at(-0.3, -0.7, 2));
+        if (h) { this.soundHandles.push(h); later(4000, () => h.stop()); }
+        dur = 4.2;
+        break;
+      }
+      case 'speaker': {
+        const h = A.campSpeaker(...at(-2, 2, 8));
+        if (h) { this.soundHandles.push(h); later(5000, () => h.stop()); }
+        dur = 5.2;
+        break;
+      }
       case 'glowstick':
         A.glowCrack(...at(0.3, -0.4, 0.7), true);
         later(1500, () => A.throwWhoosh());

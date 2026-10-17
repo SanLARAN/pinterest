@@ -7,6 +7,31 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v: '1.10', date: '2026-10-17',
+    ru: {
+      title: '«Зорька» и пожарная вышка',
+      items: [
+        'Два новых места в лесу: пожарная вышка на северо-западе и заброшенный пионерлагерь «Зорька» на юго-западе. У костра — указатель',
+        'На вышку нужно подниматься по скрипучей лестнице. Наверху бинокль: десять секунд зелёного изображения леса, генераторов и движущихся тварей — не сквозь стены',
+        'В «Зорьке» два спальных корпуса, столовая и восемь шкафчиков с лутом. Громкоговоритель на линейке можно включить один раз за ночь — твари идут на старый горн',
+        'Кассетный магнитофон: V — записать две секунды голоса, B — поставить приманку. Через три секунды она зазвучит на двадцать секунд. Два заряда; без микрофона — стук',
+        'Лом у ворот лагеря и у вышки: удерживай E у запертого шкафчика. Взлом громкий; лом — не оружие',
+        'В атласе шесть новых 3D-страниц: фонарик, магнитофон, лом, бинокль и оба новых места. Всё работает в коопе и с тач-управлением',
+      ],
+    },
+    en: {
+      title: 'Zarya and the fire lookout',
+      items: [
+        'Two new forest detours: a fire lookout to the northwest and the abandoned Zarya pioneer camp to the southwest. A signpost by the fire points the way',
+        'Climb the creaking ladder. At the top, binoculars give ten seconds of green forest, generators and moving creatures — never through walls',
+        'Zarya has two dormitories, a dining hall and eight cabinets with loot. The assembly-square loudspeaker works once a night — creatures follow its old bugle call',
+        'Cassette recorder: V records two seconds of your voice, B places a lure. Three seconds of silence, then twenty seconds of playback. Two charges; without a mic, it knocks',
+        'A crowbar by the camp gate and the lookout: hold E at a locked cabinet. Prying is loud; the bar is not a weapon',
+        'Six new 3D atlas pages: flashlight, recorder, crowbar, binoculars and both places. Co-op and touch controls included',
+      ],
+    },
+  },
+  {
     v: '1.9', date: '2026-10-17',
     ru: {
       title: 'Фонарик — для того, чтобы глянуть',

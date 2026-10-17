@@ -6,6 +6,7 @@ import { MeshBuilder, KIND } from './builder.js';
 import { Terrain } from './terrain.js';
 import { Collision } from './collision.js';
 import { buildYard, buildOutside, inYard } from './yard.js';
+import { FIRETOWER, ZARYA, buildFiretower, buildZarya, buildWaymarks } from './expedition.js';
 
 export const CAP = { TREE: 0, ROCK: 1, WOOD: 2, METAL: 3, WATER: 4, EFFIGY: 5, FENCE: 6 }; // FENCE: chain-link (you see and light through it)
 
@@ -35,6 +36,8 @@ export const LANDMARKS = [
   { id: 'medhut', x: 12, z: 22, r: 6.5, ry: -2.606 },
   // the forestry yard by the north edge: the УАЗ, the sliding gate, the cut through the hills (see yard.js)
   { id: 'yard', x: CFG.YARD.x, z: CFG.YARD.z, r: 21 },
+  { id: 'firetower', x: FIRETOWER.x, z: FIRETOWER.z, r: FIRETOWER.r },
+  { id: 'zarya', x: ZARYA.x, z: ZARYA.z, r: ZARYA.r },
 ];
 
 // the tracks that lead to and from the yard: no trees grow on them
@@ -134,6 +137,7 @@ export class World {
       if (fn) fn.call(this, L, rng);
     }
     this.genSites(); // own RNG: the forest stays exactly the same
+    buildWaymarks(this);
 
     this.genTrees(rng);
     this.genScatter(rng);
@@ -151,9 +155,9 @@ export class World {
 
   // a cupboard standing (or hanging) at world (x, z) on a floor at y, its front facing yaw (three's rotation.y);
   // mimic: big enough to be something else. Its body is solid (its collider), the game builds the rest
-  addCabinet(id, kind, x, y, z, yaw, mimic = false) {
+  addCabinet(id, kind, x, y, z, yaw, mimic = false, extra = {}) {
     const D = CABINET_DIMS[kind];
-    this.cabinets.push({ id, kind, x, y, z, yaw, mimic });
+    this.cabinets.push({ id, kind, x, y, z, yaw, mimic, ...extra });
     if (D.lift) return; // (on the wall: nothing to bump into)
     const rx = Math.cos(yaw), rz = -Math.sin(yaw), half = Math.max(0, D.w / 2 - D.d / 2);
     this.col.add(x - rx * half, z - rz * half, x + rx * half, z + rz * half, D.d / 2, D.h, CAP.WOOD);
@@ -380,6 +384,9 @@ export class World {
     const [tx, tz] = [L.x - 4.2, L.z + 2.6];
     this.col.add(tx - 0.5, tz - 1.1, tx + 0.5, tz + 1.1, 1.0, 1.2, CAP.WOOD);
   }
+
+  lm_firetower(L) { buildFiretower(this, L); }
+  lm_zarya(L) { buildZarya(this, L); }
 
   lm_cabin(L, rng) {
     const y = this.terrain.height(L.x, L.z);

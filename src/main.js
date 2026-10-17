@@ -538,6 +538,8 @@ function pause() {
   if (state !== 'playing' || !game || !['play', 'morning', 'dusk'].includes(game.state)) return;
   state = 'paused';
   setBodyState();
+  game.tools.cancelRecord();
+  game.expedition.closeView();
   if (game.online) {
     game.inputMuted = true;
     input.reset();
@@ -589,6 +591,8 @@ function toMenu(keepRoom = false) {
     game.objectives.silence();
     game.escape.silence();
     game.cabinets.silence();
+    game.tools.silence(true);
+    game.expedition.silence();
     game.flares.clear();
     game.selfBody.hide();
     game.beyond.hide();
@@ -661,6 +665,8 @@ function onEnd(res) {
     console.warn('[atlas] could not record the night', e);
   }
   const { rank, list } = submitScore({ name: settings.name || '???', score: game.score, time: stats.time, won: res.won, shards: stats.shards, gens: stats.gens, coop: online ? Math.max(team.length, game.teamSize || 1) : 0 });
+  game.tools.silence(true); // stop lures and discard this night's recorded voice
+  game.expedition.silence();
   game.flares.clear(); // (a burning flare would hiss on behind the end screen)
   menus.showOver(res, stats, rank, list, team);
   const ow = $('overWallet');

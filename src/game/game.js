@@ -23,6 +23,8 @@ import { Rescue } from './rescue.js';
 import { Escape } from './escape.js';
 import { Cabinets } from './cabinets.js';
 import { Torches } from './torch.js';
+import { ForestTools } from './tools.js';
+import { Expedition } from './expedition.js';
 import { Dread } from './dread.js';
 import { CAP } from '../world/world.js';
 import { shared } from '../render/sonar.js';
@@ -36,7 +38,7 @@ const HOWL = [1.0, 0.36, 0.1];
 const LAMPC = [1.0, 0.74, 0.42];
 const MORNING_LIGHT = 0.95;
 const NO_LOOK = { dx: 0, dy: 0 };
-const SRC_SELF = new Set(['voice', 'ping', 'step', 'bump', 'breath', 'repair', 'door', 'flare', 'glow', 'part', 'engine', 'torch']);
+const SRC_SELF = new Set(['voice', 'ping', 'step', 'bump', 'breath', 'repair', 'door', 'flare', 'glow', 'part', 'engine', 'torch', 'crowbar', 'ladder']);
 const _v = new THREE.Vector3();
 const escHtml = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -57,6 +59,8 @@ export class Game {
     this.escape = new Escape(this); // the forestry yard, the УАЗ and its four parts, the way out
     this.cabinets = new Cabinets(this); // cupboards in the buildings (and the шкафандр)
     this.torch = new Torches(this); // flashlights: one lies out there each night
+    this.tools = new ForestTools(this);
+    this.expedition = new Expedition(this);
     this.selfBody = new SelfBody(this); // yours, when you look down
     this.beyond = new Beyond(document.getElementById('beyond')); // co-op: the dead talk among themselves
     this.hud.onNoteClose = () => this.objectives.closeNote();
@@ -179,6 +183,7 @@ export class Game {
     this.rescue.left(r);
     this.glows.dropFor(r.id, r.x, r.z);
     this.escape.dropFor(r.id, r.x, r.z);
+    this.tools.dropFor(r.id, r.x, r.z);
     this.remotes.delete(id);
     r.dispose();
     this.escape.left(id);
@@ -229,6 +234,8 @@ export class Game {
     this.escape.reset(new RNG((this.rng.next() * 4294967296) >>> 0)); // (its own stream: the same on every machine)
     this.cabinets.reset(new RNG((this.rng.next() * 4294967296) >>> 0));
     this.torch.reset(new RNG((this.rng.next() * 4294967296) >>> 0), opts.online || this.online);
+    this.tools.reset();
+    this.expedition.reset();
     this.setFlares(0, false);
     this.objectives.setMorning(true);
     this.charge = { active: false, t: 0 };
@@ -654,6 +661,7 @@ export class Game {
   // ---------------- hands ----------------
   // R: a part in your arms goes down; in the УАЗ, out of your seat; carrying a friend by the car, into the back
   carryKey() {
+    if (this.expedition.onTower) return this.expedition.descend();
     const es = this.escape;
     if (es.held) return es.putDown();
     if (es.mySeat >= 0) return es.standUp();
@@ -1081,6 +1089,8 @@ export class Game {
   // ---------------- death ----------------
   kill(m, victim = this.player) {
     if (this.state !== 'play') return;
+    // A thing on the ground cannot reach someone sixteen metres up the lookout. It can wait below.
+    if (victim.y - m.y > 3.1) return;
     const cause = m.huntCause === 'scream' && (m.huntCausePid == null || m.huntCausePid === victim.id) ? 'scream' : m.type;
     if (victim !== this.player) {
       // co-op host: one of the others was caught. it stays with the body; the rest can get away.
@@ -1607,8 +1617,11 @@ export class Game {
     const fx = this.fx;
     const input = this.input;
     if (this.inputMuted) raw = { look: NO_LOOK, events: [] };
-    const look = raw.look;
+    let look = raw.look;
     this.events = raw.events;
+    this.tools.update(dt);
+    this.expedition.update(dt);
+    if (this.expedition.viewing) look = { dx: look.dx * 0.3, dy: look.dy * 0.3 };
     if (this.state === 'morning') return this.updateMorning(dt, raw);
     if (this.state === 'dusk') return this.updateDusk(dt, raw);
 
@@ -1696,6 +1709,8 @@ export class Game {
         else this.glows.use();
       } else if (e === 'carry') this.carryKey();
       else if (e === 'torch') this.torch.toggle();
+      else if (e === 'record') this.tools.record();
+      else if (e === 'tape') this.tools.play();
     }
     // E puts a note away
     if (this.objectives.note && raw.events.includes('useDown')) {
@@ -1716,7 +1731,7 @@ export class Game {
     // ---- player ----
     const p = this.player;
     // (in the УАЗ you sit still and look about: see Escape._seated)
-    const pev = es.mySeat >= 0 || caught ? this.seatedLook(look) : p.update(dt, input, look, this.inputMuted, es.load(p.id));
+    const pev = es.mySeat >= 0 || caught || this.expedition.onTower ? this.seatedLook(look) : p.update(dt, input, look, this.inputMuted, es.load(p.id));
     if (pev.step) {
       const s = pev.step;
       this.audio.footstep(s.intensity);
@@ -2108,7 +2123,7 @@ export class Game {
       camera.rotation.set(pitch, yaw, roll, 'YXZ');
       const cy = Math.cos(p.yaw), sy = Math.sin(p.yaw);
       camera.position.set(p.x + cy * sh * 0.08 * px, p.y + p.eyeCur + (p.bobY || 0) + sh * 0.06 * py, p.z - sy * sh * 0.08 * px);
-      const fov = CFG.FOV + fx.fovKick + (p.sprinting ? 5 : 0);
+      const fov = this.expedition.viewing ? 22 : CFG.FOV + fx.fovKick + (p.sprinting ? 5 : 0);
       if (Math.abs(camera.fov - fov) > 0.01) {
         camera.fov = damp(camera.fov, fov, 10, 1 / 60);
         camera.updateProjectionMatrix();
@@ -2117,14 +2132,16 @@ export class Game {
     camera.updateMatrixWorld();
     camera.getWorldDirection(_v);
     this.audio.setListener(camera.position.x, camera.position.y, camera.position.z, _v.x, _v.y, _v.z);
-    const hands = !cutCam && !sp && this.player.alive && (this.state === 'play' || this.state === 'dawn');
+    this.expedition.applyView(camera);
+    const hands = !cutCam && !sp && !this.expedition.onTower && this.player.alive && (this.state === 'play' || this.state === 'dawn');
     this.glows.placeView(camera, hands && !this.cabinets.busy);
     this.escape.placeView(camera, hands);
     this.cabinets.placeView(camera, hands);
     this.torch.placeView(camera, hands && !this.cabinets.busy);
+    this.tools.placeView(camera, hands && !this.cabinets.busy && !this.escape.held && !this.player.carrying);
     // your own body, under your eyes
     const st = this.state;
-    this.selfBody.place(!cutCam && !sp && this.player.alive && !this.cabinets.busy && (st === 'play' || st === 'dawn' || st === 'morning' || st === 'dusk'));
+    this.selfBody.place(!cutCam && !sp && this.player.alive && !this.cabinets.busy && !this.expedition.onTower && (st === 'play' || st === 'dawn' || st === 'morning' || st === 'dusk'));
 
     const u = this.post.u;
     u.uAberr.value = 0.12 + fx.glitch * 0.9 + fx.danger * 0.25 + sh * 0.5;

@@ -1,6 +1,50 @@
 // RU / EN strings. Russian is the default.
 const STR = {
   ru: {
+    // Field kit and the two optional destinations.
+    fieldMetres: "м",
+    tapeName: "магнитофон",
+    crowbarName: "лом",
+    tapeGot: "магнитофон · V — записать 2 с · B — поставить приманку",
+    tapeGotT: "магнитофон · ЗАПИСЬ — 2 с · КАССЕТА — поставить приманку",
+    crowbarGot: "лом · удерживай E у запертого шкафчика — будет громко",
+    tapeKeys: "V — запись · B — поставить",
+    tapeKeysT: "ЗАПИСЬ · КАССЕТА — поставить",
+    tapeRecorded: "записано · B — поставить; запись услышат друзья в этой игре",
+    tapeSilent: "слишком тихо — старая кассета осталась",
+    tapeNoMic: "нет записи с микрофона — на кассете стук; M — включить микрофон",
+    tapeRecordWarn: "REC · 2 секунды — говори; твари слышат тебя и сейчас",
+    tapePlaced: "магнитофон: пауза 3 с, затем 20 с звука — уходи",
+    tapeFlat: "батарейки магнитофона сели — он останется на земле",
+    pryNeed: "заперто · нужен лом (у входа в «Зорьку» или у пожарной вышки)",
+    usePry: "УДЕРЖИВАЙ E — ВЗЛОМАТЬ · ШУМНО",
+    usePryT: "УДЕРЖИВАЙ РУКИ — ВЗЛОМАТЬ · ШУМНО",
+    useLookout: "УДЕРЖИВАЙ E — НАВЕРХ",
+    useLookoutT: "УДЕРЖИВАЙ РУКИ — НАВЕРХ",
+    useClimbing: "ДЕРЖИ E — ПОДНИМАТЬСЯ · R — ВНИЗ",
+    useClimbingT: "ДЕРЖИ РУКИ — ПОДНИМАТЬСЯ · ВНИЗ — СПУСК",
+    lookoutDescending: "спускаешься · лестница скрипит",
+    lookoutCreak: "лестница слышна снизу · отпустишь — спустишься",
+    lookoutTop: "наверху · E — бинокль · R — спуститься",
+    lookoutTopT: "наверху · РУКИ — бинокль · ВНИЗ — спуститься",
+    binoCooldown: "оптика остывает: {n} с · R / ВНИЗ — спуститься",
+    useBino: "E — БИНОКЛЬ · R — ВНИЗ",
+    useBinoT: "РУКИ — БИНОКЛЬ · ВНИЗ — СПУСТИТЬСЯ",
+    useBinoOff: "E — ОПУСТИТЬ БИНОКЛЬ",
+    useBinoOffT: "РУКИ — ОПУСТИТЬ БИНОКЛЬ",
+    binoTitle: "ПОЛЕВОЙ БИНОКЛЬ · УСИЛЕНИЕ СВЕТА",
+    binoExit: "E — опустить · R — вниз",
+    binoExitT: "РУКИ — опустить · ВНИЗ — спуск",
+    useSpeaker: "E — ГРОМКОГОВОРИТЕЛЬ · ПРИМАНКА",
+    useSpeakerT: "РУКИ — ГРОМКОГОВОРИТЕЛЬ · ПРИМАНКА",
+    useSpeakerOff: "E — ВЫКЛЮЧИТЬ ГРОМКОГОВОРИТЕЛЬ",
+    useSpeakerOffT: "РУКИ — ВЫКЛЮЧИТЬ ГРОМКОГОВОРИТЕЛЬ",
+    speakerSpent: "громкоговоритель больше не включится",
+    zaryaArrival: "ПИОНЕРЛАГЕРЬ «ЗОРЬКА» · столовая, корпуса, закрытые шкафчики",
+    lookoutArrival: "ПОЖАРНАЯ ВЫШКА · наверху остался бинокль",
+    touchTape: "КАССЕТА",
+    touchRecord: "ЗАПИСЬ",
+    touchDescend: "ВНИЗ",
     title: 'ТИШЕ',
     tagline: 'Ты слеп. Лес — нет.',
     subtitle: 'эхолокационный хоррор · запусти пять генераторов',
@@ -340,6 +384,8 @@ const STR = {
 <p><b>Слушатели и Ползуны</b> идут туда, где был звук. Пискнул — уходи. Камень (ПКМ / F) уводит их в сторону. Позже приходят двое других, по одному на лес: <b>Наблюдатель</b> глух, но двигается, только пока на него не падает свет, — свети на него; лампы он обходит. <b>Ревун</b> почти не слышит, но иногда набирает воздух и воет: всё, что движется в этой волне, он видит. Услышал вдох — замри.</p>
 <p><b>Ракетница.</b> У одного из тел (каждую ночь у другого) лежит ракетница — два заряда. Q — ракета уходит вверх, раскрывает парашют и секунд пятнадцать заливает лес красным светом: видно всё и всех. Но <span class="red">на свет сходятся все твари с округи</span> — стреляй подальше от себя. <b>Охотничья избушка</b>: дверь закрывается (E). Бродячие твари не сразу её откроют — навалятся, и она со скрипом подастся; а та, что охотится за тобой, выбьет её в три удара.</p>
 <p><b>Фонарик</b> лежит где-то в лесу — у разбитой машины, у вышки, у могил, — ещё включённый: его слабый луч видно издалека. T — включить: конус настоящего света туда, куда смотришь. Он не для того, чтобы ходить со светом, а чтобы быстро глянуть: батарейки хватает на минуту (найдёшь его полуразряженным, запасные в шкафах редки), а <span class="red">включённый фонарь видно издалека</span> — тварь, попавшая в луч, и любая тварь поблизости, которой ничто тебя не загораживает, идёт на свет. Когда батарейка почти села, фонарь мигает и гаснет на мгновения — <b>в эти мгновения Наблюдатель двигается</b>.</p>
+<p><b>Пожарная вышка</b> стоит на северо-западе: держи E пять секунд, чтобы подняться по скрипучей лестнице. Наверху E — бинокль на 10 секунд (затем 25 секунд остывания), R — спуститься. Он показывает настоящий лес, огни генераторов и движение тварей, но не светит на них и не останавливает Наблюдателя. Стены и деревья остаются непрозрачными.</p>
+<p><b>Пионерлагерь «Зорька»</b> на юго-западе: два спальных корпуса и столовая, в шкафчиках вещи. <b>Лом</b> лежит у лагерных ворот и у пожарной вышки: удерживай E у замка 2,8 секунды; взлом слышно далеко. В столовой и у вышки есть <b>кассетный магнитофон</b>: V — записать 2 секунды с микрофона, B — оставить на земле. Через 3 секунды он 20 секунд повторяет запись и отвлекает тварей; E — забрать (две прокрутки на батарейках). Без микрофона на нём стук. Запись хранится только до конца этой игры и передаётся друзьям напрямую, когда ставишь приманку. Громкоговоритель на лагерной площади включается кнопкой E, играет 35 секунд один раз за ночь — уходи до того, как все соберутся.</p>
 <p><b>Светящаяся палочка</b> — у каждого одна на ночь. G — переломить: пару минут она светит зелёным у тебя в руке, G ещё раз — бросить вперёд (E — подобрать с земли). В её свете, как и под лампой генератора, лес виден таким, какой он есть, — легко понять, где ты. Наблюдатель в такой свет не шагнёт.</p>
 <p><b>Интерфейса почти нет.</b> Кольцо вокруг точки — твоя громкость. Tab — время, генераторы и текущая задача. Полоска сверху заполняется с каждым генератором. Через 45 минут лес просыпается окончательно.</p>
 <p><b>Очки:</b> время × множитель опасности, найденные тела, генераторы, осколки, проходы впритык, отрывы. За победу — бонус, и тем больше, чем быстрее.</p>
@@ -351,6 +397,7 @@ const STR = {
 <tr><td>E (удерживать)</td><td>обыскать тело · чинить генератор · дверь · пульс друга · поднять / поставить деталь · сесть в УАЗ, завести</td></tr>
 <tr><td>ПКМ / F</td><td>бросить камень (с деталью в руках — бросить её)</td></tr>
 <tr><td>G</td><td>светящаяся палочка: переломить · бросить</td></tr>
+<tr><td>V / B</td><td>магнитофон: записать / поставить приманку</td></tr>
 <tr><td>T</td><td>фонарик (если нашёл): включить · выключить</td></tr>
 <tr><td>R</td><td>нести упавшего друга · положить (на койку, в машину) · положить деталь · выйти из машины</td></tr>
 <tr><td>Q</td><td>сигнальная ракета (если нашёл)</td></tr>
@@ -453,6 +500,50 @@ const STR = {
     stDead: 'мёртв',
   },
   en: {
+    // Field kit and the two optional destinations.
+    fieldMetres: "m",
+    tapeName: "cassette recorder",
+    crowbarName: "crowbar",
+    tapeGot: "recorder · V — record 2 s · B — place a lure",
+    tapeGotT: "recorder · RECORD — 2 s · TAPE — place a lure",
+    crowbarGot: "crowbar · hold E at a locked cupboard — it will be loud",
+    tapeKeys: "V — record · B — place",
+    tapeKeysT: "RECORD · TAPE — place",
+    tapeRecorded: "recorded · B — place; friends in this game will hear your clip",
+    tapeSilent: "too quiet — the old tape is still there",
+    tapeNoMic: "no mic recording — the tape has knocks; M — enable microphone",
+    tapeRecordWarn: "REC · 2 seconds — speak; the things can hear you right now too",
+    tapePlaced: "recorder: 3 s delay, then 20 s of sound — leave",
+    tapeFlat: "the recorder is flat — it will stay on the ground",
+    pryNeed: "locked · need a crowbar (Zarya entrance or the fire lookout)",
+    usePry: "HOLD E — PRY OPEN · LOUD",
+    usePryT: "HOLD HANDS — PRY OPEN · LOUD",
+    useLookout: "HOLD E — CLIMB",
+    useLookoutT: "HOLD HANDS — CLIMB",
+    useClimbing: "HOLD E — CLIMB · R — DOWN",
+    useClimbingT: "HOLD HANDS — CLIMB · DOWN — DESCEND",
+    lookoutDescending: "climbing down · the ladder creaks",
+    lookoutCreak: "the ladder is heard below · let go to climb down",
+    lookoutTop: "at the top · E — binoculars · R — descend",
+    lookoutTopT: "at the top · HANDS — binoculars · DOWN — descend",
+    binoCooldown: "optics cooling: {n} s · R / DOWN — descend",
+    useBino: "E — BINOCULARS · R — DOWN",
+    useBinoT: "HANDS — BINOCULARS · DOWN — DESCEND",
+    useBinoOff: "E — LOWER BINOCULARS",
+    useBinoOffT: "HANDS — LOWER BINOCULARS",
+    binoTitle: "FIELD BINOCULARS · LIGHT AMPLIFICATION",
+    binoExit: "E — lower · R — down",
+    binoExitT: "HANDS — lower · DOWN — descend",
+    useSpeaker: "E — LOUDSPEAKER · LURE",
+    useSpeakerT: "HANDS — LOUDSPEAKER · LURE",
+    useSpeakerOff: "E — SWITCH LOUDSPEAKER OFF",
+    useSpeakerOffT: "HANDS — SWITCH LOUDSPEAKER OFF",
+    speakerSpent: "the loudspeaker won't start again",
+    zaryaArrival: "ZARYA PIONEER CAMP · dining hall, dorms, locked cupboards",
+    lookoutArrival: "FIRE LOOKOUT · binoculars still at the top",
+    touchTape: "TAPE",
+    touchRecord: "RECORD",
+    touchDescend: "DOWN",
     title: 'HUSH',
     tagline: 'You are blind. The forest is not.',
     subtitle: 'an echolocation horror · start five generators',
@@ -783,6 +874,8 @@ const STR = {
 <p><b>Listeners and Crawlers</b> walk to where the sound was. Made a noise? Move. A stone (RMB / F) lures them away. Later two others arrive, one of each per forest: <b>the Watcher</b> is deaf but moves only while no light is on it — keep it lit; it won't enter a lamp. <b>The Howler</b> barely hears, but now and then it fills its chest and howls: whatever moves inside that wave, it sees. Hear the breath — freeze.</p>
 <p><b>The flare gun.</b> One of the bodies (a different one every night) has a flare gun with two shots. Q — the flare climbs, opens its parachute and floods the forest with red light for about fifteen seconds: you see everything, and everyone. But <span class="red">every creature around comes to the light</span> — fire it away from yourself. <b>The hunting cabin</b>: its door closes (E). Wanderers won't get it open at once — they lean on it until it creaks open; the one hunting you breaks it down in three blows.</p>
 <p><b>The flashlight</b> lies somewhere in the forest — by a wrecked car, a tower, the graves — still switched on: you can see its weak beam from far off. T switches it: a cone of real light where you look. It isn't for walking with the light on — it's for a quick look: the battery lasts a minute (you find it half flat, and spares are rare in the cupboards), and <span class="red">a lit flashlight is seen from far off</span> — whatever the beam falls on, and anything near with nothing between you, comes to the light. When the battery is nearly flat, it flickers and goes out for moments — <b>the Watcher moves in those moments</b>.</p>
+<p><b>The fire lookout</b> stands in the northwest: hold E for five seconds to climb the creaking ladder. At the top, E — binoculars for 10 seconds (then 25 seconds to cool), R — down. They show the real forest, generator lights and moving creatures, but cast no light and do not freeze the Watcher. Trees and walls still block the view.</p>
+<p><b>Zarya pioneer camp</b> in the southwest: two dormitories and a dining hall, cupboards with supplies. A <b>crowbar</b> lies at its gate and by the lookout: hold E at a padlock for 2.8 seconds; prying is loud. A <b>cassette recorder</b> is in the dining hall and by the lookout: V — record 2 seconds from your mic, B — place it. After 3 seconds it loops for 20 seconds, luring creatures; E — retrieve it (two playbacks per battery). No mic? The tape has knocks. Recordings live only for this game and go directly to friends when you place a lure. E at the square’s loudspeaker switch starts a 35-second assembly call, once per night — leave before the guests arrive.</p>
 <p><b>The glow stick</b> — one each per night. G — crack it: for a couple of minutes it glows green in your hand; G again — throw it ahead (E — pick it up off the ground). In its light, as under a generator's lamp, the forest looks the way it really is — easy to tell where you are. The Watcher won't step into that light.</p>
 <p><b>There is almost no interface.</b> The ring around the dot is your loudness. Tab shows time, generators and the current task. The hairline at the top fills with each generator. After 45 minutes the forest wakes up for good.</p>
 <p><b>Score:</b> time × danger multiplier, bodies found, generators, shards, close calls, escapes. Winning gives a bonus — bigger the faster you are.</p>
@@ -794,6 +887,7 @@ const STR = {
 <tr><td>E (hold)</td><td>search a body · repair a generator · door · a friend's pulse · pick up / fit a part · get in the UAZ, start it</td></tr>
 <tr><td>RMB / F</td><td>throw stone (with a part in your arms — throw that)</td></tr>
 <tr><td>G</td><td>glow stick: crack · throw</td></tr>
+<tr><td>V / B</td><td>recorder: record / place a lure</td></tr>
 <tr><td>T</td><td>flashlight (once you've found it): on · off</td></tr>
 <tr><td>R</td><td>carry a fallen friend · put down (on the cot, in the car) · put a part down · get out of the car</td></tr>
 <tr><td>Q</td><td>signal flare (once you've found the gun)</td></tr>
