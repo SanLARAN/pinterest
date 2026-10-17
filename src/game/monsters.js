@@ -1033,6 +1033,7 @@ export class Watcher extends Monster {
       if (g.objectives.lampAt(x, z) > 0.005) continue;
       if (g.lightAt(x, g.world.terrain.height(x, z) + 1.8, z) > 0.02) continue;
       if (g.flares && g.flares.lightAt(x, g.world.terrain.height(x, z) + 1.8, z) > 0.02) continue; // nor under a flare
+      if (g.smallLightAt && g.smallLightAt(x, g.world.terrain.height(x, z) + 1.8, z) > 0.02) continue; // nor by a glow stick
       if (g.livePlayers().some((q) => Math.hypot(q.x - x, q.z - z) < dmin * 0.7)) continue; // not right next to someone else
       this.spawn(x, z, 'stalk');
       this.tgt = p;
@@ -1073,8 +1074,8 @@ export class Watcher extends Monster {
     if (this.state === 'lurk') {
       this.lurkT -= dt;
       if (this.lurkT <= 0) {
-        // it picks someone who isn't sheltering in a lamp
-        const live = g.livePlayers().filter((q) => !g.objectives.inLamp(q.x, q.z));
+        // it picks someone who isn't sheltering in a lamp (or in a glow stick's light)
+        const live = g.livePlayers().filter((q) => !g.objectives.inLamp(q.x, q.z) && !(g.smallLightAt && g.smallLightAt(q.x, q.y + 1, q.z) > 0.3));
         const p = live.length ? live[Math.floor(Math.random() * live.length)] : null;
         if (!p || !this.appearBehind(p, 27, 37)) this.lurkT = 1.5;
       }
@@ -1083,12 +1084,13 @@ export class Watcher extends Monster {
     const p = this.pickTarget() || FAR;
     const pdx = p.x - this.x, pdz = p.z - this.z;
     const pd = this.tgtDist;
-    const lampL = Math.max(g.objectives.lampAt(this.x, this.z), g.flares ? g.flares.lightAt(this.x, this.y + 1.8, this.z) : 0);
+    const lampL = Math.max(g.objectives.lampAt(this.x, this.z), g.flares ? g.flares.lightAt(this.x, this.y + 1.8, this.z) : 0, g.smallLightAt ? g.smallLightAt(this.x, this.y + 1.8, this.z) : 0);
     const lit = g.lightAt(this.x, this.y + 1.8, this.z) > cfg.litThreshold || lampL > 0.08;
     this.lit = lit;
     this.state = lit ? 'frozen' : 'stalk';
     this.litStreak = lit ? this.litStreak + dt : Math.max(0, this.litStreak - dt * 0.5);
-    this.lampWait = p.alive && g.objectives.inLamp(p.x, p.z) ? this.lampWait + dt : 0;
+    const sheltered = g.objectives.inLamp(p.x, p.z) || (g.smallLightAt && g.smallLightAt(p.x, (p.y || 0) + 1, p.z) > 0.3);
+    this.lampWait = p.alive && sheltered ? this.lampWait + dt : 0;
     // it gets bored of being stared at, and it won't wait forever at the edge of a lamp
     if (this.litStreak > 14 || this.lampWait > 9 || !p.alive) {
       this.vanish(18 + Math.random() * 16);
@@ -1104,7 +1106,7 @@ export class Watcher extends Monster {
       // it will not step into a lamp's light
       const la = Math.min(1.2, speed * 0.4);
       const ax = this.x + Math.sin(this.yaw) * la, az = this.z + Math.cos(this.yaw) * la;
-      if (g.objectives.lampAt(ax, az) > 0.05 || (g.flares && g.flares.lightAt(ax, this.y + 1.8, az) > 0.05)) speed = 0;
+      if (g.objectives.lampAt(ax, az) > 0.05 || (g.flares && g.flares.lightAt(ax, this.y + 1.8, az) > 0.05) || (g.smallLightAt && g.smallLightAt(ax, this.y + 1.8, az) > 0.05)) speed = 0;
     }
     if (speed > 0) {
       this._steer(dt, p.x, p.z, speed, 3.2);

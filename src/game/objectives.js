@@ -425,7 +425,11 @@ export class Objectives {
       if (wantHum && !g.hum) g.hum = audio.genHum(g.x, g.y + 0.5, g.z);
       if (!wantHum && g.hum && !g.dying) { g.hum.stop(); g.hum = null; }
     }
-    if (!night) return;
+    if (!night) {
+      // the morning: nothing to do yet — but a door opens (the first-aid hut is right by the camp)
+      if (game.state === 'morning' && p.alive) this._interact(dt, true);
+      return;
+    }
 
     // flies around the bodies (you hear them before you find them)
     for (const body of this.bodies) {
@@ -491,11 +495,12 @@ export class Objectives {
     }
   }
 
-  _interact(dt) {
+  _interact(dt, doorsOnly = false) {
     const game = this.g;
     const p = game.player;
     const input = game.input;
     const f = p.forward();
+    const hands = !doorsOnly && !p.carrying; // (with someone on your shoulder you can still shove a door)
     // what's in front of you
     let best = null, bd = 1e9;
     const consider = (obj, x, z, r, kind) => {
@@ -507,8 +512,12 @@ export class Objectives {
       const score = d * (1.6 - facing);
       if (score < bd) { bd = score; best = { obj, kind, d }; }
     };
-    for (const body of this.bodies) if (!body.searched && body.mesh.visible) consider(body, body.x, body.z, USE_R_BODY, 'body');
-    for (const g of this.gens) if (!g.running) consider(g, g.x, g.z, USE_R_GEN, 'gen');
+    if (hands) {
+      for (const body of this.bodies) if (!body.searched && body.mesh.visible) consider(body, body.x, body.z, USE_R_BODY, 'body');
+      for (const g of this.gens) if (!g.running) consider(g, g.x, g.z, USE_R_GEN, 'gen');
+      if (game.rescue) game.rescue.consider(consider);
+      if (game.glows) game.glows.consider(consider);
+    }
     if (game.doors) game.doors.consider(consider);
     if (best && this.target && best.obj !== this.target.obj) this.searchT = 0;
     this.target = best;
@@ -517,17 +526,30 @@ export class Objectives {
     const pressed = game.events.includes('useDown');
     const still = p.speed < 0.6;
     const hud = game.hud;
+    const T = (key) => t(input.touch ? key + 'T' : key); // touch has no E key: name the button instead
+    if (game.rescue && (!best || (best.kind !== 'mate' && best.kind !== 'cot'))) game.rescue.idle();
     if (!best) {
       this.searchT = 0;
-      hud.setUse(null);
+      // your hands are full: say what R does
+      hud.setUse(p.carrying && game.rescue ? game.rescue.carryPrompt(T) : null, 0, false);
       return;
     }
     const o = best.obj;
-    const T = (key) => t(input.touch ? key + 'T' : key); // touch has no E key: name the button instead
     if (best.kind === 'door') {
       this.searchT = 0;
       hud.setUse(T(game.doors.prompt(o)), 0, true);
       if (pressed) game.doors.use(o);
+      return;
+    }
+    if (best.kind === 'mate' || best.kind === 'cot') {
+      this.searchT = 0;
+      game.rescue.interact(best, dt, held, still, T);
+      return;
+    }
+    if (best.kind === 'glow') {
+      this.searchT = 0;
+      hud.setUse(T('useGlowPick'), 0, true);
+      if (pressed) game.glows.pick(o);
       return;
     }
     if (best.kind === 'body') {

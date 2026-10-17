@@ -13,6 +13,9 @@ import { Shards } from './shards.js';
 import { Stones } from './stones.js';
 import { Doors } from './doors.js';
 import { Flares } from './flares.js';
+import { GlowSticks } from './glowsticks.js';
+import { MedHut } from './medhut.js';
+import { Rescue } from './rescue.js';
 import { Dread } from './dread.js';
 import { CAP } from '../world/world.js';
 import { shared } from '../render/sonar.js';
@@ -25,7 +28,7 @@ const HOWL = [1.0, 0.36, 0.1];
 const LAMPC = [1.0, 0.74, 0.42];
 const MORNING_LIGHT = 0.95;
 const NO_LOOK = { dx: 0, dy: 0 };
-const SRC_SELF = new Set(['voice', 'ping', 'step', 'bump', 'breath', 'repair', 'door', 'flare']);
+const SRC_SELF = new Set(['voice', 'ping', 'step', 'bump', 'breath', 'repair', 'door', 'flare', 'glow']);
 const _v = new THREE.Vector3();
 const escHtml = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -40,6 +43,9 @@ export class Game {
     this.objectives = new Objectives(this);
     this.doors = new Doors(this);
     this.flares = new Flares(this);
+    this.glows = new GlowSticks(this);
+    this.medhut = new MedHut(this); // (after the glow sticks: its lantern is one of their small lights)
+    this.rescue = new Rescue(this);
     this.hud.onNoteClose = () => this.objectives.closeNote();
     this.events = [];
     this.monsters = [];
@@ -115,8 +121,7 @@ export class Game {
     this.role = coop.isHost ? 'host' : 'client';
     this.sync = new NetSync(this, coop);
     this.player.id = coop.selfId;
-    for (const r of this.remotes.values()) if (r.liveGhost) this.ghosts.release(r.liveGhost);
-    this.remotes.clear();
+    this._dropRemotes();
     for (const p of players) {
       if (p.id === coop.selfId) continue;
       const r = new RemotePlayer(this, p);
@@ -126,9 +131,14 @@ export class Game {
     this.teamSize = players.length;
   }
 
-  setupSolo() {
-    for (const r of this.remotes.values()) if (r.liveGhost) this.ghosts.release(r.liveGhost);
+  // teammates gone from this machine (their bodies too)
+  _dropRemotes() {
+    for (const r of this.remotes.values()) r.dispose();
     this.remotes.clear();
+  }
+
+  setupSolo() {
+    this._dropRemotes();
     this.role = 'solo';
     this.coop = null;
     this.sync = null;
@@ -143,18 +153,20 @@ export class Game {
       this.audio.voiceSet(id, 0, 0, 0, 1);
     }
     for (const r of this.remotes.values()) {
-      if (r.liveGhost) this.ghosts.release(r.liveGhost);
-      r.liveGhost = null;
+      r.rig.root.visible = false;
       this.audio.voiceSpatial(r.id, false);
       this.audio.voiceSet(r.id, 0, 0, 0, 1);
     }
+    this.glows.view.visible = this.glows.viewHalo.visible = false;
   }
 
   removeRemote(id) {
     const r = this.remotes.get(id);
     if (!r) return;
-    if (r.liveGhost) this.ghosts.release(r.liveGhost);
+    this.rescue.left(r);
+    this.glows.dropFor(r.id, r.x, r.z);
     this.remotes.delete(id);
+    r.dispose();
     if (this.state !== 'over') this.hud.popup(t('mateLeft').replace('{name}', r.name), 'dim');
     if (this.spectate && this.spectate.target === r) this.nextSpectate();
     if (this.auth) this.checkTeam();
@@ -170,7 +182,7 @@ export class Game {
     this.time = 0;
     this.score = 0;
     this.mult = 1;
-    this.stats = { shards: 0, close: 0, escapes: 0, loudest: 0, hunts: 0, gens: 0, bodies: 0, thrown: 0, flares: 0, seen: {} }; // seen: creatures that showed themselves (the atlas)
+    this.stats = { shards: 0, close: 0, escapes: 0, loudest: 0, hunts: 0, gens: 0, bodies: 0, thrown: 0, flares: 0, glows: 0, revives: 0, seen: {} }; // seen: creatures that showed themselves (the atlas)
     this.state = 'morning';
     this.grace = true;
     this.fx = this._fxDefaults();
@@ -182,7 +194,10 @@ export class Game {
     this.inputMuted = false;
     this.teamOverAt = 0;
     this.netT = 0;
-    for (const r of this.remotes.values()) r.liveGhost = null;
+    this.rescue.reset();
+    this.rescue.resetPlayer(this.player);
+    for (const r of this.remotes.values()) this.rescue.resetPlayer(r);
+    this.glows.reset();
     this.pulses.clear();
     this.ghosts.clear();
     this.particles.clear();
@@ -257,7 +272,7 @@ export class Game {
           return;
         }
         this.coop.toHost('sk', 1); // a guest asks; the host's word starts the dusk for everyone
-      }
+      } else if (e === 'glow') this.glows.use(); // (save it for the dark)
     }
     if (this.state !== 'morning') return;
     const pev = p.update(dt, this.input, this.inputMuted ? NO_LOOK : raw.look, this.inputMuted);
@@ -289,6 +304,8 @@ export class Game {
     hud.setHint(hint);
     this.objectives.update(dt, false);
     this.doors.update(dt);
+    this.medhut.update(dt);
+    this.glows.update(dt);
     this.pulses.update(this.time);
     this.audio.morningTick();
     this.fx.danger = 0;
@@ -304,6 +321,7 @@ export class Game {
     this.duskLight = shared.uDawn.value;
     this.hud.setIntro(null);
     this.hud.setHint(null);
+    this.hud.setUse(null);
     this.hud.setSkip(false);
     this.audio.dusk();
     this.objectives.campFail();
@@ -343,7 +361,6 @@ export class Game {
     shared.uSun.value.set(0.5, 0.35, -0.8).normalize(); // if you ever see the sky again, it'll be a sunrise
     this.pulses.clear();
     this.ghosts.clear();
-    for (const r of this.remotes.values()) r.liveGhost = null;
     this.timeline = [];
     this.audio.setMorning(false);
     this.objectives.setMorning(false);
@@ -941,11 +958,14 @@ export class Game {
     if (this.state !== 'play') return;
     const cause = m.huntCause === 'scream' && (m.huntCausePid == null || m.huntCausePid === victim.id) ? 'scream' : m.type;
     if (victim !== this.player) {
-      // co-op host: one of the others was caught. it stays with the body; the rest can get away
+      // co-op host: one of the others was caught. it stays with the body; the rest can get away.
+      // (down, not dead: they bleed out slowly — unless someone gets them onto the hut's cot. see Rescue)
       if (!victim.alive) return;
+      const bleed = this.rescue.bleedFor(victim);
       victim.die(victim.x, victim.z);
       victim.cause = cause;
-      this.sync.ev('ki', m.id, victim.id, cause, +victim.x.toFixed(2), +victim.z.toFixed(2));
+      this.sync.ev('ki', m.id, victim.id, cause, +victim.x.toFixed(2), +victim.z.toFixed(2), bleed);
+      this.rescue.down(victim, bleed);
       m.feed();
       this.fxMateDied(victim, m);
       this.checkTeam();
@@ -953,11 +973,13 @@ export class Game {
     }
     if (!this.player.alive) return;
     if (this.online) {
+      const bleed = this.rescue.bleedFor(this.player);
       if (this.auth) {
-        this.sync.ev('ki', m.id, this.player.id, cause, +this.player.x.toFixed(2), +this.player.z.toFixed(2));
+        this.sync.ev('ki', m.id, this.player.id, cause, +this.player.x.toFixed(2), +this.player.z.toFixed(2), bleed);
         m.feed();
       }
       this.localDie(m, cause);
+      this.rescue.down(this.player, bleed);
       if (this.auth) this.checkTeam();
       return;
     }
@@ -966,19 +988,53 @@ export class Game {
   }
 
   // the host says someone was caught
-  netKill(mid, pid, cause, x, z) {
+  netKill(mid, pid, cause, x, z, bleed) {
     if (this.state !== 'play') return;
     const m = this.monsterById(mid);
     if (pid === this.player.id) {
       if (!this.player.alive) return;
       this.localDie(m || { type: 'listener', x: this.player.x + 1, z: this.player.z, id: -1 }, cause || 'listener');
+      this.rescue.down(this.player, Number.isFinite(bleed) ? bleed : this.rescue.bleedFor(this.player));
       return;
     }
     const r = this.remotes.get(pid);
     if (!r || !r.alive) return;
     r.die(x, z);
     r.cause = cause;
+    this.rescue.down(r, Number.isFinite(bleed) ? bleed : this.rescue.bleedFor(r));
     this.fxMateDied(r, m);
+  }
+
+  // co-op: brought back on the first-aid hut's cot — on your feet beside it, gasping (see Rescue)
+  reviveLocal(x, z, yaw) {
+    const p = this.player;
+    p.alive = true;
+    p.x = x;
+    p.z = z;
+    p.yaw = yaw;
+    p.pitch = -0.12;
+    p.vx = p.vz = 0;
+    p.speed = 0;
+    p.y = this.world.terrain.height(x, z);
+    p.stamina = 30;
+    p.exhausted = false;
+    p.carrying = null;
+    p.carriedBy = null;
+    p.onCot = false;
+    p.gone = false;
+    this.localDeath = false;
+    this.spectate = null;
+    this.spectLabel = null;
+    this.jsGhost = null;
+    this.charge.active = false;
+    document.body.classList.remove('spectating');
+    this.fx.fade = 1;
+    this.fx.white = Math.max(this.fx.white, 0.55);
+    this.fx.red = 0.25;
+    this.addTrauma(0.35);
+    this.audio.heartbeat(0.8);
+    this.timeline.push({ at: this.time + 0.9, fn: () => this.audio.heartbeat(0.55) });
+    this.hud.flashAlert(t('aRevived'), 'dawn', 2.6);
   }
 
   // co-op: you're dead, the night goes on without you
@@ -995,6 +1051,12 @@ export class Game {
 
   fxMateDied(r, m) {
     const near = this.distToEars(r.x, r.z) < 30;
+    if (this.player.alive && !this.hinted.downed) {
+      // the first time: they can still be saved
+      this.hinted.downed = true;
+      this.timeline.push({ at: this.time + 2.6, fn: () => this.hud.setHint(t(this.input.touch ? 'hintDownedTouch' : 'hintDowned')) });
+      this.timeline.push({ at: this.time + 10, fn: () => this.hud.setHint(null) });
+    }
     this.audio.mateDeath(r.x, r.y + 1.4, r.z, near);
     if (m && m.x !== undefined) this.pulses.emit(r.x, r.y + 1.2, r.z, this.time, { radius: near ? 18 : 12, strength: 0.9, decay: 0.8, color: RED, kind: 'monster' });
     this.hud.flashAlert(t('mateDied').replace('{name}', r.name), 'danger', 2.4);
@@ -1040,6 +1102,13 @@ export class Game {
 
   nextSpectate() {
     if (!this.spectate) return;
+    const carrier = this.player.carriedBy && this.remotes.get(this.player.carriedBy);
+    if (carrier && carrier.alive) {
+      // over their shoulder: you see what they see
+      this.spectate.target = carrier;
+      this.spectLabel = null;
+      return;
+    }
     const live = [...this.remotes.values()].filter((r) => r.alive);
     const i = live.indexOf(this.spectate.target);
     this.spectate.target = live.length ? live[(i + 1) % live.length] : null;
@@ -1323,24 +1392,16 @@ export class Game {
     if (!this.remotes.size) return;
     const day = this.state === 'morning' || (this.state === 'dusk' && this.duskT < 1.5) || this.state === 'dawn' || this.state === 'won';
     const meAlive = this.player.alive;
+    const watched = this.spectate && this.spectate.target;
     for (const r of this.remotes.values()) {
       r.update(dt);
       // the dead are heard only by the dead
       this.audio.voiceSet(r.id, r.x, r.y + (r.alive ? r.eyeCur : 0.35), r.z, r.alive || !meAlive ? 1 : 0);
-      const watching = this.spectate && this.spectate.target === r;
-      const lit = watching ? 0 : day ? 1 : this.glowAt(r.x, r.y + 1.2, r.z);
-      if (lit > 0.06) {
-        const str = day ? 0.62 : Math.min(0.8, 0.22 + lit * 1.2);
-        if (!r.liveGhost) r.liveGhost = this.ghosts.spawn(r.rig, this.time, { sticky: true, strength: str, full: day ? 0.7 : 0.3, color: r.alive ? r.hex : 0x8a9396, jitter: 0.25, dyeK: r.alive ? 1 : 0.3 });
-        else {
-          this.ghosts.refresh(r.liveGhost, r.rig);
-          r.liveGhost.strength = str;
-        }
-        if (!day) r.revealT = this.time;
-      } else if (r.liveGhost) {
-        this.ghosts.release(r.liveGhost);
-        r.liveGhost = null;
-      }
+      // in daylight — or in any real light: a lamp, a flare, a glow stick, the hut's lantern — they're simply
+      // there, in their own clothes (not while you're behind their eyes, or they're on your shoulder)
+      const lit = day ? 1 : this.glowAt(r.x, r.y + (r.alive || r.carriedBy ? 1.2 : 0.4), r.z);
+      r.rig.root.visible = watched !== r && !this.onShoulder(r) && lit > 0.03 && this.state !== 'idle';
+      if (lit > 0.06 && !day) r.revealT = this.time;
     }
   }
 
@@ -1358,6 +1419,7 @@ export class Game {
       this.updateDying(dt);
       this.doors.update(dt);
       this.flares.update(dt);
+      this.glows.update(dt);
       this.time += dt;
       this._commonFx(dt);
       return;
@@ -1367,6 +1429,10 @@ export class Game {
       this.updateDawn(dt);
       this.doors.update(dt);
       this.flares.update(dt);
+      this.medhut.update(dt);
+      this.glows.update(dt);
+      this.rescue.update(dt);
+      for (const e of this.inputMuted ? [] : raw.events) if (e === 'carry') this.rescue.carryKey();
       this.time += dt;
       if (this.player.alive) this.player.update(dt, input, look, this.inputMuted);
       this._commonFx(dt);
@@ -1399,6 +1465,8 @@ export class Game {
       } else if (e === 'pingUp') this.pingRelease();
       else if (e === 'throw') this.throwStone();
       else if (e === 'flare') this.fireFlare();
+      else if (e === 'glow') this.glows.use();
+      else if (e === 'carry') this.rescue.carryKey();
     }
     // E puts a note away
     if (this.objectives.note && raw.events.includes('useDown')) {
@@ -1466,6 +1534,9 @@ export class Game {
     this.stones.update(dt, this);
     this.doors.update(dt);
     this.flares.update(dt);
+    this.medhut.update(dt);
+    this.glows.update(dt);
+    this.rescue.update(dt);
     const nearest = this.updateMonsters(dt);
     if (this.state !== 'play') return; // killed this frame
     if (!this.player.alive) return; // co-op: caught this frame — the death plays from the next one
@@ -1491,7 +1562,7 @@ export class Game {
     this.audio.update(fx.danger, this.time / CFG.RUN_SECONDS);
     this.audio.setAmbience(0.9, fx.danger);
 
-    // past half an hour the forest stops pretending: everything starts closing in on you
+    // past three quarters of an hour the forest stops pretending: everything starts closing in on you
     if (this.time > CFG.RUN_SECONDS && this.auth) {
       if (!this.endgame) {
         this.endgame = true;
@@ -1530,6 +1601,10 @@ export class Game {
     this.stones.update(dt, this);
     this.doors.update(dt);
     this.flares.update(dt);
+    this.medhut.update(dt);
+    this.glows.update(dt);
+    this.rescue.update(dt);
+    if (this.player.alive) return; // brought back this frame
     const nearest = this.updateMonsters(dt);
     if (this.state !== 'play') return;
     this.objectives.update(dt, true);
@@ -1573,7 +1648,20 @@ export class Game {
 
   // steady light at a spot: a running generator's lamp, or a burning flare (0..1)
   glowAt(x, y, z) {
-    return Math.max(this.objectives.lampAt(x, z), this.flares.lightAt(x, y, z));
+    return Math.max(this.objectives.lampAt(x, z), this.flares.lightAt(x, y, z), this.glows.lightAt(x, y, z));
+  }
+
+  // a friend over the shoulder of the one whose eyes you're looking through (you, or whoever you watch):
+  // not drawn — they'd fill the view
+  onShoulder(r) {
+    if (r.alive || !r.carriedBy) return false;
+    const watched = this.spectate && this.spectate.target;
+    return r.carriedBy === this.player.id || (!!watched && r.carriedBy === watched.id);
+  }
+
+  // a glow stick's light (or the hut's lantern) at a spot (0..1)
+  smallLightAt(x, y, z) {
+    return this.glows.lightAt(x, y, z);
   }
 
   // standing in a lamp's (or a flare's) light, a monster can simply be seen — a live afterimage that follows it
@@ -1633,7 +1721,7 @@ export class Game {
         }
       }
       for (const r of this.remotes.values()) {
-        if (this.spectate && this.spectate.target === r) continue;
+        if ((this.spectate && this.spectate.target === r) || this.onShoulder(r)) continue;
         const d = Math.hypot(r.x - s.x, r.y + 1.0 - s.y, r.z - s.z);
         if (d > s.prevR && d <= s.curR && d <= s.radius && d > 0.8) {
           const fall = 1 - smoothstep(s.radius * 0.42, s.radius, d);
@@ -1674,7 +1762,7 @@ export class Game {
     }
     // a bigger team draws a few more of them
     const extra = this.online ? Math.max(0, Math.round((this.livePlayers().length - 1) * 0.7)) : 0;
-    if (L < want.listeners + extra) this.spawnMonster('listener', 60, 90);
+    if (L < Math.min(CFG.MAX_LISTENERS, want.listeners + extra)) this.spawnMonster('listener', 60, 90);
     else if (C < want.crawlers) this.spawnMonster('crawler', 55, 85);
     for (const m of this.monsters) {
       if ((m.state === 'wander' || m.state === 'idle') && m.tgtDist > 120 && !m.intro) this.relocate(m);
@@ -1775,6 +1863,8 @@ export class Game {
     }
     camera.getWorldDirection(_v);
     this.audio.setListener(camera.position.x, camera.position.y, camera.position.z, _v.x, _v.y, _v.z);
+    camera.updateMatrixWorld();
+    this.glows.placeView(camera, !sp && this.player.alive && (this.state === 'play' || this.state === 'dawn'));
 
     const u = this.post.u;
     u.uAberr.value = 0.12 + fx.glitch * 0.9 + fx.danger * 0.25 + sh * 0.5;
@@ -1799,18 +1889,27 @@ export class Game {
     const p = this.player;
     this.hud.update(this, dt, this.input.peekHeld);
     const sp = this.spectate;
-    const key = sp ? (sp.target ? sp.target.id : '-') : '';
+    const self = this.online ? this.rescue.selfState() : null; // down / carried / cot / gone
+    const key = sp ? `${sp.target ? sp.target.id : '-'}|${self}` : '';
     if (this.spectLabel !== key) {
       this.spectLabel = key;
       const el = document.getElementById('spect');
       if (sp) {
         el.style.setProperty('--c', sp.target ? sp.target.color : '#fff');
-        el.innerHTML = sp.target
-          ? `${t('spectating').replace('{name}', escHtml(sp.target.name))}<small>${t(this.input.touch ? 'spectNextTouch' : 'spectNext')}</small>`
-          : t('spectAllDead');
+        const name = sp.target ? escHtml(sp.target.name) : '';
+        const next = `<small>${t(this.input.touch ? 'spectNextTouch' : 'spectNext')}</small>`;
+        if (self === 'carried' && sp.target) el.innerHTML = t('spectCarried').replace('{name}', name);
+        else if (self === 'cot') el.innerHTML = sp.target ? `${t('spectCot')}<small>${t('spectWatching').replace('{name}', name)}</small>` : t('spectCot');
+        else if (self === 'down') el.innerHTML = sp.target ? `${t('spectDown').replace('{name}', name)}<small>${t('spectDownHint')}</small>` : t('spectAllDead');
+        else el.innerHTML = sp.target ? `${t('spectating').replace('{name}', name)}${next}` : t('spectAllDead');
       }
       document.body.classList.toggle('spectating', !!sp);
     }
+    // touch: the buttons that only make sense right now
+    const playing = this.state === 'play' && p.alive;
+    document.body.classList.toggle('can-carry', this.online && playing && (!!p.carrying || !!this.rescue.liftTarget()));
+    document.body.classList.toggle('carrying', playing && !!p.carrying);
+    document.body.classList.toggle('has-glow', playing && (this.glows.count > 0 || !!this.glows.held));
     const chargeLvl = this.charge.active ? (this.charge.t < 0.18 ? 0.24 : lerp(0.32, 1, clamp((this.charge.t - 0.18) / 0.95, 0, 1))) : 0;
     this.hud.ring(dt, this.mic, this.state === 'play' ? chargeLvl : 0, this.mic.state === 'on');
     if (settings.radar) {

@@ -2,19 +2,22 @@
 //
 //  everyone → everyone  'ps'  own state, 15/s: position, look, speed, flags, loudness, score
 //                       'ev'  things that happened: pulses, stones, shards, repair sounds, found parts,
-//                             a flare fired, a door swung (newest swing wins, see Doors)
+//                             a flare fired, a door swung (newest swing wins, see Doors), a glow stick
+//                             cracked / thrown / picked up, a friend put down (see Rescue)
 //                       'ob'  the objectives (generators, bodies) — merged monotonically, see Objectives —
 //                             and the doors
 //  guest → host         'nz'  a noise the guest made (voice, ping, steps, repairs): the host's monsters hear it
 //                       'sk'  "skip the morning"
+//                       'rc' / 'rr'  "let me lift them" / "they're breathing" (see Rescue)
 //  host → everyone      'sn'  monster snapshot, 10/s
-//                       'ev'  monster events (hunt, howl, kill...), phase changes (dusk, dawn, end)
+//                       'ev'  monster events (hunt, howl, kill...), phase changes (dusk, dawn, end),
+//                             who lifted whom, who is back, who bled out
 import { createMonster, STATES, TYPES } from './monsters.js';
 import { PF } from './remote.js';
 
 const PS_HZ = 15;
 const SNAP_HZ = 10;
-export const NOISE_SRC = ['voice', 'ping', 'step', 'bump', 'breath', 'repair', 'door', 'flare'];
+export const NOISE_SRC = ['voice', 'ping', 'step', 'bump', 'breath', 'repair', 'door', 'flare', 'glow'];
 const r2 = (v) => Math.round(v * 100) / 100;
 const r3 = (v) => Math.round(v * 1000) / 1000;
 
@@ -152,6 +155,12 @@ export class NetSync {
       case 'sk':
         if (this.host && g.state === 'morning') g.startDusk();
         break;
+      case 'rc': // a guest wants to lift someone who's down
+        if (this.host && typeof d === 'string') g.rescue.grant(d, pid);
+        break;
+      case 'rr': // a guest finished working on someone on the cot
+        if (this.host && typeof d === 'string') g.rescue.hostRevive(d, pid);
+        break;
       case 'ev':
         if (Array.isArray(d)) this.event(d, pid, isHostMsg);
         break;
@@ -191,6 +200,18 @@ export class NetSync {
       case 'dr': // a door swung (a player — or, from the host, a monster)
         g.doors.netSet(a, b, c, e, f | 0);
         break;
+      case 'gc': // a glow stick cracked, in their hand
+        if (r && typeof a === 'string') g.glows.crack(a, pid);
+        break;
+      case 'gt': // ...thrown
+        if (r && typeof a === 'string' && [b, c, e, f, d[6], d[7]].every((v) => Number.isFinite(+v))) g.glows.remoteThrow(pid, a, +b, +c, +e, +f, +d[6], +d[7], +d[8]);
+        break;
+      case 'gp': // ...picked up off the ground
+        if (r && typeof a === 'string') g.glows.remotePick(pid, a);
+        break;
+      case 'cd': // the one carrying someone put them down (here, or on the cot)
+        if (r && typeof a === 'string') g.rescue.netPlace(pid, a, +b, +c, !!e);
+        break;
       // ---- from the host only ----
       default: {
         if (!isHostMsg || this.host) break;
@@ -206,7 +227,10 @@ export class NetSync {
           case 'ar': g.fxArrive(a); break;
           case 'wk': g.fxWake(); break;
           case 'aw': g.fxAwake(Number.isFinite(a) ? a : null, Number.isFinite(b) ? b : null); break;
-          case 'ki': g.netKill(a, b, c, +e, +f); break;
+          case 'ki': g.netKill(a, b, c, +e, +f, +d[6]); break;
+          case 'cu': g.rescue.netLift(a, b); break;
+          case 'rv': g.rescue.netRevive(a, +b, +c, +e, f); break;
+          case 'bo': g.rescue.netGone(a); break;
           case 'dk': g.doors.netKnock(a, b); break;
           case 'dn': if (g.state === 'play') g.startDawn(); break;
           case 'en': g.endOnline(false); break;

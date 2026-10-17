@@ -344,8 +344,10 @@ export function poseSurvivor(rig, phase, speed, crouch, dead) {
   if (dead) {
     rig.root.rotation.x = -PI / 2;
     n.hips.position.y = 0.2;
+    n.chest.rotation.set(0, 0, 0);
     n.head.rotation.set(0, 0, 0.6);
     n.shL.rotation.set(-2.6, 0, -0.3); n.shR.rotation.set(-0.4, 0, 0.5);
+    n.elL.rotation.x = -0.2; n.elR.rotation.x = -0.35;
     n.thL.rotation.set(0.2, 0, 0); n.thR.rotation.set(-0.15, 0, 0);
     n.knL.rotation.x = 0.4; n.knR.rotation.x = 0.1;
     return;
@@ -356,14 +358,61 @@ export function poseSurvivor(rig, phase, speed, crouch, dead) {
   n.hips.position.y = crouch ? 0.62 : 0.94 - Math.abs(Math.cos(phase)) * 0.03 * amp;
   n.chest.rotation.x = crouch ? 0.55 : 0.08 * amp;
   n.head.rotation.set(crouch ? -0.35 : 0, 0, 0);
-  n.thL.rotation.x = s * 0.55 * amp - (crouch ? 1.1 : 0);
-  n.thR.rotation.x = -s * 0.55 * amp - (crouch ? 1.1 : 0);
+  n.thL.rotation.set(s * 0.55 * amp - (crouch ? 1.1 : 0), 0, 0);
+  n.thR.rotation.set(-s * 0.55 * amp - (crouch ? 1.1 : 0), 0, 0);
   n.knL.rotation.x = Math.max(0, -s) * 0.7 * amp + (crouch ? 1.6 : 0);
   n.knR.rotation.x = Math.max(0, s) * 0.7 * amp + (crouch ? 1.6 : 0);
   n.shL.rotation.set(-s * 0.45 * amp, 0, -0.06);
   n.shR.rotation.set(s * 0.45 * amp, 0, 0.06);
   n.elL.rotation.x = -0.25 - amp * 0.2;
   n.elR.rotation.x = -0.25 - amp * 0.2;
+}
+
+// slung over a friend's shoulder (a fireman's carry): folded at the waist on their shoulder — legs hanging
+// down in front of them, the body and arms hanging down their back. The caller puts the root (the hips) on
+// the shoulder, rotation (0, carrier's yaw, 0): the body faces the carrier.
+export function poseCarried(rig, sway = 0) {
+  const n = rig.nodes;
+  rig.root.rotation.x = 0;
+  n.hips.position.y = 0;
+  n.chest.rotation.set(2.72 + sway * 0.06, 0, 0);
+  n.head.rotation.set(0.3, 0, 0.12);
+  n.shL.rotation.set(-2.72 + sway * 0.2, 0, -0.08);
+  n.shR.rotation.set(-2.86 - sway * 0.2, 0, 0.1);
+  n.elL.rotation.x = -0.25;
+  n.elR.rotation.x = -0.12;
+  n.thL.rotation.set(0.3 + sway * 0.12, 0, 0.04);
+  n.thR.rotation.set(0.16 - sway * 0.12, 0, -0.04);
+  n.knL.rotation.x = 0.32;
+  n.knR.rotation.x = 0.5;
+}
+
+// laid out on the cot: on the back, arms by the sides (the caller places and turns the root)
+export function poseLying(rig) {
+  const n = rig.nodes;
+  rig.root.rotation.x = -PI / 2;
+  n.hips.position.y = 0.2;
+  n.chest.rotation.set(0, 0, 0);
+  n.head.rotation.set(-0.12, 0, 0.18);
+  n.shL.rotation.set(0.12, 0, -0.1); n.shR.rotation.set(0.18, 0, 0.14);
+  n.elL.rotation.x = -0.35; n.elR.rotation.x = -0.2;
+  n.thL.rotation.set(0.04, 0, 0.03); n.thR.rotation.set(-0.02, 0, -0.04);
+  n.knL.rotation.x = 0.08; n.knR.rotation.x = 0.15;
+}
+
+// carrying someone that way: the near arm wraps their legs, a lean under the weight (after poseSurvivor)
+export function poseCarrier(rig) {
+  const n = rig.nodes;
+  n.chest.rotation.x += 0.16;
+  n.shR.rotation.set(-0.62, 0, 0.32);
+  n.elR.rotation.x = -1.25;
+}
+
+// a glow stick held up in the other hand (after poseSurvivor)
+export function poseGlowHand(rig) {
+  const n = rig.nodes;
+  n.shL.rotation.set(-0.95, 0, -0.18);
+  n.elL.rotation.x = -0.85;
 }
 
 // how many vertices an outfit costs (the echo ghosts hold up to 3200)

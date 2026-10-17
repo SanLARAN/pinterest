@@ -544,6 +544,12 @@ export class Atlas {
         later(1350, () => A.flareHiss(...at(-3, 8.5, 14), 2.6));
         dur = 4.2;
         break;
+      case 'glowstick':
+        A.glowCrack(...at(0.3, -0.4, 0.7), true);
+        later(1500, () => A.throwWhoosh());
+        later(2100, () => A.glowLand(...at(1, -1.4, 6), 0.8));
+        dur = 2.8;
+        break;
       default:
         return;
     }

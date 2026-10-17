@@ -1,6 +1,7 @@
 // Minimal HUD. Nothing lives on screen permanently except a faint dot.
 //  - your loudness is a ring around the dot (with a dashed red line where screaming starts)
-//  - stamina / stones appear under the dot only when they change
+//  - stamina / stones / flares / your glow stick appear under the dot only when they change
+//  - what you feel when you check a friend's pulse: a line under the prompt, for a few seconds
 //  - time, generators, the current task and score "peek" in every minute, when the task changes,
 //    and while Tab is held (tap top on touch)
 //  - a hairline at the very top of the screen fills in five steps, one per running generator
@@ -45,6 +46,8 @@ export class HUD {
     });
     this.stones = $('stones');
     this.flares = $('flares');
+    this.glows = $('glows');
+    this.pulseEl = $('pulse');
     this.stamWrap = $('stam');
     this.stam = $('stamFill');
     this.cross = $('crosshair');
@@ -69,6 +72,8 @@ export class HUD {
     this.peekUntil = 0;
     this.stonesUntil = 0;
     this.flaresUntil = 0;
+    this.glowsUntil = 0;
+    this.pulseUntil = 0;
     this.lastMinute = -1;
     this.ringU = 0;
     this.taskUntil = 0;
@@ -76,7 +81,7 @@ export class HUD {
 
   show(on) {
     this.el.classList.toggle('hidden', !on);
-    if (!on) document.body.classList.remove('can-use', 'morning', 'note-open');
+    if (!on) document.body.classList.remove('can-use', 'morning', 'note-open', 'can-carry', 'has-glow', 'carrying');
     if (on) {
       this.cache = {};
       this.lastMinute = -1;
@@ -149,6 +154,14 @@ export class HUD {
       [...this.flares.children].forEach((c, i) => c.classList.toggle('on', i < fl));
     }
     this._cls('flares', this.flares, 'show', !!g.player.hasFlare && (show || this.clock < this.flaresUntil));
+    // your glow stick: a green pip while it's still in your pocket
+    const gl = g.glows ? g.glows.count : 0;
+    if (this.cache.glows !== gl) {
+      this.cache.glows = gl;
+      [...this.glows.children].forEach((c, i) => c.classList.toggle('on', i < gl));
+    }
+    this._cls('glows', this.glows, 'show', night && (show || this.clock < this.glowsUntil));
+    this._cls('pulse', this.pulseEl, 'show', this.clock < this.pulseUntil);
 
     // stamina: only while it isn't full
     const sp = g.player.stamina;
@@ -204,8 +217,10 @@ export class HUD {
   }
 
   // a radio beep: an amber tick on a ring around the dot, pointing where it came from
-  beacon(rel, dist) {
+  // (kind 'med': red — the first-aid hut, while you carry someone)
+  beacon(rel, dist, kind = '') {
     const el = this.beaconEl;
+    el.classList.toggle('med', kind === 'med');
     el.style.setProperty('--a', `${rel.toFixed(3)}rad`);
     el.style.setProperty('--o', dist < 25 ? '1' : dist < 70 ? '0.8' : '0.55');
     el.classList.remove('go');
@@ -226,6 +241,22 @@ export class HUD {
 
   flashFlares() {
     this.flaresUntil = this.clock + 3;
+  }
+
+  flashGlows() {
+    this.glowsUntil = this.clock + 3;
+  }
+
+  // what you felt on their neck (kind: ok / low / none)
+  pulse(text, kind = 'ok') {
+    const el = this.pulseEl;
+    el.textContent = text;
+    el.dataset.kind = kind;
+    el.classList.remove('beat');
+    void el.offsetWidth;
+    el.classList.add('beat');
+    this.pulseUntil = this.clock + 4.2;
+    this.cache['pulse:show'] = undefined;
   }
 
   // loudness ring. u-space: 0 = silence, uT = where sound starts to echo, uS = scream.

@@ -43,6 +43,7 @@ export class Player {
     this.breathT = 0;
     this.moved = 0;
     this.distFromSpawn = 0;
+    this.carrying = null; // co-op: the id of a friend on your shoulder (see Rescue)
   }
 
   forward() {
@@ -60,9 +61,11 @@ export class Player {
     let mx = frozen ? 0 : input.move.x, my = frozen ? 0 : input.move.y;
     const mag = Math.min(1, Math.hypot(mx, my));
     this.crouching = input.crouch && !frozen;
-    const wantSprint = input.sprint && !this.crouching && mag > 0.3 && !this.exhausted && this.stamina > 2;
+    const heavy = !!this.carrying; // someone on your shoulder: no running, slow going
+    const wantSprint = input.sprint && !heavy && !this.crouching && mag > 0.3 && !this.exhausted && this.stamina > 2;
     this.sprinting = wantSprint;
-    const target = this.crouching ? P.crouch : wantSprint ? P.sprint : P.walk;
+    const R = CFG.REVIVE;
+    const target = heavy ? (this.crouching ? R.carryCrouch : R.carry) : this.crouching ? P.crouch : wantSprint ? P.sprint : P.walk;
 
     const sy = Math.sin(this.yaw), cy = Math.cos(this.yaw);
     // forward = (-sin, -cos), right = (cos, -sin)
@@ -135,20 +138,26 @@ export class Player {
     // eye height / bob / footsteps
     const eyeTarget = this.crouching ? P.crouchEye : P.eye;
     this.eyeCur = damp(this.eyeCur, eyeTarget, 10, dt);
-    const stepLen = this.crouching ? P.stepCrouch : this.sprinting ? P.stepSprint : P.stepWalk;
+    const stepLen = heavy ? P.stepWalk * 0.82 : this.crouching ? P.stepCrouch : this.sprinting ? P.stepSprint : P.stepWalk;
     if (this.speed > 0.25) {
       this.stepAcc += moved;
       this.bobPhase += (moved / stepLen) * Math.PI;
       if (this.stepAcc >= stepLen) {
         this.stepAcc -= stepLen;
         const mode = this.crouching ? 'crouch' : this.sprinting ? 'sprint' : 'walk';
-        const loud = mode === 'sprint' ? 0.24 : mode === 'walk' ? 0.085 : 0;
-        ev.step = { loud, mode, intensity: mode === 'sprint' ? 0.85 : mode === 'walk' ? 0.4 : 0.12 };
+        let loud = mode === 'sprint' ? 0.24 : mode === 'walk' ? 0.085 : 0;
+        let intensity = mode === 'sprint' ? 0.85 : mode === 'walk' ? 0.4 : 0.12;
+        if (heavy) {
+          // two people's weight on the ground: every step is heavier (even crouched)
+          loud = this.crouching ? R.carryStep * 0.45 : R.carryStep;
+          intensity = this.crouching ? 0.35 : 0.62;
+          ev.step = { loud, mode: 'walk', intensity, heavy: true };
+        } else ev.step = { loud, mode, intensity };
       }
     } else {
       this.stepAcc = Math.min(this.stepAcc, stepLen * 0.6);
     }
-    const bobAmp = clamp(this.speed / P.sprint, 0, 1) * (this.sprinting ? 0.075 : 0.045);
+    const bobAmp = heavy ? clamp(this.speed / R.carry, 0, 1) * 0.06 : clamp(this.speed / P.sprint, 0, 1) * (this.sprinting ? 0.075 : 0.045);
     this.bobY = -Math.abs(Math.sin(this.bobPhase)) * bobAmp;
     this.roll = damp(this.roll, Math.sin(this.bobPhase) * bobAmp * 0.35 - input.move.x * 0.012, 10, dt);
     return ev;

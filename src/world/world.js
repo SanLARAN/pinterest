@@ -21,6 +21,9 @@ export const LANDMARKS = [
   { id: 'tower2', x: 190, z: -190, r: 11, ry: 1.0 },
   { id: 'graves2', x: -210, z: 120, r: 14, ry: 0.7 },
   { id: 'wreck2', x: 30, z: -230, r: 11, ry: 0.2 },
+  // the scouts' first-aid hut, a stone's throw from the camp, its door turned toward the fire.
+  // (last in the list: the atlas reads the first five as the generator sites)
+  { id: 'medhut', x: 12, z: 22, r: 6.5, ry: -2.606 },
 ];
 
 const _m = new THREE.Matrix4();
@@ -63,6 +66,7 @@ export class World {
     this.spawn = { x: 0, z: 0, yaw: 0 };
     this.effigies = [];
     this.doors = []; // cabin doors (the game hangs and swings them)
+    this.medhut = null; // the first-aid hut: where its cot and lantern are (see lm_medhut)
   }
 
   generate() {
@@ -388,6 +392,193 @@ export class World {
     // a plank door on strap hinges at the right jamb, swinging either way. hinge (hx, hz) and everything
     // else in cabin-local metres
     if (this.doors) this.doors.push({ id: L.id, x: L.x, z: L.z, y: y + 0.21, ry, hx: 1.92, hz: D / 2, w: 1.42, h: 1.95, W, D, gap: [0.5, 1.9] });
+  }
+
+  // the scouts' first-aid hut: a plank hut under a gable roof, a red cross over the door, a battery lantern
+  // by it that still works. Inside, along the back wall, a cot — the one place a fallen friend can be
+  // brought back. Its own RNG: adding it moved no other landmark.
+  lm_medhut(L) {
+    const y = this.terrain.height(L.x, L.z);
+    const ry = L.ry || 0;
+    const r = new RNG(911);
+    const W = 4.6, D = 3.8, H = 2.4, T = 0.16;
+    const g0 = -0.7, g1 = 0.7; // the doorway
+    const cot = { x: -1.05, z: -D / 2 + 0.52, len: 1.95, wid: 0.68, top: 0.62 }; // hut-local, along x
+    const lamp = { x: 1.2, y: 2.12, z: D / 2 + 0.3 };
+    const lampIn = { x: -0.55, y: 2.0, z: -0.3 }; // a camping lantern hung from the ridge, over the cot's foot
+    this.addProp(L.x, L.z, (b) => {
+      const base = makeBase(L.x, y, L.z, ry);
+      const P = (lx, ly, lz, rx = 0, ryy = 0, rz = 0, sx = 1, sy = sx, sz = sx) => localPlace(b, base, lx, ly, lz, rx, ryy, rz, sx, sy, sz);
+      // floor on a low frame, a step up to the door
+      P(0, 0.1, 0);
+      b.box(W + 0.3, 0.2, D + 0.3, KIND.WOOD);
+      P((g0 + g1) / 2, 0.06, D / 2 + 0.42);
+      b.box(1.5, 0.12, 0.5, KIND.WOOD);
+      // walls: back, sides, the front around the doorway, a lintel over it
+      P(0, H / 2, -D / 2);
+      b.box(W, H, T, KIND.WOOD);
+      for (const sx of [-1, 1]) {
+        // a small window in each side wall
+        const wz0 = -0.45, wz1 = 0.45, wy0 = 1.05, wy1 = 1.6;
+        P(sx * W / 2, wy0 / 2, 0);
+        b.box(T, wy0, D, KIND.WOOD);
+        P(sx * W / 2, (wy1 + H) / 2, 0);
+        b.box(T, H - wy1, D, KIND.WOOD);
+        P(sx * W / 2, (wy0 + wy1) / 2, (-D / 2 + wz0) / 2);
+        b.box(T, wy1 - wy0, wz0 + D / 2, KIND.WOOD);
+        P(sx * W / 2, (wy0 + wy1) / 2, (D / 2 + wz1) / 2);
+        b.box(T, wy1 - wy0, D / 2 - wz1, KIND.WOOD);
+        P(sx * (W / 2 + 0.03), (wy0 + wy1) / 2, 0);
+        b.box(0.05, 0.05, wz1 - wz0, KIND.WOOD); // the cross bar of the frame
+      }
+      P((-W / 2 + g0) / 2, H / 2, D / 2);
+      b.box(g0 + W / 2, H, T, KIND.WOOD);
+      P((W / 2 + g1) / 2, H / 2, D / 2);
+      b.box(W / 2 - g1, H, T, KIND.WOOD);
+      P((g0 + g1) / 2, (2.12 + H) / 2, D / 2);
+      b.box(g1 - g0, H - 2.12, T, KIND.WOOD);
+      // gable roof, ridge along the hut
+      const ov = 0.35, ridge = H + 1.05, eave = H - 0.1;
+      const q = [
+        [-W / 2 - ov, eave, D / 2 + ov], [W / 2 + ov, eave, D / 2 + ov],
+        [W / 2 + ov, ridge, 0], [-W / 2 - ov, ridge, 0],
+        [-W / 2 - ov, eave, -D / 2 - ov], [W / 2 + ov, eave, -D / 2 - ov],
+      ];
+      P(0, 0, 0);
+      b.quadN(q[0], q[1], q[2], q[3], [0, 1, 1], KIND.WOOD);
+      b.quadN(q[0], q[1], q[2], q[3], [0, -1, -1], KIND.WOOD);
+      b.quadN(q[4], q[5], q[2], q[3], [0, 1, -1], KIND.WOOD);
+      b.quadN(q[4], q[5], q[2], q[3], [0, -1, 1], KIND.WOOD);
+      for (const sx of [-1, 1]) {
+        const gt = [[sx * W / 2, H, D / 2], [sx * W / 2, H, -D / 2], [sx * W / 2, ridge - 0.08, 0]];
+        b.triN(gt[0], gt[1], gt[2], [sx, 0, 0], KIND.WOOD);
+      }
+      // a white board with a red cross over the door
+      P(0, H + 0.42, D / 2 + 0.1);
+      b.box(0.72, 0.62, 0.04, KIND.BONE);
+      P(0, H + 0.42, D / 2 + 0.13);
+      b.box(0.46, 0.13, 0.03, KIND.FLESH);
+      P(0, H + 0.42, D / 2 + 0.13);
+      b.box(0.13, 0.46, 0.03, KIND.FLESH);
+      // the lantern on its bracket
+      P(lamp.x, lamp.y + 0.28, D / 2 + 0.02);
+      b.box(0.05, 0.05, 0.36, KIND.METAL);
+      P(lamp.x, lamp.y + 0.07, lamp.z);
+      b.limb([0, 0.2, 0], [0, 0.1, 0], 0.008, 0.008, KIND.METAL, 3);
+      P(lamp.x, lamp.y - 0.12, lamp.z);
+      b.box(0.15, 0.04, 0.15, KIND.METAL);
+      P(lamp.x, lamp.y + 0.1, lamp.z);
+      b.box(0.15, 0.04, 0.15, KIND.METAL);
+      for (const [cx, cz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+        P(lamp.x + cx * 0.065, lamp.y - 0.1, lamp.z + cz * 0.065);
+        b.cylinder(3, 0.008, 0.008, 0.2, KIND.METAL);
+      }
+      // inside, from the ridge beam: a camping lantern on a wire
+      P(lampIn.x, 0, lampIn.z);
+      b.limb([0, ridge - 0.12, 0], [0, lampIn.y + 0.16, 0], 0.011, 0.011, KIND.METAL, 3);
+      P(lampIn.x, lampIn.y + 0.1, lampIn.z);
+      b.cylinder(6, 0.075, 0.05, 0.06, KIND.METAL, { capBottom: true });
+      P(lampIn.x, lampIn.y - 0.14, lampIn.z);
+      b.cylinder(6, 0.08, 0.08, 0.04, KIND.METAL, { capBottom: true });
+      for (let i = 0; i < 3; i++) {
+        const a = (i / 3) * Math.PI * 2;
+        P(lampIn.x + Math.cos(a) * 0.07, lampIn.y - 0.1, lampIn.z + Math.sin(a) * 0.07);
+        b.cylinder(3, 0.006, 0.006, 0.2, KIND.METAL);
+      }
+      P(0, 0, 0);
+      b.limb([-W / 2, ridge - 0.12, 0], [W / 2, ridge - 0.12, 0], 0.05, 0.05, KIND.WOOD, 4); // the ridge beam
+      // inside: the cot along the back wall — a wooden frame, old canvas, a pillow, an army blanket
+      const cx0 = cot.x, cz0 = cot.z, hl = cot.len / 2, hw = cot.wid / 2;
+      for (const [sx, sz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+        P(cx0 + sx * (hl - 0.06), 0.2, cz0 + sz * (hw - 0.04), sz * 0.12, 0, 0);
+        b.cylinder(4, 0.03, 0.03, cot.top - 0.2, KIND.WOOD);
+      }
+      for (const sz of [-1, 1]) {
+        P(cx0, cot.top - 0.03, cz0 + sz * hw);
+        b.box(cot.len, 0.06, 0.06, KIND.WOOD);
+      }
+      P(cx0, cot.top - 0.02, cz0);
+      b.box(cot.len - 0.12, 0.035, cot.wid - 0.04, KIND.BONE);
+      P(cx0 - hl + 0.28, cot.top + 0.05, cz0, 0, 0.08, 0);
+      b.box(0.36, 0.1, 0.5, KIND.BONE);
+      P(cx0 + hl - 0.32, cot.top + 0.05, cz0 + 0.02, 0, -0.1, 0);
+      b.box(0.42, 0.1, cot.wid - 0.08, KIND.LEAF);
+      // a stool and a wash basin by the cot
+      P(cx0 + hl + 0.42, 0.2, cz0 + 0.55);
+      b.cylinder(6, 0.17, 0.15, 0.04, KIND.WOOD, { y0: 0.4 });
+      for (let i = 0; i < 3; i++) {
+        const a = (i / 3) * Math.PI * 2;
+        P(cx0 + hl + 0.42 + Math.cos(a) * 0.1, 0.2, cz0 + 0.55 + Math.sin(a) * 0.1, Math.sin(a) * 0.12, 0, -Math.cos(a) * 0.12);
+        b.cylinder(3, 0.02, 0.02, 0.42, KIND.WOOD);
+      }
+      P(cx0 + hl + 0.42, 0.64, cz0 + 0.55);
+      b.cylinder(7, 0.11, 0.15, 0.08, KIND.METAL, { capTop: false, capBottom: true });
+      // the first-aid cabinet on the right wall, a red cross on its door; a shelf of jars and rolled bandages
+      P(W / 2 - T / 2 - 0.12, 1.45, -0.55);
+      b.box(0.22, 0.72, 0.6, KIND.BONE);
+      P(W / 2 - T / 2 - 0.24, 1.45, -0.55);
+      b.box(0.02, 0.1, 0.34, KIND.FLESH);
+      P(W / 2 - T / 2 - 0.24, 1.45, -0.55);
+      b.box(0.02, 0.34, 0.1, KIND.FLESH);
+      P(W / 2 - T / 2 - 0.12, 1.02, 0.55);
+      b.box(0.24, 0.03, 0.9, KIND.WOOD);
+      for (let i = 0; i < 5; i++) {
+        P(W / 2 - T / 2 - 0.12 + r.float(-0.04, 0.04), 1.035, 0.2 + i * 0.17 + r.float(-0.03, 0.03));
+        if (i % 2) b.cylinder(6, 0.045, 0.045, r.float(0.07, 0.11), KIND.BONE, { phase: r.next() });
+        else b.cylinder(5, 0.035, 0.03, r.float(0.12, 0.17), i === 2 ? KIND.WATER : KIND.METAL);
+      }
+      // a stretcher leans on the outside of the left wall
+      P(-W / 2 - 0.32, 0, 0.2, 0, 0, -0.22);
+      b.limb([0, 0, -0.32], [0, 2.1, -0.32], 0.025, 0.025, KIND.WOOD, 4);
+      b.limb([0, 0, 0.32], [0, 2.1, 0.32], 0.025, 0.025, KIND.WOOD, 4);
+      P(-W / 2 - 0.32, 1.05, 0.2, 0, 0, -0.22);
+      b.box(0.02, 1.5, 0.6, KIND.BONE);
+      // the scouts' flag: a bare pole and what is left of their pennant
+      const fx = -W / 2 - 1.1, fz = D / 2 + 1.0;
+      P(fx, 0, fz);
+      b.cylinder(5, 0.05, 0.035, 4.4, KIND.WOOD, { capTop: true });
+      P(fx, 0, fz);
+      const p0 = [0.04, 4.25, 0], p1 = [0.04, 3.7, 0], p2 = [0.95, 3.9, 0.12];
+      b.triN(p0, p1, p2, [0, 0, 1], KIND.FLESH);
+      b.triN(p0, p1, p2, [0, 0, -1], KIND.FLESH);
+      for (const lx of [-0.5, 0.5]) {
+        P(fx + lx * 0.6, 0, fz + 0.25, r.float(-0.15, 0.15), 0, r.float(-0.15, 0.15));
+        b.rock(0.12, () => r.next(), KIND.ROCK, 0.3, 0.6);
+      }
+    });
+    const seg = (ax, az, bx, bz, rad = T, h = H) => {
+      const [x1, z1] = rot(ax, az, ry), [x2, z2] = rot(bx, bz, ry);
+      this.col.add(L.x + x1, L.z + z1, L.x + x2, L.z + z2, rad, h, CAP.WOOD);
+    };
+    seg(-W / 2, -D / 2, W / 2, -D / 2);
+    seg(-W / 2, -D / 2, -W / 2, D / 2);
+    seg(W / 2, -D / 2, W / 2, D / 2);
+    seg(-W / 2, D / 2, g0, D / 2);
+    seg(g1, D / 2, W / 2, D / 2);
+    seg(cot.x - cot.len / 2 + 0.25, cot.z, cot.x + cot.len / 2 - 0.25, cot.z, 0.3, 0.7); // the cot
+    {
+      const [fx, fz] = rot(-W / 2 - 1.1, D / 2 + 1.0, ry);
+      this.col.circle(L.x + fx, L.z + fz, 0.12, 4, CAP.WOOD);
+    }
+    if (this.doors) this.doors.push({ id: L.id, x: L.x, z: L.z, y: y + 0.21, ry, hx: g1 + 0.02, hz: D / 2, w: g1 - g0 + 0.02, h: 1.95, W, D, gap: [g0, g1] });
+    // for the game: where the cot is (and which way it lies), where to stand at it, where the lantern hangs
+    const at = (lx, lz) => {
+      const [wx, wz] = rot(lx, lz, ry);
+      return { x: L.x + wx, z: L.z + wz };
+    };
+    const c = at(cot.x, cot.z);
+    const side = at(cot.x, cot.z + 0.95); // in front of it, in the room
+    const l = at(lamp.x, lamp.z);
+    const li = at(lampIn.x, lampIn.z);
+    const head = at(cot.x - cot.len / 2, cot.z);
+    this.medhut = {
+      x: L.x, z: L.z, y, ry, W, D,
+      cot: { x: c.x, z: c.z, y: y + cot.top, yaw: Math.atan2(head.x - c.x, head.z - c.z), len: cot.len },
+      stand: { x: side.x, z: side.z, yaw: Math.atan2(-(c.x - side.x), -(c.z - side.z)) },
+      lamp: { x: l.x, y: y + lamp.y, z: l.z },
+      lampIn: { x: li.x, y: y + lampIn.y, z: li.z },
+      door: at((g0 + g1) / 2, D / 2 + 1.0),
+    };
   }
 
   lm_tower(L, rng) {

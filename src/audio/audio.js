@@ -717,6 +717,128 @@ export class AudioEngine {
     this._noiseBurst(this.now, { f: 500, fEnd: 2600, q: 2.2, a: 0.04, d: 0.22, gain: 0.18 });
   }
 
+  // ---------- glow sticks ----------
+  // the inner vial snaps, then a shake: liquid rattling in plastic (own = in your hand: not positioned)
+  glowCrack(x, y, z, own = false) {
+    if (!this.ready) return;
+    const t = this.now;
+    let dest = this.sfx;
+    if (!own) {
+      dest = this._panner(x, y, z, 2.5, 1.2);
+      dest.connect(this.sfx);
+    }
+    this._noiseBurst(t, { type: 'highpass', f: 3200, a: 0.0006, d: 0.03, gain: 0.7, dest });
+    this._tone(t, { f: 2650, fEnd: 2100, a: 0.001, d: 0.05, gain: 0.08, dest });
+    this._noiseBurst(t + 0.012, { type: 'bandpass', f: 5200, q: 3, a: 0.001, d: 0.035, gain: 0.25, dest });
+    for (let i = 0; i < 4; i++) {
+      const at = t + 0.24 + i * (0.13 + Math.random() * 0.03);
+      this._noiseBurst(at, { type: 'bandpass', f: 1900 + Math.random() * 600, q: 1.6, a: 0.01, d: 0.07, gain: 0.12, dest });
+      this._noiseBurst(at + 0.02, { type: 'highpass', f: 4500, a: 0.002, d: 0.03, gain: 0.05, dest });
+    }
+  }
+
+  // a light plastic tick where it lands (k: how hard)
+  glowLand(x, y, z, k = 1) {
+    if (!this.ready) return;
+    const t = this.now;
+    const pn = this._panner(x, y, z, 3, 1.0);
+    pn.connect(this.sfx);
+    this._noiseBurst(t, { type: 'bandpass', f: 2400, q: 2.5, a: 0.0008, d: 0.04, gain: 1.1 * k, dest: pn });
+    this._noiseBurst(t + 0.06 + Math.random() * 0.03, { type: 'bandpass', f: 1600, q: 2, a: 0.0008, d: 0.03, gain: 0.55 * k, dest: pn });
+  }
+
+  glowPick() {
+    if (!this.ready) return;
+    const t = this.now;
+    this._noiseBurst(t, { type: 'bandpass', f: 1300, q: 0.9, a: 0.03, d: 0.12, gain: 0.14 });
+    this._noiseBurst(t + 0.09, { type: 'bandpass', f: 2200, q: 2, a: 0.002, d: 0.04, gain: 0.12 });
+  }
+
+  // ---------- carrying a friend ----------
+  // cloth and weight: a heave, a held breath let out (own = it's you lifting)
+  bodyLift(x, y, z, own = false) {
+    if (!this.ready) return;
+    const t = this.now;
+    let dest = this.sfx;
+    if (!own) {
+      dest = this._panner(x, y, z, 3, 1.1);
+      dest.connect(this.sfx);
+    }
+    this._noiseBurst(t, { type: 'bandpass', f: 900, q: 0.8, a: 0.05, d: 0.25, gain: 0.16, dest });
+    this._noiseBurst(t + 0.18, { buf: this.brown, type: 'lowpass', f: 260, a: 0.005, d: 0.16, gain: 0.5, dest });
+    this._noiseBurst(t + 0.32, { type: 'bandpass', f: 650, fEnd: 420, q: 1.4, a: 0.06, d: 0.35, hold: 0.06, gain: own ? 0.09 : 0.06, dest });
+  }
+
+  // a body set down: a soft heavy thud — on the cot, a creak of old canvas and wood
+  bodyDrop(x, y, z, cot = false) {
+    if (!this.ready) return;
+    const t = this.now;
+    const pn = this._panner(x, y, z, 3, 1.0);
+    pn.connect(this.sfx);
+    this._noiseBurst(t, { buf: this.brown, type: 'lowpass', f: 220, a: 0.004, d: 0.22, gain: 1.3, dest: pn, rev: 0.2 });
+    this._noiseBurst(t + 0.01, { type: 'bandpass', f: 1100, q: 0.7, a: 0.01, d: 0.16, gain: 0.08, dest: pn });
+    if (cot) {
+      const o = this._osc('sawtooth', 180);
+      o.frequency.linearRampToValueAtTime(240, t + 0.18);
+      o.frequency.linearRampToValueAtTime(150, t + 0.42);
+      const bp = this._filter('bandpass', 900, 9);
+      const g = this._gain();
+      o.connect(bp).connect(g).connect(pn);
+      this._env(g, t + 0.05, 0.05, 0.05, 0.3, 0.05);
+      o.start(t + 0.05);
+      o.stop(t + 0.6);
+    }
+  }
+
+  // two fingers on a friend's neck: what you feel, as sound. k: 1 steady, 0.6 weak, 0.3 faint, 0 nothing
+  pulseFelt(k) {
+    if (!this.ready) return;
+    const t = this.now;
+    if (k <= 0) {
+      // nothing. just your own blood in your ears
+      this._noiseBurst(t, { buf: this.brown, type: 'lowpass', f: 90, a: 0.4, d: 1.2, hold: 0.4, gain: 0.08, dest: this.body });
+      return;
+    }
+    const gap = k >= 1 ? 0.82 : k >= 0.6 ? 0.62 : 0.5;
+    const n = 3;
+    for (let i = 0; i < n; i++) {
+      const at = t + 0.06 + i * gap + (k < 0.5 && i > 0 ? (Math.random() - 0.5) * 0.12 : 0); // (faint: it stumbles)
+      this._tone(at, { f: 58, fEnd: 40, a: 0.008, d: 0.12, gain: 0.25 * k + 0.08, dest: this.body });
+      this._noiseBurst(at, { buf: this.brown, type: 'lowpass', f: 140, a: 0.006, d: 0.1, gain: 0.18 * k + 0.04, dest: this.body });
+    }
+  }
+
+  // one push on someone's chest, on the creaking cot
+  cprPush(x, y, z) {
+    if (!this.ready) return;
+    const t = this.now;
+    const pn = this._panner(x, y, z, 2.5, 1.1);
+    pn.connect(this.sfx);
+    this._noiseBurst(t, { buf: this.brown, type: 'lowpass', f: 200, a: 0.01, d: 0.12, gain: 1.1, dest: pn });
+    this._noiseBurst(t + 0.02, { type: 'bandpass', f: 700 + Math.random() * 200, q: 6, a: 0.02, d: 0.1, gain: 0.1, dest: pn });
+    this._noiseBurst(t + 0.05, { type: 'bandpass', f: 500, q: 0.8, a: 0.04, d: 0.18, gain: 0.12, dest: pn });
+  }
+
+  // a breath dragged back in, then coughing (own = it's you, coming back)
+  reviveGasp(x, y, z, own = false) {
+    if (!this.ready) return;
+    const t = this.now;
+    let dest = this.sfx;
+    if (!own) {
+      dest = this._panner(x, y, z, 3, 1.0);
+      dest.connect(this.sfx);
+    } else dest = this.body;
+    // the gasp: noise swept up through a narrowing throat
+    this._noiseBurst(t, { type: 'bandpass', f: 380, fEnd: 2300, q: 2.2, a: 0.09, d: 0.32, hold: 0.12, gain: own ? 0.34 : 0.28, dest, rev: own ? 0 : 0.3 });
+    this._noiseBurst(t + 0.04, { type: 'highpass', f: 3000, a: 0.08, d: 0.3, hold: 0.06, gain: 0.05, dest });
+    // ...and the coughs
+    for (let i = 0; i < 3; i++) {
+      const at = t + 0.75 + i * (0.3 + Math.random() * 0.08);
+      this._noiseBurst(at, { type: 'bandpass', f: 520 + Math.random() * 120, q: 1.1, a: 0.004, d: 0.13, gain: (own ? 0.3 : 0.24) * (1 - i * 0.2), dest });
+      this._noiseBurst(at, { buf: this.brown, type: 'lowpass', f: 300, a: 0.003, d: 0.1, gain: 0.2 * (1 - i * 0.2), dest });
+    }
+  }
+
   impact(x, y, z, water = false) {
     if (!this.ready) return;
     const t = this.now;

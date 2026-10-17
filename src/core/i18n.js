@@ -85,6 +85,45 @@ const STR = {
     useDoorCloseT: 'РУКИ · закрыть дверь',
     flareGun: 'ракетница',
     flareCharges: 'зарядов: {n}',
+    // glow sticks
+    touchGlow: 'СВЕТ',
+    aGlowDay: 'прибереги палочку до темноты',
+    aNoGlow: 'палочек больше нет',
+    hintGlow: 'G — бросить палочку · E — подобрать её снова',
+    hintGlowTouch: 'СВЕТ — бросить палочку · РУКИ — подобрать её снова',
+    useGlowPick: 'E · подобрать палочку',
+    useGlowPickT: 'РУКИ · подобрать палочку',
+    // a friend who's down: pulse, carrying, the cot
+    touchCarry: 'НЕСТИ',
+    touchPutDown: 'ПОЛОЖИТЬ',
+    usePulse: 'держи E · пульс',
+    usePulseT: 'держи РУКИ · пульс',
+    useLift: 'R · нести',
+    useLiftT: 'НЕСТИ',
+    useRevive: 'держи E · вернуть к жизни',
+    useReviveT: 'держи РУКИ · вернуть к жизни',
+    useReviveWait: 'дышит?..',
+    usePutDown: 'R · положить',
+    usePutDownT: 'ПОЛОЖИТЬ',
+    useLayCot: 'R · положить на койку',
+    useLayCotT: 'ПОЛОЖИТЬ · на койку',
+    useCotTaken: 'койка занята',
+    pulseSteady: 'пульс ровный',
+    pulseWeak: 'пульс слабый',
+    pulseFaint: 'пульс еле слышен',
+    pulseLeft: 'осталось ~{t}',
+    pulseNone: 'пульса нет',
+    reviveLate: 'поздно — пульса нет',
+    popRevive: 'СПАС',
+    mateRevived: '{name} снова дышит',
+    aRevived: 'ТЫ ДЫШИШЬ',
+    youGone: 'сердце остановилось',
+    hintDowned: 'упавшего ещё можно спасти: E — пульс, R — нести · на койку в мед-хижине у лагеря',
+    hintDownedTouch: 'упавшего ещё можно спасти: РУКИ — пульс, НЕСТИ · на койку в мед-хижине у лагеря',
+    hintCarry: 'тяжело: бежать не выйдет, шаги слышно · красный тик у точки — мед-хижина · R — положить',
+    hintCarryTouch: 'тяжело: бежать не выйдет, шаги слышно · красный тик у точки — мед-хижина',
+    hintCot: 'держи E — вернуть к жизни',
+    hintCotTouch: 'держи РУКИ — вернуть к жизни',
     // alerts
     aHeard: 'ОНО УСЛЫШАЛО',
     aHunt: 'ОХОТА',
@@ -159,15 +198,18 @@ const STR = {
 <p><b>Микрофон:</b> щёлкни языком, хлопни, скажи «эй». Громче звук — дальше видно. Но <span class="red">и они слышат дальше</span>: обычную речь — за пару шагов, громкий голос — издалека. Крик (кольцо вокруг точки стало красным) — мгновенная охота. <b>Без микрофона:</b> ПРОБЕЛ — щелчок, удерживай — громче.</p>
 <p><b>Слушатели и Ползуны</b> идут туда, где был звук. Пискнул — уходи. Камень (ПКМ / F) уводит их в сторону. Позже приходят двое других, по одному на лес: <b>Наблюдатель</b> глух, но двигается, только пока на него не падает свет, — свети на него; лампы он обходит. <b>Ревун</b> почти не слышит, но иногда набирает воздух и воет: всё, что движется в этой волне, он видит. Услышал вдох — замри.</p>
 <p><b>Ракетница.</b> У одного из тел (каждую ночь у другого) лежит ракетница — два заряда. Q — ракета уходит вверх, раскрывает парашют и секунд пятнадцать заливает лес красным светом: видно всё и всех. Но <span class="red">на свет сходятся все твари с округи</span> — стреляй подальше от себя. <b>Охотничья избушка</b>: дверь закрывается (E). Бродячие твари не сразу её откроют — навалятся, и она со скрипом подастся; а та, что охотится за тобой, выбьет её в три удара.</p>
-<p><b>Интерфейса почти нет.</b> Кольцо вокруг точки — твоя громкость. Tab — время, генераторы и текущая задача. Полоска сверху заполняется с каждым генератором. Через 30 минут лес просыпается окончательно.</p>
+<p><b>Светящаяся палочка</b> — у каждого одна на ночь. G — переломить: пару минут она светит зелёным у тебя в руке, G ещё раз — бросить вперёд (E — подобрать с земли). В её свете, как и под лампой генератора, лес виден таким, какой он есть, — легко понять, где ты. Наблюдатель в такой свет не шагнёт.</p>
+<p><b>Интерфейса почти нет.</b> Кольцо вокруг точки — твоя громкость. Tab — время, генераторы и текущая задача. Полоска сверху заполняется с каждым генератором. Через 45 минут лес просыпается окончательно.</p>
 <p><b>Очки:</b> время × множитель опасности, найденные тела, генераторы, осколки, проходы впритык, отрывы. За победу — бонус, и тем больше, чем быстрее.</p>
-<p><b>С друзьями:</b> «С ДРУЗЬЯМИ» › «СОЗДАТЬ» и отправь ссылку (или код) — до 4 игроков в одном лесу. Голоса слышно с той стороны, где стоит друг, и тише издалека; <span class="red">монстры слышат их так же</span> — но вполголоса рядом друг с другом говорить можно: такое они слышат только вплотную. Эхо друзей тоже освещает лес. Погибший смотрит глазами живых, и живые его не слышат. Лобби — гараж: у каждого своё место (клик по своей фигуре — гардероб, по другу — его громкость), а когда хост жмёт НАЧАТЬ, заводится машина.</p>
+<p><b>С друзьями:</b> «С ДРУЗЬЯМИ» › «СОЗДАТЬ» и отправь ссылку (или код) — до 4 игроков в одном лесу. Голоса слышно с той стороны, где стоит друг, и тише издалека; <span class="red">монстры слышат их так же</span> — но вполголоса рядом друг с другом говорить можно: такое они слышат только вплотную. Эхо друзей тоже освещает лес. Пойманный друг не умирает сразу — он падает и медленно истекает кровью. Подойди и проверь пульс (удерживай E): узнаешь, сколько ему осталось, — и каждый раз придётся проверять заново. Подними его на плечо (R) — бежать с ним нельзя, шаги тяжёлые — и неси в <b>заброшенную мед-хижину скаутов</b> у лагеря: только на её койке (R) и только руками (удерживай E) его можно вернуть. Упавший смотрит глазами живых, и живые его не слышат. Лобби — гараж: у каждого своё место (клик по своей фигуре — гардероб, по другу — его громкость), а когда хост жмёт НАЧАТЬ, заводится машина.</p>
 <table class="keys">
 <tr><td>WASD · стрелки</td><td>движение и поворот</td></tr>
 <tr><td>Мышь</td><td>обзор (клик — захват курсора)</td></tr>
 <tr><td>ПРОБЕЛ</td><td>эхо: тап — щелчок, удерживай — громко</td></tr>
-<tr><td>E (удерживать)</td><td>обыскать тело · чинить генератор · дверь</td></tr>
+<tr><td>E (удерживать)</td><td>обыскать тело · чинить генератор · дверь · пульс друга</td></tr>
 <tr><td>ПКМ / F</td><td>бросить камень</td></tr>
+<tr><td>G</td><td>светящаяся палочка: переломить · бросить</td></tr>
+<tr><td>R</td><td>нести упавшего друга · положить (на койку)</td></tr>
 <tr><td>Q</td><td>сигнальная ракета (если нашёл)</td></tr>
 <tr><td>Shift / C</td><td>бег / красться</td></tr>
 <tr><td>Tab</td><td>время, генераторы, задача</td></tr>
@@ -230,12 +272,17 @@ const STR = {
     defaultName: 'Путник',
     toLobby: 'В ЛОББИ',
     pauseCoop: 'игра не на паузе: ты стоишь в лесу',
-    mateDied: '{name} погиб',
+    mateDied: '{name} упал',
     mateLeft: '{name} отключился',
     mateFound: '{name}: {part}',
     mateFlare: '{name} нашёл ракетницу',
     mateStarted: '{name} запустил генератор',
     spectating: 'ты мёртв · глазами: <b>{name}</b>',
+    spectDown: 'ты ранен · глазами: <b>{name}</b>',
+    spectDownHint: 'друг может донести тебя до мед-хижины',
+    spectCarried: '<b>{name}</b> несёт тебя',
+    spectCot: 'ты на койке в мед-хижине',
+    spectWatching: 'глазами: <b>{name}</b>',
     spectNext: 'ПРОБЕЛ / клик — следующий',
     voicesHead: 'ГОЛОСА',
     voiceVolume: 'громкость голоса',
@@ -337,6 +384,43 @@ const STR = {
     useDoorOpenT: 'HANDS · open the door',
     useDoorCloseT: 'HANDS · close the door',
     flareGun: 'flare gun',
+    touchGlow: 'LIGHT',
+    aGlowDay: 'save the glow stick for the dark',
+    aNoGlow: 'no glow sticks left',
+    hintGlow: 'G — throw the stick · E — pick it up again',
+    hintGlowTouch: 'LIGHT — throw the stick · HANDS — pick it up again',
+    useGlowPick: 'E · pick up the glow stick',
+    useGlowPickT: 'HANDS · pick up the glow stick',
+    touchCarry: 'CARRY',
+    touchPutDown: 'PUT DOWN',
+    usePulse: 'hold E · pulse',
+    usePulseT: 'hold HANDS · pulse',
+    useLift: 'R · carry',
+    useLiftT: 'CARRY',
+    useRevive: 'hold E · bring them back',
+    useReviveT: 'hold HANDS · bring them back',
+    useReviveWait: 'breathing?..',
+    usePutDown: 'R · put down',
+    usePutDownT: 'PUT DOWN',
+    useLayCot: 'R · lay them on the cot',
+    useLayCotT: 'PUT DOWN · on the cot',
+    useCotTaken: 'the cot is taken',
+    pulseSteady: 'a steady pulse',
+    pulseWeak: 'a weak pulse',
+    pulseFaint: 'barely a pulse',
+    pulseLeft: '~{t} left',
+    pulseNone: 'no pulse',
+    reviveLate: 'too late — no pulse',
+    popRevive: 'SAVED',
+    mateRevived: '{name} is breathing again',
+    aRevived: "YOU'RE BREATHING",
+    youGone: 'your heart has stopped',
+    hintDowned: 'the fallen can still be saved: E — pulse, R — carry · onto the cot in the first-aid hut by the camp',
+    hintDownedTouch: 'the fallen can still be saved: HANDS — pulse, CARRY · onto the cot in the first-aid hut by the camp',
+    hintCarry: "heavy: no running, your steps can be heard · the red tick by the dot — the first-aid hut · R — put down",
+    hintCarryTouch: 'heavy: no running, your steps can be heard · the red tick by the dot — the first-aid hut',
+    hintCot: 'hold E — bring them back',
+    hintCotTouch: 'hold HANDS — bring them back',
     flareCharges: '{n} shots',
     aHeard: 'IT HEARD THAT',
     aHunt: 'HUNTED',
@@ -408,15 +492,18 @@ const STR = {
 <p><b>Microphone:</b> click your tongue, clap, say “hey”. Louder sound — you see further. But <span class="red">they hear further too</span>: normal talk from a couple of steps, a raised voice from far away. A scream (the ring around the dot turns red) means an instant hunt. <b>No mic:</b> SPACE — a click, hold for louder.</p>
 <p><b>Listeners and Crawlers</b> walk to where the sound was. Made a noise? Move. A stone (RMB / F) lures them away. Later two others arrive, one of each per forest: <b>the Watcher</b> is deaf but moves only while no light is on it — keep it lit; it won't enter a lamp. <b>The Howler</b> barely hears, but now and then it fills its chest and howls: whatever moves inside that wave, it sees. Hear the breath — freeze.</p>
 <p><b>The flare gun.</b> One of the bodies (a different one every night) has a flare gun with two shots. Q — the flare climbs, opens its parachute and floods the forest with red light for about fifteen seconds: you see everything, and everyone. But <span class="red">every creature around comes to the light</span> — fire it away from yourself. <b>The hunting cabin</b>: its door closes (E). Wanderers won't get it open at once — they lean on it until it creaks open; the one hunting you breaks it down in three blows.</p>
-<p><b>There is almost no interface.</b> The ring around the dot is your loudness. Tab shows time, generators and the current task. The hairline at the top fills with each generator. After 30 minutes the forest wakes up for good.</p>
+<p><b>The glow stick</b> — one each per night. G — crack it: for a couple of minutes it glows green in your hand; G again — throw it ahead (E — pick it up off the ground). In its light, as under a generator's lamp, the forest looks the way it really is — easy to tell where you are. The Watcher won't step into that light.</p>
+<p><b>There is almost no interface.</b> The ring around the dot is your loudness. Tab shows time, generators and the current task. The hairline at the top fills with each generator. After 45 minutes the forest wakes up for good.</p>
 <p><b>Score:</b> time × danger multiplier, bodies found, generators, shards, close calls, escapes. Winning gives a bonus — bigger the faster you are.</p>
-<p><b>With friends:</b> WITH FRIENDS › CREATE and send the link (or code) — up to 4 players in one forest. Voices come from where your friends stand and fade with distance; <span class="red">the monsters hear them just as well</span> — but talking quietly side by side is fine: they only hear that from up close. Their echoes light the forest too. The dead watch through the eyes of the living — and the living can't hear them. The lobby is a garage: everyone has their own place (click yourself for the wardrobe, a friend for their volume), and when the host presses START, the car starts.</p>
+<p><b>With friends:</b> WITH FRIENDS › CREATE and send the link (or code) — up to 4 players in one forest. Voices come from where your friends stand and fade with distance; <span class="red">the monsters hear them just as well</span> — but talking quietly side by side is fine: they only hear that from up close. Their echoes light the forest too. A friend who gets caught doesn't die at once — they go down and slowly bleed out. Kneel and feel for a pulse (hold E): you'll know how long they have left — and you'll have to check again to know again. Lift them onto your shoulder (R) — no running with them, heavy steps — and carry them to <b>the scouts' abandoned first-aid hut</b> by the camp: only on its cot (R) and only by hand (hold E) can they be brought back. The fallen watch through the eyes of the living — and the living can't hear them. The lobby is a garage: everyone has their own place (click yourself for the wardrobe, a friend for their volume), and when the host presses START, the car starts.</p>
 <table class="keys">
 <tr><td>WASD · arrows</td><td>move &amp; turn</td></tr>
 <tr><td>Mouse</td><td>look (click to lock cursor)</td></tr>
 <tr><td>SPACE</td><td>echo: tap = click, hold = loud</td></tr>
-<tr><td>E (hold)</td><td>search a body · repair a generator · door</td></tr>
+<tr><td>E (hold)</td><td>search a body · repair a generator · door · a friend's pulse</td></tr>
 <tr><td>RMB / F</td><td>throw stone</td></tr>
+<tr><td>G</td><td>glow stick: crack · throw</td></tr>
+<tr><td>R</td><td>carry a fallen friend · put down (on the cot)</td></tr>
 <tr><td>Q</td><td>signal flare (once you've found the gun)</td></tr>
 <tr><td>Shift / C</td><td>run / sneak</td></tr>
 <tr><td>Tab</td><td>time, generators, task</td></tr>
@@ -479,12 +566,17 @@ const STR = {
     defaultName: 'Wanderer',
     toLobby: 'LOBBY',
     pauseCoop: "the game isn't paused: you're standing in the forest",
-    mateDied: '{name} is dead',
+    mateDied: '{name} is down',
     mateLeft: '{name} disconnected',
     mateFound: '{name}: {part}',
     mateFlare: '{name} found a flare gun',
     mateStarted: '{name} started a generator',
     spectating: "you're dead · watching: <b>{name}</b>",
+    spectDown: "you're down · watching: <b>{name}</b>",
+    spectDownHint: 'a friend can carry you to the first-aid hut',
+    spectCarried: '<b>{name}</b> is carrying you',
+    spectCot: "you're on the cot in the first-aid hut",
+    spectWatching: 'watching: <b>{name}</b>',
     spectNext: 'SPACE / click — next',
     voicesHead: 'VOICES',
     voiceVolume: 'voice volume',

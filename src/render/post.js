@@ -99,9 +99,11 @@ void main() {
   vec2 rd = uv - 0.5;
   float ab = uAberr * (0.25 + dot(rd, rd) * 2.5) * 0.022;
   vec3 col;
+  vec4 s0 = texture2D(tScene, uv);
   col.r = texture2D(tScene, uv + rd * ab).r;
-  col.g = texture2D(tScene, uv).g;
+  col.g = s0.g;
   col.b = texture2D(tScene, uv - rd * ab).b;
+  float ashK = clamp(s0.a, 0.0, 1.0); // the scene marks what a lamp lights in its own colours (alpha → 0)
   vec3 bl = texture2D(tBloom, uv).rgb;
   col += bl * uBloom;
 
@@ -114,7 +116,7 @@ void main() {
   float lum = dot(col, vec3(0.299, 0.587, 0.114));
   float redness = clamp((col.r - col.b) * 2.2 - 0.08, 0.0, 1.0);
   vec3 ash = vec3(lum) * vec3(0.9, 0.98, 1.05);
-  col = mix(col, mix(ash, col, redness), uAsh);
+  col = mix(col, mix(ash, col, redness), uAsh * ashK);
   col = mix(col, col * vec3(1.06, 0.98, 0.9), uWarm);
 
   // tunnel vision: the dark closes in when something is near

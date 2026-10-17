@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { CFG } from '../core/config.js';
 
 const N = CFG.PULSE.slots;
+export const GLOW_SLOTS = 6; // small lights: glow sticks, the first-aid hut's lantern
 
 export const shared = {
   uTime: { value: 0 },
@@ -21,10 +22,14 @@ export const shared = {
   // burning signal flares (the two brightest): xyz + intensity (0 = none)
   uFlare: { value: Array.from({ length: 2 }, () => new THREE.Vector4(0, -100, 0, 0)) },
   uFlareR: { value: CFG.FLARE.radius },
+  // small lights (glow sticks, a battery lantern): xyz + intensity (0 = off), and colour + reach (m)
+  uGlow: { value: Array.from({ length: GLOW_SLOTS }, () => new THREE.Vector4(0, -100, 0, 0)) },
+  uGlowC: { value: Array.from({ length: GLOW_SLOTS }, () => new THREE.Vector4(1, 1, 1, 8)) },
 };
 
-const PULSE_GLSL = /* glsl */ `
+export const PULSE_GLSL = /* glsl */ `
 #define MAXP ${N}
+#define MAXG ${GLOW_SLOTS}
 uniform float uTime;
 uniform vec4 uPA[MAXP];
 uniform vec4 uPB[MAXP];
@@ -38,6 +43,8 @@ uniform vec4 uLamp[5];
 uniform float uLampR;
 uniform vec4 uFlare[2];
 uniform float uFlareR;
+uniform vec4 uGlow[MAXG];
+uniform vec4 uGlowC[MAXG];
 
 // a signal flare: hard red light from above, over a whole stretch of forest. surfaces turned away
 // from it stay dark (it's the only thing out here that casts a direction)
@@ -68,6 +75,23 @@ vec3 lampLight(vec3 P, vec3 Nrm) {
     float fall = 1.0 - smoothstep(uLampR * 0.12, uLampR * 1.5, d);
     float facing = dot(Nrm, Nrm) > 0.5 ? 0.35 + 0.65 * abs(dot(Nrm, dv / max(d, 0.001))) : 1.0;
     acc += vec3(1.0, 0.72, 0.4) * Lm.w * fall * fall * facing;
+  }
+  return acc;
+}
+
+// small coloured lights close by: a cracked glow stick (in a hand, or lying where it was thrown), a lantern
+vec3 glowLight(vec3 P, vec3 Nrm) {
+  vec3 acc = vec3(0.0);
+  for (int i = 0; i < MAXG; i++) {
+    vec4 G = uGlow[i];
+    if (G.w <= 0.001) continue;
+    vec4 C = uGlowC[i];
+    vec3 dv = G.xyz - P;
+    float d = length(dv);
+    if (d > C.w) continue;
+    float fall = 1.0 - smoothstep(C.w * 0.05, C.w, d);
+    float facing = dot(Nrm, Nrm) > 0.5 ? 0.45 + 0.55 * max(dot(Nrm, dv / max(d, 0.001)), 0.0) : 1.0;
+    acc += C.rgb * G.w * fall * fall * facing;
   }
   return acc;
 }
@@ -175,7 +199,9 @@ const vec3 DC[12] = vec3[12](
 );
 
 void main() {
-  vec3 Nrm = normalize(cross(dFdx(vWorld), dFdy(vWorld)));
+  vec3 Ncr = cross(dFdx(vWorld), dFdy(vWorld));
+  float Ncl = length(Ncr);
+  vec3 Nrm = Ncl > 1e-12 ? Ncr / Ncl : vec3(0.0, 1.0, 0.0); // (a sliver thinner than a pixel has no normal: no NaN)
   vec3 toCam = uCam - vWorld;
   float camD = length(toCam);
   if (dot(Nrm, toCam) < 0.0) Nrm = -Nrm;
@@ -185,8 +211,9 @@ void main() {
   float ring;
   vec3 L = sonarLight(vWorld, Nrm, ring);
   vec3 lamp = lampLight(vWorld, Nrm);
+  vec3 glow = glowLight(vWorld, Nrm);
   vec3 flare = flareLight(vWorld, Nrm);
-  L += lamp + flare;
+  L += lamp + glow + flare;
 
   float edge = edgeFactor(vBary, k == 0 ? 0.75 : 1.0);
   float distEdge = 1.0 - smoothstep(14.0, 90.0, camD) * 0.82;
@@ -207,12 +234,18 @@ void main() {
   float edgeGain = (k == 5 ? 1.75 : 1.4);
 
   vec3 col = base * L * (face + edge * edgeGain);
-  col += base * lamp * (0.17 + 0.12 * st); // a lamp fills surfaces, not just their edges
-  col += base * flare * (0.26 + 0.2 * st); // ...and so does a flare, red, everywhere it reaches
+  col += base * flare * (0.26 + 0.2 * st); // a flare fills surfaces, red, everywhere it reaches
   col += vec3(0.78, 0.85, 0.9) * ring * edge * 0.42;
   // rare sparkles on the wavefront
   float sp = step(0.993, hash13(floor(vWorld * 11.0) + floor(uTime * 14.0)));
   col += base * sp * ring * 1.1;
+  // in a lamp's light (or a glow stick's) the forest is simply there, in its own colours, the way it was
+  // in the morning: you can see where you are. (alpha tells the post pass to leave these colours alone)
+  vec3 near = lamp * vec3(1.0, 1.2, 1.55) + glow; // the lamp's bulb, a little less orange than its pool
+  float nat = clamp(max(near.r, max(near.g, near.b)) * 1.4, 0.0, 1.0);
+  vec3 seen = DC[k] * near * (0.78 + 0.3 * st) * 1.3;
+  if (k == 10) seen *= 0.75 + 0.5 * face; // water still moves
+  col = mix(col, seen + col * 0.35, nat);
 
   // the dark eats distance
   col *= exp(-camD * 0.015);
@@ -236,7 +269,7 @@ void main() {
     day = mix(day, fogC, fog);
     col = mix(col, day + col * 0.3, uDawn);
   }
-  gl_FragColor = vec4(col, 1.0);
+  gl_FragColor = vec4(col, 1.0 - nat * 0.95);
 }
 `;
 
@@ -292,7 +325,9 @@ varying vec3 vBary;
 varying float vKind;
 ${EDGE_GLSL}
 void main() {
-  vec3 Nrm = normalize(cross(dFdx(vWorld), dFdy(vWorld)));
+  vec3 Ncr = cross(dFdx(vWorld), dFdy(vWorld));
+  float Ncl = length(Ncr);
+  vec3 Nrm = Ncl > 1e-12 ? Ncr / Ncl : vec3(0.0, 1.0, 0.0); // (a sliver thinner than a pixel has no normal: no NaN)
   vec3 toCam = uCam - vWorld;
   float camD = length(toCam);
   float facing = abs(dot(Nrm, toCam / camD));
@@ -367,7 +402,7 @@ void main() {
   vec3 halfB = vec3(uBox * 0.5, 6.0, uBox * 0.5);
   vec3 wp = uCam + mod(p - uCam + halfB, vec3(uBox, 12.0, uBox)) - halfB;
   float ring;
-  vec3 L = sonarLight(wp, vec3(0.0), ring) + lampLight(wp, vec3(0.0)) * 1.6 + flareLight(wp, vec3(0.0)) * 1.2;
+  vec3 L = sonarLight(wp, vec3(0.0), ring) + lampLight(wp, vec3(0.0)) * 1.6 + flareLight(wp, vec3(0.0)) * 1.2 + glowLight(wp, vec3(0.0)) * 1.4;
   vCol = (L * 0.3 + ring * vec3(0.7, 0.76, 0.8) * 0.38) * (0.3 + aSeed.w);
   vec4 mv = viewMatrix * vec4(wp, 1.0);
   gl_Position = projectionMatrix * mv;

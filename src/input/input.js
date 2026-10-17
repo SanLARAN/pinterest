@@ -3,7 +3,7 @@ import { settings } from '../core/storage.js';
 
 const GAME_KEYS = new Set([
   'KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space',
-  'ShiftLeft', 'ShiftRight', 'KeyC', 'KeyF', 'KeyQ', 'KeyM', 'KeyP', 'KeyR', 'KeyE', 'Tab', 'Enter',
+  'ShiftLeft', 'ShiftRight', 'KeyC', 'KeyF', 'KeyQ', 'KeyM', 'KeyP', 'KeyR', 'KeyE', 'KeyG', 'Tab', 'Enter',
 ]);
 
 export class Input {
@@ -61,6 +61,9 @@ export class Input {
         case 'KeyQ':
           this.emit('flare');
           break;
+        case 'KeyG':
+          this.emit('glow');
+          break;
         case 'KeyE':
           this.useHeld = true;
           this.emit('useDown');
@@ -80,7 +83,8 @@ export class Input {
           this.emit('pause');
           break;
         case 'KeyR':
-          this.emit('restart');
+          this.emit('restart'); // (on the results screen)
+          this.emit('carry'); // (in the forest: lift a friend who's down / put them down)
           break;
         case 'Enter':
         case 'NumpadEnter':
@@ -313,6 +317,8 @@ export class Input {
     });
     btn('#tStone', () => this.emit('throw'));
     btn('#tFlare', () => this.emit('flare'));
+    btn('#tCarry', () => this.emit('carry'));
+    btn('#tGlow', () => this.emit('glow'));
     const peekZone = el.querySelector('#peekZone');
     if (peekZone) {
       peekZone.addEventListener('pointerdown', (e) => {

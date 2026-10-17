@@ -7,8 +7,8 @@
 
 export const CHAPTERS = [
   { id: 'beasts', num: 'I', entries: ['listener', 'crawler', 'watcher', 'howler', 'shade'] },
-  { id: 'tasks', num: 'II', entries: ['generator', 'corpse', 'fuel', 'plug', 'fuses', 'belt', 'battery', 'shard', 'stone', 'flare'] },
-  { id: 'places', num: 'III', entries: ['camp', 'cabin', 'tower', 'stones', 'wreck'] },
+  { id: 'tasks', num: 'II', entries: ['generator', 'corpse', 'fuel', 'plug', 'fuses', 'belt', 'battery', 'shard', 'stone', 'flare', 'glowstick'] },
+  { id: 'places', num: 'III', entries: ['camp', 'medhut', 'cabin', 'tower', 'stones', 'wreck'] },
 ];
 
 export const ENTRIES = {
@@ -27,7 +27,9 @@ export const ENTRIES = {
   shard: { model: 'shard', sound: 'shard', kind: 'thing', log: [['found', 'shards']] },
   stone: { model: 'stone', sound: 'stone', kind: 'thing', log: [['thrown', 'stones']] },
   flare: { model: 'flare', sound: 'flare', kind: 'thing', log: [['fired', 'flares']] },
+  glowstick: { model: 'glowstick', sound: 'glowstick', kind: 'thing', log: [['cracked', 'glows']] },
   camp: { model: 'camp', kind: 'place', log: [['startedHere', 'site:camp']] },
+  medhut: { model: 'medhut', kind: 'place', log: [['revived', 'revives']] },
   cabin: { model: 'cabin', kind: 'place', log: [['startedHere', 'site:cabin']] },
   tower: { model: 'tower', kind: 'place', log: [['startedHere', 'site:tower']] },
   stones: { model: 'stones', kind: 'place', log: [['startedHere', 'site:stones']] },
@@ -70,6 +72,7 @@ const TEXT = {
     log: {
       seen: 'ночей рядом', killed: 'убил тебя', appeared: 'являлась', started: 'запущено при тебе', wins: 'побед',
       searched: 'обыскано тел', fitted: 'поставлено', found: 'найдено', thrown: 'брошено', fired: 'выпущено', startedHere: 'запущено здесь',
+      cracked: 'зажжено', revived: 'вернул к жизни',
       nights: 'ночей', best: 'дольше всего', deaths: 'смертей', screams: 'закричал', gens: 'генераторов',
     },
     entries: {
@@ -84,7 +87,7 @@ const TEXT = {
           'Не беги мимо: бег в паре метров он чувствует. Рядом — только красться (C).',
           'Камень уводит его. Даже в погоне — если ты затих, а камень упал ближе к нему, чем ты.',
         ],
-        facts: [['рост с рогами', '{h}'], ['шаг · охота', '1.0 · 4.7–5.5 м/с'], ['ты бежишь', '5.7 м/с'], ['бросает погоню', '~6 с тишины'], ['в лесу', 'от 2 до 6 к 25-й минуте']],
+        facts: [['рост с рогами', '{h}'], ['шаг · охота', '1.0 · 4.7–5.5 м/с'], ['ты бежишь', '5.7 м/с'], ['бросает погоню', '~6 с тишины'], ['в лесу', '2, с 2-й минуты — 3, не больше']],
         quote: 'И тише. ОНИ слышат.',
       },
       crawler: {
@@ -248,6 +251,16 @@ const TEXT = {
         tips: ['Стреляй подальше от себя: пусть идут туда, а ты — в другую сторону.', 'Наблюдатель в её свете замирает: пока ракета горит, ему не подойти.', 'Попадёт в дерево — упадёт и догорит у корней. В озеро — погаснет.'],
         facts: [['заряды', '2'], ['горит', '~15 с'], ['свет', 'на ~80 м вокруг'], ['зовёт', 'на ~140 м']],
       },
+      glowstick: {
+        name: 'Светящаяся палочка', latin: 'одна на ночь · у каждого',
+        text: [
+          'Химический источник света: пластиковая трубка, внутри — стеклянная ампула. Переломишь — жидкости смешаются, и палочка загорится ровным зелёным светом. Никакого огня, никакого звука, кроме щелчка.',
+          'G — переломить, и она светит у тебя в руке. G ещё раз — бросить вперёд: пусть светит там. Горящую палочку можно подобрать с земли (E).',
+          'В её свете, как под лампой генератора, лес виден таким, какой он есть, — понятно, где ты и куда идти. А тварь в нём видна живым силуэтом.',
+        ],
+        tips: ['Утром она не нужна — прибереги до темноты.', 'Наблюдатель в её свет не шагнёт: брось её между собой и им.', 'Под конец она тускнеет и мигает — значит, осталось секунд пятнадцать.', 'Если упадёшь, палочка выпадет из руки и будет светить там, где ты лежишь, — друзьям проще тебя найти.'],
+        facts: [['с собой', '1 на ночь'], ['горит', '~2,5 мин'], ['свет', 'на ~6 м'], ['щелчок', 'слышно в паре шагов']],
+      },
       camp: {
         name: 'Лагерь', latin: 'старая просека · генератор №1',
         text: [
@@ -256,6 +269,16 @@ const TEXT = {
         ],
         tips: ['Утром не уходи далеко от лагеря. Осмотрись, пока светло.'],
         facts: [['генератор', '№1, всегда'], ['утро', '32 секунды'], ['размер', '{len}']],
+      },
+      medhut: {
+        name: 'Мед-хижина скаутов', latin: 'заброшенный медпункт · у лагеря',
+        text: [
+          'Дощатая хижина под двускатной крышей, над дверью — белая доска с красным крестом. У двери до сих пор горит фонарь на батарейках, внутри под коньком висит походная лампа. Носилки у стены, флагшток без флага, у задней стены — койка.',
+          'Только здесь можно спасти друга, которого поймали. Упавший не умирает сразу — он медленно истекает кровью. Донеси его сюда (R — поднять на плечо), положи на койку (R) и работай руками (удерживай E), пока он не вдохнёт.',
+          'Сколько ему осталось, не скажет никто. Опустись рядом и нащупай пульс (удерживай E): ровный, слабый, еле слышен — и примерно сколько минут. Чтобы узнать снова, щупай снова.',
+        ],
+        tips: ['С другом на плече бежать нельзя, а шаги тяжёлые и громкие. Красная засечка у точки показывает, где хижина.', 'Каждое падение короче прошлого: 4 минуты, потом меньше трёх, потом две.', 'Дверь закрывается (E) — даже с ношей на плече: толкнёшь плечом.', 'Её фонарь видно издалека: тёплая точка в лесу у лагеря.'],
+        facts: [['где', '~25 м от костра'], ['койка', 'одна'], ['вернуть', '~6 с руками'], ['истекает', '4 · 3 · 2 мин'], ['размер', '{len}']],
       },
       cabin: {
         name: 'Охотничья избушка', latin: 'генератор №2–5',
@@ -331,6 +354,7 @@ const TEXT = {
     log: {
       seen: 'nights near it', killed: 'killed you', appeared: 'appeared', started: 'started with you', wins: 'wins',
       searched: 'bodies searched', fitted: 'fitted', found: 'found', thrown: 'thrown', fired: 'fired', startedHere: 'started here',
+      cracked: 'cracked', revived: 'brought back',
       nights: 'nights', best: 'longest', deaths: 'deaths', screams: 'screamed', gens: 'generators',
     },
     entries: {
@@ -345,7 +369,7 @@ const TEXT = {
           "Don't run past it: it feels running within a couple of metres. Near it, only sneak (C).",
           "A stone draws it away. Even in a chase — if you've gone quiet and the stone lands closer to it than you are.",
         ],
-        facts: [['height with antlers', '{h}'], ['walk · hunt', '1.0 · 4.7–5.5 m/s'], ['you sprint', '5.7 m/s'], ['gives up', '~6 s of silence'], ['in the forest', 'from 2 up to 6 by minute 25']],
+        facts: [['height with antlers', '{h}'], ['walk · hunt', '1.0 · 4.7–5.5 m/s'], ['you sprint', '5.7 m/s'], ['gives up', '~6 s of silence'], ['in the forest', '2, from minute 2 — 3, never more']],
         quote: 'And be quiet. THEY hear.',
       },
       crawler: {
@@ -509,6 +533,16 @@ const TEXT = {
         tips: ['Fire it away from yourself: let them go there while you go the other way.', 'The Watcher freezes in its light: while the flare burns it cannot come for you.', 'Into a tree — it drops and burns out among the roots. Into the lake — it drowns.'],
         facts: [['shots', '2'], ['burns', '~15 s'], ['light', '~80 m around'], ['calls', 'from ~140 m']],
       },
+      glowstick: {
+        name: 'Glow stick', latin: 'one each · one a night',
+        text: [
+          'A chemical light: a plastic tube with a glass vial inside. Bend it till the vial snaps, the liquids mix and it glows a steady green. No flame, no sound but the snap.',
+          'G — crack it, and it glows in your hand. G again — throw it ahead and let it glow there. A lit stick can be picked up off the ground (E).',
+          "In its light, as under a generator's lamp, the forest looks the way it really is — you can tell where you are and where to go. A creature in it shows as a living silhouette.",
+        ],
+        tips: ["You won't need it in the morning — save it for the dark.", "The Watcher won't step into its light: throw it between you and it.", 'Near the end it dims and flickers — fifteen seconds or so left.', "If you go down it falls from your hand and keeps glowing where you lie — easier for your friends to find you."],
+        facts: [['carry', '1 a night'], ['burns', '~2.5 min'], ['light', '~6 m'], ['the snap', 'heard a couple of steps away']],
+      },
       camp: {
         name: 'The camp', latin: 'an old clearing · generator #1',
         text: [
@@ -517,6 +551,16 @@ const TEXT = {
         ],
         tips: ["In the morning don't stray far from the camp. Look around while it's light."],
         facts: [['generator', '#1, always'], ['morning', '32 seconds'], ['size', '{len}']],
+      },
+      medhut: {
+        name: "Scouts' first-aid hut", latin: 'an abandoned aid post · by the camp',
+        text: [
+          'A plank hut under a gable roof, a white board with a red cross over the door. A battery lantern by the door still burns; inside, a camping lantern hangs from the ridge. A stretcher against the wall, a flagpole without a flag, and by the back wall — a cot.',
+          'Only here can a friend who was caught be saved. The fallen do not die at once — they slowly bleed out. Carry them here (R — onto your shoulder), lay them on the cot (R) and work on them (hold E) until they draw breath.',
+          'Nobody can tell you how long they have. Kneel and feel for a pulse (hold E): steady, weak, barely there — and roughly how many minutes. To know again, feel again.',
+        ],
+        tips: ['With a friend on your shoulder you cannot run, and your steps are heavy and loud. A red tick by the dot shows where the hut is.', 'Each fall is shorter than the last: 4 minutes, then under three, then two.', 'The door closes (E) — even with someone on your shoulder: you shove it.', 'Its lantern shows from far off: a warm point in the forest by the camp.'],
+        facts: [['where', '~25 m from the fire'], ['cot', 'one'], ['bring back', '~6 s by hand'], ['bleeds out', '4 · 3 · 2 min'], ['size', '{len}']],
       },
       cabin: {
         name: 'Hunting cabin', latin: 'generator #2–5',

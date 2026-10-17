@@ -5,7 +5,7 @@ export const CFG = {
   WORLD_WALL: 286, // player / monsters can't go past this
   CHUNK: 40,
   TERRAIN_CELL: 2.5,
-  RUN_SECONDS: 30 * 60, // after this the forest wakes up: everything starts closing in on you
+  RUN_SECONDS: 45 * 60, // after this the forest wakes up: everything starts closing in on you
   GRACE_SECONDS: 12, // at the start of the night monsters can't hunt you
   SPAWN_DELAY: 45, // ...and for the first 45 s the forest sleeps: no monsters at all, look around in peace
   MORNING_SECONDS: 32, // the calm before: daylight, birds, a humming generator
@@ -91,6 +91,32 @@ export const CFG = {
   // cabin doors: how loud they are, and how long a shut one holds
   DOOR: { loud: 0.12, shutLoud: 0.2, bashes: 3, bashEvery: 0.55, calmPush: 1.1 },
 
+  // co-op: a friend who is caught goes down, not out. Check their pulse (it tells you how long they have
+  // left), carry them to the scouts' first-aid hut and lay them on the cot — only there can they be brought back
+  REVIVE: {
+    bleed: [240, 170, 120], // s they last on the ground: the first time, the second, the third and after
+    pulse: 1.3, // s holding E to find a pulse
+    revive: 6, // s holding E at the cot
+    carry: 1.75, // m/s with someone on your shoulders (no running)
+    carryCrouch: 1.0,
+    carryStep: 0.12, // heavier steps (a walk is 0.085)
+    pick: 1.9, // how close you have to be to lift someone (m)
+    cot: 1.9, // ...and to lay them on the cot
+    gasp: 0.22, // the first breath of someone brought back
+    work: 0.05, // each push on the chest
+  },
+  // glow sticks: one each. Crack it (G) and it glows for a while — in your hand, or wherever you throw it (G again)
+  GLOW: {
+    burn: 150, // s of light
+    radius: 10, // how far its light reaches (m) — it's bright for the first five or so
+    light: 1.5, // brightness (a work lamp is 1.15, but its pool is much wider)
+    color: [0.5, 1.0, 0.62],
+    speed: 11, // m/s thrown
+    gravity: 15,
+    crackLoud: 0.07, // the snap
+  },
+  MAX_LISTENERS: 3, // never more than this many Listeners in the forest, however long the night or big the team
+
   SCORE: {
     perSecond: 10,
     shard: 250,
@@ -98,6 +124,7 @@ export const CFG = {
     escape: 500,
     corpse: 400,
     generator: 2000,
+    revive: 1500, // you brought someone back
     win: 25000, // + speedBonus for every second left before RUN_SECONDS
     speedBonus: 10,
   },
@@ -116,12 +143,9 @@ export function monsterTargets(t) {
   let listeners = 2, crawlers = 0;
   if (m >= 2) listeners = 3;
   if (m >= 4) crawlers = 1;
-  if (m >= 7) listeners = 4;
   if (m >= 10) crawlers = 2;
-  if (m >= 15) listeners = 5;
   if (m >= 20) crawlers = 3;
-  if (m >= 25) listeners = 6;
-  return { listeners, crawlers };
+  return { listeners: Math.min(listeners, CFG.MAX_LISTENERS), crawlers };
 }
 
 export const PALETTE = {

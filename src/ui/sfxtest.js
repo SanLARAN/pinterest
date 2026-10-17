@@ -52,6 +52,10 @@ export function mountSfxPanel(audio) {
     ['дверь: сама открывается', () => audio.doorCreak(...at(4, -2, 1.2), 1.9, 0.78, 0.55)],
     ['дверь: выбивают', () => { audio.doorBash(...at(3, 0.5, 1.1)); setTimeout(() => audio.doorBash(...at(3, 0.5, 1.1)), 560); setTimeout(() => audio.doorBash(...at(3, 0.5, 1.1), true), 1120); }],
     ['ракетница: выстрел и горение', () => { audio.flareShot(...at(0.5, 0, 0), true); setTimeout(() => audio.flarePop(...at(30, 6, 30)), 1500); setTimeout(() => audio.flareHiss(...at(30, 6, 29), 4), 1550); }],
+    ['палочка: сломать, бросить, подобрать', () => { audio.glowCrack(0, 0, 0, true); setTimeout(() => audio.throwWhoosh(), 1300); setTimeout(() => audio.glowLand(...at(8, 1, -1.4), 0.9), 1900); setTimeout(() => audio.glowPick(), 3200); }],
+    ['друг: пульс (ровный / слабый / нет)', () => { audio.pulseFelt(1); setTimeout(() => audio.pulseFelt(0.3), 2800); setTimeout(() => audio.pulseFelt(0), 4800); }],
+    ['друг: поднять, положить на койку', () => { audio.bodyLift(0, 0, 0, true); setTimeout(() => audio.bodyDrop(...at(1.2, 0.3, -0.8), true), 1600); }],
+    ['койка: вернуть к жизни', () => { for (let i = 0; i < 6; i++) setTimeout(() => audio.cprPush(...at(1, 0.4, -0.9)), i * 550); setTimeout(() => audio.reviveGasp(...at(1, 0.4, -0.6)), 3500); }],
     ['напряжение: 0', (b) => {
       tension = tension >= 1 ? 0 : tension + 0.5;
       audio.startAmbience();

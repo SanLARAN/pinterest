@@ -33,6 +33,7 @@ uniform float uNoise; // dash / speck cells per metre (scaled to the specimen)
 uniform vec3 uGround; // ground disc: centre x, z, radius
 uniform vec4 uLamp;   // a running work lamp: xyz, intensity
 uniform float uLampR;
+uniform vec3 uLampC;  // ...its colour (a glow stick's is green)
 uniform float uFade;
 varying vec3 vWorld;
 varying vec3 vBary;
@@ -70,7 +71,7 @@ void main() {
     vec3 ld = uLamp.xyz - vWorld;
     float dl = length(ld);
     float fall = 1.0 - smoothstep(uLampR * 0.08, uLampR, dl);
-    lamp = vec3(1.0, 0.72, 0.4) * uLamp.w * fall * fall * (0.35 + 0.65 * abs(dot(N, ld / max(dl, 0.001))));
+    lamp = uLampC * uLamp.w * fall * fall * (0.35 + 0.65 * abs(dot(N, ld / max(dl, 0.001))));
   }
 
   float edge = edgeFactor(vBary, k == 0 ? 0.8 : 1.05);
@@ -167,6 +168,7 @@ export class Specimen {
       uGround: { value: new THREE.Vector3(0, 0, 2) },
       uLamp: { value: new THREE.Vector4(0, 0, 0, 0) },
       uLampR: { value: 6 },
+      uLampC: { value: new THREE.Vector3(1.0, 0.72, 0.4) },
       uFade: { value: 1 },
     };
     this.mat = new THREE.ShaderMaterial({ uniforms: this.u, vertexShader: VERT, fragmentShader: FRAG });
@@ -267,9 +269,14 @@ export class Specimen {
     if (lamp) {
       this.glow[0].position.set(lamp.x, lamp.y, lamp.z);
       this.glow[1].position.set(lamp.x, lamp.y, lamp.z);
-      this.glow[0].scale.setScalar(0.85);
-      this.glow[1].scale.setScalar(3.4);
+      const gs = lamp.s || 1;
+      this.glow[0].scale.setScalar(0.85 * gs);
+      this.glow[1].scale.setScalar(3.4 * gs);
+      this.glow[0].material.color.setHex(lamp.core ?? 0xffd2a0);
+      this.glow[1].material.color.setHex(lamp.halo ?? 0xff9a50);
       this.u.uLampR.value = lamp.r;
+      const c = lamp.c || [1.0, 0.72, 0.4];
+      this.u.uLampC.value.set(c[0], c[1], c[2]);
     }
     this.u.uLamp.value.w = 0;
     this.u.uFade.value = 0;

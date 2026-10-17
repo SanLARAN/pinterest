@@ -427,6 +427,25 @@ function flare(mat) {
   return still(root, 0.32, { yaw: 0.55, pitch: 0.5 });
 }
 
+// a glow stick, cracked and glowing, and a spare one beside it
+function glowstick(mat) {
+  const b = new MeshBuilder(1024);
+  const tube = (x, z, yaw, bend) => {
+    // a plastic tube in two halves (bent a little where the vial snapped), a cap with a ring at one end
+    b.place(x, 0.013, z, 0, yaw, Math.PI / 2);
+    b.cylinder(8, 0.012, 0.012, 0.085, KIND.LEAF, { capBottom: true });
+    b.cylinder(8, 0.0135, 0.0135, 0.012, KIND.ROCK, { y0: 0.085, capTop: true });
+    b.limb([0, 0.097, 0], [0, 0.112, 0.006], 0.003, 0.003, KIND.METAL, 3);
+    b.place(x, 0.013, z, bend, yaw, -Math.PI / 2);
+    b.cylinder(8, 0.012, 0.012, 0.085, KIND.LEAF, { capBottom: true });
+  };
+  tube(0, 0, 0.35, 0.08);
+  tube(0.03, 0.06, 0.62, 0);
+  const root = new THREE.Group();
+  root.add(meshOf(b, mat));
+  return still(root, 0.32, { yaw: 0.5, pitch: 0.55 }, { lamp: { x: 0, y: 0.03, z: 0, r: 0.35, c: [0.5, 1.0, 0.62], core: 0xd8ffe0, halo: 0x60ff90, s: 0.1 } });
+}
+
 // ---------------- places ----------------
 // the landmark builders run against a stand-in world: flat ground, no colliders. Drawing the first five
 // landmarks in order with the forest's own seed reproduces exactly the random bits you meet in the game.
@@ -435,13 +454,14 @@ function placeGeometry(id, world) {
   if (!_places) {
     _places = {};
     const rng = new RNG(world ? world.seed : 1337);
-    for (const L of LANDMARKS.slice(0, 5)) {
+    for (const L of [...LANDMARKS.slice(0, 5), LANDMARKS.find((l) => l.id === 'medhut')]) {
       const kind = L.id.replace(/\d+$/, '');
       const props = [];
       const fake = { terrain: { height: () => 0, flats: [] }, col: { add() {}, circle() {} }, addProp: (x, z, fn) => props.push(fn), spawn: null, lake: null, effigies: [], doors: [] };
       World.prototype['lm_' + kind].call(fake, { ...L, x: 0, z: 0 }, rng);
       _places[L.id] = props;
       props.doors = fake.doors;
+      props.hut = fake.medhut; // (the first-aid hut: where its lantern hangs)
     }
   }
   const b = new MeshBuilder(16384);
@@ -477,7 +497,10 @@ function place(id, view) {
       leaf.rotation.y = d.ry + 0.7;
       root.add(leaf);
     }
-    return still(root, 0.3, view);
+    // the first-aid hut's lantern still burns
+    const hut = _places[id].hut;
+    const extra = hut ? { lamp: { x: hut.lamp.x, y: hut.lamp.y, z: hut.lamp.z, r: 5, s: 0.35 } } : {};
+    return still(root, 0.3, view, extra);
   };
 }
 
@@ -485,8 +508,9 @@ function place(id, view) {
 const MODELS = {
   listener, crawler, watcher, howler, shade,
   generator: (mat) => generator(mat, true),
-  corpse, fuel, plug, fuses, belt, battery, shard, stone, flare,
+  corpse, fuel, plug, fuses, belt, battery, shard, stone, flare, glowstick,
   camp: place('camp', { yaw: 2.6, pitch: 0.62, fit: 0.78 }),
+  medhut: place('medhut', { yaw: 3.75, pitch: 0.26, fit: 0.66, focus: [0, 1.5, 0] }),
   cabin: place('cabin', { yaw: 0.9, pitch: 0.34, fit: 0.95 }),
   tower: place('tower', { yaw: 0.6, pitch: 0.16, fit: 1.0 }),
   stones: place('stones', { yaw: 0.4, pitch: 0.5, fit: 0.92 }),
