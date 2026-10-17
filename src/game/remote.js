@@ -138,6 +138,8 @@ export class RemotePlayer {
     poseSurvivor(this.rig, this.phase, this.alive ? this.speed : 0, this.crouching, !this.alive);
     const r = this.rig.root;
     const es = this.game.escape;
+    const cb = this.game.cabinets;
+    if (cb && cb.poseRemote(this)) return; // caught by the шкафандр — or pulling someone out of it
     if (this.alive) {
       if (es && es.poseRemote(this)) return; // in a seat of the УАЗ (or: a part in their arms, posed there)
       if (this.carrying) poseCarrier(this.rig);

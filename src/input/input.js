@@ -5,6 +5,7 @@ const GAME_KEYS = new Set([
   'KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space',
   'ShiftLeft', 'ShiftRight', 'KeyC', 'KeyF', 'KeyQ', 'KeyM', 'KeyP', 'KeyR', 'KeyE', 'KeyG', 'Tab', 'Enter',
 ]);
+const QTE_KEYS = { KeyW: 'qU', ArrowUp: 'qU', KeyA: 'qL', ArrowLeft: 'qL', KeyS: 'qD', ArrowDown: 'qD', KeyD: 'qR', ArrowRight: 'qR' };
 
 export class Input {
   constructor(canvas) {
@@ -50,6 +51,7 @@ export class Input {
       if (e.code === 'Space') e.preventDefault();
       if (e.repeat) return;
       this.keys.add(e.code);
+      if (QTE_KEYS[e.code]) this.emit(QTE_KEYS[e.code]); // (the шкафандр's beat: W A S D, or the arrows)
       switch (e.code) {
         case 'Space':
           this.pingHeld = true;
@@ -319,6 +321,7 @@ export class Input {
     btn('#tFlare', () => this.emit('flare'));
     btn('#tCarry', () => this.emit('carry'));
     btn('#tGlow', () => this.emit('glow'));
+    btn('#tPull', () => this.emit('qX')); // (touch: one button for the beat — only the timing counts)
     const peekZone = el.querySelector('#peekZone');
     if (peekZone) {
       peekZone.addEventListener('pointerdown', (e) => {

@@ -23,6 +23,7 @@ const LAMP_I = 1.15;
 const NOTE_SECONDS = 11;
 const PH = ['dead', 'work', 'cord', 'spin', 'running'];
 const ESC_KINDS = new Set(['part', 'carNote', 'carDoor', 'carFit', 'carSeat']); // see Escape.consider
+const CAB_KINDS = new Set(['cabinet', 'cabinetItem', 'trapGrab', 'trapSelf']); // see Cabinets.consider
 
 const _m = new THREE.Matrix4();
 const _l = new THREE.Matrix4();
@@ -541,6 +542,8 @@ export class Objectives {
     }
     if (es && !doorsOnly) es.consider(consider);
     if (game.doors && !seated) game.doors.consider(consider);
+    // cupboards (in the morning too: the first-aid hut is right by the camp) — and someone caught in one
+    if (game.cabinets && !seated) game.cabinets.consider(consider, !p.carrying && !(es && es.held));
     if (best && this.target && best.obj !== this.target.obj) this.searchT = 0;
     this.target = best;
 
@@ -566,6 +569,11 @@ export class Objectives {
     if (escKind) {
       this.searchT = 0;
       es.interact(best, dt, held, pressed, still, T);
+      return;
+    }
+    if (CAB_KINDS.has(best.kind)) {
+      this.searchT = 0;
+      game.cabinets.interact(best, dt, held, pressed, T);
       return;
     }
     if (best.kind === 'door') {

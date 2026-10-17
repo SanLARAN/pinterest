@@ -7,7 +7,7 @@
 //   13 / 14 = headwear main / accent, 15 / 16 = outfit main / accent, 17 / 18 = a light in the accent colour
 import * as THREE from 'three';
 import { MeshBuilder, KIND } from '../world/builder.js';
-import { clamp } from '../core/rng.js';
+import { clamp, lerp } from '../core/rng.js';
 import { cleanFit, shapeKey } from './outfit.js';
 
 export const DYE = { HA: 13, HB: 14, BA: 15, BB: 16, HG: 17, BG: 18 };
@@ -451,6 +451,64 @@ export function poseSlumped(rig, t = 0) {
   n.shR.rotation.set(0.05, 0, 0.3);
   n.elL.rotation.x = -0.2;
   n.elR.rotation.x = -0.3;
+}
+
+// caught by the шкафандр: dragged in up to the waist, bent out of its doors, arms reaching — or held out stiff to
+// the hands that hold them (hands = [left holder, right holder]). out: 0..1 yanked free (a stumble forward)
+export function poseGrabbed(rig, t, hands = [null, null], out = 0) {
+  const n = rig.nodes;
+  rig.root.rotation.x = 0;
+  n.hips.position.set(0, lerp(0.78, 0.9, out), 0);
+  n.hips.rotation.set(0, 0, 0);
+  n.chest.rotation.set(lerp(0.55 + Math.sin(t * 9) * 0.06, 0.25, out), Math.sin(t * 6.3) * 0.12 * (1 - out), Math.sin(t * 11) * 0.06);
+  n.head.rotation.set(lerp(-0.55, -0.1, out), 0, Math.sin(t * 13) * 0.12 * (1 - out));
+  for (const [A, s, k] of [['L', -1, 0], ['R', 1, 1]]) {
+    const held = !!hands[k];
+    if (held || out > 0) {
+      n['sh' + A].rotation.set(-1.62 + Math.sin(t * 17 + k) * 0.04, 0, s * 0.08);
+      n['el' + A].rotation.x = -0.1;
+    } else {
+      n['sh' + A].rotation.set(-1.25 + Math.sin(t * 8.5 + k * 1.7) * 0.55, 0, s * (0.15 + Math.sin(t * 6 + k) * 0.15));
+      n['el' + A].rotation.x = -0.45 + Math.sin(t * 7.2 + k) * 0.4;
+    }
+    n['th' + A].rotation.set(lerp(0.75, 0.2, out) + Math.sin(t * 10 + k * 3) * 0.08, 0, s * 0.06);
+    n['kn' + A].rotation.x = lerp(0.95, 0.4, out);
+  }
+}
+
+// pulling someone out by one hand: feet braced, leaning back, both arms out to the hand (s: −1 left, +1 right).
+// effort 0..1 — a heave
+export function poseRescuer(rig, s, effort = 0.5) {
+  const n = rig.nodes;
+  rig.root.rotation.x = 0;
+  n.hips.position.set(0, 0.86 - effort * 0.04, 0);
+  n.hips.rotation.set(0, 0, 0);
+  n.chest.rotation.set(-0.3 - effort * 0.18, s * 0.12, 0);
+  n.head.rotation.set(0.25 + effort * 0.1, -s * 0.15, 0);
+  n.thL.rotation.set(-0.55, 0, -0.06);
+  n.knL.rotation.x = 0.55;
+  n.thR.rotation.set(0.35, 0, 0.06);
+  n.knR.rotation.x = 0.2;
+  for (const [A, k] of [['L', -1], ['R', 1]]) {
+    n['sh' + A].rotation.set(-1.32 - effort * 0.08, 0, -k * 0.12 + s * 0.08);
+    n['el' + A].rotation.x = -0.12;
+  }
+}
+
+// knocked onto your backside when it lets go (k 0..1)
+export function poseSprawled(rig, k = 1) {
+  const n = rig.nodes;
+  rig.root.rotation.x = 0;
+  n.hips.position.set(0, lerp(0.86, 0.3, k), lerp(0, 0.12, k));
+  n.hips.rotation.set(0, 0, 0);
+  n.chest.rotation.set(lerp(-0.4, -0.75, k), 0, 0);
+  n.head.rotation.set(lerp(0.2, 0.55, k), 0, 0);
+  for (const [A, s] of [['L', -1], ['R', 1]]) {
+    n['th' + A].rotation.set(lerp(-0.3, -1.45, k), 0, s * lerp(0.05, 0.25, k));
+    n['kn' + A].rotation.x = lerp(0.4, 0.35, k);
+    n['sh' + A].rotation.set(lerp(-1.3, 0.75, k), 0, s * lerp(0.1, 0.35, k));
+    n['el' + A].rotation.x = lerp(-0.12, -0.35, k);
+  }
 }
 
 // a glow stick held up in the other hand (after poseSurvivor)

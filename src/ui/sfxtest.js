@@ -65,6 +65,13 @@ export function mountSfxPanel(audio) {
     ['УАЗ: завёлся, газует, уехал', () => { const c = audio.uazCrank(...at(3, 1, 0.5), true); setTimeout(() => { if (c) c.stop(0.05); const e = audio.uazStart(...at(3, 1, 0.5)); if (!e) return; setTimeout(() => e.rev(0.6), 3200); setTimeout(() => e.rev(1), 4600); setTimeout(() => e.stop(2), 6500); }, 2100); }],
     ['УАЗ: дверь, капот, ворота на таран', () => { audio.carDoor(...at(1.5, 1, 0), true); setTimeout(() => audio.hoodSlam(...at(2.5, 0, 0)), 1100); setTimeout(() => audio.gateCrash(...at(6, 0, 0.5)), 2200); }],
     ['шоссе: машина мимо · аккорд', () => { audio.carPass(...at(60, -40, 0), 1, 22); setTimeout(() => audio.escapeChord(), 2500); }],
+    ['шкафы: платяной / низкий / аптечка / шкафчик · гайки · патрон', () => { ['wardrobe', 'cupboard', 'firstaid', 'locker'].forEach((k, i) => setTimeout(() => audio.cabinetOpen(...at(1.6, i - 1.5, 0.9), k), i * 900)); setTimeout(() => audio.cabinetItem('nuts'), 3800); setTimeout(() => audio.cabinetItem('flare'), 4600); }],
+    ['шкафандр: тикает и дышит', () => audio.shkafTell(...at(2, 0.5, 1))],
+    ['шкафандр: схватил тебя + мясорубка + крик', () => { audio.shkafSpring(...at(0.6, 0, 1), true); const g = audio.shkafGrind(...at(0.6, 0, 0.9)); for (let i = 0; i < 3; i++) setTimeout(() => audio.humanScream(0, 0, 0, true, i / 2), 600 + i * 1700); setTimeout(() => g && g.stop(1), 5500); }],
+    ['шкафандр: такт · попал · идеально · мимо', () => { for (let i = 0; i < 6; i++) setTimeout(() => audio.qteTick(), i * 740); setTimeout(() => audio.qteHit(false), 740); setTimeout(() => audio.qteHit(true), 1480); setTimeout(() => audio.qteMiss(), 2220); setTimeout(() => audio.grabHand(), 3000); }],
+    ['шкафандр: рывок в такт / вразнобой', () => { audio.trapPull(...at(1.2, 0, 1), true); setTimeout(() => audio.trapPull(...at(1.2, 0, 1), false, true), 900); setTimeout(() => audio.trapPull(...at(1.2, 0, 1), false), 1700); }],
+    ['шкафандр: вытащили', () => audio.trapRescue(...at(1.2, 0, 1))],
+    ['шкафандр: не успели (друг / ты)', () => { audio.trapKill(...at(4, 2, 1), false); setTimeout(() => audio.trapKill(...at(0.5, 0, 1), true), 2600); }],
     ['напряжение: 0', (b) => {
       tension = tension >= 1 ? 0 : tension + 0.5;
       audio.startAmbience();

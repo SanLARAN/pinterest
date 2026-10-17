@@ -6,7 +6,7 @@
 // fact values may use {h} (height) and {len} (longest side) — measured from the 3D model itself.
 
 export const CHAPTERS = [
-  { id: 'beasts', num: 'I', entries: ['listener', 'crawler', 'watcher', 'howler', 'shade'] },
+  { id: 'beasts', num: 'I', entries: ['listener', 'crawler', 'watcher', 'howler', 'shkaf', 'shade'] },
   { id: 'tasks', num: 'II', entries: ['generator', 'corpse', 'fuel', 'plug', 'fuses', 'belt', 'battery', 'shard', 'stone', 'flare', 'glowstick'] },
   { id: 'places', num: 'III', entries: ['camp', 'medhut', 'cabin', 'tower', 'stones', 'wreck'] },
   { id: 'way', num: 'IV', entries: ['yard', 'uaz', 'wheel', 'carbattery', 'carb', 'jerrycan'] },
@@ -17,6 +17,7 @@ export const ENTRIES = {
   crawler: { model: 'crawler', sound: 'crawler', kind: 'beast', rate: [3, 3, 5, 4], log: [['seen', 'seen:crawler'], ['killed', 'kills:crawler']] },
   watcher: { model: 'watcher', sound: 'watcher', kind: 'beast', rate: [0, 5, 2, 4], log: [['seen', 'seen:watcher'], ['killed', 'kills:watcher']] },
   howler: { model: 'howler', sound: 'howler', kind: 'beast', rate: [2, 4, 5, 5], log: [['seen', 'seen:howler'], ['killed', 'kills:howler']] },
+  shkaf: { model: 'shkaf', sound: 'shkaf', kind: 'beast', rate: [0, 1, 0, 5], log: [['seen', 'seen:shkaf'], ['killed', 'kills:shkaf']] },
   shade: { model: 'shade', sound: 'shade', kind: 'beast', rate: [null, null, null, null], log: [['appeared', 'seen:shade']] },
   generator: { model: 'generator', sound: 'generator', kind: 'thing', log: [['started', 'gens'], ['wins', 'wins']] },
   corpse: { model: 'corpse', sound: 'corpse', kind: 'thing', log: [['searched', 'bodies']] },
@@ -137,6 +138,21 @@ const TEXT = {
         ],
         facts: [['рост', '{h}'], ['слышит', 'только громкое'], ['охота', '6.4–7.6 м/с'], ['вой', 'раз в 24–38 с · ~46 м'], ['приходит', '8-я минута или 3-й генератор'], ['в лесу', 'один']],
         quote: 'Услышишь глубокий вдох — замри. Оно видит своим воем: кто шевелится, того и берёт.',
+      },
+      shkaf: {
+        name: 'Шкафандр', latin: 'Armarium vorax',
+        text: [
+          'В домах стоят шкафы: платяной и низкий в избушках, аптечка на стене в медпункте, железный шкафчик на лесхозе. В шкафу бывает пусто — а бывает до трёх вещей: светящаяся палочка, горсть гаек вместо камней, осколок, патрон к ракетнице.',
+          'Но очень редко большой шкаф — не шкаф. Шкафандр стоит и ждёт, а кто его откроет, того хватают валики и тянут внутрь, в мясорубку. Пятнадцать секунд.',
+          'Один или двое друзей могут взять схваченного за руки (E) и тянуть: по дорожке едут клавиши — жми свою, когда она на линии. Двое — каждый за свою руку — должны попадать в один такт: вразнобой вы только рвёте его друг у друга. Один в лесу ты можешь только вырываться сам — и это редко получается. Сработав раз, шкафандр больше не работает.',
+        ],
+        tips: [
+          'Перед тем как открыть большой шкаф, послушай и посмотри: створки чуть приоткрыты, из-под них тянется тёмная струйка, внутри иногда тикает и дышит.',
+          'Тяните вдвоём в такт — это втрое сильнее, чем поодиночке.',
+          'Его скрежет слышен издалека: на шум придут и другие.',
+        ],
+        facts: [['высота', '{h}'], ['слух', 'нет'], ['время', '15 с'], ['встречается', 'редко · один за ночь'], ['после', 'больше не работает']],
+        quote: 'Шкаф был тёплый. Я подумал — печка за стенкой.',
       },
       shade: {
         name: 'Тень', latin: 'Umbra incerta',
@@ -280,7 +296,7 @@ const TEXT = {
       medhut: {
         name: 'Мед-хижина скаутов', latin: 'заброшенный медпункт · у лагеря',
         text: [
-          'Дощатая хижина под двускатной крышей, над дверью — белая доска с красным крестом. У двери до сих пор горит фонарь на батарейках, внутри под коньком висит походная лампа. Носилки у стены, флагшток без флага, у задней стены — койка.',
+          'Дощатая хижина под двускатной крышей, над дверью — белая доска с красным крестом. У двери до сих пор горит фонарь на батарейках, внутри под коньком висит походная лампа. Носилки у стены, аптечка на стене (в ней всегда есть светящаяся палочка), флагшток без флага, у задней стены — койка.',
           'Только здесь можно спасти друга, которого поймали. Упавший не умирает сразу — он медленно истекает кровью. Донеси его сюда (R — поднять на плечо), положи на койку (R) и работай руками (удерживай E), пока он не вдохнёт.',
           'Сколько ему осталось, не скажет никто. Опустись рядом и нащупай пульс (удерживай E): ровный, слабый, еле слышен — и примерно сколько минут. Чтобы узнать снова, щупай снова.',
         ],
@@ -290,7 +306,7 @@ const TEXT = {
       cabin: {
         name: 'Охотничья избушка', latin: 'генератор №2–5',
         text: [
-          'Бревенчатый сруб под двускатной крышей. Дверь из толстых досок на кованых петлях — её можно закрыть (E). Внутри — стол и нары, у крыльца — столбы и остатки забора.',
+          'Бревенчатый сруб под двускатной крышей. Дверь из толстых досок на кованых петлях — её можно закрыть (E). Внутри — стол и нары, платяной шкаф у задней стены и низкая тумба (E — открыть: в шкафу бывает что-то полезное), у крыльца — столбы и остатки забора.',
           'Генератор стоит где-то у сруба, тело — рядом с ним.',
         ],
         tips: ['В лесу есть и вторая избушка. Генератор — только у одной.', 'Закрытая дверь задержит тварь: бродячая навалится, и дверь со скрипом подастся; та, что охотится, выбьет её в три удара — ты услышишь.'],
@@ -481,6 +497,21 @@ const TEXT = {
         facts: [['height', '{h}'], ['hears', 'only loud things'], ['hunt', '6.4–7.6 m/s'], ['howls', 'every 24–38 s · ~46 m'], ['arrives', 'minute 8 or generator #3'], ['in the forest', 'one']],
         quote: 'If you hear a deep breath in — freeze. It sees with its howl: whatever moves, it takes.',
       },
+      shkaf: {
+        name: 'Grindrobe', latin: 'Armarium vorax',
+        text: [
+          'The buildings have cupboards: a wardrobe and a low cupboard in the cabins, a first-aid cabinet on the wall of the hut, a steel locker at the forestry yard. A cupboard may be empty — or hold up to three things: a glow stick, a handful of nuts to throw instead of stones, a shard, a flare cartridge.',
+          'But very rarely a big cupboard is not a cupboard. The grindrobe stands and waits, and whoever opens it is caught by the rollers and dragged in, into the grinder. Fifteen seconds.',
+          'One or two friends can grab the caught one by the hands (E) and pull: keys come down the track — press yours as it hits the line. Two of you, one hand each, have to hit the same beat: out of sync you only tear them from each other. Alone in the forest you can only fight it yourself — and that rarely works. Once it has worked, it never works again.',
+        ],
+        tips: [
+          'Before you open a big cupboard, look and listen: the doors never quite shut, a dark trickle runs from under them, and something inside ticks and breathes.',
+          'Pull together on the beat — it is three times stronger than one at a time.',
+          'Its grinding carries far: other things will come to the noise.',
+        ],
+        facts: [['height', '{h}'], ['hearing', 'none'], ['time', '15 s'], ['found', 'rarely · one a night'], ['after', 'never works again']],
+        quote: 'The cupboard was warm. I thought there was a stove behind the wall.',
+      },
       shade: {
         name: 'Shade', latin: 'Umbra incerta',
         text: [
@@ -623,7 +654,7 @@ const TEXT = {
       medhut: {
         name: "Scouts' first-aid hut", latin: 'an abandoned aid post · by the camp',
         text: [
-          'A plank hut under a gable roof, a white board with a red cross over the door. A battery lantern by the door still burns; inside, a camping lantern hangs from the ridge. A stretcher against the wall, a flagpole without a flag, and by the back wall — a cot.',
+          'A plank hut under a gable roof, a white board with a red cross over the door. A battery lantern by the door still burns; inside, a camping lantern hangs from the ridge. A stretcher against the wall, a first-aid cabinet on the wall (there is always a glow stick in it), a flagpole without a flag, and by the back wall — a cot.',
           'Only here can a friend who was caught be saved. The fallen do not die at once — they slowly bleed out. Carry them here (R — onto your shoulder), lay them on the cot (R) and work on them (hold E) until they draw breath.',
           'Nobody can tell you how long they have. Kneel and feel for a pulse (hold E): steady, weak, barely there — and roughly how many minutes. To know again, feel again.',
         ],
@@ -633,7 +664,7 @@ const TEXT = {
       cabin: {
         name: 'Hunting cabin', latin: 'generator #2–5',
         text: [
-          'A log cabin under a gable roof. A door of thick planks on strap hinges — it closes (E). Inside, a table and a bunk; by the porch, posts and what is left of a fence.',
+          'A log cabin under a gable roof. A door of thick planks on strap hinges — it closes (E). Inside, a table and a bunk, a wardrobe by the back wall and a low cupboard (E — open: there may be something useful inside); by the porch, posts and what is left of a fence.',
           'The generator stands somewhere by the cabin, the body beside it.',
         ],
         tips: ['There is a second cabin in the forest. Only one has a generator.', 'A shut door holds them for a while: a wanderer leans on it until it creaks open; the one hunting you breaks it down in three blows — you will hear it.'],

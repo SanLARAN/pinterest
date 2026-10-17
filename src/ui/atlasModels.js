@@ -15,6 +15,7 @@ import { placer, buildCorpse, buildToolBag, buildFlareGun } from '../game/object
 import { buildDoorLeaf } from '../game/doors.js';
 import { buildForestCar, buildPart, WHEELS, MISSING, HOOD_HINGE, HOOD_OPEN, PARTS } from '../game/uaz.js';
 import { buildYard, buildGateLeaf, buildBackLeaf, GATE, BACK, CAR_AT, LAMP_AT } from '../world/yard.js';
+import { cabinetGroup } from '../game/cabinets.js';
 
 const BEAM = 12; // a kind past the palette: the faint light pillar over a shard
 
@@ -459,10 +460,14 @@ function placeGeometry(id, world) {
     for (const L of [...LANDMARKS.slice(0, 5), LANDMARKS.find((l) => l.id === 'medhut')]) {
       const kind = L.id.replace(/\d+$/, '');
       const props = [];
-      const fake = { terrain: { height: () => 0, flats: [] }, col: { add() {}, circle() {} }, addProp: (x, z, fn) => props.push(fn), spawn: null, lake: null, effigies: [], doors: [] };
+      const fake = {
+        terrain: { height: () => 0, flats: [] }, col: { add() {}, circle() {} }, addProp: (x, z, fn) => props.push(fn), spawn: null, lake: null, effigies: [], doors: [],
+        cabinets: [], addCabinet(id, kind, x, y, z, yaw) { this.cabinets.push({ kind, x, y, z, yaw }); },
+      };
       World.prototype['lm_' + kind].call(fake, { ...L, x: 0, z: 0 }, rng);
       _places[L.id] = props;
       props.doors = fake.doors;
+      props.cabinets = fake.cabinets; // (its cupboards, shut)
       props.hut = fake.medhut; // (the first-aid hut: where its lantern hangs)
     }
   }
@@ -498,6 +503,12 @@ function place(id, view) {
       leaf.position.set(d.x + d.hx * c + d.hz * s, d.y, d.z - d.hx * s + d.hz * c);
       leaf.rotation.y = d.ry + 0.7;
       root.add(leaf);
+    }
+    for (const c of _places[id].cabinets || []) {
+      const { group, D } = cabinetGroup(c.kind, mat);
+      group.position.set(c.x, c.y + (D.lift || 0), c.z);
+      group.rotation.y = c.yaw;
+      root.add(group);
     }
     // the first-aid hut's lantern still burns
     const hut = _places[id].hut;
@@ -594,9 +605,29 @@ function yard(mat) {
   return still(root, 0.3, { yaw: 0.75, pitch: 0.62, fit: 0.98 }, { lamp: { x: LAMP_AT.x + Math.sin(a) * 0.3, y: LAMP_AT.h - 0.35, z: LAMP_AT.z + Math.cos(a) * 0.3, r: 12, s: 0.6 } });
 }
 
+// the шкафандр: a wardrobe with its doors thrown open on what it really is — the throat, the teeth, the rollers
+function shkaf(mat) {
+  const { group, doors, rollers, D } = cabinetGroup('wardrobe', mat, { open: 1.45, machine: true });
+  const root = new THREE.Group();
+  root.add(group);
+  let chomp = 0;
+  return {
+    root, base: 0.3, view: { yaw: 0.42, pitch: 0.14, fit: 0.92, focus: [0, 0.95, 0] },
+    lamp: { x: 0, y: D.h * 0.55, z: 0.02, r: 3.2, c: [1.0, 0.24, 0.1], core: 0xff8a70, halo: 0xff3020, s: 0.18 },
+    tick(S) {
+      // after its sound: it feeds (the rollers race, the doors chew); otherwise it idles, and waits
+      if (S.react >= 1.9 && S.react < 4.6) chomp = Math.min(1, chomp + S.dt * 5);
+      else chomp = Math.max(0, chomp - S.dt * 1.5);
+      const sp = 0.8 + chomp * 8;
+      rollers.forEach((r, i) => (r.rotation.y += (i ? -1 : 1) * S.dt * sp));
+      for (const d of doors) d.pivot.rotation.y = d.side * (1.45 - chomp * (0.35 + 0.3 * Math.sin(S.t * 8.5 + d.side)));
+    },
+  };
+}
+
 // ---------------- registry ----------------
 const MODELS = {
-  listener, crawler, watcher, howler, shade,
+  listener, crawler, watcher, howler, shkaf, shade,
   generator: (mat) => generator(mat, true),
   corpse, fuel, plug, fuses, belt, battery, shard, stone, flare, glowstick,
   camp: place('camp', { yaw: 2.6, pitch: 0.62, fit: 0.78 }),

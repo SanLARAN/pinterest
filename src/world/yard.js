@@ -321,6 +321,8 @@ export function buildYard(world, L) {
   col.add(X + 8.7, Z + 10.2, X + 9.7, Z + 10.2, 0.55, 0.2, CAPW);
   for (const sx of [-1, 1]) col.add(X + sx * 4.4 - 1.1, Z + 10.4, X + sx * 4.4 + 1.1, Z + 10.4, 0.32, 0.6, CAPM);
   col.add(X + 14.9, Z + 0.5, X + 14.9, Z + 2.5, 0.38, 0.9, CAPW);
+  // a tool locker by the workbench (game/cabinets.js: it opens)
+  if (world.addCabinet) world.addCabinet('yard:locker', 'locker', X + 15.5, gy(15.5, 4.5) + 0.08, Z + 4.5, -Math.PI / 2, true);
   // the УАЗ (its body: one long capsule; the doors are where you get in — see game/escape.js)
   const car = { x: X + CAR_AT.x, z: Z + CAR_AT.z, yaw: PI / 2, y: gy(CAR_AT.x, CAR_AT.z) + 0.04 };
   col.add(car.x, car.z - 1.75, car.x, car.z + 1.75, 0.95, 1.7, CAPM);

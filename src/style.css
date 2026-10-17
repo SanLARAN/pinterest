@@ -414,6 +414,42 @@ body.morning #crosshair .dot { background: rgba(40, 30, 22, 0.5); }
 }
 body.needlock #lockHint { opacity: 0.8; animation: introBreath 1.8s ease-in-out infinite; }
 
+/* ---------------- the шкафандр: the beat track ---------------- */
+#qte { position: absolute; left: 50%; top: 66%; width: min(66vw, 700px); transform: translate(-50%, -50%); opacity: 0; pointer-events: none; transition: opacity 0.25s; text-align: center; }
+#qte.show { opacity: 1; }
+#qteHint { font-size: 11px; letter-spacing: 0.3em; text-transform: uppercase; color: rgba(255, 150, 130, 0.9); text-shadow: 0 0 10px rgba(160, 10, 6, 0.9), 0 0 2px #000; margin-bottom: 14px; }
+#qteTrack { position: relative; height: 58px; border-top: 1px solid rgba(214, 205, 192, 0.12); border-bottom: 1px solid rgba(214, 205, 192, 0.12); background: linear-gradient(90deg, transparent, rgba(0, 0, 0, 0.45) 30%, rgba(0, 0, 0, 0.45) 70%, transparent); overflow: hidden; }
+#qteTrack .qline { position: absolute; left: 50%; top: 4px; bottom: 4px; width: 46px; transform: translateX(-50%); border: 1px solid rgba(214, 160, 76, 0.75); border-radius: 6px; box-shadow: 0 0 14px rgba(214, 160, 76, 0.35), inset 0 0 10px rgba(214, 160, 76, 0.2); }
+#qteTrack .qline.b { animation: qBeat 0.22s ease-out; }
+@keyframes qBeat { 0% { box-shadow: 0 0 26px rgba(255, 190, 90, 0.8), inset 0 0 14px rgba(255, 190, 90, 0.5); } 100% { box-shadow: 0 0 14px rgba(214, 160, 76, 0.35), inset 0 0 10px rgba(214, 160, 76, 0.2); } }
+.qmark {
+  position: absolute; left: 50%; top: 50%; width: 38px; height: 38px; display: grid; place-items: center; font-style: normal; font-weight: 700; font-size: 18px;
+  color: var(--bone); background: rgba(12, 9, 8, 0.92); border: 1px solid rgba(214, 205, 192, 0.55); border-radius: 6px; will-change: transform; transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.qmark.hit { color: #1a120a; background: var(--amber); border-color: #ffd9a0; box-shadow: 0 0 16px rgba(214, 160, 76, 0.8); }
+.qmark.perfect { color: #1a120a; background: #ffe7b8; border-color: #fff; box-shadow: 0 0 22px rgba(255, 220, 160, 0.95), 0 0 4px #fff; }
+.qmark.miss { color: rgba(255, 120, 100, 0.85); background: rgba(60, 6, 4, 0.85); border-color: var(--red); text-decoration: line-through; }
+.qmark.t-sync { outline: 2px solid rgba(255, 220, 160, 0.9); outline-offset: 4px; }
+.qmark.t-off { outline: 2px dashed rgba(224, 54, 44, 0.9); outline-offset: 4px; }
+#qteBars { display: flex; gap: 10px; margin: 12px auto 0; width: 72%; }
+.qbar { flex: 1; height: 3px; background: rgba(214, 205, 192, 0.1); overflow: hidden; border-radius: 2px; }
+.qbar i { display: block; height: 100%; transform-origin: left; transform: scaleX(0); }
+.qbar.time i { background: var(--red); box-shadow: 0 0 6px rgba(224, 54, 44, 0.8); transform-origin: right; }
+.qbar.pull i { background: var(--amber); box-shadow: 0 0 6px rgba(214, 160, 76, 0.8); }
+#qteWord { position: absolute; left: 50%; top: -52px; transform: translateX(-50%); white-space: nowrap; font-size: clamp(16px, 2.4vw, 24px); letter-spacing: 0.32em; text-indent: 0.32em; font-weight: 700; opacity: 0; color: var(--bone); text-shadow: 0 0 14px #000, 0 0 3px #000; }
+#qteWord.show.go { animation: qWord 0.7s ease-out forwards; }
+#qteWord.hit { color: var(--amber); }
+#qteWord.perfect, #qteWord.sync { color: #ffe7b8; text-shadow: 0 0 18px rgba(255, 210, 140, 0.8), 0 0 3px #000; }
+#qteWord.miss, #qteWord.off { color: var(--red); }
+@keyframes qWord { 0% { opacity: 0; transform: translate(-50%, 8px) scale(1.3); } 15% { opacity: 1; transform: translate(-50%, 0) scale(1); } 70% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -10px); } }
+body.qte #use, body.qte #hint, body.qte #note { opacity: 0 !important; }
+body.qte #crosshair { opacity: 0.15; }
+body.qte #peek { opacity: 0 !important; }
+body.touch #qte { top: 40%; width: min(80vw, 560px); }
+#tPull { display: none; right: calc(24px + var(--safe-r)); bottom: calc(132px + var(--safe-b)); width: 104px; height: 104px; font-size: 14px; letter-spacing: 0.2em; color: #ffe0c0; border-color: rgba(214, 160, 76, 0.75); background: rgba(80, 30, 10, 0.35); }
+body.qte #tPull { display: grid; }
+body.qte #tStone, body.qte #tFlare, body.qte #tGlow, body.qte #tCarry, body.qte #tUse, body.qte #tCrouch { display: none !important; }
+
 /* ---------------- touch ---------------- */
 #touch { position: fixed; inset: 0; z-index: 12; display: none; pointer-events: none; }
 body.touch.playing #touch { display: block; }

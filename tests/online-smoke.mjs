@@ -213,6 +213,20 @@ try {
   });
   const aDoor = await until(() => A.page.evaluate(() => { const d = window.__hush.game.doors.list[0]; return d.open ? `${d.dir}/${d.seq}` : null; }), 20000);
   check("B's door swing reaches the host", aDoor === bDoor, `${aDoor} vs ${bDoor}`);
+  // a cupboard: B opens the cabin's low one and takes something out; the host sees the same
+  const bCab = await B.page.evaluate(() => {
+    const g = window.__hush.game, cb = g.cabinets, c = cb.list.find((q) => q.kind === 'cupboard');
+    cb.open(c);
+    const k = c.items.findIndex((q) => !q.taken && q.kind !== 'nuts');
+    if (k >= 0) cb.take(c, k);
+    return `${c.i}:${c.items.map((q) => (q.taken ? 1 : 0)).join('')}`;
+  });
+  const aCab = await until(() => A.page.evaluate((want) => {
+    const c = window.__hush.game.cabinets.list[+want.split(':')[0]];
+    const s = `${c.i}:${c.items.map((q) => (q.taken ? 1 : 0)).join('')}`;
+    return c.opened && s === want ? s : null;
+  }, bCab), 20000);
+  check("B's cupboard (opened, a thing taken) reaches the host", aCab === bCab, `${aCab} vs ${bCab}`);
   // the flare gun: B fires; the flare flies on the host's machine too (owned by B)
   await B.page.evaluate(() => {
     const g = window.__hush.game, was = g.state;
@@ -224,7 +238,7 @@ try {
   });
   const aFlare = await until(() => A.page.evaluate(() => { const g = window.__hush.game, f = g.flares.list[0]; return f ? (f.owner === g.remotes.keys().next().value ? 'B' : 'someone else') : null; }), 20000);
   check("B's flare flies on the host's machine", aFlare === 'B', String(aFlare));
-  facts.push(`door ${aDoor === bDoor ? 'synced' : 'NOT synced'} · flare ${aFlare === 'B' ? 'synced' : 'NOT synced'}`);
+  facts.push(`door ${aDoor === bDoor ? 'synced' : 'NOT synced'} · cupboard ${aCab === bCab ? 'synced' : 'NOT synced'} · flare ${aFlare === 'B' ? 'synced' : 'NOT synced'}`);
   // the night, and one of the UAZ's parts: B asks for it (the host decides), throws it; it lands for the host too
   await A.page.evaluate(() => window.__hush.game.startDusk());
   const night = await until(async () => (await A.page.evaluate(() => window.__hush.game.state)) === 'play' && (await B.page.evaluate(() => window.__hush.game.state)) === 'play', 90000);

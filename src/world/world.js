@@ -9,6 +9,14 @@ import { buildYard, buildOutside, inYard } from './yard.js';
 
 export const CAP = { TREE: 0, ROCK: 1, WOOD: 2, METAL: 3, WATER: 4, EFFIGY: 5, FENCE: 6 }; // FENCE: chain-link (you see and light through it)
 
+// the cupboards in the buildings (game/cabinets.js opens them): body size and, for a wall cabinet, how high it hangs
+export const CABINET_DIMS = {
+  wardrobe: { w: 1.0, h: 1.95, d: 0.56 },
+  cupboard: { w: 0.9, h: 0.86, d: 0.5 },
+  firstaid: { w: 0.6, h: 0.72, d: 0.22, lift: 1.09 },
+  locker: { w: 0.78, h: 1.9, d: 0.5 },
+};
+
 export const LANDMARKS = [
   { id: 'camp', x: 0, z: 0, r: 11 },
   { id: 'cabin', x: 58, z: -74, r: 15, ry: 0.5 },
@@ -101,6 +109,7 @@ export class World {
     this.spawn = { x: 0, z: 0, yaw: 0 };
     this.effigies = [];
     this.doors = []; // cabin doors (the game hangs and swings them)
+    this.cabinets = []; // cupboards in the buildings (the game fills them — and one of them may not be a cupboard)
     this.medhut = null; // the first-aid hut: where its cot and lantern are (see lm_medhut)
   }
 
@@ -138,6 +147,16 @@ export class World {
 
   addProp(x, z, build) {
     this.props.push({ x, z, build });
+  }
+
+  // a cupboard standing (or hanging) at world (x, z) on a floor at y, its front facing yaw (three's rotation.y);
+  // mimic: big enough to be something else. Its body is solid (its collider), the game builds the rest
+  addCabinet(id, kind, x, y, z, yaw, mimic = false) {
+    const D = CABINET_DIMS[kind];
+    this.cabinets.push({ id, kind, x, y, z, yaw, mimic });
+    if (D.lift) return; // (on the wall: nothing to bump into)
+    const rx = Math.cos(yaw), rz = -Math.sin(yaw), half = Math.max(0, D.w / 2 - D.d / 2);
+    this.col.add(x - rx * half, z - rz * half, x + rx * half, z + rz * half, D.d / 2, D.h, CAP.WOOD);
   }
 
   inLandmark(x, z, pad = 0) {
@@ -431,6 +450,13 @@ export class World {
     // a plank door on strap hinges at the right jamb, swinging either way. hinge (hx, hz) and everything
     // else in cabin-local metres
     if (this.doors) this.doors.push({ id: L.id, x: L.x, z: L.z, y: y + 0.21, ry, hx: 1.92, hz: D / 2, w: 1.42, h: 1.95, W, D, gap: [0.5, 1.9] });
+    // a wardrobe against the back wall between the table and the bunk, a low cupboard by the left wall
+    if (this.cabinets) {
+      const [wx, wz] = rot(0.45, -D / 2 + T / 2 + CABINET_DIMS.wardrobe.d / 2 + 0.02, ry);
+      this.addCabinet(`${L.id}:wardrobe`, 'wardrobe', L.x + wx, y + 0.2, L.z + wz, ry, true);
+      const [cx, cz] = rot(-W / 2 + T / 2 + CABINET_DIMS.cupboard.d / 2 + 0.02, 1.2, ry);
+      this.addCabinet(`${L.id}:cupboard`, 'cupboard', L.x + cx, y + 0.2, L.z + cz, ry + Math.PI / 2);
+    }
   }
 
   // the scouts' first-aid hut: a plank hut under a gable roof, a red cross over the door, a battery lantern
@@ -553,12 +579,7 @@ export class World {
       P(cx0 + hl + 0.42, 0.64, cz0 + 0.55);
       b.cylinder(7, 0.11, 0.15, 0.08, KIND.METAL, { capTop: false, capBottom: true });
       // the first-aid cabinet on the right wall, a red cross on its door; a shelf of jars and rolled bandages
-      P(W / 2 - T / 2 - 0.12, 1.45, -0.55);
-      b.box(0.22, 0.72, 0.6, KIND.BONE);
-      P(W / 2 - T / 2 - 0.24, 1.45, -0.55);
-      b.box(0.02, 0.1, 0.34, KIND.FLESH);
-      P(W / 2 - T / 2 - 0.24, 1.45, -0.55);
-      b.box(0.02, 0.34, 0.1, KIND.FLESH);
+      // (the first-aid cabinet on the right wall: game/cabinets.js hangs it — its door opens)
       P(W / 2 - T / 2 - 0.12, 1.02, 0.55);
       b.box(0.24, 0.03, 0.9, KIND.WOOD);
       for (let i = 0; i < 5; i++) {
@@ -600,6 +621,10 @@ export class World {
       this.col.circle(L.x + fx, L.z + fz, 0.12, 4, CAP.WOOD);
     }
     if (this.doors) this.doors.push({ id: L.id, x: L.x, z: L.z, y: y + 0.21, ry, hx: g1 + 0.02, hz: D / 2, w: g1 - g0 + 0.02, h: 1.95, W, D, gap: [g0, g1] });
+    if (this.cabinets) {
+      const [fx, fz] = rot(W / 2 - T / 2 - CABINET_DIMS.firstaid.d / 2 - 0.01, -0.55, ry);
+      this.addCabinet(`${L.id}:firstaid`, 'firstaid', L.x + fx, y, L.z + fz, ry - Math.PI / 2);
+    }
     // for the game: where the cot is (and which way it lies), where to stand at it, where the lantern hangs
     const at = (lx, lz) => {
       const [wx, wz] = rot(lx, lz, ry);

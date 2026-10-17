@@ -49,6 +49,7 @@ export class Rescue {
     p.downs = 0;
     p.bleedEnd = 0;
     p.gone = false;
+    p.consumed = false; // (the шкафандр leaves nothing to carry)
     p.carriedBy = null;
     p.carrying = null;
     p.onCot = false;
@@ -176,7 +177,7 @@ export class Rescue {
     const g = this.g, p = g.player, f = p.forward();
     let best = null, bd = 1e9;
     for (const b of this.downed()) {
-      if (b === p || b.carriedBy) continue;
+      if (b === p || b.carriedBy || b.consumed) continue;
       const dx = b.x - p.x, dz = b.z - p.z, d = Math.hypot(dx, dz);
       if (d > RV.pick) continue;
       const facing = d < 0.9 ? 1 : (dx * f.x + dz * f.z) / d;
@@ -320,7 +321,7 @@ export class Rescue {
     if (!g.online) return;
     const me = g.player;
     for (const b of this.downed()) {
-      if (b === me || b.carriedBy || b.onCot) continue;
+      if (b === me || b.carriedBy || b.onCot || b.consumed) continue;
       fn(b, b.x, b.z, RV.pick, 'mate');
     }
     const h = this.hut;

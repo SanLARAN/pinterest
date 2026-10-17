@@ -102,7 +102,7 @@ export class NetSync {
       this.obT = 0.15;
       this.obBeat = 3;
       ob.dirty = false;
-      this.send('ob', { ...ob.netState(), d: g.doors.netState(), e: g.escape.netState() });
+      this.send('ob', { ...ob.netState(), d: g.doors.netState(), e: g.escape.netState(), k: g.cabinets.netState() });
     }
   }
 
@@ -144,6 +144,7 @@ export class NetSync {
           g.objectives.netMerge(d, g.remotes.get(pid));
           g.doors.netMerge(d.d);
           g.escape.netMerge(d.e, isHostMsg);
+          g.cabinets.netMerge(d.k, isHostMsg);
         }
         break;
       case 'nz': {
@@ -174,6 +175,13 @@ export class NetSync {
         break;
       case 'xb':
         if (this.host && typeof d === 'string' && g.state === 'play') g.escape.hostLoad(d, pid);
+        break;
+      // the шкафандр (see Cabinets): a guest grabs a hand of whoever's caught; a guest's press on a beat
+      case 'zg':
+        if (this.host) g.cabinets.hostGrab(pid);
+        break;
+      case 'zp':
+        if (this.host && Array.isArray(d)) g.cabinets.hostPress(pid, d[0] | 0, d[1] | 0, d[2] | 0);
         break;
       case 'ev':
         if (Array.isArray(d)) this.event(d, pid, isHostMsg);
@@ -244,6 +252,15 @@ export class NetSync {
       case 'xe': // it caught
         if (r) g.escape.startEngine(false);
         break;
+      case 'co': // a cupboard opened
+        g.cabinets.netOpen(a);
+        break;
+      case 'ct': // ...something taken out of it
+        g.cabinets.netTake(a, b);
+        break;
+      case 'zs': // ...it was the шкафандр, and it has them
+        if (r) g.cabinets.netSpring(pid, a);
+        break;
       // ---- from the host only ----
       default: {
         if (!isHostMsg || this.host) break;
@@ -269,6 +286,10 @@ export class NetSync {
           case 'xa': g.escape.netSeats(a); break;
           case 'xl': g.escape.netLoaded(a, b); break;
           case 'xx': if (g.state === 'play' && Array.isArray(a)) g.escape.depart(a); break;
+          case 'zh': g.cabinets.netHands(a, b, c); break;
+          case 'zb': g.cabinets.netBeat(a, b, c, e); break;
+          case 'zr': g.cabinets.netEnd(a, 'rescued'); break;
+          case 'zd': g.cabinets.netEnd(a, 'died'); break;
           case 'en': g.endOnline(false); break;
         }
       }

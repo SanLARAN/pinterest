@@ -17,6 +17,7 @@ import { GlowSticks } from './glowsticks.js';
 import { MedHut } from './medhut.js';
 import { Rescue } from './rescue.js';
 import { Escape } from './escape.js';
+import { Cabinets } from './cabinets.js';
 import { Dread } from './dread.js';
 import { CAP } from '../world/world.js';
 import { shared } from '../render/sonar.js';
@@ -49,6 +50,7 @@ export class Game {
     this.medhut = new MedHut(this); // (after the glow sticks: its lantern is one of their small lights)
     this.rescue = new Rescue(this);
     this.escape = new Escape(this); // the forestry yard, the УАЗ and its four parts, the way out
+    this.cabinets = new Cabinets(this); // cupboards in the buildings (and the шкафандр)
     this.hud.onNoteClose = () => this.objectives.closeNote();
     this.events = [];
     this.monsters = [];
@@ -172,6 +174,7 @@ export class Game {
     this.remotes.delete(id);
     r.dispose();
     this.escape.left(id);
+    this.cabinets.left(id);
     if (this.state !== 'over') this.hud.popup(t('mateLeft').replace('{name}', r.name), 'dim');
     if (this.spectate && this.spectate.target === r) this.nextSpectate();
     if (this.auth) this.checkTeam();
@@ -215,6 +218,7 @@ export class Game {
     this.shards.reset(this.world, this.rng);
     this.objectives.reset(this.rng);
     this.escape.reset(new RNG((this.rng.next() * 4294967296) >>> 0)); // (its own stream: the same on every machine)
+    this.cabinets.reset(new RNG((this.rng.next() * 4294967296) >>> 0));
     this.setFlares(0, false);
     this.objectives.setMorning(true);
     this.charge = { active: false, t: 0 };
@@ -310,6 +314,7 @@ export class Game {
     hud.setHint(hint);
     this.objectives.update(dt, false);
     this.doors.update(dt);
+    this.cabinets.update(dt);
     this.medhut.update(dt);
     this.glows.update(dt);
     this.pulses.update(this.time);
@@ -713,7 +718,7 @@ export class Game {
 
   // it was lying by the body you just searched
   onFlareFound() {
-    this.setFlares(CFG.FLARE.charges);
+    this.setFlares(CFG.FLARE.charges + (this.player.flares | 0)); // (+ any cartridges you found in cupboards)
     this.hud.popup(`+ ${t('flareGun')} · ${t('flareCharges').replace('{n}', CFG.FLARE.charges)}`, 'amber');
     this.hud.flashFlares();
     this.audio.flareFound();
@@ -735,7 +740,7 @@ export class Game {
   fireFlare() {
     const p = this.player;
     if (!p.alive || this.state !== 'play') return;
-    if (p.flares <= 0) {
+    if (p.flares <= 0 || !p.hasFlare) {
       this.hud.popup(t(p.hasFlare ? 'aNoFlares' : 'aNoFlareGun'), 'dim');
       if (p.hasFlare) this.hud.flashFlares();
       return;
@@ -1123,6 +1128,41 @@ export class Game {
     this.hud.flashAlert(t('aRevived'), 'dawn', 2.6);
   }
 
+  // the шкафандр kept you (every machine: the host said so). Yours: the doors shut in front of your face
+  shkafDeath(c) {
+    const p = this.player;
+    if (!p.alive || (this.state !== 'play' && this.state !== 'dying')) return;
+    const m = { type: 'shkaf', x: c.group.position.x, z: c.group.position.z, id: -1, y: c.group.position.y };
+    this.shkafCab = c;
+    this.stats.seen.shkaf = 1;
+    if (this.online) {
+      p.gone = true;
+      p.consumed = true;
+      this.localDie(m, 'shkaf');
+      if (this.auth) this.checkTeam();
+      return;
+    }
+    this.state = 'dying';
+    this.beginDeath(m, 'shkaf');
+  }
+
+  // ...and a friend's: nothing left to carry to the hut
+  shkafTook(r, c) {
+    if (!r.alive) return;
+    r.die(c.group.position.x, c.group.position.z);
+    r.gone = true;
+    r.consumed = true;
+    r.cause = 'shkaf';
+    r.carriedBy = null;
+    const near = this.distToEars(r.x, r.z) < 30;
+    this.audio.mateDeath(r.x, r.y + 1.2, r.z, near);
+    this.hud.flashAlert(t('mateShkafDied').replace('{name}', r.name), 'danger', 2.8);
+    this.addTrauma(near ? 0.4 : 0.15);
+    this.fx.red = Math.max(this.fx.red, near ? 0.4 : 0.15);
+    if (this.spectate && this.spectate.target === r) this.timeline.push({ at: this.time + 1.6, fn: () => this.nextSpectate() });
+    if (this.auth) this.checkTeam();
+  }
+
   // co-op: you're dead, the night goes on without you
   localDie(m, cause) {
     const p = this.player;
@@ -1210,7 +1250,7 @@ export class Game {
     this.killZ = m.z;
     this.cause = cause;
     const reduced = settings.scares === 'reduced';
-    this.audio.jumpscare(reduced ? 0.45 : 1);
+    this.audio.jumpscare(reduced ? 0.45 : m.type === 'shkaf' ? 0.55 : 1);
     this.fx.trauma = reduced ? 0.6 : 1;
     this.fx.white = reduced ? 0 : 0.85;
     this.fx.red = 0.7;
@@ -1225,6 +1265,7 @@ export class Game {
 
   // the kill: it's in your face. solo → game over; co-op → you watch the others
   updateDying(dt) {
+    if (this.killType === 'shkaf') return this._dyingShkaf(dt);
     this.deathT += dt;
     const p = this.player;
     const reduced = settings.scares === 'reduced';
@@ -1311,6 +1352,42 @@ export class Game {
       this.fx.fade = 0;
       this.audio.setAmbience(0, 0);
       if (this.onEnd) this.onEnd({ won: false, cause: this.cause });
+    }
+  }
+
+  // inside the шкафандр: the doors close in front of you, the rollers close in, red, then nothing
+  _dyingShkaf(dt) {
+    this.deathT += dt;
+    const tt = this.deathT;
+    const p = this.player;
+    const c = this.shkafCab;
+    if (c) {
+      const b = c.group.position;
+      p.x = b.x + c.fwd.x * 0.02;
+      p.z = b.z + c.fwd.z * 0.02;
+      p.y = b.y - (c.D.lift || 0);
+      p.eyeCur = Math.max(0.55, 1.1 - tt * 0.35);
+      p.yaw = c.spec.yaw + Math.PI + Math.sin(tt * 31) * 0.06; // (facing out: the doors close in front of you)
+      p.pitch = -0.08 + Math.sin(tt * 23) * 0.07 - tt * 0.1;
+    }
+    const fx = this.fx;
+    fx.trauma = Math.max(fx.trauma, 0.85 - tt * 0.2);
+    fx.red = Math.max(fx.red, 0.55);
+    fx.glitch = Math.max(fx.glitch, 0.45);
+    fx.fovKick = -6;
+    if (tt > 0.85) fx.fade = Math.max(0, 1 - (tt - 0.85) * 2.2);
+    if (tt > 1.8) {
+      if (this.jsGhost) this.ghosts.release(this.jsGhost);
+      this.jsGhost = null;
+      if (this.online) {
+        this.localDeath = 'done';
+        this.enterSpectate();
+        return;
+      }
+      this.state = 'over';
+      fx.fade = 0;
+      this.audio.setAmbience(0, 0);
+      if (this.onEnd) this.onEnd({ won: false, cause: 'shkaf' });
     }
   }
 
@@ -1486,7 +1563,7 @@ export class Game {
       // in daylight — or in any real light: a lamp, a flare, a glow stick, the hut's lantern — they're simply
       // there, in their own clothes (not while you're behind their eyes, or they're on your shoulder)
       const lit = day ? 1 : this.glowAt(r.x, r.y + (r.alive || r.carriedBy ? 1.2 : 0.4), r.z);
-      r.rig.root.visible = watched !== r && !this.onShoulder(r) && lit > 0.03 && this.state !== 'idle';
+      r.rig.root.visible = watched !== r && !this.onShoulder(r) && lit > 0.03 && this.state !== 'idle' && !this.cabinets.hides(r);
       if (lit > 0.06 && !day) r.revealT = this.time;
     }
   }
@@ -1504,6 +1581,7 @@ export class Game {
       this._updateEars();
       this.updateDying(dt);
       this.doors.update(dt);
+      this.cabinets.update(dt);
       this.flares.update(dt);
       this.glows.update(dt);
       this.time += dt;
@@ -1559,7 +1637,9 @@ export class Game {
 
     // ---- input events ----
     const es = this.escape;
+    const caught = this.cabinets.busy; // (caught, or pulling someone out: your hands are on that)
     for (const e of raw.events) {
+      if (caught && e !== 'pingDown' && e !== 'pingUp') continue;
       if (e === 'pingDown') {
         this.charge.active = true;
         this.charge.t = 0;
@@ -1589,7 +1669,7 @@ export class Game {
     // ---- player ----
     const p = this.player;
     // (in the УАЗ you sit still and look about: see Escape._seated)
-    const pev = es.mySeat >= 0 ? this.seatedLook(look) : p.update(dt, input, look, this.inputMuted, es.load(p.id));
+    const pev = es.mySeat >= 0 || caught ? this.seatedLook(look) : p.update(dt, input, look, this.inputMuted, es.load(p.id));
     if (pev.step) {
       const s = pev.step;
       this.audio.footstep(s.intensity);
@@ -1646,6 +1726,7 @@ export class Game {
     this.glows.update(dt);
     this.rescue.update(dt);
     es.update(dt);
+    this.cabinets.update(dt);
     const nearest = this.updateMonsters(dt);
     if (this.state !== 'play') return; // killed this frame
     if (!this.player.alive) return; // co-op: caught this frame — the death plays from the next one
@@ -1715,6 +1796,7 @@ export class Game {
     this.glows.update(dt);
     this.rescue.update(dt);
     this.escape.update(dt);
+    this.cabinets.update(dt);
     if (this.player.alive) return; // brought back this frame
     const nearest = this.updateMonsters(dt);
     if (this.state !== 'play') return;
@@ -1832,7 +1914,7 @@ export class Game {
         }
       }
       for (const r of this.remotes.values()) {
-        if ((this.spectate && this.spectate.target === r) || this.onShoulder(r)) continue;
+        if ((this.spectate && this.spectate.target === r) || this.onShoulder(r) || r.consumed) continue;
         const d = Math.hypot(r.x - s.x, r.y + 1.0 - s.y, r.z - s.z);
         if (d > s.prevR && d <= s.curR && d <= s.radius && d > 0.8) {
           const fall = 1 - smoothstep(s.radius * 0.42, s.radius, d);
@@ -1987,8 +2069,9 @@ export class Game {
     camera.getWorldDirection(_v);
     this.audio.setListener(camera.position.x, camera.position.y, camera.position.z, _v.x, _v.y, _v.z);
     const hands = !cutCam && !sp && this.player.alive && (this.state === 'play' || this.state === 'dawn');
-    this.glows.placeView(camera, hands);
+    this.glows.placeView(camera, hands && !this.cabinets.busy);
     this.escape.placeView(camera, hands);
+    this.cabinets.placeView(camera, hands);
 
     const u = this.post.u;
     u.uAberr.value = 0.12 + fx.glitch * 0.9 + fx.danger * 0.25 + sh * 0.5;

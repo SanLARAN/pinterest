@@ -488,6 +488,18 @@ export class Atlas {
         later(1800, () => A.howlerHowl(...at(-1.4, 0.6, 4), 0.8));
         dur = 4.4;
         break;
+      case 'shkaf':
+        A.shkafTell(...at(-1, 0, 2));
+        later(1900, () => {
+          A.shkafSpring(...at(-1, 0, 2), false);
+          const g = A.shkafGrind(...at(-1, 0, 2));
+          if (g) {
+            this.soundHandles.push(g);
+            later(2500, () => g.stop(0.8));
+          }
+        });
+        dur = 5.2;
+        break;
       case 'shade':
         A.whisper(...at(-1.1, 0, 0.9));
         dur = 2.8;

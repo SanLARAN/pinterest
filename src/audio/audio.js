@@ -3209,6 +3209,286 @@ export class AudioEngine {
     o.stop(t + 0.7);
   }
 
+  // ---------- cupboards, the шкафандр ----------
+  // a cupboard door: a short wooden creak and the latch (the locker: a tin latch and a squeal)
+  cabinetOpen(x, y, z, kind = 'wardrobe') {
+    if (!this.ready) return;
+    const t = this.now;
+    const pn = this._panner(x, y, z, 2.5, 1.1);
+    pn.connect(this.sfx);
+    if (kind === 'locker') {
+      this._noiseBurst(t, { type: 'highpass', f: 2600, a: 0.0005, d: 0.02, gain: 0.5, dest: pn });
+      [1, 2.71, 5.2].forEach((m, i) => this._tone(t + 0.01, { f: 640 * m, a: 0.001, d: 0.22 - i * 0.05, gain: 0.12 / (i + 1), dest: pn }));
+      const o = this._osc('sawtooth', 1500);
+      o.frequency.linearRampToValueAtTime(1900, t + 0.18);
+      o.frequency.linearRampToValueAtTime(1350, t + 0.42);
+      const bp = this._filter('bandpass', 1900, 9);
+      const g = this._gain();
+      o.connect(bp).connect(g);
+      this._out(g, pn, 0.3);
+      this._env(g, t + 0.06, 0.04, 0.08, 0.2, 0.15);
+      o.start(t + 0.05); o.stop(t + 0.6);
+      return;
+    }
+    if (kind === 'firstaid') {
+      this._noiseBurst(t, { type: 'highpass', f: 3000, a: 0.0005, d: 0.015, gain: 0.35, dest: pn });
+      this._tone(t, { f: 2300, a: 0.001, d: 0.08, gain: 0.05, dest: pn });
+      this.doorCreak(x, y, z, 0.25, 1.7, 0.12);
+      return;
+    }
+    this._noiseBurst(t, { type: 'bandpass', f: 1800, q: 3, a: 0.0006, d: 0.025, gain: 0.3, dest: pn }); // the latch
+    this.doorCreak(x, y, z, kind === 'wardrobe' ? 0.55 : 0.4, kind === 'wardrobe' ? 1.1 : 1.35, 0.26);
+  }
+
+  // what you take: a clink of nuts, a cartridge in your pocket
+  cabinetItem(kind) {
+    if (!this.ready) return;
+    const t = this.now;
+    if (kind === 'nuts') {
+      for (let i = 0; i < 5; i++) {
+        const tt = t + i * 0.035 + Math.random() * 0.02;
+        this._tone(tt, { f: 2600 + Math.random() * 2400, a: 0.001, d: 0.05, gain: 0.05 });
+      }
+      this._noiseBurst(t, { type: 'bandpass', f: 1500, q: 0.9, a: 0.02, d: 0.1, gain: 0.1 });
+    } else {
+      this._noiseBurst(t, { type: 'bandpass', f: 900, q: 1.4, a: 0.004, d: 0.05, gain: 0.25 });
+      this._tone(t + 0.04, { f: 210, fEnd: 150, a: 0.002, d: 0.08, gain: 0.12 });
+      this._noiseBurst(t + 0.1, { type: 'bandpass', f: 1300, q: 0.9, a: 0.03, d: 0.12, gain: 0.1 });
+    }
+  }
+
+  // close to it, now and then: something in there ticks over, slow, and breathes out through the gap
+  shkafTell(x, y, z) {
+    if (!this.ready) return;
+    const t = this.now;
+    const pn = this._panner(x, y, z, 1.2, 1.6);
+    pn.connect(this.sfx);
+    for (let i = 0; i < 3; i++) {
+      const tt = t + i * 0.42;
+      this._noiseBurst(tt, { type: 'bandpass', f: 2600, q: 6, a: 0.0006, d: 0.025, gain: 0.16, dest: pn });
+      this._tone(tt, { f: 140, fEnd: 90, a: 0.002, d: 0.06, gain: 0.07, dest: pn });
+    }
+    this._noiseBurst(t + 1.35, { buf: this.pink, type: 'lowpass', f: 520, q: 0.7, a: 0.5, d: 1.1, hold: 0.2, gain: 0.22, dest: pn, rev: 0.2 });
+    this._noiseBurst(t + 1.5, { buf: this.pink, type: 'bandpass', f: 260, q: 3, a: 0.4, d: 0.9, gain: 0.12, dest: pn }); // wet
+  }
+
+  // it opens on you: the doors bang out, the motor roars up, steel on steel. mine: it's you
+  shkafSpring(x, y, z, mine = false) {
+    if (!this.ready) return;
+    const t = this.now;
+    const pn = this._panner(x, y, z, 4.5, 0.85);
+    pn.connect(this.sfx);
+    const rs = this._gain(0.6); pn.connect(rs); rs.connect(this.revSend);
+    this.doorShut(x, y, z, 1.3);
+    this._noiseBurst(t, { buf: this.brown, type: 'lowpass', f: 260, fEnd: 1600, q: 1.2, a: 0.01, d: 0.6, gain: 2.2, dest: pn });
+    const o = this._osc('sawtooth', 38);
+    o.frequency.exponentialRampToValueAtTime(96, t + 0.5);
+    const sh = this.ctx.createWaveShaper();
+    sh.curve = this.distHard;
+    const lp = this._filter('lowpass', 900, 1.2);
+    const g = this._gain();
+    o.connect(sh).connect(lp).connect(g).connect(pn);
+    this._env(g, t, 0.03, 0.5, 0.5, 0.4);
+    o.start(t); o.stop(t + 1.0);
+    // steel scraping steel
+    const sc = this._osc('sawtooth', 2100);
+    sc.frequency.exponentialRampToValueAtTime(3400, t + 0.3);
+    sc.frequency.exponentialRampToValueAtTime(1700, t + 0.8);
+    const sbp = this._filter('bandpass', 2600, 6);
+    const sg = this._gain();
+    sc.connect(sbp).connect(sg).connect(pn);
+    this._env(sg, t + 0.05, 0.03, 0.16, 0.5, 0.25);
+    sc.start(t); sc.stop(t + 0.9);
+    if (mine) {
+      this.sting(0.85);
+      this._tone(t, { f: 55, fEnd: 30, a: 0.003, d: 0.9, gain: 0.7, dest: this.body });
+    }
+  }
+
+  // the grinding while it has someone: a motor, the teeth on the beat of its rollers, something wet
+  shkafGrind(x, y, z) {
+    if (!this.ready) return null;
+    const t = this.now;
+    const pn = this._panner(x, y, z, 3, 1.0);
+    pn.connect(this.sfx);
+    const rs = this._gain(0.35); pn.connect(rs); rs.connect(this.revSend);
+    const out = this._gain(0);
+    out.connect(pn);
+    const o1 = this._osc('sawtooth', 46), o2 = this._osc('square', 92.6);
+    const lp = this._filter('lowpass', 620, 1.6);
+    const am = this._gain(0.55);
+    const lfo = this._osc('square', 9);
+    const lg = this._gain(0.45);
+    lfo.connect(lg).connect(am.gain);
+    const og2 = this._gain(0.25);
+    o1.connect(lp); o2.connect(og2).connect(lp);
+    lp.connect(am).connect(out);
+    // the teeth: crunchy noise gated by the same rollers
+    const n = this._noise(this.white);
+    const bp = this._filter('bandpass', 1500, 1.4);
+    const ng = this._gain(0.0);
+    const lg2 = this._gain(0.22);
+    lfo.connect(lg2).connect(ng.gain);
+    n.connect(bp).connect(ng).connect(out);
+    // something wet
+    const w = this._noise(this.pink);
+    const wbp = this._filter('bandpass', 320, 2.5);
+    const wg = this._gain(0.22);
+    const wl = this._osc('sine', 1.3);
+    const wlg = this._gain(160);
+    wl.connect(wlg).connect(wbp.frequency);
+    w.connect(wbp).connect(wg).connect(out);
+    const srcs = [o1, o2, lfo, n, w, wl];
+    srcs.forEach((q) => q.start(t, q.buffer ? Math.random() * 1.5 : undefined));
+    out.gain.setTargetAtTime(0.32, t, 0.12);
+    const self = this;
+    let dead = false;
+    return {
+      rate(k) {
+        if (dead) return;
+        const now = self.now;
+        o1.frequency.setTargetAtTime(36 + 22 * k, now, 0.2);
+        o2.frequency.setTargetAtTime(72 + 44 * k, now, 0.2);
+        lfo.frequency.setTargetAtTime(6 + 6 * k, now, 0.2);
+        if (k <= 0) out.gain.setTargetAtTime(0.06, now, 0.25);
+      },
+      stop(fade = 0.5) {
+        if (dead) return;
+        dead = true;
+        const now = self.now;
+        out.gain.cancelScheduledValues(now);
+        out.gain.setTargetAtTime(0, now, Math.max(0.03, fade / 3));
+        o1.frequency.setTargetAtTime(14, now, fade / 2);
+        srcs.forEach((q) => { try { q.stop(now + fade + 0.6); } catch { /* */ } });
+      },
+    };
+  }
+
+  // a human scream from inside it (isMe: yours, close and dry). k 0..1: the clock running out
+  humanScream(x, y, z, isMe = false, k = 0) {
+    if (!this.ready) return;
+    const t = this.now;
+    const dest = isMe ? this._gain(0.55) : this._panner(x, y, z, 3.5, 0.9);
+    dest.connect(isMe ? this.body : this.sfx);
+    const f = 260 + Math.random() * 60 + k * 120;
+    const dur = 0.7 + Math.random() * 0.4 + k * 0.4;
+    const v = this._voice(t, {
+      dur, type: 'sawtooth', f0: [[0, f * 0.8], [0.08, f * 1.25], [dur * 0.6, f * (1.1 + k * 0.2)], [dur, f * 0.7]],
+      vowel: [[0, 'a'], [dur * 0.5, 'A'], [dur, 'o']], vib: [6.5, 30 + k * 40], jitter: 22, rasp: 0.5 + k * 0.4, q: 6, fg: 2.4,
+    });
+    const g = this._gain();
+    const sh = this.ctx.createWaveShaper();
+    sh.curve = this.distScream;
+    v.connect(sh).connect(g);
+    this._out(g, dest, isMe ? 0.2 : 0.7);
+    this._env(g, t, 0.03, isMe ? 0.2 : 0.3, 0.22, dur - 0.2);
+  }
+
+  // you've got their hand
+  grabHand() {
+    if (!this.ready) return;
+    const t = this.now;
+    this._noiseBurst(t, { type: 'bandpass', f: 1400, q: 1, a: 0.01, d: 0.09, gain: 0.25, dest: this.body });
+    this._tone(t + 0.02, { f: 130, fEnd: 70, a: 0.003, d: 0.12, gain: 0.3, dest: this.body });
+  }
+
+  // the beat (a tick in your head), a hit on it, a miss
+  qteTick() {
+    if (!this.ready) return;
+    const t = this.now;
+    this._tone(t, { f: 1250, a: 0.001, d: 0.035, gain: 0.05, dest: this.body });
+    this._tone(t, { f: 62, fEnd: 48, a: 0.003, d: 0.09, gain: 0.18, dest: this.body });
+  }
+
+  qteHit(perfect = false, victim = false) {
+    if (!this.ready) return;
+    const t = this.now;
+    if (perfect) {
+      [1760, 2637, 3520].forEach((f, i) => this._tone(t, { f, a: 0.001, d: 0.28 - i * 0.06, gain: 0.07 / (i + 1), dest: this.body }));
+    }
+    this._tone(t, { type: 'triangle', f: victim ? 330 : 440, fEnd: victim ? 300 : 400, a: 0.002, d: 0.1, gain: 0.16, dest: this.body });
+    this._noiseBurst(t, { type: 'bandpass', f: 2400, q: 1.5, a: 0.0006, d: 0.02, gain: 0.18, dest: this.body });
+  }
+
+  qteMiss() {
+    if (!this.ready) return;
+    const t = this.now;
+    const o = this._osc('sawtooth', 98);
+    o.frequency.linearRampToValueAtTime(82, t + 0.16);
+    const lp = this._filter('lowpass', 500, 2);
+    const g = this._gain();
+    o.connect(lp).connect(g).connect(this.body);
+    this._env(g, t, 0.004, 0.13, 0.14, 0.04);
+    o.start(t); o.stop(t + 0.25);
+  }
+
+  // a heave together: a grunt, cloth, the thing giving a little (off: tearing at each other — a scrape, no give)
+  trapPull(x, y, z, strong = false, off = false) {
+    if (!this.ready) return;
+    const t = this.now;
+    const pn = this._panner(x, y, z, 3, 1.0);
+    pn.connect(this.sfx);
+    if (off) {
+      this._noiseBurst(t, { type: 'bandpass', f: 900, fEnd: 500, q: 2, a: 0.01, d: 0.18, gain: 0.3, dest: pn });
+      this._tone(t, { type: 'sawtooth', f: 180, fEnd: 120, a: 0.005, d: 0.15, gain: 0.05, dest: pn });
+      return;
+    }
+    const v = this._voice(t, { dur: 0.22, type: 'sawtooth', f0: [[0, 150], [0.06, 175], [0.22, 120]], vowel: 'y', rasp: 0.6, q: 5, fg: 2 });
+    const vg = this._gain();
+    v.connect(vg).connect(pn);
+    this._env(vg, t, 0.01, strong ? 0.22 : 0.15, 0.1, 0.1);
+    this._noiseBurst(t, { type: 'bandpass', f: 1500, q: 0.8, a: 0.01, d: 0.12, gain: 0.25, dest: pn }); // cloth
+    this._noiseBurst(t + 0.05, { buf: this.pink, type: 'bandpass', f: 520, fEnd: 260, q: 2, a: 0.01, d: 0.25, gain: strong ? 0.5 : 0.3, dest: pn }); // it gives
+    if (strong) this._noiseBurst(t + 0.06, { buf: this.brown, type: 'lowpass', f: 300, a: 0.004, d: 0.18, gain: 1.1, dest: pn });
+  }
+
+  // out! the machine chokes on it: a crack, sparks, the motor dying, steam — and air
+  trapRescue(x, y, z) {
+    if (!this.ready) return;
+    const t = this.now;
+    const pn = this._panner(x, y, z, 4, 0.9);
+    pn.connect(this.sfx);
+    const rs = this._gain(0.6); pn.connect(rs); rs.connect(this.revSend);
+    this._noiseBurst(t, { buf: this.brown, type: 'lowpass', f: 900, a: 0.002, d: 0.3, gain: 2.0, dest: pn });
+    this._tone(t, { f: 80, fEnd: 36, a: 0.003, d: 0.5, gain: 0.7, dest: pn });
+    for (let i = 0; i < 9; i++) this._noiseBurst(t + 0.05 + Math.random() * 0.6, { type: 'highpass', f: 3500 + Math.random() * 3000, a: 0.0005, d: 0.01 + Math.random() * 0.02, gain: 0.35, dest: pn });
+    const o = this._osc('sawtooth', 70);
+    o.frequency.exponentialRampToValueAtTime(18, t + 1.3);
+    const lp = this._filter('lowpass', 500, 2);
+    const g = this._gain();
+    o.connect(lp).connect(g).connect(pn);
+    this._env(g, t, 0.01, 0.3, 1.0, 0.25);
+    o.start(t); o.stop(t + 1.5);
+    this._noiseBurst(t + 0.15, { type: 'highpass', f: 2800, a: 0.05, d: 1.6, gain: 0.18, dest: pn, rev: 0.3 }); // steam
+    [220, 277.2, 329.6, 440].forEach((f, i) => this._tone(t + 0.25 + i * 0.05, { type: 'triangle', f, a: 0.4, d: 1.8, hold: 0.2, gain: 0.03, dest: this.body, rev: 0.6 }));
+  }
+
+  // it keeps them: the doors slam, a crunch, the motor hauls up and stops. isMe: you're inside
+  trapKill(x, y, z, isMe = false) {
+    if (!this.ready) return;
+    const t = this.now;
+    const pn = this._panner(x, y, z, isMe ? 1 : 4, 0.9);
+    pn.connect(this.sfx);
+    const rs = this._gain(0.7); pn.connect(rs); rs.connect(this.revSend);
+    this.doorShut(x, y, z, 1.5);
+    for (let i = 0; i < 4; i++) this._noiseBurst(t + 0.08 + i * 0.12, { buf: this.brown, type: 'lowpass', f: 420 + i * 60, a: 0.003, d: 0.14, gain: 1.6, dest: pn });
+    this._noiseBurst(t + 0.1, { buf: this.pink, type: 'bandpass', f: 380, q: 1.5, a: 0.02, d: 0.7, gain: 0.5, dest: pn }); // wet
+    const o = this._osc('sawtooth', 50);
+    o.frequency.exponentialRampToValueAtTime(150, t + 0.7);
+    const sh = this.ctx.createWaveShaper();
+    sh.curve = this.distHard;
+    const lp = this._filter('lowpass', 1000, 1);
+    const g = this._gain();
+    o.connect(sh).connect(lp).connect(g).connect(pn);
+    this._env(g, t, 0.02, 0.45, 0.08, 0.68);
+    o.start(t); o.stop(t + 0.9);
+    if (!isMe) this.mateDeath(x, y + 0.2, z, true);
+    else {
+      this._tone(t, { f: 45, fEnd: 22, a: 0.003, d: 1.6, gain: 0.8, dest: this.body });
+      this.stun(0.5, 2.2);
+    }
+  }
+
   uiClick() {
     if (!this.ready) return;
     const t = this.now;

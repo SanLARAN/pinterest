@@ -558,6 +558,7 @@ function toMenu(keepRoom = false) {
     game.state = 'idle';
     game.objectives.silence();
     game.escape.silence();
+    game.cabinets.silence();
     game.flares.clear();
     audio.setMorning(false);
     game.inputMuted = false;
@@ -570,7 +571,7 @@ function toMenu(keepRoom = false) {
     else coop.leave();
   }
   mates.clear();
-  document.body.classList.remove('coop', 'coop-over', 'coop-guest', 'spectating', 'cutscene', 'in-car', 'holding');
+  document.body.classList.remove('coop', 'coop-over', 'coop-guest', 'spectating', 'cutscene', 'in-car', 'holding', 'qte');
   shared.uDawn.value = 0;
   shared.uMorning.value = 0;
   pulses.clear();
