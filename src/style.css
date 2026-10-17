@@ -407,6 +407,7 @@ body.touch.playing #touch { display: block; }
 body.can-use #tUse { display: grid; }
 #tFlare { display: none; right: calc(40px + var(--safe-r)); bottom: calc(200px + var(--safe-b)); width: 56px; height: 56px; border-color: rgba(224, 54, 44, 0.5); color: rgba(255, 128, 108, 0.9); }
 body.has-flare #tFlare { display: grid; }
+body.spectating #tFlare { display: none; }
 #tSkip { display: none; left: 50%; bottom: calc(18px + var(--safe-b)); transform: translateX(-50%); width: auto; height: 34px; padding: 0 18px; border-radius: 17px; color: rgba(40, 30, 20, 0.8); border-color: rgba(40, 30, 20, 0.35); background: rgba(255, 245, 230, 0.25); }
 #tSkip.down { transform: translateX(-50%) scale(0.94); }
 body.morning #tSkip { display: grid; }
