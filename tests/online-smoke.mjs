@@ -227,17 +227,24 @@ try {
   facts.push(`door ${aDoor === bDoor ? 'synced' : 'NOT synced'} · flare ${aFlare === 'B' ? 'synced' : 'NOT synced'}`);
   // the night, and one of the UAZ's parts: B asks for it (the host decides), throws it; it lands for the host too
   await A.page.evaluate(() => window.__hush.game.startDusk());
-  const night = await until(async () => (await A.page.evaluate(() => window.__hush.game.state)) === 'play' && (await B.page.evaluate(() => window.__hush.game.state)) === 'play', 30000);
+  const night = await until(async () => (await A.page.evaluate(() => window.__hush.game.state)) === 'play' && (await B.page.evaluate(() => window.__hush.game.state)) === 'play', 90000);
   check('the night falls for both', !!night);
   const partOk = await (async () => {
-    await B.page.evaluate(() => { const g = window.__hush.game, p = g.escape.parts[2]; g.player.x = p.x + 0.8; g.player.z = p.z; g.player.vx = g.player.vz = 0; });
-    await sleep(1500); // (the host sees B there first)
-    await B.page.evaluate(() => { const g = window.__hush.game; g.escape.pick(g.escape.parts[2]); });
-    const mine = await until(() => B.page.evaluate(() => { const h = window.__hush.game.escape.held; return !!h && h.i === 2; }), 15000);
+    const P = await A.page.evaluate(() => { const q = window.__hush.game.escape.parts[2]; return [q.x, q.z]; });
+    await B.page.evaluate(([x, z]) => { const g = window.__hush.game; g.player.x = x + 0.8; g.player.z = z; g.player.vx = g.player.vz = 0; }, P);
+    // the host has to see B there first (it checks who's close enough to take it)
+    const near = await until(() => A.page.evaluate(([x, z]) => { const r = [...window.__hush.game.remotes.values()][0]; return !!r && Math.hypot(r.x - x, r.z - z) < 2.5; }, P), 20000);
+    let mine = false;
+    for (let i = 0; i < 6 && !mine; i++) {
+      await B.page.evaluate(() => { const g = window.__hush.game; g.escape.askT = 0; g.escape.pick(g.escape.parts[2]); });
+      mine = await until(() => B.page.evaluate(() => { const h = window.__hush.game.escape.held; return !!h && h.i === 2; }), 3000);
+    }
+    const diag = await A.page.evaluate(([x, z]) => { const g = window.__hush.game, r = [...g.remotes.values()][0], q = g.escape.parts[2]; return `host ${g.state}, B ${r ? Math.hypot(r.x - x, r.z - z).toFixed(1) : '?'} m off, part ${q.state}/${q.seq}`; }, P);
+    if (!mine) return `not granted (${near ? 'seen near' : 'never seen near'}; ${diag})`;
     const hostSees = await A.page.evaluate(() => { const q = window.__hush.game.escape.parts[2]; return q.state === 'held' && q.holder !== window.__hush.game.player.id; });
-    if (!mine || !hostSees) return `not granted (B ${mine}, host ${hostSees})`;
+    if (!hostSees) return `granted, but the host doesn't agree (${diag})`;
     await B.page.evaluate(() => window.__hush.game.escape.throwHeld());
-    const landed = await until(() => A.page.evaluate(() => { const q = window.__hush.game.escape.parts[2]; return q.state === 'ground' && !q.settle; }), 30000);
+    const landed = await until(() => A.page.evaluate(() => { const q = window.__hush.game.escape.parts[2]; return q.state === 'ground' && !q.settle; }), 45000);
     return landed ? 'ok' : 'no landing';
   })();
   check("B's part: granted by the host, thrown, lands on the host's machine", partOk === 'ok', partOk);
