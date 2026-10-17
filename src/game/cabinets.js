@@ -868,7 +868,10 @@ export class Cabinets {
     if (how === 'rescued') {
       tr.progress = 1;
       if (a.ready && a.trapRescue) a.trapRescue(p.x, p.y + 1, p.z);
-      g.particles.burst(p.x + c.fwd.x * 0.3, p.y + 1.1, p.z + c.fwd.z * 0.3, 40, { color: [1, 0.8, 0.45], speed: 6, up: 2, life: 0.6, size: 0.05, gravity: -9, drag: 1.1 });
+      // it chokes on them: sparks off both rollers, a burst from the throat
+      const rx = Math.cos(c.spec.yaw), rz = -Math.sin(c.spec.yaw);
+      for (const s of [-1, 1]) g.particles.burst(p.x + c.fwd.x * 0.22 + rx * s * c.D.w * 0.32, p.y + 0.95, p.z + c.fwd.z * 0.22 + rz * s * c.D.w * 0.32, 34, { color: [1.3, 0.9, 0.45], speed: 7, up: 2.4, life: 0.7, size: 0.045, gravity: -9.8, drag: 1.0, spread: 0.5 });
+      g.particles.burst(p.x + c.fwd.x * 0.3, p.y + 1.1, p.z + c.fwd.z * 0.3, 30, { color: [1, 0.8, 0.45], speed: 5, up: 2, life: 0.6, size: 0.05, gravity: -9, drag: 1.1 });
       g.particles.burst(p.x, p.y + 1.6, p.z, 26, { color: [0.4, 0.4, 0.42], speed: 1.2, up: 1.4, life: 2.2, size: 0.14, gravity: 0.6, drag: 1.4 });
       g.pulses.emit(p.x, p.y + 1, p.z, g.time, { radius: 12, strength: 0.9, decay: 1, color: [0.9, 0.95, 1], kind: 'stone' });
       if (tr.victim === me.id) {
