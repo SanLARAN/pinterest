@@ -10,11 +10,11 @@ import * as THREE from 'three';
 import { EDGE_GLSL } from '../render/sonar.js';
 import { Particles } from '../render/particles.js';
 import { clamp, lerp, damp } from '../core/rng.js';
-import { buildSurvivor, dyeColors } from '../game/survivor.js';
+import { buildSurvivor, dyeColors, poseFur } from '../game/survivor.js';
 import { cleanFit, shapeKey, item } from '../game/outfit.js';
 import {
   ROOM, GATE, WIN, CAR, BULB, BULB_LOCAL, BULB2, BULB2_LOCAL, CARP, SPOTS, LANTERN_AT, DRUM_AT, ITEM_SPOTS, PACK,
-  buildRoom, buildCeiling, buildWicket, buildProps, buildBulb, buildBulb2, buildCarBody, buildCarWheels, buildCarGlass, buildSteering,
+  buildRoom, buildCeiling, buildWicket, buildProps, buildBulb, buildBulb2, buildSteering, CAR_MODELS, GPAL_GLSL,
   buildItems, buildPack, buildPackFlap, buildCigarette, buildCup, buildLighter, buildFlame, buildPasser,
 } from './garageSet.js';
 
@@ -60,6 +60,7 @@ uniform float uFade;
 uniform float uNoise;
 uniform vec4 uBlob[10]; // contact shadows on the floor: x, z, radius, strength
 uniform vec4 uCarBox;   // the car's shadow: centre x, z, half length, half width
+uniform vec3 uCarDye[2]; // the car's paint: main, accent (the host's colours)
 uniform vec3 uDye[4];
 uniform vec4 uGlow;
 uniform vec3 uGlowCol;
@@ -77,40 +78,8 @@ const vec3 PAL[12] = vec3[12](
   vec3(0.44, 0.40, 0.33), vec3(0.60, 0.64, 0.68), vec3(0.78, 0.13, 0.10), vec3(0.84, 0.66, 0.56),
   vec3(0.86, 0.80, 0.70), vec3(1.00, 0.86, 0.55), vec3(0.22, 0.32, 0.48), vec3(1.00, 0.70, 0.25)
 );
-// ...and in the garage (kinds 19…47)
-const vec3 GPAL[31] = vec3[31](
-  vec3(0.30, 0.30, 0.29),  // concrete
-  vec3(0.46, 0.45, 0.42),  // block, whitewashed long ago
-  vec3(0.15, 0.23, 0.23),  // oil paint on the lower wall
-  vec3(0.25, 0.29, 0.16),  // УАЗ khaki
-  vec3(0.72, 0.74, 0.76),  // chrome
-  vec3(0.07, 0.07, 0.075), // rubber
-  vec3(0.09, 0.09, 0.095), // dark
-  vec3(0.75, 0.74, 0.66),  // headlamp glass
-  vec3(0.42, 0.05, 0.04),  // tail lamp
-  vec3(1.00, 0.85, 0.60),  // bulb
-  vec3(1.00, 0.45, 0.15),  // ember
-  vec3(0.17, 0.27, 0.19),  // gate green
-  vec3(0.36, 0.20, 0.11),  // rust
-  vec3(0.07, 0.11, 0.21),  // the night outside
-  vec3(0.12, 0.16, 0.12),  // dash glass
-  vec3(0.80, 0.75, 0.62),  // paper
-  vec3(0.30, 0.33, 0.22),  // canvas
-  vec3(0.62, 0.62, 0.60),  // tin
-  vec3(0.60, 0.09, 0.06),  // red paint
-  vec3(0.17, 0.11, 0.08),  // seat
-  vec3(0.035, 0.035, 0.04),// oil
-  vec3(0.24, 0.17, 0.11),  // dark wood
-  vec3(1.00, 0.70, 0.35),  // lantern glass
-  vec3(1.00, 0.60, 0.22),  // radio dial
-  vec3(0.0, 0.0, 0.0),     // the thing outside
-  vec3(1.00, 0.75, 0.35),  // flame
-  vec3(0.55, 0.62, 0.66),  // glass
-  vec3(0.70, 0.52, 0.12),  // yellow paint
-  vec3(0.75, 0.10, 0.08),  // red marks
-  vec3(1.00, 0.85, 0.60),  // the bare bulb
-  vec3(0.045, 0.065, 0.12) // the yard outside, under the moon
-);
+// ...and in the garage (kinds 19…49)
+${GPAL_GLSL}
 
 float hash13(vec3 p3) {
   p3 = fract(p3 * 0.1031);
@@ -134,7 +103,7 @@ void main() {
   vec3 toCam = uCam - vWorld;
   vec3 V = normalize(toCam);
   if (dot(N, V) < 0.0) N = -N;
-  vec3 base = k < 12 ? PAL[k] : k < 19 ? ((k == 13) ? uDye[0] : (k == 14 || k == 17) ? uDye[1] : (k == 15) ? uDye[2] : uDye[3]) : GPAL[clamp(k - 19, 0, 30)];
+  vec3 base = k < 12 ? PAL[k] : k < 19 ? ((k == 13) ? uDye[0] : (k == 14 || k == 17) ? uDye[1] : (k == 15) ? uDye[2] : uDye[3]) : k >= 52 ? (k == 52 ? uCarDye[0] : uCarDye[1]) : GPAL[clamp(k - 19, 0, 30)];
 
   // the echo: a wavefront, a flash, an afterglow (a voice doesn't light the whole garage)
   float age = uTime - uPing.w;
@@ -563,6 +532,7 @@ export class Garage {
       uNoise: { value: 26 },
       uBlob: { value: Array.from({ length: 10 }, () => V4()) },
       uCarBox: { value: V4(CAR.x, CAR.z, CAR.len / 2 + 0.05, CAR.wid / 2 + 0.02) },
+      uCarDye: { value: [new THREE.Color('#4e6b3c'), new THREE.Color('#8a6a48')] },
     };
     this.matSet = this._mat({}, { side: THREE.DoubleSide });
     this.matGlass = this._mat({ uAlpha: { value: 0.16 } }, { transparent: true, depthWrite: false, side: THREE.DoubleSide });
@@ -624,21 +594,17 @@ export class Garage {
     this.carRoot = new THREE.Group();
     this.carRoot.position.set(CAR.x, 0, CAR.z);
     S.add(this.carRoot);
-    this._mesh(buildCarWheels(), this.matSet, this.carRoot);
     this.carBody = new THREE.Group();
     this.carBody.position.set(0, 0.45, 0);
     this.carRoot.add(this.carBody);
     this.carMesh = new THREE.Group();
     this.carMesh.position.set(0, -0.45, 0);
     this.carBody.add(this.carMesh);
-    this._mesh(buildCarBody(), this.matSet, this.carMesh);
-    const glass = this._mesh(buildCarGlass(), this.matGlass, this.carMesh);
-    glass.renderOrder = 5;
     this.steering = new THREE.Group();
-    this.steering.position.set(...CARP.wheelC);
-    this.steering.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), new THREE.Vector3(...CARP.wheelN).normalize());
     this.carMesh.add(this.steering);
-    this.steerMesh = this._mesh(buildSteering(), this.matSet, this.steering);
+    this.carParts = []; // this model's meshes (swapped with the model)
+    this.pods = []; // a Trueno's pop-up headlights
+    this.podA = 0;
     this.shake = { roll: 0, vroll: 0, pitch: 0, vpitch: 0, y: 0, vy: 0 };
     // light shafts
     const beam = (len, r, color) => {
@@ -654,13 +620,14 @@ export class Garage {
       mesh.renderOrder = 7;
       return mesh;
     };
-    this.headBeams = CARP.head.map(([x, y, z]) => {
+    this.headBeams = [0, 1].map(() => {
       const b = beam(3.4, 0.95, [1.0, 0.92, 0.75]);
-      b.position.set(x - 0.02, y, z);
       b.quaternion.setFromUnitVectors(new THREE.Vector3(0, -1, 0), new THREE.Vector3(-1, -0.05, 0).normalize());
       this.carMesh.add(b);
       return b;
     });
+    this.carId = null;
+    this.setCar('uaz');
     this.bulbBeam = beam(2.2, 1.35, [1.0, 0.72, 0.45]);
     this.bulbBeam.position.set(0, BULB_LOCAL - 0.02, 0);
     this.bulbPivot.add(this.bulbBeam);
@@ -729,6 +696,11 @@ export class Garage {
   // ---------------- who is where ----------------
   // list: [{ slot, id, name, self, host, fit }]
   setPlayers(list) {
+    const host = list.find((q) => q.slot === 0);
+    if (host) {
+      const fit = cleanFit(host.fit);
+      this.setCar(fit.car, fit.cc);
+    }
     for (let s = 0; s < 4; s++) {
       const p = list.find((q) => q.slot === s);
       const f = this.figs[s];
@@ -764,7 +736,7 @@ export class Garage {
     mat.uniforms.uAppearY.value.set(s === 0 ? 0.55 : -0.05, 2.15);
     if (s === 0) {
       this.carMesh.add(f.rig.root);
-      f.rig.root.position.set(...spot.pos);
+      f.rig.root.position.set(...this.model.driver.pos);
     } else {
       this.scene.add(f.rig.root);
       f.rig.root.position.set(...spot.pos);
@@ -886,6 +858,50 @@ export class Garage {
   }
 
   // ---------------- the car starts ----------------
+  // ---------------- the car: the host's, from their wardrobe ----------------
+  setCar(id, colors = null) {
+    const M = CAR_MODELS[id] || CAR_MODELS.uaz;
+    if (colors) {
+      this.u.uCarDye.value[0].set(colors[0]);
+      this.u.uCarDye.value[1].set(colors[1]);
+    }
+    if (this.carId === (CAR_MODELS[id] ? id : 'uaz')) return;
+    this.carId = CAR_MODELS[id] ? id : 'uaz';
+    for (const m of this.carParts) {
+      if (m.parent) m.parent.remove(m);
+      m.geometry.dispose();
+    }
+    this.carParts = [];
+    for (const pod of this.pods) if (pod.parent) pod.parent.remove(pod);
+    this.pods = [];
+    this.model = M;
+    this.CP = M.P;
+    const keep = (m) => (this.carParts.push(m), m);
+    keep(this._mesh(M.wheels(), this.matSet, this.carRoot));
+    keep(this._mesh(M.body(), this.matSet, this.carMesh));
+    const glass = keep(this._mesh(M.glass(), this.matGlass, this.carMesh));
+    glass.renderOrder = 5;
+    this.steering.position.set(...this.CP.wheelC);
+    this.steering.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), new THREE.Vector3(...this.CP.wheelN).normalize());
+    this.steerMesh = keep(this._mesh(buildSteering(this.CP.wheelRad), this.matSet, this.steering));
+    if (M.pod) {
+      const pd = this.CP.pod;
+      for (const sz of [-1, 1]) {
+        const g = new THREE.Group();
+        g.position.set(pd.x, pd.y, sz * pd.z);
+        this.carMesh.add(g);
+        keep(this._mesh(M.pod(), this.matSet, g));
+        this.pods.push(g);
+      }
+    }
+    this.podA = 0;
+    this.CP.head.forEach(([x, y, z], i) => this.headBeams[i].position.set(x - 0.02, y, z));
+    this.u.uCarBox.value.set(CAR.x, CAR.z, M.len / 2 + 0.05, M.wid / 2 + 0.02);
+    // the driver changes cars too
+    const f = this.figs && this.figs[0];
+    if (f && f.rig) f.rig.root.position.set(...M.driver.pos);
+  }
+
   startCar(onDone) {
     if (this.cut) return false;
     this.cut = { t: 0, onDone, keyed: false, caught: false, honk: 0, fired: false, done: false };
@@ -947,9 +963,9 @@ export class Garage {
       this.shake.vy += 0.25;
       this.camShake = 0.5;
       this.bulbSwing.va += 0.25;
-      const ex = this._carPoint(CARP.exhaust, _w);
+      const ex = this._carPoint(this.CP.exhaust, _w);
       for (let i = 0; i < 14; i++) this.smoke.emit(ex.x + 0.05, ex.y, ex.z, rnd(0.6, 1.6), rnd(0, 0.4), rnd(-0.3, 0.3), { life: 2.6, s0: 0.12, s1: 0.9, a: 0.32, rise: 0.25, drag: 1.6, col: [0.42, 0.42, 0.44], jitter: 0.5 });
-      const eng = this._carPoint([-1.3, 1.1, 0], _w2);
+      const eng = this._carPoint(this.model.engine, _w2);
       this.ping(eng.x, eng.y, eng.z, 6.5, 0.22);
     }
     if (c.honk < 2 && t >= 2.3 + c.honk * 0.24) {
@@ -1141,11 +1157,17 @@ export class Garage {
     this.carBody.rotation.z = s.pitch * 0.03;
     this.carRoot.updateMatrixWorld(true);
     // lamps in the world
-    this._carPoint(CARP.head[0], this.u.uHeadP0.value);
-    this._carPoint(CARP.head[1], this.u.uHeadP1.value);
-    const tl = this._carPoint([2.02, 0.95, 0], _w);
+    // a Trueno's lamps flip up when the engine catches (and fold away when it stops)
+    if (this.pods.length) {
+      const want = this.idle > 0 || (this.cut && this.cut.caught) ? this.CP.pod.open : 0;
+      this.podA = damp(this.podA, want, want > this.podA ? 7 : 4, dt);
+      for (const g of this.pods) g.rotation.z = -this.podA;
+    }
+    this._carPoint(this.CP.head[0], this.u.uHeadP0.value);
+    this._carPoint(this.CP.head[1], this.u.uHeadP1.value);
+    const tl = this._carPoint(this.model.tailAt, _w);
     this.u.uTail.value.set(tl.x + 0.3, tl.y, tl.z, this.u.uTail.value.w);
-    const dp = this._carPoint(CARP.dash, _w);
+    const dp = this._carPoint(this.CP.dash, _w);
     this.u.uDash.value.set(dp.x, dp.y, dp.z, this.u.uDash.value.w);
     for (const b of this.headBeams) b.material.uniforms.uI.value = 0.11 * this.u.uHeadI.value;
     // the steering wheel
@@ -1155,7 +1177,7 @@ export class Garage {
       this.exhaustT -= dt;
       if (this.exhaustT <= 0) {
         this.exhaustT = 0.08;
-        const ex = this._carPoint(CARP.exhaust, _w);
+        const ex = this._carPoint(this.CP.exhaust, _w);
         this.smoke.emit(ex.x + 0.04, ex.y, ex.z, rnd(0.5, 1.0), rnd(0.05, 0.25), rnd(-0.15, 0.15), { life: 2.0, s0: 0.08, s1: 0.6, a: 0.16, rise: 0.22, drag: 1.4, col: [0.46, 0.46, 0.48], jitter: 0.2 });
       }
     }
@@ -1191,6 +1213,7 @@ export class Garage {
       else if (s === 2) this._smoker(f, dt);
       else this._packer(f, dt);
       this._glow(f);
+      poseFur(f.rig, dt);
       if (n.crow) this._crow(f, dt);
     }
   }
@@ -1301,12 +1324,13 @@ export class Garage {
     const st = f.st;
     const t = this.t;
     const breathe = Math.sin(t * 1.6 + 1) * 0.012;
-    n.hips.position.set(0, 1.02, 0.0);
-    n.hips.rotation.x = -0.1;
+    const D = this.model.driver;
+    n.hips.position.set(0, D.hips, 0.0);
+    n.hips.rotation.x = D.recline;
     n.chest.rotation.x = -0.02 + breathe;
     for (const [A, s] of [['L', -1], ['R', 1]]) {
-      n['th' + A].rotation.set(-1.5, 0, s * 0.07);
-      n['kn' + A].rotation.x = 0.88;
+      n['th' + A].rotation.set(D.thigh, 0, s * 0.07);
+      n['kn' + A].rotation.x = D.knee;
     }
     // what the hands are up to
     if (st.phase === 'intro' && st.t > 1.8) { st.phase = 'idle'; st.t = 0; st.next = rnd(2, 5); }
@@ -1329,13 +1353,13 @@ export class Garage {
     // the grips follow the wheel as it turns
     const grip = (a, out) => {
       const aa = a + this.steer;
-      return this.steering.localToWorld(out.set(0.0, Math.sin(aa) * CARP.wheelRad, Math.cos(aa) * CARP.wheelRad));
+      return this.steering.localToWorld(out.set(0.0, Math.sin(aa) * this.CP.wheelRad, Math.cos(aa) * this.CP.wheelRad));
     };
     const gL = grip(PI * 0.82, _v1.clone());
     const gR = grip(PI * 0.18, _v2.clone());
     let L = gL, R = gR, kL = 1, kR = 1;
     const c = this.cut;
-    const mirror = this._carPoint([-0.62, 1.62, 0.02], new THREE.Vector3());
+    const mirror = this._carPoint(this.model.mirror, new THREE.Vector3());
     if (st.phase === 'intro' || st.phase === 'mirror') {
       const x = st.t / 1.8;
       const k = bell(x, 0.0, 0.25, 0.75, 1.0);
@@ -1350,7 +1374,7 @@ export class Garage {
     }
     if (c) {
       const ct = c.t;
-      const key = this._carPoint(CARP.key, new THREE.Vector3());
+      const key = this._carPoint(this.CP.key, new THREE.Vector3());
       const toKey = seg(ct, 0, 0.32) * (1 - seg(ct, 1.4, 1.75));
       key.x += seg(ct, 0.32, 0.42) * 0.0; // (the turn is in the wrist)
       key.y += -0.012 * seg(ct, 0.33, 0.4);

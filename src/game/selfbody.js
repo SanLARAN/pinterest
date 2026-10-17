@@ -10,7 +10,7 @@
 // Nothing here goes over the network: your friends see your remote body, as always.
 import { CFG } from '../core/config.js';
 import { clamp, lerp } from '../core/rng.js';
-import { buildSurvivor, poseCarrier } from './survivor.js';
+import { buildSurvivor, poseCarrier, poseFur } from './survivor.js';
 import { fitKey } from './outfit.js';
 import { createPersonMaterial, dressPerson, undressPerson } from '../render/people.js';
 
@@ -105,13 +105,16 @@ export class SelfBody {
     const k = clamp((P.eye - p.eyeCur) / (P.eye - P.crouchEye), 0, 1); // standing 0 → squatting 1
     const amp = clamp(p.speed / 3.2, 0, 1.4) * (1 - 0.5 * k);
     poseSelf(rig, p.bobPhase || 0, amp, k);
+    const now = performance.now();
+    poseFur(rig, Math.min(0.1, (now - (this._t || now)) / 1000), p.speed); // (a tail behind you, as it should be)
+    this._t = now;
     const carrying = !!p.carrying, part = !!es.held;
     if (carrying) poseCarrier(rig);
     root.position.set(p.x, p.y + (p.bobY || 0), p.z);
     root.rotation.set(0, p.yaw + PI, 0); // (the rig faces +z; you look down -z)
     root.translateZ(-this._clear(n.chest.rotation.x));
     // hands busy with something drawn up close: those arms step aside
-    this._arms(!(carrying || part), !(carrying || part || !!g.glows.held));
+    this._arms(!(carrying || part || (g.torch && g.torch.on)), !(carrying || part || !!g.glows.held));
   }
 
   // how far back the body goes: the top of your collar, wherever the chest's lean puts it, stays behind your eyes

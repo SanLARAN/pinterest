@@ -8,8 +8,9 @@ import * as THREE from 'three';
 import { EDGE_GLSL } from '../render/sonar.js';
 import { MeshBuilder, KIND } from '../world/builder.js';
 import { RNG, clamp, lerp, damp } from '../core/rng.js';
-import { buildSurvivor, poseSurvivor, dyeColors } from '../game/survivor.js';
+import { buildSurvivor, poseSurvivor, poseFur, dyeColors } from '../game/survivor.js';
 import { cleanFit, shapeKey, item } from '../game/outfit.js';
+import { CAR_MODELS, GPAL_GLSL, buildSteering } from './garageSet.js';
 
 const VERT = /* glsl */ `
 attribute vec4 data;
@@ -32,6 +33,7 @@ uniform vec3 uCam;
 uniform vec4 uPing;    // echo origin xyz, start time
 uniform vec2 uPingK;   // speed, ring width
 uniform vec3 uDye[4];  // headwear main / accent, outfit main / accent
+uniform vec3 uCarDye[2]; // the car slot: its paint, main / accent
 uniform vec3 uKeyPos;  // the lamp
 uniform float uKey;
 uniform float uAmb;
@@ -62,6 +64,8 @@ const vec3 PAL[12] = vec3[12](
   vec3(1.00, 0.70, 0.25)   // shard
 );
 
+${GPAL_GLSL}
+
 float hash13(vec3 p3) {
   p3 = fract(p3 * 0.1031);
   p3 += dot(p3, p3.zyx + 31.32);
@@ -75,8 +79,9 @@ void main() {
   vec3 V = toCam / camD;
   if (dot(N, V) < 0.0) N = -N;
   int k = int(vKind + 0.5); // (an interpolated constant can land a hair under the integer)
-  bool glow = k >= 17;
-  vec3 base = k >= 13 ? (k == 13 ? uDye[0] : (k == 14 || k == 17) ? uDye[1] : k == 15 ? uDye[2] : uDye[3]) : PAL[k];
+  bool glow = k == 17 || k == 18;
+  vec3 base = k >= 52 ? (k == 52 ? uCarDye[0] : uCarDye[1]) : k >= 19 ? GPAL[clamp(k - 19, 0, 30)]
+            : k >= 13 ? (k == 13 ? uDye[0] : (k == 14 || k == 17) ? uDye[1] : k == 15 ? uDye[2] : uDye[3]) : PAL[k];
   float facing = clamp(dot(N, V), 0.0, 1.0);
 
   // the echo: a wavefront, a quick flash, a long afterglow
@@ -177,7 +182,21 @@ const easeInOut = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
 // 0 → 1 → 0 over a gesture: up in `a`, hold, down over the last `r` (fractions of its length)
 const bell = (x, a = 0.25, r = 0.3) => (x <= 0 || x >= 1 ? 0 : x < a ? easeInOut(x / a) : x > 1 - r ? easeInOut((1 - x) / r) : 1);
 
-const GESTURE_LEN = { hat: 1.15, body: 1.5, wave: 1.6, startle: 0.9 };
+const GESTURE_LEN = { hat: 1.15, body: 1.5, wave: 1.6, startle: 0.9, kiss: 2.2, paws: 1.7, tilt: 2.4 };
+// the boykisser's own: blows you a kiss (a heart floats up), paws up by the face, the smug head tilt
+const FUR_IDLE = ['kiss', 'paws', 'tilt', 'kiss', 'tilt'];
+
+// a little pink heart (the head's accent dye)
+function heartGeometry() {
+  const b = new MeshBuilder(128);
+  for (const s of [-1, 1]) {
+    b.place(s * 0.02, 0.012, 0, 0, 0, 0, 1, 1, 0.45);
+    b.octa(0.025, 0.024, 14);
+  }
+  b.place(0, 0.006, 0, Math.PI, 0, 0, 1, 1, 0.45);
+  b.cone(4, 0.04, 0.05, 14, { phase: Math.PI / 4 });
+  return geometryFrom(b.toArrays());
+}
 // where a hand goes to settle each hat (head space, x mirrored to the hand's side)
 const HAT_TOUCH = {
   hood: [0.08, 0.1, 0.14],
@@ -185,17 +204,57 @@ const HAT_TOUCH = {
   gasmask: [0.12, -0.03, 0.15],
   pumpkin: [0.22, 0.02, 0.06],
   animehair: [0.14, -0.02, 0.1], // (a lock tucked back)
+  boykisser: [0.15, 0.12, 0.0], // (a scratch behind the ear)
+  leshyhead: [0.15, 0.22, -0.03], // (an antler)
+  plaguemask: [0.21, 0.12, 0.05], // (the brim of the hat)
+  helmet: [0.19, 0.0, 0.08],
 };
 const FORE_DIR = new THREE.Vector3(0, -0.27, 0.06).normalize();
 const _v1 = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3(), _v4 = new THREE.Vector3(), _v5 = new THREE.Vector3();
 const _h = new THREE.Vector3(), _p = new THREE.Vector3();
 const _q1 = new THREE.Quaternion(), _q2 = new THREE.Quaternion();
 
-// framing on the stage: whole body / the head
+// framing on the stage: whole body / the head / the car
 const FOCUS = {
   body: { y: 0.96, h: 2.12 },
   head: { y: 1.64, h: 0.98 },
+  car: { y: 0.72, h: 1.7 },
 };
+
+// a car for the wardrobe's car slot: the garage's model, on the stage's ground
+function carGroup(id, mat) {
+  const M = CAR_MODELS[id] || CAR_MODELS.uaz;
+  const g = new THREE.Group();
+  const add = (arr, parent = g) => {
+    const m = new THREE.Mesh(geometryFrom(arr), mat);
+    m.frustumCulled = false;
+    parent.add(m);
+    return m;
+  };
+  add(M.wheels());
+  add(M.body());
+  const st = new THREE.Group();
+  st.position.set(...M.P.wheelC);
+  st.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), new THREE.Vector3(...M.P.wheelN).normalize());
+  g.add(st);
+  add(buildSteering(M.P.wheelRad), st);
+  g.userData.pods = [];
+  if (M.pod) {
+    for (const sz of [-1, 1]) {
+      const pg = new THREE.Group();
+      pg.position.set(M.P.pod.x, M.P.pod.y, sz * M.P.pod.z);
+      g.add(pg);
+      add(M.pod(), pg);
+      g.userData.pods.push(pg);
+    }
+  }
+  g.userData.open = M.pod ? M.P.pod.open : 0;
+  g.rotation.y = 0.28; // (the nose a little toward you)
+  return g;
+}
+function disposeGroup(g) {
+  g.traverse((o) => { if (o.geometry) o.geometry.dispose(); });
+}
 
 export class Mannequin {
   constructor() {
@@ -222,8 +281,14 @@ export class Mannequin {
       uGroundR: { value: 0.95 },
       uGlow: { value: new THREE.Vector4(0, 0, 0, 0) },
       uGlowCol: { value: new THREE.Color(1, 0.8, 0.4) },
+      uCarDye: { value: [new THREE.Color(), new THREE.Color()] },
     };
     this.mat = new THREE.ShaderMaterial({ uniforms: this.u, vertexShader: VERT, fragmentShader: FRAG });
+    this.car = null; // the car slot's car (on the stage instead of the figure)
+    this.carId = null;
+    this.carOn = false;
+    this.pod = { a: 0, want: 0, t: 0 };
+    this.tcars = new Map(); // id -> a car for the stills
     this.ground = new THREE.Mesh(groundGeometry(0.95), this.mat);
     this.ground.frustumCulled = false;
     this.scene.add(this.ground);
@@ -231,6 +296,7 @@ export class Mannequin {
     // the cards' stills: their own uniforms, their own rigs, an offscreen target
     this.tu = THREE.UniformsUtils.clone(this.u);
     this.tu.uDye.value = [new THREE.Color(), new THREE.Color(), new THREE.Color(), new THREE.Color()]; // (clone shares array items)
+    this.tu.uCarDye.value = [new THREE.Color(), new THREE.Color()];
     this.tmat = new THREE.ShaderMaterial({ uniforms: this.tu, vertexShader: VERT, fragmentShader: FRAG });
     this.tground = new THREE.Mesh(this.ground.geometry, this.tmat);
     this.tground.frustumCulled = false;
@@ -256,6 +322,9 @@ export class Mannequin {
     this.look = { yaw: 0, pitch: 0, wantYaw: 0, wantPitch: 0, at: -1e9, nx: 0, ny: 0 };
     this.wander = { t: 0, yaw: 0, pitch: 0 };
     this.crow = { t: 0, yaw: 0, tilt: 0 };
+    this.furT = 3;
+    this.hearts = [];
+    this.heartGeo = null;
     this.orbit = { yaw: 0.5, pitch: 0.08, zoom: 1, vyaw: 0, idle: 9, base: 0.5 };
     this.focus = 'body';
     this.view = { y: FOCUS.body.y, h: FOCUS.body.h };
@@ -336,10 +405,55 @@ export class Mannequin {
     if (gesture) this.play(gesture);
   }
 
-  play(type) {
+  // the car slot: the car stands on the stage instead of you (id null: you again)
+  showCar(id, colors = null) {
+    if (!id) {
+      if (!this.carOn) return;
+      this.carOn = false;
+      if (this.car) this.car.visible = false;
+      if (this.rig) this.rig.root.visible = true;
+      this.ground.scale.setScalar(1);
+      return;
+    }
+    if (!this.car || this.carId !== id) {
+      if (this.car) {
+        this.scene.remove(this.car);
+        disposeGroup(this.car);
+      }
+      this.car = carGroup(id, this.mat);
+      this.carId = id;
+      this.scene.add(this.car);
+      this.pod = { a: 0, want: 0, t: 0 };
+    }
+    if (colors) {
+      this.u.uCarDye.value[0].set(colors[0]);
+      this.u.uCarDye.value[1].set(colors[1]);
+    }
+    if (!this.carOn) this.pod.t = 0;
+    this.carOn = true;
+    this.car.visible = true;
+    if (this.rig) this.rig.root.visible = false;
+    this.ground.scale.setScalar(2.7);
+  }
+
+  // a tap on the car: the pop-ups flip (if it has them)
+  toggleLights() {
+    if (this.carOn && this.car && this.car.userData.pods.length) this.pod.want = this.pod.want > 0 ? 0 : 1;
+  }
+
+  _carFrame(dt) {
+    const P = this.pod, c = this.car;
+    if (!c || !c.userData.pods.length) return;
+    P.t += dt;
+    if (P.t > 0.7 && P.t - dt <= 0.7) P.want = 1; // it says hello
+    P.a = damp(P.a, P.want ? c.userData.open : 0, P.want ? 7 : 4, dt);
+    for (const g of c.userData.pods) g.rotation.z = -P.a;
+  }
+
+  play(type, quiet = false) {
     if (!GESTURE_LEN[type]) return;
     this.gesture = { type, t: 0 };
-    if (type !== 'startle') this.ping();
+    if (type !== 'startle' && !quiet) this.ping();
   }
 
   setFocus(f) {
@@ -383,6 +497,7 @@ export class Mannequin {
     u.uFade.value = Math.min(1, u.uFade.value + dt * 1.6);
     this._camera(dt);
     this._animate(dt);
+    if (this.carOn) this._carFrame(dt);
     u.uTime.value = this.t;
     u.uCam.value.copy(this.camera.position);
     this._glow(this.rig, u, this.t, this.glowOn);
@@ -419,7 +534,7 @@ export class Mannequin {
     const fovV = THREE.MathUtils.degToRad(this.camera.fov);
     const fovH = 2 * Math.atan(Math.tan(fovV / 2) * this.camera.aspect);
     const need = this.view.h * 0.5 * (stage ? 1.08 : 1.0);
-    const halfW = stage ? (this.focus === 'head' ? this.view.h * 0.5 : 0.62) : 0.5;
+    const halfW = stage ? (this.focus === 'head' ? this.view.h * 0.5 : this.focus === 'car' ? 2.3 : 0.62) : 0.5;
     const d = Math.max(need / Math.tan(fovV / 2), halfW / Math.tan(fovH / 2)) * o.zoom;
     const cp = Math.cos(o.pitch);
     const ty = this.view.y;
@@ -473,6 +588,15 @@ export class Mannequin {
     n.head.rotation.x = L.pitch;
     n.chest.rotation.y = L.yaw * 0.2;
 
+    // fur with a life of its own; and now and then, left alone, one of the boykisser's little numbers
+    poseFur(rig, dt);
+    if (n.earL || n.tail0) {
+      this.furT -= dt;
+      if (this.furT <= 0 && !this.gesture) {
+        this.furT = 4.5 + Math.random() * 5;
+        this.play(FUR_IDLE[Math.floor(Math.random() * FUR_IDLE.length)], true);
+      }
+    }
     // gestures
     const g = this.gesture;
     if (g) {
@@ -483,6 +607,34 @@ export class Mannequin {
       else this._gesture(g.type, x, n);
     }
     this._crow(dt);
+    this._hearts(dt);
+  }
+
+  // hearts blown from a paw: up, a sway, gone
+  _heart(at) {
+    if (!this.heartGeo) this.heartGeo = heartGeometry();
+    const m = new THREE.Mesh(this.heartGeo, this.mat);
+    m.frustumCulled = false;
+    m.position.copy(at);
+    this.scene.add(m);
+    this.hearts.push({ m, t: 0, x0: at.x, s: Math.random() * 6 });
+  }
+
+  _hearts(dt) {
+    for (let i = this.hearts.length - 1; i >= 0; i--) {
+      const h = this.hearts[i];
+      h.t += dt;
+      const k = h.t / 1.7;
+      if (k >= 1) {
+        this.scene.remove(h.m);
+        this.hearts.splice(i, 1);
+        continue;
+      }
+      h.m.position.y += dt * 0.32;
+      h.m.position.x = h.x0 + Math.sin(h.t * 4 + h.s) * 0.03;
+      h.m.rotation.y = Math.sin(h.t * 3) * 0.6;
+      h.m.scale.setScalar(Math.sin(Math.min(1, k * 4) * Math.PI / 2) * (1 - k * k));
+    }
   }
 
   // the arm nearer the viewer does the showing
@@ -535,6 +687,38 @@ export class Mannequin {
       const w = Math.sin(x * Math.PI * 6) * 0.07;
       this._reach(A, _h.set(s * (0.44 + w), 0.98, 0.1), _p.set(s, -0.7, -0.1), k);
       n.head.rotation.z = -s * 0.07 * k;
+    } else if (type === 'kiss') {
+      // a paw to the lips... and out: a heart floats off it
+      const k = bell(x, 0.18, 0.22);
+      const out = clamp((x - 0.48) / 0.28, 0, 1);
+      const mouth = _v1.set(head.x + s * 0.03, head.y - 0.1, head.z + 0.21);
+      const far = _v2.set(head.x + s * 0.24, head.y + 0.04, head.z + 0.42);
+      _h.copy(mouth).lerp(far, easeInOut(out));
+      this._reach(A, _h, _p.set(s, -0.6, -0.2), k);
+      n.head.rotation.z += -s * 0.16 * k;
+      n.head.rotation.x += -0.06 * k * (1 - out);
+      if (out > 0.25 && !this.gesture.blown) {
+        this.gesture.blown = true;
+        this.rig.root.updateMatrixWorld(true);
+        this._heart(n['el' + A].localToWorld(_v3.set(0, -0.33, 0.09)));
+      }
+    } else if (type === 'paws') {
+      // paws up by the face, beans out: nya
+      const k = bell(x, 0.18, 0.3);
+      for (const [B, t] of [['L', -1], ['R', 1]]) this._reach(B, _h.set(head.x + t * 0.15, head.y - 0.03, head.z + 0.17), _p.set(t, -0.8, -0.1), k);
+      n.hips.position.y += Math.abs(Math.sin(x * Math.PI * 3)) * 0.02 * k;
+      n.head.rotation.z += Math.sin(x * Math.PI * 2) * 0.18 * k;
+      if (n.earL) n.earL.rotation.z -= 0.2 * k;
+      if (n.earR) n.earR.rotation.z += 0.2 * k;
+    } else if (type === 'tilt') {
+      // the head tilt. you know the one
+      const k = bell(x, 0.25, 0.3);
+      n.head.rotation.z += s * 0.36 * k;
+      n.head.rotation.x += -0.12 * k;
+      n.chest.rotation.z += -s * 0.05 * k;
+      n.hips.rotation.z += s * 0.03 * k;
+      if (n.earL) n.earL.rotation.x -= 0.15 * k;
+      if (n.earR) n.earR.rotation.x -= 0.15 * k;
     } else if (type === 'startle') {
       // something out there: it flinches, hands up to the face, and hunches
       const k = bell(x, 0.1, 0.6);
@@ -672,6 +856,7 @@ export class Mannequin {
     const fit = cleanFit(fitIn);
     const W = canvas.width, H = canvas.height;
     if (W < 2 || H < 2) return;
+    if (slot === 'car') return this._carStill(fit, canvas);
     const SS = 2; // supersampled, then scaled down
     const rw = W * SS, rh = H * SS;
     if (!this.rt || this.rt.width !== rw || this.rt.height !== rh) {
@@ -689,6 +874,8 @@ export class Mannequin {
       this.trigs.set(key, rig);
     }
     for (const r of this.trigs.values()) r.root.visible = r === rig;
+    for (const c of this.tcars.values()) c.visible = false;
+    this.tground.scale.setScalar(1);
     if (!rig.root.parent) this.tscene.add(rig.root);
     rig.fit = fit;
     const n = rig.nodes;
@@ -738,6 +925,74 @@ export class Mannequin {
     r.setRenderTarget(null);
     r.setClearColor(prevClear, prevAlpha);
     // flip (GL rows run bottom-up) and shrink
+    const c2 = this._c2.getContext('2d');
+    const img = c2.createImageData(rw, rh);
+    const row = rw * 4;
+    for (let y = 0; y < rh; y++) img.data.set(this._px.subarray((rh - 1 - y) * row, (rh - y) * row), y * row);
+    c2.putImageData(img, 0, 0);
+    const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.clearRect(0, 0, W, H);
+    ctx.drawImage(this._c2, 0, 0, W, H);
+  }
+
+  // a car's card: three-quarters from the front, lamps up if it has the kind that flip
+  _carStill(fit, canvas) {
+    const W = canvas.width, H = canvas.height;
+    let car = this.tcars.get(fit.car);
+    if (!car) {
+      car = carGroup(fit.car, this.tmat);
+      for (const g of car.userData.pods) g.rotation.z = -car.userData.open;
+      this.tcars.set(fit.car, car);
+      this.tscene.add(car);
+    }
+    for (const r of this.trigs.values()) r.root.visible = false;
+    for (const c of this.tcars.values()) c.visible = c === car;
+    const tu = this.tu;
+    tu.uCarDye.value[0].set(fit.cc[0]);
+    tu.uCarDye.value[1].set(fit.cc[1]);
+    tu.uOpaque.value = 1;
+    tu.uFade.value = 1;
+    tu.uHover.value = 0;
+    tu.uKey.value = 1.0;
+    tu.uAmb.value = 0.34;
+    tu.uTime.value = 1.3;
+    tu.uPing.value.set(0, 0, 0, -1e4);
+    tu.uGlow.value.w = 0;
+    const cam = this.tcam;
+    cam.aspect = W / H;
+    const yaw = 0.95, d = 7.4;
+    cam.position.set(Math.sin(yaw) * d, 2.2, Math.cos(yaw) * d);
+    cam.lookAt(0, 0.62, 0);
+    cam.near = 0.05;
+    cam.far = 40;
+    cam.updateProjectionMatrix();
+    tu.uCam.value.copy(cam.position);
+    tu.uKeyPos.value.set(2.4, 3.2, 3.6);
+    tu.uNoise.value = 18;
+    tu.uGroundR.value = 0.95;
+    this.tground.visible = true;
+    this.tground.scale.setScalar(2.6);
+    const SS = 2, rw = W * SS, rh = H * SS;
+    if (!this.rt || this.rt.width !== rw || this.rt.height !== rh) {
+      if (this.rt) this.rt.dispose();
+      this.rt = new THREE.WebGLRenderTarget(rw, rh, { depthBuffer: true });
+      this._px = new Uint8Array(rw * rh * 4);
+      this._c2 = document.createElement('canvas');
+      this._c2.width = rw;
+      this._c2.height = rh;
+    }
+    const r = this.renderer;
+    const prevClear = r.getClearColor(new THREE.Color());
+    const prevAlpha = r.getClearAlpha();
+    r.setRenderTarget(this.rt);
+    r.setClearColor(0x0b0908, 1);
+    r.clear();
+    r.render(this.tscene, cam);
+    r.readRenderTargetPixels(this.rt, 0, 0, rw, rh, this._px);
+    r.setRenderTarget(null);
+    r.setClearColor(prevClear, prevAlpha);
     const c2 = this._c2.getContext('2d');
     const img = c2.createImageData(rw, rh);
     const row = rw * 4;

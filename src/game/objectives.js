@@ -539,6 +539,7 @@ export class Objectives {
       for (const g of this.gens) if (!g.running) consider(g, g.x, g.z, USE_R_GEN, 'gen');
       if (game.rescue) game.rescue.consider(consider);
       if (game.glows) game.glows.consider(consider);
+      if (game.torch) game.torch.consider(consider);
     }
     if (es && !doorsOnly) es.consider(consider);
     if (game.doors && !seated) game.doors.consider(consider);
@@ -591,6 +592,12 @@ export class Objectives {
       this.searchT = 0;
       hud.setUse(T('useGlowPick'), 0, true);
       if (pressed) game.glows.pick(o);
+      return;
+    }
+    if (best.kind === 'torch') {
+      this.searchT = 0;
+      hud.setUse(T('useTorch'), 0, true);
+      if (pressed) game.torch.take(o);
       return;
     }
     if (best.kind === 'body') {

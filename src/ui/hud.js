@@ -36,6 +36,8 @@ export class HUD {
     this.peekTask = $('peekTask');
     this.useEl = $('use');
     this.useRing = $('useRing');
+    this.cdRing = $('cdRing');
+    this.tPing = $('tPing');
     this.noteEl = $('note');
     this.beaconEl = $('beacon');
     this.skipEl = $('skip');
@@ -47,6 +49,8 @@ export class HUD {
     this.stones = $('stones');
     this.flares = $('flares');
     this.glows = $('glows');
+    this.torchBat = $('torchBat');
+    this.torchFill = this.torchBat.querySelector('i');
     this.pulseEl = $('pulse');
     this.stamWrap = $('stam');
     this.stam = $('stamFill');
@@ -162,6 +166,18 @@ export class HUD {
       [...this.glows.children].forEach((c, i) => c.classList.toggle('on', i < gl));
     }
     this._cls('glows', this.glows, 'show', night && (show || this.clock < this.glowsUntil));
+    // the flashlight's battery: while it's on (and a moment after), or with Tab
+    const tc = g.torch;
+    if (tc && tc.has) {
+      const v = Math.round(tc.charge * 40) / 40;
+      if (this.cache.torchV !== v) {
+        this.cache.torchV = v;
+        this.torchFill.style.transform = `scaleX(${v.toFixed(3)})`;
+      }
+      if (tc.on) this.torchUntil = this.clock + 2.5;
+    }
+    this._cls('torch', this.torchBat, 'show', !!(tc && tc.has) && (show || this.clock < (this.torchUntil || 0)));
+    this._cls('torchLow', this.torchBat, 'low', !!(tc && tc.has) && tc.charge < 0.18);
     this._cls('pulse', this.pulseEl, 'show', this.clock < this.pulseUntil);
 
     // stamina: only while it isn't full
@@ -290,6 +306,24 @@ export class HUD {
 
   setMic() {
     /* the minimal HUD has no mic button; toggles are announced with a popup */
+  }
+
+  // the echo's short wait (SPACE / ECHO): a thin arc round the dot that runs out. k: 1 → 0
+  cooldown(k) {
+    const v = k > 0 ? k.toFixed(2) : '0';
+    if (this.cache.cd === v) return;
+    this.cache.cd = v;
+    const C = 2 * Math.PI * 4.4;
+    this.cdRing.style.strokeDasharray = `${(C * k).toFixed(2)} ${C.toFixed(2)}`;
+    this._cls('cdOn', this.cross, 'cd', k > 0);
+    if (this.tPing) this.tPing.style.setProperty('--cd', v);
+  }
+
+  // SPACE while the echo is still out: the arc flinches
+  cooldownDeny() {
+    this.cross.classList.remove('deny');
+    void this.cross.offsetWidth;
+    this.cross.classList.add('deny');
   }
 
   pulseCross() {

@@ -30,6 +30,8 @@ export const shared = {
   // small lights (glow sticks, a battery lantern): xyz + intensity (0 = off), and colour + reach (m)
   uGlow: { value: Array.from({ length: GLOW_SLOTS }, () => new THREE.Vector4(0, -100, 0, 0)) },
   uGlowC: { value: Array.from({ length: GLOW_SLOTS }, () => new THREE.Vector4(1, 1, 1, 8)) },
+  // ...and for a beam (a flashlight): which way it points + the cosine of its edge (w = 0: all round)
+  uGlowD: { value: Array.from({ length: GLOW_SLOTS }, () => new THREE.Vector4(0, 0, 0, 0)) },
   // the shadow atlas, and for each light where its six faces were drawn from + its reach (w = 0: no shadows)
   uShadowMap: { value: null },
   uShG: { value: Array.from({ length: GLOW_SLOTS }, () => new THREE.Vector4(0, 0, 0, 0)) },
@@ -71,6 +73,7 @@ uniform vec4 uFlare[2];
 uniform float uFlareR;
 uniform vec4 uGlow[MAXG];
 uniform vec4 uGlowC[MAXG];
+uniform vec4 uGlowD[MAXG];
 uniform sampler2D uShadowMap;
 uniform vec4 uShG[MAXG];
 uniform vec4 uShL[MAXL];
@@ -199,6 +202,12 @@ vec3 glowLight(vec3 P, vec3 Nrm) {
     if (d > C.w) continue;
     float fall = 1.0 - smoothstep(C.w * 0.05, C.w, d);
     float facing = dot(Nrm, Nrm) > 0.5 ? 0.45 + 0.55 * max(dot(Nrm, dv / max(d, 0.001)), 0.0) : 1.0;
+    vec4 Bm = uGlowD[i];
+    if (Bm.w > 0.0) {
+      // a beam: bright inside its cone, a soft edge, a little spill right by the lens
+      float c = dot(-dv / max(d, 0.001), Bm.xyz);
+      facing *= smoothstep(Bm.w, mix(Bm.w, 1.0, 0.55), c) + 0.06 * (1.0 - smoothstep(0.3, 1.6, d));
+    }
     acc += C.rgb * G.w * fall * fall * facing * omniShadow(uShG[i], float(i), P, Nrm);
   }
   return acc;

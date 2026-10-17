@@ -61,6 +61,7 @@ export class Menus {
     click('btnHow', () => this.show('howPanel'));
     click('btnHowBack', () => this.show('howPanel', false));
     click('btnAtlas', () => this.h.onAtlas && this.h.onAtlas());
+    click('btnShop', () => this.h.onShop && this.h.onShop());
     click('btnScores', () => {
       this.renderScores();
       this.show('scoresPanel');

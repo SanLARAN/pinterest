@@ -756,6 +756,20 @@ export class AudioEngine {
     this._noiseBurst(t + 0.06 + Math.random() * 0.03, { type: 'bandpass', f: 1600, q: 2, a: 0.0008, d: 0.03, gain: 0.55 * k, dest: pn });
   }
 
+  // the flashlight's switch: a firm plastic click (flat battery: a dull double tick, and nothing)
+  torchClick(on, dead = false) {
+    if (!this.ready) return;
+    const t = this.now;
+    if (dead) {
+      for (const dt of [0, 0.11]) this._noiseBurst(t + dt, { type: 'bandpass', f: 900, q: 1.6, a: 0.001, d: 0.03, gain: 0.12 });
+      this._tone(t + 0.02, { type: 'square', f: 70, a: 0.002, d: 0.05, gain: 0.03 });
+      return;
+    }
+    this._noiseBurst(t, { type: 'bandpass', f: on ? 2600 : 1900, q: 2.2, a: 0.001, d: 0.025, gain: 0.2 });
+    this._noiseBurst(t + 0.012, { type: 'lowpass', f: 700, q: 0.8, a: 0.001, d: 0.05, gain: 0.12 });
+    if (on) this._tone(t + 0.02, { type: 'sine', f: 7400, fEnd: 7000, a: 0.01, d: 0.18, gain: 0.006 }); // the bulb's faint whine
+  }
+
   glowPick() {
     if (!this.ready) return;
     const t = this.now;
@@ -2425,6 +2439,12 @@ export class AudioEngine {
     } else if (kind === 'tap') {
       this._tone(t, { type: 'sine', f: 2300, fEnd: 1500, a: 0.001, d: 0.05, gain: 0.06, dest: out });
       this._tone(t + 0.16, { type: 'sine', f: 1500, fEnd: 1100, a: 0.001, d: 0.08, gain: 0.025, dest: out });
+    } else if (kind === 'buy') {
+      // amber shards poured out: a run of glassy chimes, a low thump of the deal
+      const notes = [1046, 1318, 1568, 2093, 2637];
+      notes.forEach((f, i) => this._tone(t + i * 0.055, { type: 'sine', f, a: 0.002, d: 0.32, gain: 0.06 - i * 0.006, dest: out }));
+      for (let i = 0; i < 7; i++) this._tone(t + 0.02 + i * 0.03 + Math.random() * 0.02, { type: 'triangle', f: 2600 + Math.random() * 1800, a: 0.001, d: 0.05, gain: 0.018, dest: out });
+      this._tone(t, { type: 'sine', f: 140, fEnd: 70, a: 0.004, d: 0.22, gain: 0.12, dest: out });
     }
   }
 

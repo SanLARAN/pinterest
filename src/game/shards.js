@@ -64,15 +64,17 @@ export class Shards {
   }
 
   // someone else picked it up
+  // someone else took it: true if it was still there
   take(i) {
     const s = this.items[i];
-    if (!s || !s.alive) return;
+    if (!s || !s.alive) return false;
     s.alive = false;
     this.glow[i] = 0;
     this._m.makeScale(0, 0, 0);
     this.mesh.setMatrixAt(i, this._m);
     this.mesh.instanceMatrix.needsUpdate = true;
     this.glowAttr.needsUpdate = true;
+    return true;
   }
 
   remaining() {

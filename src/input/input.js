@@ -3,7 +3,7 @@ import { settings } from '../core/storage.js';
 
 const GAME_KEYS = new Set([
   'KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space',
-  'ShiftLeft', 'ShiftRight', 'KeyC', 'KeyF', 'KeyQ', 'KeyM', 'KeyP', 'KeyR', 'KeyE', 'KeyG', 'Tab', 'Enter',
+  'ShiftLeft', 'ShiftRight', 'KeyC', 'KeyF', 'KeyQ', 'KeyM', 'KeyP', 'KeyR', 'KeyE', 'KeyG', 'KeyT', 'Tab', 'Enter',
 ]);
 const QTE_KEYS = { KeyW: 'qU', ArrowUp: 'qU', KeyA: 'qL', ArrowLeft: 'qL', KeyS: 'qD', ArrowDown: 'qD', KeyD: 'qR', ArrowRight: 'qR' };
 
@@ -62,6 +62,9 @@ export class Input {
           break;
         case 'KeyQ':
           this.emit('flare');
+          break;
+        case 'KeyT':
+          this.emit('torch');
           break;
         case 'KeyG':
           this.emit('glow');
@@ -321,6 +324,7 @@ export class Input {
     btn('#tFlare', () => this.emit('flare'));
     btn('#tCarry', () => this.emit('carry'));
     btn('#tGlow', () => this.emit('glow'));
+    btn('#tTorch', () => this.emit('torch'));
     btn('#tPull', () => this.emit('qX')); // (touch: one button for the beat — only the timing counts)
     const peekZone = el.querySelector('#peekZone');
     if (peekZone) {

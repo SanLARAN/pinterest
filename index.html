@@ -42,6 +42,7 @@
           <circle id="screamRing" r="30" />
           <circle id="noiseRing" r="7" />
           <circle id="useRing" r="13" transform="rotate(-90)" />
+          <circle id="cdRing" r="4.4" transform="rotate(-90)" />
         </svg>
         <div id="ripple"></div>
         <div id="beacon"><i></i></div>
@@ -50,6 +51,7 @@
         <div id="stones"><i></i><i></i><i></i></div>
         <div id="flares"><i></i><i></i></div>
         <div id="glows"><i></i></div>
+        <div id="torchBat"><i></i></div>
       </div>
       <div id="alert"></div>
       <div id="popups"></div>
@@ -84,12 +86,14 @@
       <button id="tUse" class="tbtn"><span data-i18n="touchUse">РУКИ</span></button>
       <button id="tCarry" class="tbtn"><span class="a" data-i18n="touchCarry">НЕСТИ</span><span class="b" data-i18n="touchPutDown">ПОЛОЖИТЬ</span><span class="c" data-i18n="touchOut">ВЫЙТИ</span></button>
       <button id="tGlow" class="tbtn"><span data-i18n="touchGlow">СВЕТ</span></button>
+      <button id="tTorch" class="tbtn"><span data-i18n="touchTorch">ФОНАРЬ</span></button>
       <button id="tPull" class="tbtn big"><span data-i18n="touchPull">ТЯНИ</span></button>
       <button id="tSkip" class="tbtn wide"><span data-i18n="touchSkip">ПРОПУСТИТЬ</span></button>
     </div>
 
     <!-- main menu -->
     <div id="menu" class="screen">
+      <aside id="news" class="news" aria-label="news"></aside>
       <div class="menu-wrap">
         <div class="title-block">
           <h1 class="title" id="titleText" data-text="ТИШЕ">ТИШЕ</h1>
@@ -104,6 +108,8 @@
             <i>·</i>
             <button class="link atlas-link" id="btnAtlas"><svg class="book-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6.5C10 5 7 4.6 4 5v13c3-.4 6 0 8 1.5 2-1.5 5-1.9 8-1.5V5c-3-.4-6 0-8 1.5zM12 6.5v13"/></svg><span data-i18n="atlas"></span></button>
             <i>·</i>
+            <button class="link shop-link" id="btnShop"><svg class="gem-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l5.5 6.5L12 20.5 6.5 10z"/><path d="M6.5 10h11"/></svg><span data-i18n="shop"></span><b id="walletMenu">0</b></button>
+            <i>·</i>
             <button class="link" id="btnScores"><span data-i18n="scores"></span></button>
             <i>·</i>
             <button class="link" id="btnSettings"><span data-i18n="settings"></span></button>
@@ -112,6 +118,7 @@
             <div class="mic-row">
               <span id="micStatus"></span>
               <button class="chip" id="micToggle"></button>
+              <button class="chip mc-chip" id="micCalBtn" type="button"><span data-i18n="mcShort"></span></button>
             </div>
             <div id="micTest"><div class="bar"><div id="micTestFill"></div><div id="micTestTrig"></div></div><span data-i18n="micTest"></span></div>
             <div id="micWarn"></div>
@@ -152,6 +159,7 @@
         <div id="newRecord" class="badge" data-i18n="newRecord"></div>
         <div id="overScore" class="big-score">0</div>
         <div id="overStats" class="stats-grid"></div>
+        <div id="overWallet"></div>
         <div id="overTeam" class="team-table"></div>
         <div id="overTable" class="score-table compact"></div>
         <div class="btn-row">
@@ -173,6 +181,7 @@
           <label class="check"><span data-i18n="sInvert"></span><input type="checkbox" id="sInvert" /></label>
           <label class="check"><span data-i18n="sMic"></span><input type="checkbox" id="sMic" /></label>
           <label><span data-i18n="sMicSens"></span><input type="range" id="sMicSens" min="0" max="1" step="0.01" /></label>
+          <button class="chip mc-open" id="btnMicCal" type="button"><span data-i18n="mcOpen"></span></button>
           <label class="check"><span data-i18n="sEcho"></span><input type="checkbox" id="sEcho" /></label>
           <label class="check"><span data-i18n="sRadar"></span><input type="checkbox" id="sRadar" /></label>
           <label><span data-i18n="sScares"></span>
@@ -282,10 +291,12 @@
           <div class="wr-tag" id="wrTag"></div>
           <div class="plate-hint wr-hint" id="wrHint"></div>
           <div class="plate-stamp wr-set" id="wrSet"></div>
+          <div class="wr-toast" id="wrToast"></div>
         </div>
         <div class="wr-side">
           <div class="wr-head">
             <h2 class="wr-title" id="wrTitle"></h2>
+            <div class="wr-wallet" id="wrWallet"></div>
             <button class="book-close" id="wrClose" aria-label="close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></svg></button>
           </div>
           <div class="wr-sub" id="wrSub"></div>
@@ -305,6 +316,8 @@
         </div>
       </div>
     </div>
+
+    <div id="micCalPanel" class="screen modal" role="dialog" aria-modal="true" aria-hidden="true" aria-label="microphone"></div>
 
     <div id="noise-overlay"></div>
     <script type="module" src="./src/main.js"></script>

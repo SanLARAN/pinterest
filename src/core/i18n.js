@@ -9,6 +9,29 @@ const STR = {
     settings: 'НАСТРОЙКИ',
     howto: 'КАК ИГРАТЬ',
     atlas: 'АТЛАС',
+    shop: 'МАГАЗИН',
+    mcTitle: 'Микрофон за 15 секунд',
+    mcOpen: 'Настроить микрофон · 15 с',
+    mcShort: 'настроить · 15 с',
+    mcStep_quiet: 'тишина',
+    mcStep_talk: 'голос',
+    mcStep_shout: 'крик',
+    mcSay_quiet: 'Помолчи. Слушаю комнату.',
+    mcSub_quiet: 'Не двигайся и не печатай — три секунды.',
+    mcSay_talk: 'Говори обычным голосом.',
+    mcSub_talk: 'Как другу рядом: «раз, два, три — меня слышно?»',
+    mcSay_shout: 'А теперь — крикни!',
+    mcSub_shout: 'Или громко хлопни в ладоши. Это тот звук, за который в лесу убивают.',
+    mcAsk: 'Разреши доступ к микрофону…',
+    mcNoMic: 'Микрофон недоступен — проверь разрешение в браузере.',
+    mcFail: 'Голоса почти не слышно. Проверь, тот ли микрофон выбран, и попробуй ещё раз.',
+    mcDone: 'Готово — микрофон настроен под тебя.',
+    mcResult: 'тишина {q} дБ · голос {v} дБ · крик {s} дБ',
+    mcWhat: 'Обычный голос твари слышат лишь в паре шагов, повышенный — издалека, а такой крик — это сразу охота.',
+    mcNoShout: 'Крика не было — линию крика поставил с запасом над голосом.',
+    mcOk: 'ГОТОВО',
+    mcAgain: 'Ещё раз',
+    mcClose: 'Закрыть',
     back: 'НАЗАД',
     resume: 'ПРОДОЛЖИТЬ',
     restart: 'ЗАНОВО',
@@ -93,6 +116,17 @@ const STR = {
     hintGlowTouch: 'СВЕТ — бросить палочку · РУКИ — подобрать её снова',
     useGlowPick: 'E · подобрать палочку',
     useGlowPickT: 'РУКИ · подобрать палочку',
+    useTorch: 'E · взять фонарик',
+    useTorchT: 'РУКИ · взять фонарик',
+    touchTorch: 'ФОНАРЬ',
+    torchGot: 'фонарик · T — включить (батарейка не вечная)',
+    torchGotT: 'фонарик · ФОНАРЬ — включить (батарейка не вечная)',
+    torchMore: 'ещё фонарик — его батарейка в твой',
+    torchNone: 'фонарика нет — поищи у разбитой машины, у вышки, у могил',
+    torchDead: 'батарейка села',
+    torchDied: 'фонарик погас — батарейка села',
+    torchBattery: '+ батарейки — фонарику полегчало',
+    torchBatterySpare: '+ батарейки — пригодятся, когда найдёшь фонарик',
     // cupboards, the шкафандр
     useCabinet: 'E · открыть {what}',
     useCabinetT: 'РУКИ · открыть {what}',
@@ -100,7 +134,7 @@ const STR = {
     useTake: 'E · взять',
     useTakeT: 'РУКИ · взять',
     cabItems: { glow: 'светящуюся палочку', nuts: 'горсть гаек', shard: 'осколок', flare: 'патрон к ракетнице' },
-    cabGot: { glow: 'палочка', nuts: 'гайки', shard: 'осколок', flare: 'патрон к ракетнице' },
+    cabGot: { glow: 'палочка', nuts: 'гайки', shard: 'осколок', flare: 'патрон к ракетнице', battery: 'батарейки' },
     useGrabHand: 'E · хватай за руку!',
     useGrabHandT: 'РУКИ · хватай за руку!',
     aPocketsFull: 'карманы полны',
@@ -267,6 +301,9 @@ const STR = {
     gensGot: 'генераторы',
     survived: 'продержался',
     shardsGot: 'осколки',
+    walletNight: 'в кошелёк: +{n}{escape} · всего {total} — магазин в главном меню',
+    walletEscape: ' (из них +{n} за побег)',
+    mateShard: '{name} нашёл осколок · +1 и тебе',
     closeCalls: 'впритык',
     escapes: 'отрывы',
     loudest: 'громче всего',
@@ -302,6 +339,7 @@ const STR = {
 <p><b>Микрофон:</b> щёлкни языком, хлопни, скажи «эй». Громче звук — дальше видно. Но <span class="red">и они слышат дальше</span>: обычную речь — за пару шагов, громкий голос — издалека. Крик (кольцо вокруг точки стало красным) — мгновенная охота. <b>Без микрофона:</b> ПРОБЕЛ — щелчок, удерживай — громче.</p>
 <p><b>Слушатели и Ползуны</b> идут туда, где был звук. Пискнул — уходи. Камень (ПКМ / F) уводит их в сторону. Позже приходят двое других, по одному на лес: <b>Наблюдатель</b> глух, но двигается, только пока на него не падает свет, — свети на него; лампы он обходит. <b>Ревун</b> почти не слышит, но иногда набирает воздух и воет: всё, что движется в этой волне, он видит. Услышал вдох — замри.</p>
 <p><b>Ракетница.</b> У одного из тел (каждую ночь у другого) лежит ракетница — два заряда. Q — ракета уходит вверх, раскрывает парашют и секунд пятнадцать заливает лес красным светом: видно всё и всех. Но <span class="red">на свет сходятся все твари с округи</span> — стреляй подальше от себя. <b>Охотничья избушка</b>: дверь закрывается (E). Бродячие твари не сразу её откроют — навалятся, и она со скрипом подастся; а та, что охотится за тобой, выбьет её в три удара.</p>
+<p><b>Фонарик</b> лежит где-то в лесу — у разбитой машины, у вышки, у могил, — ещё включённый: его слабый луч видно издалека. T — включить: конус настоящего света туда, куда смотришь. Батарейка садится (запасные — в шкафах), а то, что попало в луч, видит его и идёт посмотреть.</p>
 <p><b>Светящаяся палочка</b> — у каждого одна на ночь. G — переломить: пару минут она светит зелёным у тебя в руке, G ещё раз — бросить вперёд (E — подобрать с земли). В её свете, как и под лампой генератора, лес виден таким, какой он есть, — легко понять, где ты. Наблюдатель в такой свет не шагнёт.</p>
 <p><b>Интерфейса почти нет.</b> Кольцо вокруг точки — твоя громкость. Tab — время, генераторы и текущая задача. Полоска сверху заполняется с каждым генератором. Через 45 минут лес просыпается окончательно.</p>
 <p><b>Очки:</b> время × множитель опасности, найденные тела, генераторы, осколки, проходы впритык, отрывы. За победу — бонус, и тем больше, чем быстрее.</p>
@@ -309,10 +347,11 @@ const STR = {
 <table class="keys">
 <tr><td>WASD · стрелки</td><td>движение и поворот</td></tr>
 <tr><td>Мышь</td><td>обзор (клик — захват курсора)</td></tr>
-<tr><td>ПРОБЕЛ</td><td>эхо: тап — щелчок, удерживай — громко</td></tr>
+<tr><td>ПРОБЕЛ</td><td>эхо: тап — щелчок, удерживай — громко (после каждого — короткая перезарядка)</td></tr>
 <tr><td>E (удерживать)</td><td>обыскать тело · чинить генератор · дверь · пульс друга · поднять / поставить деталь · сесть в УАЗ, завести</td></tr>
 <tr><td>ПКМ / F</td><td>бросить камень (с деталью в руках — бросить её)</td></tr>
 <tr><td>G</td><td>светящаяся палочка: переломить · бросить</td></tr>
+<tr><td>T</td><td>фонарик (если нашёл): включить · выключить</td></tr>
 <tr><td>R</td><td>нести упавшего друга · положить (на койку, в машину) · положить деталь · выйти из машины</td></tr>
 <tr><td>Q</td><td>сигнальная ракета (если нашёл)</td></tr>
 <tr><td>Shift / C</td><td>бег / красться</td></tr>
@@ -422,6 +461,29 @@ const STR = {
     settings: 'SETTINGS',
     howto: 'HOW TO PLAY',
     atlas: 'ATLAS',
+    shop: 'SHOP',
+    mcTitle: 'The microphone in 15 seconds',
+    mcOpen: 'Set up the mic · 15 s',
+    mcShort: 'set up · 15 s',
+    mcStep_quiet: 'silence',
+    mcStep_talk: 'voice',
+    mcStep_shout: 'shout',
+    mcSay_quiet: 'Stay quiet. Listening to the room.',
+    mcSub_quiet: "Don't move, don't type — three seconds.",
+    mcSay_talk: 'Talk in your normal voice.',
+    mcSub_talk: 'Like to a friend beside you: "one, two, three — can you hear me?"',
+    mcSay_shout: 'And now — shout!',
+    mcSub_shout: 'Or clap hard. This is the sound that gets you killed out there.',
+    mcAsk: 'Allow the microphone…',
+    mcNoMic: "The microphone isn't available — check the browser's permission.",
+    mcFail: 'I can barely hear a voice. Check the right microphone is selected and try again.',
+    mcDone: 'Done — the microphone is tuned to you.',
+    mcResult: 'silence {q} dB · voice {v} dB · shout {s} dB',
+    mcWhat: 'Things hear your normal voice only from a couple of steps away, a raised one from far off — and a shout like that means a hunt at once.',
+    mcNoShout: 'There was no shout — the scream line sits well above your voice.',
+    mcOk: 'DONE',
+    mcAgain: 'Again',
+    mcClose: 'Close',
     back: 'BACK',
     resume: 'RESUME',
     restart: 'RESTART',
@@ -501,6 +563,17 @@ const STR = {
     hintGlowTouch: 'LIGHT — throw the stick · HANDS — pick it up again',
     useGlowPick: 'E · pick up the glow stick',
     useGlowPickT: 'HANDS · pick up the glow stick',
+    useTorch: 'E · take the flashlight',
+    useTorchT: 'HANDS · take the flashlight',
+    touchTorch: 'TORCH',
+    torchGot: "flashlight · T to switch it on (the battery won't last)",
+    torchGotT: "flashlight · TORCH to switch it on (the battery won't last)",
+    torchMore: 'another flashlight — its battery goes into yours',
+    torchNone: 'no flashlight — look by a wrecked car, a tower, the graves',
+    torchDead: 'the battery is flat',
+    torchDied: 'the flashlight dies — the battery is flat',
+    torchBattery: '+ batteries — the flashlight perks up',
+    torchBatterySpare: '+ batteries — for when you find a flashlight',
     // cupboards, the grindrobe
     useCabinet: 'E · open the {what}',
     useCabinetT: 'HANDS · open the {what}',
@@ -508,7 +581,7 @@ const STR = {
     useTake: 'E · take',
     useTakeT: 'HANDS · take',
     cabItems: { glow: 'the glow stick', nuts: 'a handful of nuts', shard: 'the shard', flare: 'the flare cartridge' },
-    cabGot: { glow: 'glow stick', nuts: 'nuts', shard: 'shard', flare: 'flare cartridge' },
+    cabGot: { glow: 'glow stick', nuts: 'nuts', shard: 'shard', flare: 'flare cartridge', battery: 'batteries' },
     useGrabHand: 'E · grab their hand!',
     useGrabHandT: 'HANDS · grab their hand!',
     aPocketsFull: 'pockets full',
@@ -673,6 +746,9 @@ const STR = {
     gensGot: 'generators',
     survived: 'survived',
     shardsGot: 'shards',
+    walletNight: 'to your purse: +{n}{escape} · {total} in all — the shop is in the main menu',
+    walletEscape: ' (+{n} of it for getting away)',
+    mateShard: '{name} found a shard · +1 for you too',
     closeCalls: 'close calls',
     escapes: 'escapes',
     loudest: 'loudest',
@@ -706,6 +782,7 @@ const STR = {
 <p><b>Microphone:</b> click your tongue, clap, say “hey”. Louder sound — you see further. But <span class="red">they hear further too</span>: normal talk from a couple of steps, a raised voice from far away. A scream (the ring around the dot turns red) means an instant hunt. <b>No mic:</b> SPACE — a click, hold for louder.</p>
 <p><b>Listeners and Crawlers</b> walk to where the sound was. Made a noise? Move. A stone (RMB / F) lures them away. Later two others arrive, one of each per forest: <b>the Watcher</b> is deaf but moves only while no light is on it — keep it lit; it won't enter a lamp. <b>The Howler</b> barely hears, but now and then it fills its chest and howls: whatever moves inside that wave, it sees. Hear the breath — freeze.</p>
 <p><b>The flare gun.</b> One of the bodies (a different one every night) has a flare gun with two shots. Q — the flare climbs, opens its parachute and floods the forest with red light for about fifteen seconds: you see everything, and everyone. But <span class="red">every creature around comes to the light</span> — fire it away from yourself. <b>The hunting cabin</b>: its door closes (E). Wanderers won't get it open at once — they lean on it until it creaks open; the one hunting you breaks it down in three blows.</p>
+<p><b>The flashlight</b> lies somewhere in the forest — by a wrecked car, a tower, the graves — still switched on: you can see its weak beam from far off. T switches it: a cone of real light where you look. The battery runs down (spares are in the cupboards), and whatever the beam falls on sees it and comes to look.</p>
 <p><b>The glow stick</b> — one each per night. G — crack it: for a couple of minutes it glows green in your hand; G again — throw it ahead (E — pick it up off the ground). In its light, as under a generator's lamp, the forest looks the way it really is — easy to tell where you are. The Watcher won't step into that light.</p>
 <p><b>There is almost no interface.</b> The ring around the dot is your loudness. Tab shows time, generators and the current task. The hairline at the top fills with each generator. After 45 minutes the forest wakes up for good.</p>
 <p><b>Score:</b> time × danger multiplier, bodies found, generators, shards, close calls, escapes. Winning gives a bonus — bigger the faster you are.</p>
@@ -713,10 +790,11 @@ const STR = {
 <table class="keys">
 <tr><td>WASD · arrows</td><td>move &amp; turn</td></tr>
 <tr><td>Mouse</td><td>look (click to lock cursor)</td></tr>
-<tr><td>SPACE</td><td>echo: tap = click, hold = loud</td></tr>
+<tr><td>SPACE</td><td>echo: tap = click, hold = loud (a short cooldown after each)</td></tr>
 <tr><td>E (hold)</td><td>search a body · repair a generator · door · a friend's pulse · pick up / fit a part · get in the UAZ, start it</td></tr>
 <tr><td>RMB / F</td><td>throw stone (with a part in your arms — throw that)</td></tr>
 <tr><td>G</td><td>glow stick: crack · throw</td></tr>
+<tr><td>T</td><td>flashlight (once you've found it): on · off</td></tr>
 <tr><td>R</td><td>carry a fallen friend · put down (on the cot, in the car) · put a part down · get out of the car</td></tr>
 <tr><td>Q</td><td>signal flare (once you've found the gun)</td></tr>
 <tr><td>Shift / C</td><td>run / sneak</td></tr>

@@ -281,6 +281,24 @@ export class Mic {
     return true;
   }
 
+  // the input level right now (dBFS), with no side effects: the 15-second setup listens through this
+  readDb() {
+    if (this.state !== 'on' || !this.analyser) return -100;
+    this.analyser.getFloatTimeDomainData(this.buf);
+    let sum = 0;
+    for (let i = 0; i < this.buf.length; i++) sum += this.buf[i] * this.buf[i];
+    return 20 * Math.log10(Math.sqrt(sum / this.buf.length) + 1e-9);
+  }
+
+  // a fresh calibration (settings.micCal): start from its quiet, not from a guess
+  applyCalibration() {
+    const cal = settings.micCal;
+    if (!cal || !Number.isFinite(cal.floor)) return;
+    this.floor = clamp(cal.floor, -88, -38);
+    this.calibrated = true;
+    this.calib = [];
+  }
+
   // per-frame update; returns events
   update(dt, outDb) {
     const ev = { pulse: 0, loud: 0, scream: false };
@@ -309,9 +327,12 @@ export class Mic {
     }
 
     const sens = settings.micSens;
+    // the 15-second setup (ui/miccal.js), if you did it: your own voice and shout set the lines
+    const cal = settings.micCal && Number.isFinite(settings.micCal.talk) ? settings.micCal : null;
     // a sound starts to count once it stands well clear of the room — far enough that a quiet word to
-    // the friend next to you stays under it
-    const margin = lerp(27, 11, sens);
+    // the friend next to you stays under it (calibrated: and your normal voice above it)
+    let margin = lerp(27, 11, sens);
+    if (cal && Number.isFinite(cal.floor)) margin = clamp(Math.min(margin, cal.talk - cal.floor - 4), 8, 30);
     let trig = clamp(this.floor + margin, -62, -24);
     const gate = outDb + this.leak;
     const selfPlaying = this.selfUntil && performance.now() < this.selfUntil;
@@ -321,8 +342,15 @@ export class Mic {
     // across the desk see the same voice ~10 dB apart, but nobody talks at the level of a shout.
     //   trig → talkDb: talking (up to loudness TALK) · talkDb → screamDb: raised voice up to the scream line
     //   (SCREAM) · 6 dB past it: everything you've got (1.0)
-    const talkDb = Math.max(trig + 5, -21 - 12 * sens);
-    const screamDb = Math.max(talkDb + 9, -6 - 12 * sens);
+    let talkDb, screamDb;
+    if (cal) {
+      const shift = (0.55 - sens) * 12; // (the slider still nudges a calibrated mic, up to ±6 dB)
+      talkDb = Math.max(trig + 5, cal.talk + 5 + shift);
+      screamDb = Math.max(talkDb + 7, (Number.isFinite(cal.shout) ? cal.shout - 3 : cal.talk + 17) + shift);
+    } else {
+      talkDb = Math.max(trig + 5, -21 - 12 * sens);
+      screamDb = Math.max(talkDb + 9, -6 - 12 * sens);
+    }
     this.trig = trig;
     this.talkDb = talkDb;
     this.screamDb = screamDb;

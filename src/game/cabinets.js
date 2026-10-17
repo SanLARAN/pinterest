@@ -32,8 +32,8 @@ export const KEY_LABEL = { U: 'W', L: 'A', D: 'S', R: 'D' };
 const OPEN_R = 1.7;
 const GRAB_R = 2.4;
 const MIMIC_CHANCE = 0.3;
-const ITEMS = ['glow', 'nuts', 'shard', 'flare'];
-const ITEM_W = [0.3, 0.3, 0.25, 0.15];
+const ITEMS = ['glow', 'nuts', 'shard', 'flare', 'battery'];
+const ITEM_W = [0.27, 0.27, 0.22, 0.12, 0.12];
 const RES = { NONE: 0, PULL: 1, SYNC: 2, OFF: 3, STRUGGLE: 4, PERFECT: 5 };
 const _v = new THREE.Vector3();
 const _w = new THREE.Vector3();
@@ -176,6 +176,13 @@ function itemOf(kind) {
   } else if (kind === 'shard') {
     b.place(0, 0.05, 0, 0.2, 0.3, 0.15);
     b.octa(0.03, 0.05, KIND.SHARD);
+  } else if (kind === 'battery') {
+    for (const [x, z] of [[0, 0], [0.032, 0.01]]) { // two of them, standing
+      b.place(x, 0, z);
+      b.cylinder(8, 0.014, 0.014, 0.05, GK.YELLOW, { capBottom: true });
+      b.place(x, 0.05, z);
+      b.cylinder(6, 0.005, 0.005, 0.005, GK.CHROME);
+    }
   } else {
     b.place(0, 0.016, 0, 0, 0.8, PI / 2);
     b.cylinder(7, 0.016, 0.016, 0.075, KIND.FLESH, { y0: -0.035, capBottom: true });
@@ -590,12 +597,16 @@ export class Cabinets {
       if (a.ready && a.cabinetItem) a.cabinetItem('nuts');
       g.hud.popup(`+ ${name}`, 'dim');
     } else if (kind === 'shard') {
+      if (g.earnShards) g.earnShards(1);
       g.stats.shards++;
       const pts = Math.round(CFG.SCORE.shard * g.mult);
       g.score += pts;
       if (p.stones < CFG.PLAYER.maxStones) p.stones++;
       if (a.ready) a.shardPickup(g.stats.shards);
       g.hud.popup(`+${pts} ${t('aShard')}`, 'amber');
+    } else if (kind === 'battery') {
+      if (g.torch) g.torch.addBattery();
+      if (a.ready && a.cabinetItem) a.cabinetItem('nuts');
     } else {
       g.setFlares((p.flares | 0) + 1, !!p.hasFlare);
       if (a.ready && a.cabinetItem) a.cabinetItem('flare');

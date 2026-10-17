@@ -426,6 +426,7 @@ export class GlowSticks {
       // (lying on the ground its light is lifted a little: from right at the ground it would only graze it)
       out.push({ x: s.x, y: s.y + (s.state === 'ground' ? 0.35 : 0.1), z: s.z, I, c: G.color, R: G.radius, prio: s.state === 'held' && s.owner === me ? 2 : 0, near: 0.1, id: s });
     }
+    if (this.g.torch) this.g.torch.lightSources(out); // (flashlights: small lights with a direction)
     return out;
   }
 
@@ -454,7 +455,7 @@ export class GlowSticks {
       if (i < 0) break;
       placed[i] = l;
     }
-    const U = shared.uGlow.value, C = shared.uGlowC.value;
+    const U = shared.uGlow.value, C = shared.uGlowC.value, D = shared.uGlowD.value;
     for (let i = 0; i < GLOW_SLOTS; i++) {
       const l = placed[i];
       slots[i] = l ? l.id : null;
@@ -465,6 +466,8 @@ export class GlowSticks {
       }
       U[i].set(l.x, l.y, l.z, l.I);
       C[i].set(l.c[0], l.c[1], l.c[2], l.R);
+      if (l.dir) D[i].set(l.dir[0], l.dir[1], l.dir[2], l.cone);
+      else D[i].set(0, 0, 0, 0);
       const sl = shadowLights.glow[i] || (shadowLights.glow[i] = { x: 0, y: 0, z: 0, R: 0, near: 0 });
       sl.x = l.x;
       sl.y = l.y;
@@ -482,7 +485,11 @@ export class GlowSticks {
       const d = Math.hypot(l.x - x, l.y - y, l.z - z);
       if (d > l.R) continue;
       const f = 1 - smoothstep(l.R * 0.05, l.R, d);
-      const v = f * f * Math.min(1, l.I);
+      let v = f * f * Math.min(1, l.I);
+      if (l.dir && d > 0.01) {
+        const c = ((x - l.x) * l.dir[0] + (y - l.y) * l.dir[1] + (z - l.z) * l.dir[2]) / d;
+        v *= smoothstep(l.cone, l.cone + (1 - l.cone) * 0.55, c);
+      }
       if (v <= best) continue;
       if (world.losBlocked && world.losBlocked(l.x, l.y, l.z, x, y, z, 0.3)) continue;
       best = v;

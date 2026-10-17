@@ -7,7 +7,7 @@
 //   13 / 14 = headwear main / accent, 15 / 16 = outfit main / accent, 17 / 18 = a light in the accent colour
 import * as THREE from 'three';
 import { MeshBuilder, KIND } from '../world/builder.js';
-import { clamp, lerp } from '../core/rng.js';
+import { RNG, clamp, lerp } from '../core/rng.js';
 import { cleanFit, shapeKey } from './outfit.js';
 
 export const DYE = { HA: 13, HB: 14, BA: 15, BB: 16, HG: 17, BG: 18 };
@@ -57,6 +57,11 @@ function lathe(b, prof, segs, kind, { ribN = 0, amp = 0, phase = 0, hide = 0 } =
 function spike(b, x, y, z, yaw, tilt, r, h, kind, segs = 3) {
   b.place(x, y, z, 0, -yaw, -tilt);
   b.cone(segs, r, h, kind);
+}
+
+// a soft tuft of fur: a short, wide cone half sunk into what it grows from
+function tuft(b, x, y, z, yaw, tilt, r, h, kind) {
+  spike(b, x, y, z, yaw, tilt, r, h, kind, 5);
 }
 
 // ---------------- the body underneath ----------------
@@ -305,6 +310,193 @@ const BODY = {
     });
     hands(R);
   },
+  // Furry: white fur all over, a ruff at the neck, fluffy cuffs, paws with pink beans, and a tail on its own
+  // bones (it sways: see poseFur)
+  fluffy(R) {
+    const n = R.nodes;
+    part(R, n.hips, (b) => {
+      b.place(0, -0.065, 0); b.box(0.31, 0.16, 0.21, BA);
+      for (let i = 0; i < 10; i++) { // fur at the waist
+        const a = (i / 10) * PI * 2 + 0.3;
+        tuft(b, Math.cos(a) * 0.15, 0.0, Math.sin(a) * 0.1, PI / 2 - a, 2.5, 0.045, 0.05, BA);
+      }
+    });
+    part(R, n.chest, (b) => {
+      b.place(0, -0.075, 0); b.taper(0.32, 0.21, 0.4, 0.24, 0.635, BA);
+      // the ruff: a ring of soft tufts at the neck, out and down
+      for (let i = 0; i < 14; i++) {
+        const a = (i / 14) * PI * 2;
+        tuft(b, Math.cos(a) * 0.12, 0.53, Math.sin(a) * 0.09, PI / 2 - a, 2.0 + 0.2 * (i % 2), 0.06, 0.075 + 0.02 * (i % 3), BA);
+      }
+      // tufts on the shoulders
+      for (const sd of [-1, 1]) for (const [x, z] of [[0.19, 0.04], [0.21, -0.05]]) tuft(b, sd * x, 0.55, z, sd * (PI / 2), 0.9, 0.05, 0.05, BA);
+    });
+    // the tail: four bones from the small of the back, curling up at the end
+    const t0 = node(R, 'tail0', n.hips, 0, -0.04, -0.1);
+    const t1 = node(R, 'tail1', t0, 0, -0.08, -0.1);
+    const t2 = node(R, 'tail2', t1, 0, -0.02, -0.13);
+    const t3 = node(R, 'tail3', t2, 0, 0.07, -0.11);
+    part(R, t0, (b) => { b.identity(); b.limb([0, 0, 0], [0, -0.08, -0.1], 0.042, 0.046, BA, 6); });
+    part(R, t1, (b) => { b.identity(); b.limb([0, 0, 0], [0, -0.02, -0.13], 0.046, 0.052, BA, 6); });
+    part(R, t2, (b) => { b.identity(); b.limb([0, 0, 0], [0, 0.07, -0.11], 0.052, 0.056, BA, 6); });
+    part(R, t3, (b) => {
+      b.identity(); b.limb([0, 0, 0], [0, 0.11, -0.04], 0.056, 0.03, BA, 6);
+      for (let i = 0; i < 6; i++) { // a fluffy end
+        const a = (i / 6) * PI * 2;
+        tuft(b, Math.cos(a) * 0.03, 0.08, -0.03 + Math.sin(a) * 0.03, -a, 0.6, 0.045, 0.07, BA);
+      }
+    });
+    limbs(R, {
+      upper: (b, s) => { b.identity(); b.limb([0, 0, 0], [s * 0.04, -0.3, 0.02], 0.062, 0.052, BA, 6); },
+      fore: (b) => {
+        b.identity(); b.limb([0, 0, 0], FORE, 0.052, 0.045, BA, 6);
+        for (let i = 0; i < 7; i++) { // fluffy cuffs
+          const a = (i / 7) * PI * 2;
+          tuft(b, Math.cos(a) * 0.045, -0.235, 0.055 + Math.sin(a) * 0.045, PI / 2 - a, 2.1, 0.038, 0.045, BA);
+        }
+      },
+      thigh: (b) => { b.identity(); b.limb([0, 0, 0], THIGH, 0.08, 0.064, BA, 6); },
+      shin: (b) => {
+        b.identity(); b.limb([0, 0, 0], SHIN, 0.064, 0.05, BA, 6);
+        for (let i = 0; i < 7; i++) { // tufts at the ankle
+          const a = (i / 7) * PI * 2;
+          tuft(b, Math.cos(a) * 0.05, -0.34, Math.sin(a) * 0.05, PI / 2 - a, 2.2, 0.04, 0.05, BA);
+        }
+        b.place(0, -0.43, 0.045, 0, 0, 0, 1, 0.7, 1.35); b.octa(0.07, 0.07, BA); // a paw
+        b.place(0, -0.46, 0.12, 0.6, 0, 0, 1, 0.5, 1); b.octa(0.03, 0.02, BB); // its toe bean
+      },
+    });
+    // paws, pink beans on the palm (the palms face in, toward you when they're raised)
+    for (const L of ['L', 'R']) {
+      const s = L === 'L' ? -1 : 1;
+      part(R, n['el' + L], (b) => {
+        b.place(0, -0.31, 0.066, 0, 0, 0, 1, 1.05, 1.1); b.octa(0.05, 0.06, BA);
+        b.place(-s * 0.04, -0.32, 0.07, 0, 0, s * PI / 2, 0.9, 0.5, 1); b.octa(0.022, 0.02, BB); // the big pad
+        for (const [dy, dz] of [[-0.035, 0.035], [-0.045, 0.072], [-0.035, 0.105]]) { b.place(-s * 0.038, -0.31 + dy, dz, 0, 0, s * PI / 2, 1, 0.5, 1); b.octa(0.011, 0.01, BB); }
+      });
+    }
+  },
+
+  // Leshy (shop): a hide of moss rags to the ground, bark on the shoulders, twigs in the belt
+  ghillie(R) {
+    const n = R.nodes;
+    const rnd = new RNG(4207);
+    const rag = (b, x, y, z, a, len, r = 0.03) => spike(b, x, y, z, PI / 2 - a, PI - 0.22 - rnd.next() * 0.18, r, len * (0.8 + rnd.next() * 0.4), BA, 4);
+    part(R, n.hips, (b) => {
+      b.place(0, -0.06, 0); b.box(0.33, 0.17, 0.22, BA);
+      b.place(0, 0.03, 0, 0, PI / 9, 0, 1, 1, 0.68); b.cylinder(9, 0.205, 0.205, 0.04, KIND.WOOD); // a rope belt
+      for (let i = 0; i < 16; i++) { // the moss skirt, down to the knees
+        const a = (i / 16) * PI * 2;
+        rag(b, Math.cos(a) * 0.17, 0.0, Math.sin(a) * 0.12, a, 0.42, 0.04);
+      }
+      b.identity(); b.limb([0.12, 0.02, -0.1], [0.22, 0.32, -0.16], 0.012, 0.006, KIND.BARK, 3); // twigs in the belt
+      b.limb([-0.1, 0.02, -0.11], [-0.2, 0.26, -0.2], 0.012, 0.006, KIND.BARK, 3);
+    });
+    part(R, n.chest, (b) => {
+      b.place(0, -0.075, 0); b.taper(0.35, 0.23, 0.44, 0.26, 0.635, BA);
+      for (const [y, count, len] of [[0.56, 12, 0.24], [0.36, 12, 0.24], [0.16, 11, 0.22]]) {
+        for (let i = 0; i < count; i++) {
+          const a = (i / count) * PI * 2 + y * 3;
+          const w = 0.2 + (0.56 - y) * 0.02;
+          rag(b, Math.cos(a) * w, y, Math.sin(a) * 0.135, a, len);
+        }
+      }
+      // bark on the shoulders, moss heaped on them
+      for (const sd of [-1, 1]) {
+        b.place(sd * 0.19, 0.56, 0, 0.1, 0, -sd * 0.35); b.rock(0.1, () => rnd.next(), BB, 0.4, 0.45);
+        b.place(sd * 0.12, 0.6, -0.04); b.rock(0.07, () => rnd.next(), BA, 0.4, 0.7);
+      }
+      b.identity(); b.limb([-0.08, 0.5, -0.14], [-0.2, 0.86, -0.22], 0.014, 0.006, KIND.BARK, 3); // a branch over the shoulder
+      b.limb([-0.17, 0.75, -0.2], [-0.07, 0.83, -0.27], 0.008, 0.004, KIND.BARK, 3);
+    });
+    limbs(R, {
+      upper: (b, s) => {
+        b.identity(); b.limb([0, 0, 0], [s * 0.04, -0.3, 0.02], 0.066, 0.056, BA, 5);
+        for (let i = 0; i < 5; i++) { const a = (i / 5) * PI * 2; rag(b, Math.cos(a) * 0.06, -0.08, Math.sin(a) * 0.06, a, 0.2, 0.026); }
+      },
+      fore: (b) => {
+        b.identity(); b.limb([0, 0, 0], FORE, 0.056, 0.048, BA, 5);
+        for (let i = 0; i < 5; i++) { const a = (i / 5) * PI * 2 + 0.6; rag(b, Math.cos(a) * 0.05, -0.12, 0.03 + Math.sin(a) * 0.05, a, 0.18, 0.022); }
+      },
+      thigh: (b) => { b.identity(); b.limb([0, 0, 0], THIGH, 0.08, 0.065, BA, 5); },
+      shin: (b) => {
+        b.identity(); b.limb([0, 0, 0], SHIN, 0.065, 0.055, BA, 5);
+        for (let i = 0; i < 6; i++) { const a = (i / 6) * PI * 2; rag(b, Math.cos(a) * 0.06, -0.12, Math.sin(a) * 0.06, a, 0.2, 0.025); }
+        b.place(0, -0.44, 0.05); b.box(0.12, 0.08, 0.25, KIND.BARK);
+      },
+    });
+    hands(R, KIND.BARK, 0.046, 0.064); // bark-brown, gnarled
+  },
+
+  // Plague doctor (shop): a waxed coat to the heels with a cape, a belt and a pouch, gloves, boots
+  plaguecoat(R) {
+    const n = R.nodes;
+    part(R, n.hips, (b) => {
+      b.place(0, -0.74, 0); b.taper(0.52, 0.38, 0.38, 0.26, 0.77, BA); // the skirts of the coat
+      b.identity(); b.limb([0, -0.72, 0.19], [0, 0.0, 0.134], 0.01, 0.01, KIND.ROCK, 3); // where it closes
+      b.place(0, 0.0, 0, 0, PI / 9, 0, 1, 1, 0.66); b.cylinder(9, 0.21, 0.21, 0.06, BB); // the belt
+      b.place(0, 0.03, 0.142); b.box(0.06, 0.05, 0.02, KIND.METAL); // its buckle
+      b.place(0.17, -0.06, 0.09, 0, -0.5, 0); b.box(0.1, 0.12, 0.06, BB); // a pouch of herbs
+    });
+    part(R, n.chest, (b) => {
+      b.place(0, -0.08, 0); b.taper(0.37, 0.24, 0.44, 0.26, 0.64, BA);
+      b.place(0, 0.24, 0, 0, PI / 10, 0, 1, 1, 0.78); b.cylinder(10, 0.31, 0.21, 0.32, BA, { capTop: false }); // the cape
+      b.place(0, 0.53, 0, 0, PI / 10, 0, 1, 1, 0.8); b.cylinder(10, 0.17, 0.15, 0.1, BA); // a high collar
+      for (let i = 0; i < 4; i++) { b.place(0, 0.12 + i * 0.1, 0.13); b.octa(0.012, 0.012, KIND.METAL); } // buttons
+    });
+    limbs(R, {
+      upper: (b, s) => { b.identity(); b.limb([0, 0, 0], [s * 0.04, -0.3, 0.02], 0.066, 0.06, BA, 6); },
+      fore: (b) => {
+        b.identity(); b.limb([0, 0, 0], [0, -0.22, 0.05], 0.06, 0.07, BA, 6); // wide cuffs
+        b.limb([0, -0.2, 0.045], [0, -0.27, 0.06], 0.05, 0.045, BB, 6); // gauntlets
+      },
+      thigh: (b) => { b.identity(); b.limb([0, 0, 0], THIGH, 0.07, 0.058, KIND.ROCK, 5); },
+      shin: (b) => {
+        b.identity(); b.limb([0, -0.02, 0], [0, -0.41, -0.02], 0.068, 0.062, KIND.ROCK, 6); // tall boots
+        b.place(0, -0.44, 0.05); b.box(0.12, 0.085, 0.26, KIND.ROCK);
+      },
+    });
+    hands(R, BB, 0.046, 0.064);
+  },
+
+  // Cosmonaut (shop): a bulky white suit, the console on the chest, hoses, a life-support pack, rings at
+  // every joint
+  spacesuit(R) {
+    const n = R.nodes;
+    part(R, n.hips, (b) => {
+      b.place(0, -0.07, 0); b.box(0.38, 0.2, 0.26, BA);
+      b.place(0, 0.0, 0, 0, PI / 10, 0, 1, 1, 0.7); b.cylinder(10, 0.215, 0.215, 0.05, KIND.METAL); // the waist ring
+    });
+    part(R, n.chest, (b) => {
+      b.place(0, -0.06, 0); b.taper(0.44, 0.3, 0.5, 0.31, 0.62, BA);
+      b.place(0, 0.32, 0.165); b.box(0.22, 0.15, 0.06, BB); // the console
+      for (const [x, y, k] of [[-0.06, 0.35, KIND.EFFIGY], [0, 0.35, KIND.EYE], [0.06, 0.35, KIND.LEAF], [-0.03, 0.3, KIND.METAL], [0.03, 0.3, KIND.METAL]]) { b.place(x, y, 0.198); b.box(0.026, 0.022, 0.012, k); }
+      b.place(0.12, 0.46, 0.155, 0.04, 0, 0); b.box(0.08, 0.05, 0.012, KIND.EFFIGY); // a flag patch
+      b.place(0, 0.12, -0.24); b.box(0.42, 0.52, 0.18, BA); // the life-support pack
+      b.place(0, 0.12, -0.335); b.box(0.3, 0.36, 0.02, KIND.ROCK); // its vent
+      for (const sd of [-1, 1]) {
+        b.identity(); b.limb([sd * 0.09, 0.26, 0.19], [sd * 0.23, 0.12, 0.08], 0.024, 0.024, BB, 5); // hoses
+        b.limb([sd * 0.23, 0.12, 0.08], [sd * 0.24, 0.06, -0.14], 0.024, 0.024, BB, 5);
+        b.place(sd * 0.24, 0.5, 0, 0, 0, sd * PI / 2); b.cylinder(10, 0.085, 0.085, 0.05, KIND.METAL, { y0: -0.025 }); // shoulder rings
+      }
+      b.place(0, 0.56, 0, 0, PI / 10, 0); b.cylinder(10, 0.165, 0.16, 0.06, KIND.METAL); // the neck ring
+    });
+    limbs(R, {
+      upper: (b, s) => { b.identity(); b.limb([0, 0, 0], [s * 0.04, -0.3, 0.02], 0.082, 0.075, BA, 6); },
+      fore: (b) => {
+        b.identity(); b.limb([0, 0, 0], [0, -0.22, 0.05], 0.075, 0.068, BA, 6);
+        b.limb([0, -0.2, 0.045], [0, -0.235, 0.054], 0.072, 0.072, KIND.METAL, 6); // the wrist ring
+      },
+      thigh: (b) => { b.identity(); b.limb([0, 0, 0], THIGH, 0.096, 0.084, BA, 6); },
+      shin: (b) => {
+        b.identity(); b.limb([0, 0.02, 0], [0, -0.06, 0], 0.088, 0.088, KIND.METAL, 6); // the knee ring
+        b.limb([0, -0.04, 0], [0, -0.38, -0.02], 0.084, 0.078, BA, 6);
+        b.place(0, -0.43, 0.04); b.box(0.15, 0.12, 0.28, BA); // boots
+        b.place(0, -0.485, 0.04); b.box(0.155, 0.03, 0.285, KIND.ROCK);
+      },
+    });
+    hands(R, BB, 0.058, 0.074);
+  },
 };
 
 // ---------------- headwear ----------------
@@ -429,6 +621,115 @@ const HEAD = {
       }
     });
   },
+  // Furry: a white cat face — ears on their own bones (they twitch), eyes on theirs (they blink), pink blush,
+  // a little pink nose and a smug ":3"
+  boykisser(R) {
+    const n = R.nodes;
+    part(R, n.head, (b) => {
+      b.place(0, 0, 0.004, 0, 0, 0, 1.12, 1, 1);
+      lathe(b, [[0, -0.128], [0.06, -0.118], [0.098, -0.085], [0.118, -0.03], [0.122, 0.03], [0.112, 0.085], [0.084, 0.128], [0.042, 0.15], [0, 0.155]], 12, HA, { phase: PI / 12 });
+      // fluffy cheeks, a tuft on top
+      for (const s of [-1, 1]) {
+        for (const [y, tl, h] of [[-0.025, 1.9, 0.045], [-0.065, 2.3, 0.04], [0.02, 1.5, 0.035]]) tuft(b, s * 0.124, y, 0.02, s * (PI / 2 + 0.15), tl, 0.045, h, HA);
+      }
+      for (const [x, tl] of [[0, 0.35], [-0.035, 0.65], [0.035, 0.6]]) tuft(b, x, 0.142, 0.03, PI, tl, 0.035, 0.05, HA);
+      // blush, nose, the ":3"
+      for (const s of [-1, 1]) { b.place(s * 0.085, -0.052, 0.095, 0, s * 0.72, 0, 1, 0.6, 0.3); b.octa(0.03, 0.03, HB); }
+      b.place(0, -0.044, 0.124, 0.3, 0, 0, 1, 0.75, 0.6); b.octa(0.012, 0.01, HB);
+      for (const s of [-1, 1]) {
+        b.place(s * 0.0065, -0.064, 0.121, 0, 0, s * 0.62); b.box(0.016, 0.0045, 0.006, KIND.ROCK);
+        b.place(s * 0.019, -0.064, 0.118, 0, s * 0.3, -s * 0.62); b.box(0.016, 0.0045, 0.006, KIND.ROCK);
+      }
+    });
+    // the eyes (they blink: their bone squashes)
+    const eyes = node(R, 'eyes', n.head, 0, -0.012, 0);
+    part(R, eyes, (b) => {
+      for (const s of [-1, 1]) {
+        const x = s * 0.05, a = s * 0.36;
+        b.place(x, 0, 0.104, PI / 2, a, 0, 1, 1, 1.3); b.cylinder(8, 0.026, 0.026, 0.013, KIND.ROCK);
+        b.place(x + 0.01, 0.013, 0.118, 0, a, 0, 1, 1, 0.5); b.octa(0.009, 0.009, KIND.BONE);
+        b.place(x - 0.008, -0.012, 0.117, 0, a, 0, 1, 1, 0.5); b.octa(0.005, 0.005, KIND.BONE);
+      }
+    });
+    // the ears (they twitch: their bones turn)
+    for (const s of [-1, 1]) {
+      const ear = node(R, s < 0 ? 'earL' : 'earR', n.head, s * 0.072, 0.112, -0.005);
+      part(R, ear, (b) => {
+        b.place(0, 0, 0, 0.1, 0, -s * 0.3, 1, 1, 0.5); b.cone(4, 0.066, 0.15, HA, { phase: PI / 4 });
+        b.place(0, 0.012, 0.016, 0.1, 0, -s * 0.3, 0.68, 0.78, 0.28); b.cone(4, 0.066, 0.15, HB, { phase: PI / 4 });
+        for (const [x, y] of [[-s * 0.01, 0.05], [s * 0.01, 0.07]]) spike(b, x, y, 0.024, PI, 0.55, 0.012, 0.045, HA, 3); // fur in the ear
+      });
+    }
+  },
+
+  // Leshy (shop): a lumpy head of moss, antlers of dead branches, green fire for eyes, a beard of moss
+  leshyhead(R) {
+    const rnd = new RNG(911);
+    part(R, R.nodes.head, (b) => {
+      b.place(0, 0.0, 0); b.rock(0.155, () => rnd.next(), HA, 0.22, 1.0);
+      b.place(0.02, 0.095, -0.035); b.rock(0.1, () => rnd.next(), HA, 0.3, 0.8);
+      b.place(-0.07, -0.02, 0.07); b.rock(0.07, () => rnd.next(), HA, 0.3, 0.9);
+      // deep sockets, and the light in them
+      for (const s of [-1, 1]) {
+        b.place(s * 0.052, 0.005, 0.135, 0, s * 0.3, 0, 1, 0.75, 0.5); b.octa(0.034, 0.03, KIND.ROCK);
+        b.place(s * 0.052, 0.005, 0.15, 0, s * 0.3, 0, 1, 0.7, 0.5); b.octa(0.018, 0.016, HG);
+      }
+      // antlers: dry branches, forking
+      for (const s of [-1, 1]) {
+        b.identity();
+        const A = [s * 0.07, 0.11, -0.02], B = [s * 0.16, 0.3, -0.06], C = [s * 0.14, 0.45, -0.03], D = [s * 0.27, 0.39, -0.1], M = [s * 0.12, 0.23, -0.045], E = [s * 0.07, 0.36, 0.05];
+        b.limb(A, B, 0.02, 0.014, KIND.BARK, 4);
+        b.limb(B, C, 0.014, 0.006, KIND.BARK, 4);
+        b.limb(B, D, 0.012, 0.005, KIND.BARK, 4);
+        b.limb(M, E, 0.011, 0.005, KIND.BARK, 4);
+      }
+      // a beard of moss
+      for (let i = 0; i < 7; i++) {
+        const a = (i / 6 - 0.5) * 1.7;
+        spike(b, Math.sin(a) * 0.11, -0.085, Math.cos(a) * 0.1, PI - a, PI - 0.15, 0.024, 0.13 + 0.07 * (i % 2), HA, 4);
+      }
+      // leaves caught in it
+      for (const [x, y, z, r] of [[0.1, 0.07, 0.08, 0.5], [-0.11, 0.1, 0.03, -0.8], [0.05, 0.15, 0.06, 1.4]]) {
+        b.place(x, y, z, 0.4, r, 0.6, 1, 0.25, 0.6); b.octa(0.03, 0.03, KIND.LEAF);
+      }
+    });
+  },
+
+  // Plague doctor (shop): a leather mask with a long beak and round glass eyes, under a wide-brimmed hat
+  plaguemask(R) {
+    part(R, R.nodes.head, (b) => {
+      b.identity();
+      lathe(b, [[0, -0.15], [0.086, -0.13], [0.118, -0.06], [0.124, 0.02], [0.112, 0.09], [0.075, 0.135], [0, 0.15]], 10, HA, { phase: PI / 10 });
+      b.place(0, -0.03, 0.095, PI / 2 + 0.22, 0, 0, 1, 1, 0.82); b.cone(6, 0.06, 0.26, HA, { phase: PI / 6 }); // the beak
+      b.identity(); b.limb([0, 0.0, 0.12], [0, -0.085, 0.33], 0.006, 0.004, KIND.ROCK, 3); // its seam
+      for (const s of [-1, 1]) {
+        b.place(s * 0.05, 0.03, 0.1, PI / 2, s * 0.38, 0); b.cylinder(8, 0.034, 0.034, 0.022, KIND.METAL, { capTop: false }); // brass rims
+        b.place(s * 0.05, 0.03, 0.106, PI / 2, s * 0.38, 0); b.cylinder(8, 0.028, 0.028, 0.01, KIND.EYE); // the glass
+      }
+      // the hat
+      b.place(0, 0.11, -0.005, -0.05, 0, 0); b.cylinder(14, 0.25, 0.25, 0.016, HB, { capBottom: true });
+      b.place(0, 0.124, -0.005, -0.05, 0, 0); b.cylinder(10, 0.13, 0.12, 0.13, HB);
+      b.place(0, 0.128, -0.005, -0.05, 0, 0); b.cylinder(10, 0.132, 0.13, 0.03, KIND.ROCK);
+      // the hood under it, down the back of the neck
+      b.place(0, -0.21, -0.03); b.taper(0.28, 0.24, 0.25, 0.22, 0.17, HA);
+    });
+  },
+
+  // Cosmonaut (shop): a big white helmet, a gold sun visor (a light of its own), a red stripe
+  helmet(R) {
+    part(R, R.nodes.head, (b) => {
+      b.identity();
+      lathe(b, [[0.15, -0.2], [0.162, -0.17], [0.178, -0.08], [0.185, 0.02], [0.17, 0.11], [0.12, 0.17], [0, 0.195]], 12, HA, { phase: PI / 12 });
+      b.place(0, -0.215, 0, 0, PI / 12, 0); b.cylinder(12, 0.16, 0.152, 0.04, KIND.METAL, { capBottom: true }); // the neck ring
+      b.place(0, -0.005, 0.1, PI / 2, 0, 0, 1, 1, 0.8);
+      lathe(b, [[0.14, 0], [0.132, 0.045], [0.095, 0.085], [0.0, 0.104]], 12, HG); // the visor
+      b.place(0, 0.142, 0.118, -0.78, 0, 0); b.box(0.17, 0.036, 0.014, KIND.EFFIGY); // СССР
+      for (const s of [-1, 1]) {
+        b.place(s * 0.18, 0.04, 0.03, 0, 0, s * PI / 2); b.cylinder(8, 0.026, 0.026, 0.03, KIND.METAL, { y0: -0.01 }); // lamps
+        b.place(s * 0.19, 0.04, 0.03, 0, 0, s * PI / 2); b.cylinder(8, 0.02, 0.02, 0.012, KIND.EYE, { y0: 0.012 });
+      }
+    });
+  },
 };
 
 // ---------------- dyes ----------------
@@ -461,6 +762,47 @@ export function buildSurvivor(fitIn = null) {
   HEAD[fit.head](R);
   R.dyes = dyeColors(fit);
   return R;
+}
+
+// fur with a life of its own (the boykisser): the tail sways — and now and then wags in fits — the ears
+// twitch, the eyes blink. Keeps its own clock on the rig. dt: s, moving: m/s (walking wags harder)
+export function poseFur(rig, dt, moving = 0) {
+  const n = rig.nodes;
+  if (!n.tail0 && !n.earL && !n.eyes) return;
+  const F = rig.fur || (rig.fur = { t: Math.random() * 20, ph: 0, earT: [0.8, 1.9], earV: [0, 0], blinkT: 1.5 + Math.random() * 2, blink: 0 });
+  F.t += dt;
+  if (n.tail0) {
+    const wag = Math.max(0, Math.sin(F.t * 0.29) * Math.sin(F.t * 0.13 + 1.3)); // a fit of wagging, now and then
+    F.ph += dt * (1.6 + wag * 7 + Math.min(moving, 3) * 1.3);
+    const a = 0.2 + wag * 0.32;
+    n.tail0.rotation.set(0.28 + Math.sin(F.ph * 0.5) * 0.06, Math.sin(F.ph) * a, 0);
+    n.tail1.rotation.set(-0.08, Math.sin(F.ph - 0.6) * a * 0.9, 0);
+    n.tail2.rotation.set(-0.12, Math.sin(F.ph - 1.2) * a * 0.8, 0);
+    n.tail3.rotation.set(-0.18 + Math.sin(F.ph * 0.7) * 0.12, Math.sin(F.ph - 1.8) * a * 0.75, 0);
+  }
+  if (n.earL) {
+    for (let i = 0; i < 2; i++) {
+      F.earT[i] -= dt;
+      if (F.earT[i] <= 0) {
+        F.earT[i] = 0.9 + Math.random() * 3.6;
+        F.earV[i] = 1;
+        if (Math.random() < 0.35) F.earV[1 - i] = 1; // both at once: what was that
+      }
+      F.earV[i] = Math.max(0, F.earV[i] - dt * 4.5);
+      const tw = Math.sin(F.earV[i] * PI);
+      const e = i === 0 ? n.earL : n.earR;
+      e.rotation.set(-0.42 * tw + Math.sin(F.t * 1.3 + i * 2) * 0.03, 0, (i === 0 ? -1 : 1) * 0.3 * tw);
+    }
+  }
+  if (n.eyes) {
+    F.blinkT -= dt;
+    if (F.blinkT <= 0) {
+      F.blinkT = 1.8 + Math.random() * 4;
+      F.blink = 1;
+    }
+    F.blink = Math.max(0, F.blink - dt * 7);
+    n.eyes.scale.y = 1 - 0.9 * Math.sin(F.blink * PI);
+  }
 }
 
 // walk cycle + crouch + lying dead
@@ -641,6 +983,13 @@ export function poseGlowHand(rig) {
   const n = rig.nodes;
   n.shL.rotation.set(-0.95, 0, -0.18);
   n.elL.rotation.x = -0.85;
+}
+
+// a flashlight held out ahead, in the right hand
+export function poseTorchHand(rig) {
+  const n = rig.nodes;
+  n.shR.rotation.set(-1.15, 0, 0.1);
+  n.elR.rotation.x = -0.42;
 }
 
 // how many vertices an outfit costs (the echo ghosts hold up to 3200)

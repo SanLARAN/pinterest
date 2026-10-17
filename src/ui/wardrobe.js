@@ -3,9 +3,13 @@
 // per piece. What you pick is saved here and sent to your friends: it's how they'll see you out there.
 import { Mannequin } from './mannequin.js';
 import {
-  SLOTS, ITEMS, PALETTE, item, wardrobe, saveWardrobe, colorsOf, setColor, resetColors, isDefaultColors,
+  SLOTS, ITEMS, PALETTE, SHOP, item, product, owns, wardrobe, saveWardrobe, colorsOf, setColor, resetColors, isDefaultColors,
   myFit, fitWith, fullSet, fitKey, wt,
 } from '../game/outfit.js';
+import { wallet, onWallet, buyProduct, hasProduct } from '../game/wallet.js';
+
+// the tabs: the three slots, and the shop
+const TABS = [...SLOTS, 'shop'];
 import { PLAYER_COLORS } from '../game/remote.js';
 
 const $ = (id) => document.getElementById(id);
@@ -19,7 +23,10 @@ const ICON = {
   dice: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="8.5" cy="8.5" r="1.1"/><circle cx="15.5" cy="15.5" r="1.1"/><circle cx="12" cy="12" r="1.1"/><circle cx="15.5" cy="8.5" r="1.1"/><circle cx="8.5" cy="15.5" r="1.1"/></svg>',
   reset: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12a7 7 0 1 0 2.1-5"/><path d="M5 4.5V9h4.5"/></svg>',
   plus: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7v10M7 12h10"/></svg>',
+  car: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 15.5v-3l2-1 2.5-3.5h6l3 3.5 3 .8v3.2"/><circle cx="7.5" cy="16" r="1.8"/><circle cx="16.5" cy="16" r="1.8"/><path d="M9.3 16h5.4"/></svg>',
+  shop: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l5.5 6.5L12 20.5 6.5 10z"/><path d="M6.5 10h11M12 3.5L9.5 10 12 20.5 14.5 10z"/></svg>',
 };
+const GEM = '<i class="gem"></i>'; // (a CSS diamond: not every font has ◆)
 
 // colours: is this hex one of the swatches?
 const PAL = new Set(PALETTE.map((p) => p[0]));
@@ -45,7 +52,16 @@ export class Wardrobe {
     this.queue = [];
     this.touched = false;
     this.lastFit = fitKey(myFit());
+    this.shopSel = SHOP[0].id; // the product looked at in the shop
     this._bind();
+    onWallet(() => {
+      this._renderWallet();
+      if (this.shown && this.slot === 'shop') {
+        this._renderItems();
+        this._renderInfo();
+      }
+    });
+    this._renderWallet();
   }
 
   // the 3D figure comes up after the forest (the main renderer gets the first WebGL context)
@@ -76,8 +92,13 @@ export class Wardrobe {
   }
 
   // ---------------- open / close ----------------
-  open() {
+  // tab: open on that tab (the menu's shop link opens the shop)
+  open(tab = null) {
     if (this.shown) return;
+    if (tab && TABS.includes(tab)) {
+      this.slot = tab;
+      this.part = 0;
+    }
     this.init();
     this.shown = true;
     this.el.classList.add('show');
@@ -87,7 +108,7 @@ export class Wardrobe {
     this._renderAll();
     if (this.mq) {
       this.mq.attach(this.stageHost, 'stage');
-      this.mq.setFocus(this.slot);
+      this._stage();
       this.mq.orbit.base = 0.42;
       this.mq.orbit.yaw = 0.42;
       this.mq.orbit.pitch = 0.08;
@@ -107,6 +128,10 @@ export class Wardrobe {
     document.body.classList.remove('wardrobe-open');
     saveWardrobe();
     if (this.mq) {
+      // whatever was tried on in the shop comes off; the car goes back to the garage
+      this.mq.showCar(null);
+      this.mq.setFit(myFit());
+      this.mq.setFocus(this.slot === 'head' ? 'head' : 'body');
       this.mq.attach(this.figHost, 'menu');
       this._placeFigure();
     }
@@ -161,10 +186,10 @@ export class Wardrobe {
 
   // ---------------- what you can do here ----------------
   setSlot(slot) {
-    if (!SLOTS.includes(slot) || slot === this.slot) return;
+    if (!TABS.includes(slot) || slot === this.slot) return;
     this.slot = slot;
     this.part = 0;
-    if (this.mq) this.mq.setFocus(slot);
+    this._stage();
     this._renderSlots();
     this._renderItems();
     this._renderInfo();
@@ -172,18 +197,62 @@ export class Wardrobe {
     this._queueStills();
   }
 
+  // what stands on the stage for this tab: you (as you are, or trying on a set from the shop), or a car
+  _stage() {
+    const mq = this.mq;
+    if (!mq) return;
+    this.el.classList.toggle('shop-tab', this.slot === 'shop');
+    if (this.slot === 'shop') {
+      const p = product(this.shopSel) || SHOP[0];
+      const first = item(p.items[0]);
+      if (first.slot === 'car') {
+        mq.setFocus('car');
+        mq.showCar(first.id, colorsOf(first.id));
+      } else {
+        mq.showCar(null);
+        mq.setFocus('body');
+        mq.setFit(fitWith(...p.items));
+      }
+      return;
+    }
+    if (this.slot === 'car') {
+      mq.setFocus('car');
+      mq.showCar(wardrobe.car, colorsOf(wardrobe.car));
+      return;
+    }
+    mq.showCar(null);
+    mq.setFit(myFit());
+    mq.setFocus(this.slot);
+  }
+
+  // what's on the shelves of this tab (shop pieces only once they're yours)
+  _list(slot = this.slot) {
+    return slot === 'shop' ? SHOP : ITEMS[slot].filter((it) => owns(it.id));
+  }
+
   wear(id) {
     const it = item(id);
     if (!it) return;
+    if (!owns(id)) {
+      // not yours yet: the shop, on it
+      this.shopSel = it.shop;
+      if (this.slot !== 'shop') this.setSlot('shop');
+      else this.select(it.shop);
+      return;
+    }
     if (it.slot !== this.slot) this.setSlot(it.slot);
     if (wardrobe[it.slot] === id) {
-      if (this.mq && !this.mq.gesture) this.mq.play(it.slot === 'head' ? 'hat' : 'body');
+      if (this.mq && !this.mq.gesture && it.slot !== 'car') this.mq.play(it.slot === 'head' ? 'hat' : 'body');
+      if (it.slot === 'car' && this.mq) this.mq.toggleLights();
       return;
     }
     wardrobe[it.slot] = id;
     saveWardrobe();
-    if (this.mq) this.mq.setFit(myFit(), it.slot === 'head' ? 'hat' : 'body');
-    this._sound(it.slot === 'head' ? 'hat' : 'cloth');
+    if (this.mq) {
+      if (it.slot === 'car') this.mq.showCar(id, colorsOf(id));
+      else this.mq.setFit(myFit(), it.slot === 'head' ? 'hat' : 'body');
+    }
+    this._sound(it.slot === 'head' ? 'hat' : it.slot === 'car' ? 'dye' : 'cloth');
     this._renderItems();
     this._renderInfo();
     this._renderPaint();
@@ -192,8 +261,74 @@ export class Wardrobe {
     this._touch();
   }
 
+  // the shop: look at a product (a set goes on you, the car comes onto the stage)
+  select(pid) {
+    const p = product(pid);
+    if (!p) return;
+    this.shopSel = pid;
+    this._stage();
+    if (this.mq && item(p.items[0]).slot !== 'car') this.mq.play('body', true);
+    this._sound('cloth');
+    this._renderItems();
+    this._renderInfo();
+    this._touch();
+  }
+
+  buy(pid) {
+    const p = product(pid);
+    if (!p) return;
+    const T = wt().shop;
+    if (hasProduct(pid)) {
+      // yours already: put it on
+      for (const id of p.items) wardrobe[item(id).slot] = id;
+      saveWardrobe();
+      this._afterBuy(p, false);
+      return;
+    }
+    if (!buyProduct(pid, p.price)) {
+      this._sound('tap');
+      const b = this.el.querySelector('.wr-buy');
+      if (b) {
+        b.classList.remove('nope');
+        void b.offsetWidth;
+        b.classList.add('nope');
+      }
+      return;
+    }
+    for (const id of p.items) wardrobe[item(id).slot] = id;
+    saveWardrobe();
+    this._afterBuy(p, true);
+    const name = T.sets[p.id] ? T.sets[p.id].name : p.id;
+    const toast = $('wrToast');
+    if (toast) {
+      toast.textContent = T.bought.replace('{name}', name);
+      toast.classList.remove('show');
+      void toast.offsetWidth;
+      toast.classList.add('show');
+    }
+  }
+
+  _afterBuy(p, fresh) {
+    const car = item(p.items[0]).slot === 'car';
+    if (this.mq) {
+      if (car) {
+        this.mq.showCar(p.items[0], colorsOf(p.items[0]));
+        this.mq.toggleLights();
+      } else this.mq.setFit(myFit(), 'body');
+      this.mq.ping();
+    }
+    this._sound(fresh ? 'buy' : 'cloth');
+    this._renderAll();
+    this._queueStills();
+  }
+
   cycle(dir) {
-    const list = ITEMS[this.slot];
+    const list = this._list();
+    if (this.slot === 'shop') {
+      const i = SHOP.findIndex((p) => p.id === this.shopSel);
+      this.select(SHOP[(i + dir + SHOP.length) % SHOP.length].id);
+      return;
+    }
     const i = list.findIndex((it) => it.id === wardrobe[this.slot]);
     this.wear(list[(i + dir + list.length) % list.length].id);
     const card = this.el.querySelector(`.wr-card[data-id="${wardrobe[this.slot]}"]`);
@@ -202,11 +337,12 @@ export class Wardrobe {
 
   // live = still dragging the custom colour: no save, no sound, no rebuild
   paint(hex, live = false) {
+    if (this.slot === 'shop') return;
     const id = wardrobe[this.slot];
     const before = colorsOf(id)[this.part];
     setColor(id, this.part, hex);
     const now = colorsOf(id)[this.part];
-    if (this.mq) this.mq.setFit(myFit());
+    this._restage(id);
     if (!live) {
       saveWardrobe();
       if (now !== before || !this._lastPaint || performance.now() - this._lastPaint > 200) {
@@ -225,9 +361,16 @@ export class Wardrobe {
     this._syncPaint();
   }
 
+  // a piece's colours changed: show it
+  _restage(id) {
+    if (!this.mq) return;
+    if (item(id).slot === 'car') this.mq.showCar(id, colorsOf(id));
+    else this.mq.setFit(myFit());
+  }
+
   randomize() {
     const pick = (a) => a[Math.floor(Math.random() * a.length)];
-    const h = pick(ITEMS.head), b = pick(ITEMS.body);
+    const h = pick(this._list('head')), b = pick(this._list('body'));
     wardrobe.head = h.id;
     wardrobe.body = b.id;
     for (const id of [h.id, b.id]) {
@@ -242,6 +385,8 @@ export class Wardrobe {
       setColor(id, 1, c);
     }
     saveWardrobe();
+    if (this.slot === 'shop' || this.slot === 'car') this.slot = 'body';
+    this._stage();
     if (this.mq) this.mq.setFit(myFit(), 'body');
     this._sound('cloth');
     this._renderAll();
@@ -250,11 +395,12 @@ export class Wardrobe {
   }
 
   resetItem() {
+    if (this.slot === 'shop') return;
     const id = wardrobe[this.slot];
     if (isDefaultColors(id)) return;
     resetColors(id);
     saveWardrobe();
-    if (this.mq) this.mq.setFit(myFit());
+    this._restage(id);
     this._sound('dye');
     if (this.mq) this.mq.ping();
     this._syncPaint();
@@ -276,6 +422,8 @@ export class Wardrobe {
     this._renderPaint();
     this._renderTag();
     this._renderSet();
+    this._renderWallet();
+    this.el.classList.toggle('shop-tab', this.slot === 'shop');
     const touch = document.body.classList.contains('touch') || (window.matchMedia && matchMedia('(pointer: coarse)').matches);
     const hint = $('wrHint');
     hint.textContent = touch ? T.hintTouch : T.hint;
@@ -284,7 +432,19 @@ export class Wardrobe {
 
   _renderSlots() {
     const T = wt();
-    $('wrSlots').innerHTML = SLOTS.map((s, i) => `<button class="wr-slot${s === this.slot ? ' on' : ''}" data-slot="${s}" role="tab" aria-selected="${s === this.slot}"><b>${i + 1}</b>${ICON[s]}<em>${esc(T.slot[s])}</em></button>`).join('');
+    $('wrSlots').innerHTML = TABS.map((s, i) => `<button class="wr-slot${s === this.slot ? ' on' : ''}${s === 'shop' ? ' shop' : ''}" data-slot="${s}" role="tab" aria-selected="${s === this.slot}"><b>${i + 1}</b>${ICON[s]}<em>${esc(T.slot[s])}</em></button>`).join('');
+  }
+
+  // the purse: in the room's corner and on the menu's shop link
+  _renderWallet() {
+    const n = wallet.shards;
+    const el = $('wrWallet');
+    if (el) {
+      el.innerHTML = `${GEM}<b>${n}</b><span>${esc(wt().shop.shards)}</span>`;
+      el.title = wt().shop.sub;
+    }
+    const m = $('walletMenu');
+    if (m) m.textContent = String(n);
   }
 
   _canvasFor(id) {
@@ -303,7 +463,23 @@ export class Wardrobe {
     const T = wt();
     const box = $('wrItems');
     box.textContent = '';
-    for (const it of ITEMS[this.slot]) {
+    if (this.slot === 'shop') {
+      for (const p of SHOP) {
+        const own = hasProduct(p.id), sel = this.shopSel === p.id;
+        const first = item(p.items[0]);
+        const card = document.createElement('button');
+        card.className = `wr-card prod${sel ? ' on' : ''}${own ? ' owned' : ''}${!own && wallet.shards < p.price ? ' poor' : ''}`;
+        card.dataset.prod = p.id;
+        card.setAttribute('role', 'option');
+        card.setAttribute('aria-selected', String(sel));
+        card.innerHTML = `<span class="wr-theme t-${first.theme}">${esc(T.theme[first.theme])}</span>`;
+        card.appendChild(this._canvasFor('shop:' + p.id));
+        card.insertAdjacentHTML('beforeend', `<span class="wr-name">${esc(T.shop.sets[p.id].name)}</span><span class="wr-price">${own ? esc(T.shop.owned) : `${GEM} ${p.price}`}</span>`);
+        box.appendChild(card);
+      }
+      return;
+    }
+    for (const it of this._list()) {
       const worn = wardrobe[this.slot] === it.id;
       const card = document.createElement('button');
       card.className = `wr-card${worn ? ' on' : ''}`;
@@ -319,6 +495,21 @@ export class Wardrobe {
 
   _renderInfo() {
     const T = wt();
+    if (this.slot === 'shop') {
+      const p = product(this.shopSel) || SHOP[0];
+      const S = T.shop, first = item(p.items[0]), own = hasProduct(p.id);
+      const worn = own && p.items.every((id) => wardrobe[item(id).slot] === id);
+      const short = p.price - wallet.shards;
+      const btn = own
+        ? `<button class="btn wr-buy${worn ? ' worn' : ''}" data-buy="${p.id}"${worn ? ' disabled' : ''}>${esc(worn ? S.worn : S.wear)}</button>`
+        : `<button class="btn primary wr-buy${short > 0 ? ' short' : ''}" data-buy="${p.id}"><span>${esc(S.buy)}</span><b>${GEM} ${p.price}</b></button>`;
+      const pieces = p.items.map((id) => esc(T.items[id].name)).join(' + ');
+      $('wrInfo').innerHTML = `<div class="wr-info-head"><h3>${esc(S.sets[p.id].name)}</h3><span class="wr-theme t-${first.theme}">${esc(T.theme[first.theme])}</span></div>`
+        + `<p>${esc(S.sets[p.id].desc)}</p><p class="wr-pieces">${pieces}${first.slot === 'car' ? ` · ${esc(S.carNote)}` : ''}</p>`
+        + `<div class="wr-shoprow">${btn}${!own && short > 0 ? `<span class="wr-short">${esc(S.short.replace('{n}', short))} ${GEM}</span>` : ''}</div>`
+        + `<p class="wr-earn">${esc(S.sub)}</p>`;
+      return;
+    }
     const it = item(wardrobe[this.slot]);
     const tx = T.items[it.id];
     $('wrInfo').innerHTML = `<div class="wr-info-head"><h3>${esc(tx.name)}</h3><span class="wr-theme t-${it.theme}">${esc(T.theme[it.theme])}</span></div><p>${esc(tx.desc)}</p>`;
@@ -326,6 +517,11 @@ export class Wardrobe {
 
   _renderPaint() {
     const T = wt();
+    if (this.slot === 'shop') {
+      $('wrParts').innerHTML = '';
+      $('wrSwatches').innerHTML = '';
+      return;
+    }
     const id = wardrobe[this.slot];
     const tx = T.items[id];
     const c = colorsOf(id);
@@ -337,6 +533,7 @@ export class Wardrobe {
 
   // swatch / chip states in place (the colour input may be open: don't rebuild it)
   _syncPaint() {
+    if (this.slot === 'shop') return;
     const id = wardrobe[this.slot];
     const c = colorsOf(id);
     const cur = c[this.part];
@@ -377,26 +574,38 @@ export class Wardrobe {
 
   // ---------------- stills on the cards ----------------
   // each card shows its piece in its own colours, on you as you are now
-  _queueStills() {
-    for (const slot of SLOTS) {
-      for (const it of ITEMS[slot]) {
-        const k = `${slot}|${fitKey(fitWith(it.id))}`;
-        if (this.stillKey.get(it.id) === k) continue;
-        if (!this.queue.includes(it.id)) this.queue.push(it.id);
-      }
+  // what a card shows: [fit, which kind of still]
+  _stillOf(id) {
+    if (id.startsWith('shop:')) {
+      const p = product(id.slice(5));
+      const first = item(p.items[0]);
+      return [fitWith(...p.items), first.slot === 'car' ? 'car' : 'body'];
     }
-    // the slot you're looking at first
-    this.queue.sort((a, b) => (item(a).slot === this.slot ? 0 : 1) - (item(b).slot === this.slot ? 0 : 1));
+    return [fitWith(id), item(id).slot];
+  }
+
+  _queueStills() {
+    const ids = [];
+    for (const slot of SLOTS) for (const it of this._list(slot)) ids.push(it.id);
+    for (const p of SHOP) ids.push('shop:' + p.id);
+    for (const id of ids) {
+      const [fit, kind] = this._stillOf(id);
+      const k = `${kind}|${fitKey(fit)}`;
+      if (this.stillKey.get(id) === k) continue;
+      if (!this.queue.includes(id)) this.queue.push(id);
+    }
+    // the tab you're looking at first
+    const tabOf = (id) => (id.startsWith('shop:') ? 'shop' : item(id).slot);
+    this.queue.sort((a, b) => (tabOf(a) === this.slot ? 0 : 1) - (tabOf(b) === this.slot ? 0 : 1));
   }
 
   _stills() {
     if (!this.mq || !this.queue.length) return;
     const id = this.queue.shift();
-    const it = item(id);
-    const fit = fitWith(id);
+    const [fit, kind] = this._stillOf(id);
     try {
-      this.mq.still(fit, it.slot, this._canvasFor(id));
-      this.stillKey.set(id, `${it.slot}|${fitKey(fit)}`);
+      this.mq.still(fit, kind, this._canvasFor(id));
+      this.stillKey.set(id, `${kind}|${fitKey(fit)}`);
     } catch (e) {
       console.warn('[wardrobe] still failed', e);
     }
@@ -460,7 +669,9 @@ export class Wardrobe {
       if (t.dataset.slot) {
         this._click();
         this.setSlot(t.dataset.slot);
-      } else if (t.classList.contains('wr-card')) this.wear(t.dataset.id);
+      } else if (t.dataset.prod) this.select(t.dataset.prod);
+      else if (t.dataset.buy) this.buy(t.dataset.buy);
+      else if (t.classList.contains('wr-card')) this.wear(t.dataset.id);
       else if (t.classList.contains('wr-part')) {
         this._click();
         this.setPart(+t.dataset.part);
@@ -512,6 +723,14 @@ export class Wardrobe {
         case 'Digit2':
         case 'Numpad2':
           this.setSlot('body');
+          break;
+        case 'Digit3':
+        case 'Numpad3':
+          this.setSlot('car');
+          break;
+        case 'Digit4':
+        case 'Numpad4':
+          this.setSlot('shop');
           break;
         case 'KeyR':
           this.randomize();

@@ -28,6 +28,9 @@ import { Menus } from './ui/menus.js';
 import { Game } from './game/game.js';
 import { buildListener } from './game/monsters.js';
 import { PLAYER_COLORS } from './game/remote.js';
+import { EARN, wallet } from './game/wallet.js';
+import { News } from './ui/news.js';
+import { MicCal } from './ui/miccal.js';
 import { Coop, myName } from './net/coop.js';
 import { cleanCode } from './net/net.js';
 import { Lobby } from './ui/lobby.js';
@@ -101,6 +104,29 @@ const wardrobe = new Wardrobe({
   onChange: () => {
     if (coop.active) coop.announce();
   },
+});
+const news = new News($('news')); // what's new, on the menu's left
+// the microphone in 15 seconds (from the menu's mic row, and from the settings)
+const micCal = new MicCal({
+  mic,
+  ensureMic: async () => {
+    audio.init();
+    if (mic.state !== 'on') {
+      settings.micEnabled = true;
+      await mic.start(audio);
+      saveSettings();
+      micChanged();
+    }
+    return mic.state === 'on';
+  },
+  sound: (k) => {
+    if (!audio.ready) return;
+    audio.wardrobe(k === 'done' ? 'buy' : k === 'fail' ? 'tap' : 'dye');
+  },
+});
+for (const id of ['micCalBtn', 'btnMicCal']) $(id).addEventListener('click', (e) => {
+  e.preventDefault();
+  micCal.open();
 });
 // a modal over the menu hides the figure: don't draw it then
 const MENU_COVERS = ['settingsPanel', 'howPanel', 'scoresPanel', 'coopPanel'];
@@ -178,6 +204,9 @@ const menus = new Menus({
   onAtlas: () => {
     if (state === 'menu') atlas.open();
   },
+  onShop: () => {
+    if (state === 'menu') wardrobe.open('shop');
+  },
   onLobby: () => toMenu(true),
   onMicToggle: () => toggleMic(),
   onSettingsChanged: (key) => {
@@ -197,6 +226,7 @@ const menus = new Menus({
       hud.cache = {};
       atlas.applyI18n();
       wardrobe.applyI18n();
+      news.render();
       updateMicUI();
       lobby.render();
       $('lockHint').textContent = input.lockFailed ? t('dragToLook') : t('clickToLook');
@@ -376,7 +406,7 @@ function updateAttract(dt) {
   // talk to the menu: your voice lights the forest
   if (mic.state === 'on') {
     const ev = mic.update(dt, audio.outputDb());
-    if (ev.pulse > 0 && state === 'menu') {
+    if (ev.pulse > 0 && state === 'menu' && !micCal.isOpen()) {
       if (atlas.isOpen()) atlas.ping();
       else if (wardrobe.isOpen()) wardrobe.ping();
       else {
@@ -468,7 +498,7 @@ function startRun(opts = {}) {
   if (online) {
     const me = opts.coop.players.find((p) => p.id === coop.selfId);
     game.setupSolo();
-    game.reset({ seed: opts.coop.seed, slot: me ? me.slot : 0 });
+    game.reset({ seed: opts.coop.seed, slot: me ? me.slot : 0, online: true });
     game.setupOnline(coop, opts.coop.players);
   } else {
     game.setupSolo();
@@ -615,6 +645,14 @@ function onEnd(res) {
     loudestDb: -100,
   };
   const team = online ? teamSummary() : null;
+  // the purse: what the night brought in (getting away pays too)
+  let escBonus = 0;
+  if (res.won && game.player.alive) {
+    escBonus = EARN.escape;
+    game.earnShards(escBonus);
+  }
+  stats.earned = game.stats.earned | 0;
+  stats.escBonus = escBonus;
   try {
     const started = game.objectives.gens.filter((g) => g.running).map((g) => ({ k: g.k, site: g.site && g.site.id }));
     recordNight(stats, res, started);
@@ -625,6 +663,10 @@ function onEnd(res) {
   const { rank, list } = submitScore({ name: settings.name || '???', score: game.score, time: stats.time, won: res.won, shards: stats.shards, gens: stats.gens, coop: online ? Math.max(team.length, game.teamSize || 1) : 0 });
   game.flares.clear(); // (a burning flare would hiss on behind the end screen)
   menus.showOver(res, stats, rank, list, team);
+  const ow = $('overWallet');
+  if (ow) {
+    ow.textContent = stats.earned > 0 ? t('walletNight').replace('{n}', stats.earned).replace('{escape}', escBonus ? t('walletEscape').replace('{n}', escBonus) : '').replace('{total}', wallet.shards) : '';
+  }
   menus.renderScores();
   if (online) {
     coop.endRun();
@@ -817,7 +859,7 @@ function boot() {
       perf.fpsEl.style.cssText = 'position:fixed;right:8px;top:64px;z-index:99;font:11px JetBrains Mono,monospace;color:#8ef0ff;opacity:.8;pointer-events:none';
       document.body.appendChild(perf.fpsEl);
     }
-    window.__hush = { world, game, shared, pulses, ghosts, eyes, renderer, perf, mic, audio, input, hud, post, shadows, coop, lobby, atlas, wardrobe, debug: DEBUG, startRun, pause, resume, toMenu, ensureGarage, get garage() { return garage; }, get state() { return state; } };
+    window.__hush = { world, game, shared, pulses, ghosts, eyes, renderer, perf, mic, audio, input, hud, post, shadows, coop, lobby, atlas, wardrobe, micCal, news, debug: DEBUG, startRun, pause, resume, toMenu, ensureGarage, get garage() { return garage; }, get state() { return state; } };
     state = 'menu';
     menuTime = 0;
     post.u.uFade.value = 0;

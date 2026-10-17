@@ -73,8 +73,9 @@ export class NetSync {
       if (p.alive) f |= PF.alive;
       if (g.charge && g.charge.active && g.charge.t > 0.3) f |= PF.charging;
       if (g.input.useHeld) f |= PF.use;
+      if (g.torch && g.torch.on) f |= PF.torch;
       const loud = g.mic.state === 'on' ? g.mic.loud : 0;
-      this.send('ps', [r2(p.x), r2(p.y), r2(p.z), r3(p.yaw), r3(p.pitch), r2(p.speed), f, r2(loud), Math.floor(g.score)]);
+      this.send('ps', [r2(p.x), r2(p.y), r2(p.z), r3(p.yaw), r3(p.pitch), r2(p.speed), f, r2(loud), Math.floor(g.score), g.torch ? r2(g.torch.charge) : 0]);
     }
     // batched voice noise → host
     if (!this.host) {
@@ -205,7 +206,7 @@ export class NetSync {
         if (r) g.stones.throw(+a, +b, +c, +e, +f, +d[6], pid);
         break;
       case 'sh':
-        g.shards.take(a | 0);
+        if (g.shards.take(a | 0) && g.onMateShard) g.onMateShard(g.remotes.get(pid));
         break;
       case 'fx':
         g.objectives.remoteFx(a, b | 0, c);
@@ -215,6 +216,9 @@ export class NetSync {
         break;
       case 'fg':
         if (r) g.fxMateFlare(r);
+        break;
+      case 'tq': // someone took a flashlight
+        if (g.torch) g.torch.netTake(a);
         break;
       case 'fl':
         if (r && [a, b, c, e, f, d[6]].every((v) => Number.isFinite(+v))) g.remoteFlare(r, +a, +b, +c, +e, +f, +d[6]);

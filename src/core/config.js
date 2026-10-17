@@ -60,6 +60,11 @@ export const CFG = {
   voiceRevealRadius: (loud) => 14 + 54 * Math.pow(Math.max(loud, 0), 0.8),
   SCREAM: 0.78, // loudness at/above which it's a scream (instant hunt)
   TALK: 0.3, // loudness of ordinary talking into the microphone (its upper end)
+  // SPACE (the ECHO button): after each echo a short wait while it comes back — longer after a loud one.
+  // Let go during the wait and, if the wait is nearly over, it goes the moment it can
+  PING_CD: 0.85,
+  PING_CD_LOUD: 0.55,
+  PING_QUEUE: 0.35,
 
   MONSTER: {
     listener: { wander: 1.05, investigate: 2.1, hunt: 4.7, hearing: 1.0, lock: 6.0, radius: 0.45 },

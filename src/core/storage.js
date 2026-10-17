@@ -17,6 +17,7 @@ const DEFAULTS = {
   name: '',
   tutorialDone: false,
   voiceVol: {}, // co-op: your volume for each friend, by name (only the ones you changed)
+  micCal: null, // the 15-second setup: { floor, talk, shout } dBFS (see ui/miccal.js)
 };
 
 function read(key, fallback) {

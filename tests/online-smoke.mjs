@@ -27,9 +27,11 @@ const ARGS = [
   '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist',
 ];
 
-async function player(tag, url) {
+async function player(tag, url, seed = null) {
   const browser = await puppeteer.launch({ executablePath: CHROME, headless: true, args: ARGS, defaultViewport: { width: 640, height: 360 }, protocolTimeout: 300000 });
   const page = await browser.newPage();
+  // (what's already in this browser's storage: a purse, a wardrobe)
+  if (seed) await page.evaluateOnNewDocument((seed) => { for (const [k, v] of Object.entries(seed)) localStorage.setItem(k, v); }, seed);
   page.errors = [];
   page.on('pageerror', (e) => { page.errors.push(String(e)); log(`[${tag} pageerror]`, String(e).slice(0, 300)); });
   page.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warning') log(`[${tag} ${m.type()}]`, m.text().slice(0, 200)); });
@@ -59,7 +61,11 @@ try {
   log(`signalling: ${NET || 'nostr + torrent'}`);
   const ua = new URL(BASE);
   if (NET) ua.searchParams.set('net', NET);
-  A = await player('A', ua.toString());
+  // A has bought the Trueno and wears it in the garage (and the boykisser)
+  A = await player('A', ua.toString(), {
+    'hush.wallet.v1': JSON.stringify({ shards: 0, total: 86, owned: ['trueno'] }),
+    'hush.outfit.v1': JSON.stringify({ head: 'boykisser', body: 'fluffy', car: 'trueno', colors: {} }),
+  });
   await A.page.evaluate(async () => { const h = window.__hush; h.audio.init(); await h.mic.start(h.audio); });
   // public trackers / relays sometimes just don't pass an offer along: one more try with a fresh room
   // before calling it broken (a real break fails both)
@@ -180,6 +186,9 @@ try {
     return s === 'host me - -' ? s : null;
   }), 15000);
   check('the garage seats the host at the wheel and B on the chair', !!seats, seats || '');
+  const carB = await until(() => B.page.evaluate(() => (window.__hush.garage && window.__hush.garage.carId === 'trueno' ? 'trueno' : null)), 15000);
+  check("the host's Trueno stands in B's garage", carB === 'trueno', String(carB || (await B.page.evaluate(() => window.__hush.garage && window.__hush.garage.carId))));
+  facts.push(`host's car ${carB === 'trueno' ? 'synced' : 'NOT synced'}`);
 
   // START from the garage: the car starts on both screens, then the night
   const t0 = Date.now();
@@ -243,6 +252,21 @@ try {
   await A.page.evaluate(() => window.__hush.game.startDusk());
   const night = await until(async () => (await A.page.evaluate(() => window.__hush.game.state)) === 'play' && (await B.page.evaluate(() => window.__hush.game.state)) === 'play', 90000);
   check('the night falls for both', !!night);
+  // the host's flashlight: B sees it on (and taken); a shard the host picks up pays B as well
+  const torch = await (async () => {
+    const hostId = await B.page.evaluate(() => window.__hush.coop.hostId);
+    await A.page.evaluate(() => { const g = window.__hush.game; const it = g.torch.items[0]; g.torch.take(it); g.torch.toggle(); });
+    const seen = await until(() => B.page.evaluate((id) => { const g = window.__hush.game, r = g.remotes.get(id); return !!(r && r.torchOn && g.torch.items[0].taken); }, hostId), 20000);
+    await A.page.evaluate(() => { const g = window.__hush.game; if (g.torch.on) g.torch.toggle(); });
+    return seen ? 'ok' : `B: ${await B.page.evaluate((id) => { const g = window.__hush.game, r = g.remotes.get(id); return `torchOn ${r && r.torchOn}, taken ${g.torch.items[0] && g.torch.items[0].taken}`; }, hostId)}`;
+  })();
+  check("the host's flashlight shines on B's screen", torch === 'ok', torch);
+  const purseB = () => B.page.evaluate(() => JSON.parse(localStorage.getItem('hush.wallet.v1') || '{"shards":0}').shards | 0);
+  const before = await purseB();
+  await A.page.evaluate(() => { const g = window.__hush.game; const k = g.shards.items.findIndex((s) => s.alive); const s = g.shards.items[k]; s.alive = false; g.onShard(s, k); });
+  const paid = await until(async () => (await purseB()) === before + 1, 20000);
+  check('a shard the host picks up pays B too', !!paid, `${before} → ${await purseB()}`);
+  facts.push(`flashlight ${torch === 'ok' ? 'synced' : 'NOT synced'} · shared shard ${paid ? 'ok' : 'NOT ok'}`);
   const partOk = await (async () => {
     const P = await A.page.evaluate(() => { const q = window.__hush.game.escape.parts[2]; return [q.x, q.z]; });
     await B.page.evaluate(([x, z]) => { const g = window.__hush.game; g.player.x = x + 0.8; g.player.z = z; g.player.vx = g.player.vz = 0; }, P);

@@ -13,6 +13,45 @@ export const GK = {
   REDPAINT: 37, SEAT: 38, OIL: 39, WOODDARK: 40, LANTERN: 41, RADIO: 42, SILHOUETTE: 43, FLAME: 44, GLASS: 45,
   YELLOW: 46, MARK: 47, BULB2: 48, MOONLIT: 49,
 };
+// what the garage-only kinds look like (19…49), for every shader that draws garage things
+export const GPAL_GLSL = /* glsl */ `
+const vec3 GPAL[31] = vec3[31](
+  vec3(0.30, 0.30, 0.29),  // concrete
+  vec3(0.46, 0.45, 0.42),  // block, whitewashed long ago
+  vec3(0.15, 0.23, 0.23),  // oil paint on the lower wall
+  vec3(0.25, 0.29, 0.16),  // УАЗ khaki
+  vec3(0.72, 0.74, 0.76),  // chrome
+  vec3(0.07, 0.07, 0.075), // rubber
+  vec3(0.09, 0.09, 0.095), // dark
+  vec3(0.75, 0.74, 0.66),  // headlamp glass
+  vec3(0.42, 0.05, 0.04),  // tail lamp
+  vec3(1.00, 0.85, 0.60),  // bulb
+  vec3(1.00, 0.45, 0.15),  // ember
+  vec3(0.17, 0.27, 0.19),  // gate green
+  vec3(0.36, 0.20, 0.11),  // rust
+  vec3(0.07, 0.11, 0.21),  // the night outside
+  vec3(0.12, 0.16, 0.12),  // dash glass
+  vec3(0.80, 0.75, 0.62),  // paper
+  vec3(0.30, 0.33, 0.22),  // canvas
+  vec3(0.62, 0.62, 0.60),  // tin
+  vec3(0.60, 0.09, 0.06),  // red paint
+  vec3(0.17, 0.11, 0.08),  // seat
+  vec3(0.035, 0.035, 0.04),// oil
+  vec3(0.24, 0.17, 0.11),  // dark wood
+  vec3(1.00, 0.70, 0.35),  // lantern glass
+  vec3(1.00, 0.60, 0.22),  // radio dial
+  vec3(0.0, 0.0, 0.0),     // the thing outside
+  vec3(1.00, 0.75, 0.35),  // flame
+  vec3(0.55, 0.62, 0.66),  // glass
+  vec3(0.70, 0.52, 0.12),  // yellow paint
+  vec3(0.75, 0.10, 0.08),  // red marks
+  vec3(1.00, 0.85, 0.60),  // the bare bulb
+  vec3(0.045, 0.065, 0.12) // the yard outside, under the moon
+);
+`;
+
+// the lobby car's two paints (the host's colours from the wardrobe: main, accent) — past the world's kinds
+export const CK = { A: 52, B: 53 };
 
 // the room (metres). The camera looks in from +z, where the front wall has been cut away.
 export const ROOM = { X0: -4.3, X1: 4.3, Z0: -3.2, Z1: 3.0, H: 3.0, T: 0.25 };
@@ -465,7 +504,7 @@ export const CARP = {
 export function buildCarBody(opts = {}) {
   const forest = !!opts.forest;
   const b = new MeshBuilder(8192);
-  const P = GK.CARPAINT, D = GK.DARK;
+  const P = opts.paint ?? GK.CARPAINT, D = GK.DARK, CV = opts.canvas ?? GK.CANVAS;
   const W = 0.89;
   // chassis rails and the sump, seen under the body
   boxAt(b, 0, 0.5, 0.42, 3.8, 0.12, 0.08, D);
@@ -503,9 +542,9 @@ export function buildCarBody(opts = {}) {
     b.place(2.18, 0.98, 0.3, 0, 0, PI / 2);
     tyre(b, 0.36, 0.22, GK.RUBBER, 12, true);
     b.place(2.18, 0.98, 0.3, 0, 0, PI / 2);
-    b.cylinder(10, 0.2, 0.2, 0.18, GK.CARPAINT, { y0: -0.09 });
-    boxAt(b, 2.14, 0.98, -0.5, 0.14, 0.44, 0.3, GK.CARPAINT);
-    boxAt(b, 2.14, 1.22, -0.44, 0.06, 0.05, 0.1, GK.CARPAINT);
+    b.cylinder(10, 0.2, 0.2, 0.18, P, { y0: -0.09 });
+    boxAt(b, 2.14, 0.98, -0.5, 0.14, 0.44, 0.3, P);
+    boxAt(b, 2.14, 1.22, -0.44, 0.06, 0.05, 0.1, P);
   } else {
     b.place(2.1, 0.98, 0.3, 0, 0, PI / 2);
     b.cylinder(6, 0.04, 0.04, 0.16, GK.RUST, { y0: -0.02 }); // the stud the spare hung on
@@ -563,7 +602,7 @@ export function buildCarBody(opts = {}) {
     boxAt(b, x, 1.86, 0, 0.04, 0.04, 1.76, D);
   }
   b.place(1.92, 1.38, 0, PI / 2, 0, 0);
-  b.cylinder(8, 0.11, 0.11, 1.66, GK.CANVAS, { y0: -0.83, capBottom: true });
+  b.cylinder(8, 0.11, 0.11, 1.66, CV, { y0: -0.83, capBottom: true });
   for (const z of [-0.5, 0.5]) {
     b.place(1.92, 1.38, z, PI / 2, 0, 0);
     b.cylinder(8, 0.118, 0.118, 0.04, GK.DARK, { y0: -0.02, capTop: false });
@@ -605,16 +644,15 @@ export function buildCarBody(opts = {}) {
   // cargo in the back: a crate, a sack, a shovel
   boxAt(b, 1.75, 0.86, 0.48, 0.36, 0.36, 0.42, KIND.WOOD, 0.1);
   b.place(1.72, 0.7, -0.4, 0, 0.5, 0.25);
-  b.taper(0.42, 0.3, 0.3, 0.24, 0.42, GK.CANVAS);
+  b.taper(0.42, 0.3, 0.3, 0.24, 0.42, CV);
   b.place(1.2, 1.0, -0.78, 0.1, 0, 1.25);
   b.box(0.035, 1.1, 0.035, KIND.WOOD, { bottom: true });
   return b.toArrays();
 }
 
 // the steering wheel, in its own frame: the axis along +x, the rim in the y–z plane (12 o'clock = +y)
-export function buildSteering() {
+export function buildSteering(R = CARP.wheelRad) {
   const b = new MeshBuilder(512);
-  const R = CARP.wheelRad;
   const pts = [];
   for (let i = 0; i <= 12; i++) {
     const a = (i / 12) * PI * 2;
@@ -628,15 +666,16 @@ export function buildSteering() {
   return b.toArrays();
 }
 
-export function buildCarWheels() {
+export function buildCarWheels(opts = {}) {
   const b = new MeshBuilder(4096);
   const { wheelX: x, wheelZ: z, wheelR: r, wheelW: w } = CARP;
+  const P = opts.paint ?? GK.CARPAINT;
   for (const sx of [-1, 1]) {
     for (const sz of [-1, 1]) {
       b.place(sx * x, r, sz * z, PI / 2, 0, 0);
       tyre(b, r, w, GK.RUBBER, 12, true);
       b.place(sx * x, r, sz * (z + w * 0.38), PI / 2, 0, 0);
-      b.cylinder(10, r * 0.55, r * 0.55, 0.03, GK.CARPAINT, { y0: -0.015, capBottom: true });
+      b.cylinder(10, r * 0.55, r * 0.55, 0.03, P, { y0: -0.015, capBottom: true });
       b.place(sx * x, r, sz * (z + w * 0.45), PI / 2, 0, 0);
       b.cylinder(6, 0.07, 0.07, 0.03, GK.CHROME, { y0: -0.015 });
     }
@@ -651,6 +690,186 @@ export function buildCarGlass() {
   b.box(0.008, 0.56, 1.66, GK.GLASS);
   return b.toArrays();
 }
+
+// ---------------- the other car: a Toyota Sprinter Trueno (AE86), from the shop ----------------
+// Same frame as the УАЗ (nose toward −x, driver's side +z, facing you). Low and long: two-tone "panda" paint
+// (CK.A over CK.B), pop-up headlights on their own hinges (see buildTruenoPod), a hatch with a spoiler,
+// the wide tail-lamp bar. The cabin is hollow: the side windows are open, so the driver shows.
+export const TRUENO_P = {
+  wheelX: 1.2, wheelZ: 0.68, wheelR: 0.29, wheelW: 0.19,
+  head: [[-1.79, 0.91, 0.52], [-1.79, 0.91, -0.52]], // the lamps, flipped up
+  tail: [[2.05, 0.76, 0.55], [2.05, 0.76, -0.55]],
+  exhaust: [2.13, 0.24, -0.46],
+  dash: [-0.52, 0.88, 0.36],
+  key: [-0.42, 0.8, 0.22],
+  wheelC: [-0.3, 0.92, 0.36],
+  wheelN: [0.9, 0.38, 0],
+  wheelRad: 0.18,
+  horn: [-0.3, 0.92, 0.36],
+  pod: { x: -1.62, y: 0.8, z: 0.52, len: 0.3, open: 1.3 }, // the pop-ups' hinges (rear edge), and how far they open
+};
+
+export function buildTruenoBody() {
+  const b = new MeshBuilder(8192);
+  const A = CK.A, B = CK.B, D = GK.DARK;
+  const W = 0.8; // half width
+  const SPLIT = 0.46; // the side moulding: black below, white above
+  // the nose: in front of the front wheels, over them, the engine bay between them
+  boxAt(b, -1.76, (0.22 + SPLIT) / 2, 0, 0.44, SPLIT - 0.22, 2 * W, B);
+  boxAt(b, -1.76, (SPLIT + 0.74) / 2, 0, 0.44, 0.74 - SPLIT, 2 * W, A);
+  boxAt(b, -1.2, 0.69, 0, 0.64, 0.1, 2 * W, A); // over the front wheels
+  boxAt(b, -1.2, 0.42, 0, 0.64, 0.4, 1.0, D); // the engine bay, between them
+  // the hood: a long low slope down to the nose
+  b.place(-1.36, 0.79, 0, 0, 0, 0.035);
+  b.box(1.24, 0.04, 2 * W - 0.02, A);
+  // the pop-ups' wells (the pods themselves turn: buildTruenoPod)
+  for (const s of [-1, 1]) boxAt(b, -1.77, 0.74, s * 0.52, 0.31, 0.1, 0.33, D);
+  boxAt(b, -1.995, 0.6, 0, 0.03, 0.05, 1.1, D); // a slot of a grille
+  // the bumpers, black, with the indicators in them
+  boxAt(b, -2.03, 0.33, 0, 0.12, 0.2, 2 * W + 0.02, D);
+  for (const s of [-1, 1]) boxAt(b, -2.095, 0.35, s * 0.6, 0.012, 0.05, 0.16, GK.YELLOW);
+  boxAt(b, 2.06, 0.33, 0, 0.12, 0.2, 2 * W + 0.02, D);
+  // the cabin's sides (hollow inside): the doors, the rear quarters over the rear wheels
+  for (const s of [-1, 1]) {
+    const z = s * (W - 0.025);
+    boxAt(b, 0.0, (0.22 + SPLIT) / 2, z, 1.76, SPLIT - 0.22, 0.05, B);
+    boxAt(b, 0.0, (SPLIT + 0.79) / 2, z, 1.76, 0.79 - SPLIT, 0.05, A);
+    boxAt(b, 1.2, 0.695, z, 0.64, 0.19, 0.05, A); // over the rear wheel
+    boxAt(b, 1.2, 0.45, s * 0.53, 0.64, 0.32, 0.03, D); // its inner well
+    boxAt(b, -1.2, 0.45, s * 0.53, 0.64, 0.32, 0.03, D);
+    boxAt(b, 0.0, SPLIT, z + s * 0.03, 3.9, 0.035, 0.02, D); // the moulding
+    // door seams, the handle
+    boxAt(b, -0.76, 0.52, z + s * 0.028, 0.012, 0.52, 0.008, D);
+    boxAt(b, 0.46, 0.52, z + s * 0.028, 0.012, 0.52, 0.008, D);
+    boxAt(b, 0.3, 0.7, z + s * 0.034, 0.12, 0.022, 0.02, D);
+    // a mirror
+    b.place(-0.66, 0.9, s * 0.86, 0, s * 0.25, 0);
+    b.box(0.08, 0.07, 0.12, D);
+    // the A-pillar, the B-pillar, the C-pillar (a wide panel down to the hatch)
+    b.identity();
+    b.limb([-0.76, 0.8, s * 0.74], [-0.12, 1.33, s * 0.67], 0.028, 0.026, D, 4);
+    b.limb([0.46, 0.8, s * 0.76], [0.42, 1.33, s * 0.68], 0.03, 0.03, D, 4);
+    quadS(b, [0.6, 0.8, s * 0.785], [1.98, 0.8, s * 0.8], [1.2, 1.33, s * 0.66], [0.62, 1.34, s * 0.68], A, s);
+  }
+  // "藤原とうふ店（自家用）" on the driver's door — strokes of black, the way it reads from across a garage
+  {
+    const zf = W + 0.004;
+    let x = -0.6;
+    for (let g = 0; g < 9; g++) {
+      const w = g === 6 || g === 8 ? 0.03 : 0.065;
+      const strokes = (g * 7 + 3) % 4 + 2;
+      for (let k = 0; k < strokes; k++) {
+        const vert = (k + g) % 2 === 0;
+        boxAt(b, x + (k % 3) * w * 0.33, 0.6 + ((k * 5 + g) % 3) * 0.018, zf, vert ? 0.007 : w * 0.7, vert ? 0.05 : 0.007, 0.004, D);
+      }
+      x += w + 0.025;
+    }
+  }
+  // the roof, the windscreen's top rail, the hatch's frame and its spoiler
+  boxAt(b, 0.39, 1.35, 0, 1.02, 0.04, 1.38, A);
+  boxAt(b, -0.12, 1.33, 0, 0.06, 0.04, 1.36, D);
+  for (const s of [-1, 1]) {
+    b.identity();
+    b.limb([0.9, 1.33, s * 0.64], [1.96, 0.96, s * 0.76], 0.02, 0.02, D, 4);
+  }
+  boxAt(b, 1.98, 0.97, 0, 0.12, 0.035, 1.5, D); // the spoiler
+  // the tail: the panel, the lamp bar across it, the plate
+  boxAt(b, 1.78, (0.22 + SPLIT) / 2, 0, 0.5, SPLIT - 0.22, 2 * W, B);
+  boxAt(b, 1.78, (SPLIT + 0.94) / 2, 0, 0.5, 0.94 - SPLIT, 2 * W, A);
+  boxAt(b, 2.035, 0.76, 0, 0.02, 0.1, 1.5, GK.TAILLAMP);
+  boxAt(b, 2.04, 0.76, 0, 0.012, 0.025, 0.3, D); // the garnish between the lamps
+  boxAt(b, 2.04, 0.55, 0, 0.012, 0.11, 0.33, GK.PAPER); // the plate
+  b.place(1.86, 0.24, TRUENO_P.exhaust[2], 0, 0, PI / 2);
+  b.cylinder(6, 0.035, 0.035, 0.6, D, { y0: -0.3 });
+  // inside: the floor, the dash and its gauges, the column, two buckets and a bench, the gear stick
+  boxAt(b, 0.32, 0.22, 0, 2.4, 0.04, 2 * W - 0.1, D);
+  boxAt(b, -0.62, 0.8, 0, 0.26, 0.18, 2 * W - 0.1, D);
+  boxAt(b, -0.54, 0.9, 0, 0.14, 0.03, 2 * W - 0.12, D);
+  for (const dz of [-0.07, 0.07]) {
+    b.place(TRUENO_P.dash[0] + 0.05, TRUENO_P.dash[1] - 0.02, TRUENO_P.dash[2] + dz, 0, 0, PI / 2 - 0.3);
+    b.cylinder(8, 0.04, 0.04, 0.01, GK.DASH, { y0: -0.005 });
+  }
+  b.place(-0.5, 0.8, TRUENO_P.wheelC[2], 0, 0, -(PI / 2 - 0.4));
+  b.box(0.035, 0.22, 0.035, D, { bottom: true });
+  for (const s of [1, -1]) {
+    const z = s * 0.36;
+    boxAt(b, 0.04, 0.37, z, 0.48, 0.1, 0.46, GK.SEAT);
+    b.place(0.28, 0.42, z, 0, 0, 0.3);
+    b.box(0.1, 0.62, 0.44, GK.SEAT, { bottom: true });
+    b.place(0.43, 1.0, z, 0, 0, 0.3);
+    b.box(0.08, 0.16, 0.26, GK.SEAT, { bottom: true }); // the headrest
+  }
+  boxAt(b, 1.0, 0.4, 0, 0.42, 0.1, 1.3, GK.SEAT);
+  b.place(1.22, 0.45, 0, 0, 0, 0.28);
+  b.box(0.08, 0.45, 1.28, GK.SEAT, { bottom: true });
+  b.place(-0.26, 0.36, 0.0, 0, 0, -0.2);
+  b.box(0.02, 0.3, 0.02, D, { bottom: true });
+  b.place(-0.2, 0.65, 0.0);
+  b.octa(0.028, 0.028, D);
+  return b.toArrays();
+}
+
+// a quad that faces out on side s (+1 / -1 in z)
+function quadS(b, p0, p1, p2, p3, kind, s) {
+  b.identity();
+  b.quadN(p0, p1, p2, p3, [0, 0, s], kind);
+  b.quadN(p0, p3, p2, p1, [0, 0, -s], kind); // (and from inside the cabin)
+}
+
+// one pop-up headlight, in its hinge's frame: the white lid on top (flush with the hood when shut), the
+// black face with the round lamp underneath — up, it turns to face forward
+export function buildTruenoPod() {
+  const b = new MeshBuilder(512);
+  const L = TRUENO_P.pod.len;
+  boxAt(b, -L / 2, -0.055, 0, L, 0.11, 0.3, CK.A);
+  boxAt(b, -L / 2, -0.113, 0, L - 0.01, 0.008, 0.29, GK.DARK);
+  b.place(-L / 2, -0.115, 0, PI, 0, 0);
+  b.cylinder(10, 0.07, 0.07, 0.012, GK.HEADLAMP, { y0: 0 });
+  return b.toArrays();
+}
+
+export function buildTruenoWheels() {
+  const b = new MeshBuilder(4096);
+  const { wheelX: x, wheelZ: z, wheelR: r, wheelW: w } = TRUENO_P;
+  for (const sx of [-1, 1]) {
+    for (const sz of [-1, 1]) {
+      b.place(sx * x, r, sz * z, PI / 2, 0, 0);
+      tyre(b, r, w, GK.RUBBER, 12, true);
+      b.place(sx * x, r, sz * (z + w * 0.38), PI / 2, 0, 0);
+      b.cylinder(10, r * 0.62, r * 0.62, 0.025, GK.CHROME, { y0: -0.012, capBottom: true });
+      for (let k = 0; k < 4; k++) { // four spokes of black
+        b.place(sx * x, r, sz * (z + w * 0.46), PI / 2, (k / 4) * PI * 2 + 0.4, 0);
+        b.box(0.035, 0.02, r * 1.05, GK.DARK);
+      }
+    }
+  }
+  return b.toArrays();
+}
+
+// faint glass: the windscreen and the hatch (the side windows are down)
+export function buildTruenoGlass() {
+  const b = new MeshBuilder(64);
+  b.identity();
+  b.quadN([-0.74, 0.81, 0.74], [-0.74, 0.81, -0.74], [-0.13, 1.32, -0.66], [-0.13, 1.32, 0.66], [-1, 0.8, 0], GK.GLASS);
+  b.quadN([0.92, 1.32, 0.62], [0.92, 1.32, -0.62], [1.95, 0.97, -0.74], [1.95, 0.97, 0.74], [1, 0.9, 0], GK.GLASS);
+  return b.toArrays();
+}
+
+// the lobby's cars: what each is built of, and where its driver sits (car-local) and how
+export const CAR_MODELS = {
+  uaz: {
+    P: CARP, len: 4.0, wid: 1.78,
+    body: () => buildCarBody({ paint: CK.A, canvas: CK.B }), wheels: () => buildCarWheels({ paint: CK.A }), glass: () => buildCarGlass(),
+    driver: { pos: [0.1, 0, 0.42], hips: 1.02, recline: -0.1, thigh: -1.5, knee: 0.88 },
+    engine: [-1.3, 1.1, 0], mirror: [-0.62, 1.62, 0.02], tailAt: [2.02, 0.95, 0],
+  },
+  trueno: {
+    P: TRUENO_P, len: 4.24, wid: 1.64,
+    body: buildTruenoBody, wheels: buildTruenoWheels, glass: buildTruenoGlass, pod: buildTruenoPod,
+    driver: { pos: [-0.02, 0, 0.36], hips: 0.5, recline: -0.28, thigh: -1.22, knee: 0.55 },
+    engine: [-1.3, 0.9, 0], mirror: [-0.36, 1.26, 0.02], tailAt: [2.05, 0.76, 0],
+  },
+};
 
 // ---------------- what the packer packs (each its own little mesh) ----------------
 export function buildItems() {

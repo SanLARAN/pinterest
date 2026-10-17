@@ -9,6 +9,7 @@ import { RemotePlayer, PLAYER_HEX } from './remote.js';
 import { SelfBody } from './selfbody.js';
 import { myFit } from './outfit.js';
 import { Beyond } from '../ui/beyond.js';
+import { earn, EARN } from './wallet.js';
 import { NetSync } from './netsync.js';
 import { Objectives } from './objectives.js';
 import { Player } from './player.js';
@@ -21,6 +22,7 @@ import { MedHut } from './medhut.js';
 import { Rescue } from './rescue.js';
 import { Escape } from './escape.js';
 import { Cabinets } from './cabinets.js';
+import { Torches } from './torch.js';
 import { Dread } from './dread.js';
 import { CAP } from '../world/world.js';
 import { shared } from '../render/sonar.js';
@@ -54,6 +56,7 @@ export class Game {
     this.rescue = new Rescue(this);
     this.escape = new Escape(this); // the forestry yard, the УАЗ and its four parts, the way out
     this.cabinets = new Cabinets(this); // cupboards in the buildings (and the шкафандр)
+    this.torch = new Torches(this); // flashlights: one lies out there each night
     this.selfBody = new SelfBody(this); // yours, when you look down
     this.beyond = new Beyond(document.getElementById('beyond')); // co-op: the dead talk among themselves
     this.hud.onNoteClose = () => this.objectives.closeNote();
@@ -225,10 +228,13 @@ export class Game {
     this.objectives.reset(this.rng);
     this.escape.reset(new RNG((this.rng.next() * 4294967296) >>> 0)); // (its own stream: the same on every machine)
     this.cabinets.reset(new RNG((this.rng.next() * 4294967296) >>> 0));
+    this.torch.reset(new RNG((this.rng.next() * 4294967296) >>> 0), opts.online || this.online);
     this.setFlares(0, false);
     this.objectives.setMorning(true);
     this.charge = { active: false, t: 0 };
     this.pingCD = 0;
+    this.pingCDMax = 1;
+    this.pingQueue = null;
     this.stepNoise = 0;
     this.killer = null;
     this.deathT = 0;
@@ -322,6 +328,7 @@ export class Game {
     this.doors.update(dt);
     this.cabinets.update(dt);
     this.medhut.update(dt);
+    this.torch.update(dt);
     this.glows.update(dt);
     this.pulses.update(this.time);
     this.audio.morningTick();
@@ -580,10 +587,19 @@ export class Game {
     const c = this.charge;
     if (!c.active) return;
     c.active = false;
-    if (this.pingCD > 0) return;
-    this.pingCD = 0.22;
     const held = c.t;
+    if (this.pingCD > 0) {
+      // the last echo isn't back yet: this one goes the moment it is (if that's soon), or not at all
+      if (this.pingCD <= CFG.PING_QUEUE) this.pingQueue = held;
+      else this.hud.cooldownDeny();
+      return;
+    }
+    this._ping(held);
+  }
+
+  _ping(held) {
     const loud = held < 0.18 ? 0.24 : lerp(0.32, 1.0, clamp((held - 0.18) / 0.95, 0, 1));
+    this.pingCD = this.pingCDMax = CFG.PING_CD + CFG.PING_CD_LOUD * loud;
     if (loud < 0.36) this.audio.click(loud);
     else if (loud < CFG.SCREAM) this.audio.clap(loud);
     else this.audio.shout(loud);
@@ -822,8 +838,20 @@ export class Game {
     }
   }
 
+  // a shard is money too (wallet.js): yours, and on a co-op night everyone's
+  earnShards(n) {
+    earn(n);
+    this.stats.earned = (this.stats.earned | 0) + n;
+  }
+
+  onMateShard(r) {
+    this.earnShards(EARN.shard);
+    if (r) this.hud.popup(t('mateShard').replace('{name}', r.name), 'amber');
+  }
+
   onShard(s, i) {
     if (this.sync && i !== undefined) this.sync.ev('sh', i);
+    this.earnShards(EARN.shard);
     this.stats.shards++;
     const pts = CFG.SCORE.shard * this.mult;
     this.score += pts;
@@ -1590,6 +1618,7 @@ export class Game {
       this.doors.update(dt);
       this.cabinets.update(dt);
       this.flares.update(dt);
+      this.torch.update(dt);
       this.glows.update(dt);
       this.time += dt;
       this._commonFx(dt);
@@ -1601,6 +1630,7 @@ export class Game {
       this.time += dt;
       this.doors.update(dt);
       this.flares.update(dt);
+      this.torch.update(dt);
       this.glows.update(dt);
       this.escape.update(dt);
       for (const m of this.monsters) m.update(dt, this.time);
@@ -1615,9 +1645,13 @@ export class Game {
       this.doors.update(dt);
       this.flares.update(dt);
       this.medhut.update(dt);
+      this.torch.update(dt);
       this.glows.update(dt);
       this.rescue.update(dt);
-      for (const e of this.inputMuted ? [] : raw.events) if (e === 'carry') this.rescue.carryKey();
+      for (const e of this.inputMuted ? [] : raw.events) {
+        if (e === 'carry') this.rescue.carryKey();
+        else if (e === 'torch') this.torch.toggle();
+      }
       this.time += dt;
       if (this.player.alive) this.player.update(dt, input, look, this.inputMuted);
       this._commonFx(dt);
@@ -1661,6 +1695,7 @@ export class Game {
         if (es.held && !this.glows.held) this.handsFull();
         else this.glows.use();
       } else if (e === 'carry') this.carryKey();
+      else if (e === 'torch') this.torch.toggle();
     }
     // E puts a note away
     if (this.objectives.note && raw.events.includes('useDown')) {
@@ -1672,6 +1707,11 @@ export class Game {
       if (this.charge.t > 2.4) this.pingRelease(); // don't hold forever
     }
     this.pingCD -= dt;
+    if (this.pingQueue != null && this.pingCD <= 0) {
+      const h = this.pingQueue;
+      this.pingQueue = null;
+      this._ping(h);
+    }
 
     // ---- player ----
     const p = this.player;
@@ -1730,6 +1770,7 @@ export class Game {
     this.doors.update(dt);
     this.flares.update(dt);
     this.medhut.update(dt);
+    this.torch.update(dt);
     this.glows.update(dt);
     this.rescue.update(dt);
     es.update(dt);
@@ -1800,6 +1841,7 @@ export class Game {
     this.doors.update(dt);
     this.flares.update(dt);
     this.medhut.update(dt);
+    this.torch.update(dt);
     this.glows.update(dt);
     this.rescue.update(dt);
     this.escape.update(dt);
@@ -2079,6 +2121,7 @@ export class Game {
     this.glows.placeView(camera, hands && !this.cabinets.busy);
     this.escape.placeView(camera, hands);
     this.cabinets.placeView(camera, hands);
+    this.torch.placeView(camera, hands && !this.cabinets.busy);
     // your own body, under your eyes
     const st = this.state;
     this.selfBody.place(!cutCam && !sp && this.player.alive && !this.cabinets.busy && (st === 'play' || st === 'dawn' || st === 'morning' || st === 'dusk'));
@@ -2130,8 +2173,10 @@ export class Game {
     document.body.classList.toggle('carrying', playing && (!!p.carrying || !!es.held || es.mySeat >= 0));
     document.body.classList.toggle('holding', playing && !!es.held);
     document.body.classList.toggle('has-glow', playing && (this.glows.count > 0 || !!this.glows.held));
+    document.body.classList.toggle('has-torch', playing && this.torch.has);
     const chargeLvl = this.charge.active ? (this.charge.t < 0.18 ? 0.24 : lerp(0.32, 1, clamp((this.charge.t - 0.18) / 0.95, 0, 1))) : 0;
     this.hud.ring(dt, this.mic, this.state === 'play' ? chargeLvl : 0, this.mic.state === 'on');
+    this.hud.cooldown(this.state === 'play' && p.alive && this.pingCD > 0 ? this.pingCD / this.pingCDMax : 0);
     if (settings.radar) {
       const R = p.alive ? Math.max(this.mic.loud > 0 ? CFG.voiceHearRadius(this.mic.loud) : 0, this.stepNoise > 0 ? CFG.hearRadius(this.stepNoise) : 0, chargeLvl > 0 ? CFG.hearRadius(chargeLvl) : 0) : 0;
       const scream = p.alive && (this.mic.screamHeld > 0.1 || chargeLvl >= CFG.SCREAM);

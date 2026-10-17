@@ -5,7 +5,7 @@
 // first-aid hut's cot (see Rescue).
 import { CFG } from '../core/config.js';
 import { clamp, lerp, angleDiff } from '../core/rng.js';
-import { buildSurvivor, poseSurvivor, poseCarrier, poseGlowHand } from './survivor.js';
+import { buildSurvivor, poseSurvivor, poseCarrier, poseGlowHand, poseTorchHand, poseFur } from './survivor.js';
 import { cleanFit } from './outfit.js';
 import { createPersonMaterial, dressPerson, undressPerson } from '../render/people.js';
 
@@ -14,7 +14,7 @@ export const PLAYER_HEX = [0x8ef0ff, 0xa6ff9e, 0xd2a8ff, 0xffe08a];
 const DELAY = 110; // ms
 
 // flags in the player-state message
-export const PF = { crouch: 1, sprint: 2, alive: 4, charging: 8, use: 16, morning: 32 };
+export const PF = { crouch: 1, sprint: 2, alive: 4, charging: 8, use: 16, morning: 32, torch: 64 };
 
 // slot → spawn offset around the camp (right, back) in metres
 export const SLOT_OFFSET = [[0, 0], [1.5, 0.55], [-1.5, 0.55], [0, 1.6]];
@@ -84,6 +84,9 @@ export class RemotePlayer {
     this.buf.push({ t: now, x: +a[0], y: +a[1], z: +a[2], yaw: +a[3], pitch: +a[4], speed: +a[5], f });
     if (this.buf.length > 10) this.buf.shift();
     this.loud = +a[7] || 0;
+    // a flashlight on (its light is drawn from where they are: see Torches.lightSources)
+    this.torchOn = !!(f & PF.torch);
+    this.torchCharge = a[9] !== undefined ? +a[9] || 0 : 1;
     if (a[8] !== undefined) this.score = +a[8] || 0;
     // note: "alive" only ever changes through the host's word (a kill event), never from a state packet
   }
@@ -136,6 +139,7 @@ export class RemotePlayer {
       }
     }
     poseSurvivor(this.rig, this.phase, this.alive ? this.speed : 0, this.crouching, !this.alive);
+    if (this.alive) poseFur(this.rig, dt, this.speed);
     const r = this.rig.root;
     const es = this.game.escape;
     const cb = this.game.cabinets;
@@ -145,6 +149,7 @@ export class RemotePlayer {
       if (this.carrying) poseCarrier(this.rig);
       const gs = this.game.glows;
       if (gs && gs.heldBy(this.id)) poseGlowHand(this.rig);
+      if (this.torchOn) poseTorchHand(this.rig);
     } else {
       if (es && es.poseRemote(this)) return; // laid in the back of the УАЗ
       const rs = this.game.rescue;
