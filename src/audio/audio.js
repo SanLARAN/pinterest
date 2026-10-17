@@ -588,7 +588,7 @@ export class AudioEngine {
     wet.connect(pn).connect(this.voiceBus);
     rv.connect(this.revSend);
     this.voices.set(id, {
-      el, src, hp, lp, agc, lim, trim, user, g, dry, wet, rv, pn, level, buf: new Float32Array(level.fftSize), spatial: false,
+      el, src, hp, lp, agc, lim, trim, user, g, dry, wet, rv, pn, level, buf: new Float32Array(level.fftSize), spatial: false, mode: 'lobby',
       speech, floor: memo ? memo.floor : -62, agcDb, db: -100,
       hist: new Float32Array(50), hn: 0, hi: 0, sorted: new Float32Array(50),
     });
@@ -638,14 +638,23 @@ export class AudioEngine {
     if (v) v.user.gain.setTargetAtTime(gain, this.now, 0.04);
   }
 
-  voiceSpatial(id, on) {
+  // where a friend's voice comes from. 'lobby': straight into your ears. 'forest': from where they are, with a
+  // little of the forest around it. 'beyond': you're both dead — close and everywhere at once, wherever they lie,
+  // thinner and echoing, as if from the next room of somewhere else (the living don't hear it at all)
+  voiceMode(id, mode) {
     const v = this.voices.get(id);
-    if (!v || v.spatial === on) return;
-    v.spatial = on;
+    if (!v || v.mode === mode) return;
+    v.mode = mode;
+    v.spatial = mode === 'forest';
     const t = this.now;
-    v.dry.gain.setTargetAtTime(on ? 0 : 1, t, 0.08);
-    v.wet.gain.setTargetAtTime(on ? 1 : 0, t, 0.08);
-    v.rv.gain.setTargetAtTime(on ? 0.22 : 0, t, 0.08);
+    v.dry.gain.setTargetAtTime(mode === 'lobby' ? 1 : mode === 'beyond' ? 0.9 : 0, t, 0.08);
+    v.wet.gain.setTargetAtTime(mode === 'forest' ? 1 : 0, t, 0.08);
+    v.rv.gain.setTargetAtTime(mode === 'forest' ? 0.22 : mode === 'beyond' ? 0.5 : 0, t, 0.08);
+    v.hp.frequency.setTargetAtTime(mode === 'beyond' ? 260 : 100, t, 0.1);
+  }
+
+  voiceSpatial(id, on) {
+    this.voiceMode(id, on ? 'forest' : 'lobby');
   }
 
   voiceSet(id, x, y, z, gain) {

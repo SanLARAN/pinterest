@@ -45,7 +45,9 @@ export class Mates {
         it.div.innerHTML = `${escapeHtml(r.alive ? r.name : `† ${r.name}`)}${peek ? `<small>${Math.round(d)} ${t('meters')}</small>` : ''}`;
         it.div.classList.toggle('dead', !r.alive);
       }
-      it.div.classList.toggle('talk', r.alive && r.loud > 0.12 && op > 0);
+      // talking: the living by how loud they are out there; the dead only to the dead (you hear them, so you see it)
+      const talk = op > 0 && (r.alive ? r.loud > 0.12 : !game.player.alive && game.audio.voiceLevel(r.id) > 0.3);
+      it.div.classList.toggle('talk', talk);
       if (op > 0) {
         const tx = `translate(${((_v.x + 1) * 0.5 * W).toFixed(0)}px, ${((1 - _v.y) * 0.5 * H).toFixed(0)}px) translate(-50%, -100%)`;
         if (it.tx !== tx) {

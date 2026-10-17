@@ -66,6 +66,19 @@ function face(R) {
     for (const s of [-1, 1]) { b.place(s * 0.04, -0.006, 0.07, 0, s * 0.35, 0, 1, 0.8, 0.5); b.octa(0.017, 0.017, KIND.ROCK); }
   });
 }
+// anime: a rounder head, big dark eyes with a shine in them (both lit from the same side, as they should be)
+function animeFace(R) {
+  part(R, R.nodes.head, (b) => {
+    b.place(0, 0, 0.004);
+    lathe(b, [[0, -0.138], [0.05, -0.128], [0.088, -0.095], [0.108, -0.045], [0.116, 0.01], [0.112, 0.065], [0.092, 0.115], [0.055, 0.145], [0, 0.156]], 12, KIND.FLESH, { phase: PI / 12 });
+    for (const s of [-1, 1]) {
+      const x = s * 0.043, a = Math.asin(x / 0.118);
+      b.place(x, -0.02, 0.1, PI / 2, a, 0, 1, 1, 1.45); b.cylinder(6, 0.023, 0.023, 0.013, KIND.ROCK); // (a tall hexagon)
+      b.place(x + 0.009, -0.006, 0.115, 0, a, 0, 1, 1, 0.5); b.octa(0.0085, 0.0085, KIND.BONE);
+    }
+    b.place(0, -0.088, 0.095); b.box(0.02, 0.0045, 0.006, KIND.ROCK); // a small mouth
+  });
+}
 function hands(R, kind = KIND.FLESH, r = 0.042, h = 0.06) {
   for (const L of ['L', 'R']) part(R, R.nodes['el' + L], (b) => { b.place(0, -0.305, 0.066); b.octa(r, h, kind); });
 }
@@ -78,6 +91,17 @@ function limbs(R, { upper, fore, thigh, shin }) {
     if (thigh) part(R, R.nodes['th' + L], (b) => thigh(b, s));
     if (shin) part(R, R.nodes['kn' + L], (b) => shin(b, s));
   }
+}
+// how far the clothes already hung on a bone reach to the front (dir = 1) or the back (dir = -1), between two
+// heights on it (so what's hung on top of them — long hair — can clear a backpack, a collar, a tank)
+function reach(R, n, y0, y1, dir) {
+  let m = 0;
+  for (const p of R.parts) {
+    if (p.node !== n) continue;
+    const a = p.arr.pos;
+    for (let i = 0; i < a.length; i += 3) if (a[i + 1] >= y0 && a[i + 1] <= y1) m = Math.max(m, a[i + 2] * dir);
+  }
+  return m;
 }
 const ARM = [0, -0.3, 0.02]; // shoulder → elbow (x mirrored)
 const FORE = [0, -0.27, 0.06]; // elbow → wrist
@@ -234,6 +258,53 @@ const BODY = {
       },
     });
   },
+
+  // Anime: a sailor-collared school uniform — the blouse in the main colour; the collar, the cuffs and the pleated
+  // skirt in the accent (white stripes on them); a red neckerchief. Knee socks, loafers
+  seifuku(R) {
+    const n = R.nodes;
+    part(R, n.hips, (b) => {
+      b.place(0, -0.075, 0); b.box(0.3, 0.13, 0.19, KIND.ROCK); // (under the skirt)
+      b.place(0, 0, 0, 0, 0, 0, 1, 1, 0.74);
+      lathe(b, [[0.272, -0.3], [0.205, -0.07], [0.178, 0.045]], 24, BB, { ribN: 12, amp: 0.07, phase: PI / 24 }); // pleats
+      b.place(0, 0.035, 0, 0, 0, 0, 1, 1, 0.74); b.cylinder(12, 0.183, 0.183, 0.028, BB); // waistband
+    });
+    part(R, n.chest, (b) => {
+      b.place(0, -0.08, 0); b.taper(0.29, 0.18, 0.37, 0.215, 0.635, BA); // the blouse
+      // the sailor collar: a square flap down the back...
+      b.place(0, 0.425, -0.118); b.box(0.31, 0.21, 0.012, BB);
+      b.place(0, 0.338, -0.1255); b.box(0.27, 0.012, 0.004, KIND.BONE);
+      for (const s of [-1, 1]) {
+        b.place(s * 0.135, 0.432, -0.1255); b.box(0.012, 0.176, 0.004, KIND.BONE);
+        // ...over the shoulders...
+        b.place(s * 0.11, 0.558, -0.005); b.box(0.105, 0.014, 0.225, BB);
+        // ...and down to a V on the chest, a stripe along it
+        b.place(s * 0.0725, 0.445, 0.112, 0.028, 0, -s * 0.5); b.box(0.055, 0.245, 0.012, BB);
+        b.place(s * 0.0883, 0.4364, 0.1185, 0.028, 0, -s * 0.5); b.box(0.008, 0.235, 0.004, KIND.BONE);
+      }
+      // the neckerchief: a knot, two loops, two tails
+      b.place(0, 0.345, 0.122); b.box(0.045, 0.035, 0.022, KIND.EFFIGY);
+      for (const s of [-1, 1]) {
+        b.place(s * 0.046, 0.343, 0.119, 0, 0, -s * 0.3, 1, 0.66, 0.42); b.octa(0.052, 0.04, KIND.EFFIGY);
+        b.place(s * 0.02, 0.215, 0.117, 0.03, 0, s * 0.16); b.taper(0.05, 0.012, 0.03, 0.012, 0.125, KIND.EFFIGY);
+      }
+    });
+    limbs(R, {
+      upper: (b, s) => { b.identity(); b.limb([0, 0, 0], [s * 0.04, -0.3, 0.02], 0.056, 0.047, BA, 5); },
+      fore: (b) => {
+        b.identity(); b.limb([0, 0, 0], [0, -0.21, 0.047], 0.047, 0.041, BA, 5);
+        b.limb([0, -0.19, 0.042], [0, -0.255, 0.057], 0.05, 0.046, BB, 5); // cuff
+        b.limb([0, -0.206, 0.046], [0, -0.217, 0.048], 0.0525, 0.0515, KIND.BONE, 5); // its stripe
+      },
+      thigh: (b) => { b.identity(); b.limb([0, 0, 0], THIGH, 0.066, 0.054, KIND.FLESH, 6); },
+      shin: (b) => {
+        b.identity(); b.limb([0, 0.02, 0], [0, -0.08, -0.002], 0.054, 0.052, KIND.FLESH, 6); // the knee
+        b.limb([0, -0.065, -0.002], [0, -0.41, -0.02], 0.058, 0.046, KIND.ROCK, 6); // knee socks
+        b.place(0, -0.445, 0.04); b.box(0.105, 0.065, 0.22, KIND.BARK); // loafers
+      },
+    });
+    hands(R);
+  },
 };
 
 // ---------------- headwear ----------------
@@ -302,6 +373,60 @@ const HEAD = {
       grin(-0.084, -0.05, 0.064, 0.014, 0.024, -0.004, 0.04);
       grin(0, -0.062, 0.07, 0, 0.042, 0, 0.042);
       grin(0.084, -0.05, 0.064, -0.004, 0.04, 0.014, 0.024);
+    });
+  },
+
+  // Anime: waist-long straight hair — a blunt fringe, locks framing the face, an ahoge, a bow at the back. The
+  // long fall down the back hangs from the chest (it follows the body, not every turn of the head), clear of
+  // whatever is already on the back: a collar, a backpack, a tank
+  animehair(R) {
+    animeFace(R);
+    const n = R.nodes;
+    part(R, n.head, (b) => {
+      // the crown: tipped back, so it sits high on the forehead and low on the nape
+      b.place(0, 0, 0, -0.42, 0, 0);
+      lathe(b, [[0.128, -0.02], [0.139, 0.04], [0.134, 0.1], [0.11, 0.148], [0.066, 0.18], [0, 0.192]], 12, HA, { phase: PI / 12 });
+      b.place(0, -0.13, -0.1); b.taper(0.2, 0.09, 0.25, 0.13, 0.19, HA); // the back of the head
+      // the fringe: blunt, a little ragged, short over the eyes
+      for (const [a, h] of [[-0.92, 0.1], [-0.6, 0.078], [-0.3, 0.06], [0, 0.064], [0.3, 0.058], [0.6, 0.076], [0.92, 0.1]]) {
+        spike(b, Math.sin(a) * 0.121, 0.068 - Math.abs(a) * 0.015, Math.cos(a) * 0.121, PI - a, 2.98, 0.031, h, HA, 4);
+      }
+      // locks framing the face, down to the collarbones (forward, over whatever is worn)
+      const fz = Math.max(0.112, reach(R, n.chest, 0.3, 0.62, 1)) + 0.012 - 0.02; // (head space: the head sits 2 cm forward)
+      for (const s of [-1, 1]) {
+        b.identity();
+        b.limb([s * 0.11, 0.035, 0.05], [s * 0.124, -0.13, fz + 0.01], 0.034, 0.027, HA, 5);
+        b.limb([s * 0.124, -0.13, fz + 0.01], [s * 0.13, -0.29, fz + 0.045], 0.027, 0.014, HA, 5);
+        spike(b, s * 0.13, -0.286, fz + 0.045, PI, PI - 0.12, 0.014, 0.05, HA, 4);
+      }
+      // the ahoge
+      b.identity();
+      b.limb([0, 0.158, 0.012], [0.012, 0.232, 0.042], 0.013, 0.008, HA, 4);
+      b.limb([0.012, 0.232, 0.042], [0.04, 0.25, 0.09], 0.008, 0.003, HA, 4);
+      // the bow at the back
+      b.place(0, 0.075, -0.168); b.box(0.042, 0.036, 0.03, HB);
+      for (const s of [-1, 1]) {
+        b.place(s * 0.064, 0.088, -0.164, 0, -s * 0.25, s * 0.32, 1, 0.72, 0.42); b.octa(0.07, 0.05, HB);
+        b.place(s * 0.028, -0.04, -0.172, -0.12, 0, s * 0.2); b.taper(0.045, 0.012, 0.028, 0.012, 0.11, HB);
+      }
+    });
+    // the long fall, to the waist
+    const back = Math.max(0.112, reach(R, n.chest, -0.2, 0.62, -1), reach(R, n.hips, -0.08, 0.7, -1)) + 0.012;
+    const zc = -(back + 0.025);
+    part(R, n.chest, (b) => {
+      b.place(0, -0.06, zc); b.taper(0.38, 0.064, 0.3, 0.07, 0.535, HA);
+      b.place(0, 0.47, zc); b.taper(0.3, 0.07, 0.25, 0.1, 0.195, HA, -0.135 - zc); // up to the back of the head
+      // strands down the back of it
+      b.identity();
+      for (const f of [-0.75, -0.25, 0.28, 0.76]) {
+        b.limb([f * 0.125, 0.655, -0.184], [f * 0.15, 0.47, zc - 0.034], 0.015, 0.017, HA, 3);
+        b.limb([f * 0.15, 0.47, zc - 0.034], [f * 0.19, -0.035, zc - 0.031], 0.017, 0.02, HA, 3);
+      }
+      // the ends: a ragged edge, longest in the middle
+      for (let i = 0; i < 7; i++) {
+        const x = -0.165 + i * 0.055;
+        spike(b, x, -0.05, zc - 0.004, x < 0 ? -0.5 : 0.5, PI - Math.abs(x) * 0.5, 0.034, 0.075 + 0.05 * (1 - Math.abs(x) / 0.165) + 0.025 * (((i * 5) % 3) / 2), HA, 4);
+      }
     });
   },
 };

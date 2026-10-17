@@ -1,5 +1,5 @@
-// The wardrobe: what your survivor wears. Two slots (headwear, outfit), the standard kit plus three themed
-// pieces for each (Taiga, the Zone, Halloween), and two dyes per piece. Clothes never change the rules —
+// The wardrobe: what your survivor wears. Two slots (headwear, outfit), the standard kit plus four themed
+// pieces for each (Taiga, the Zone, Halloween, Anime), and two dyes per piece. Clothes never change the rules —
 // only how your friends see you in the echoes (and under the work lamps) on a co-op night.
 //
 // An outfit ("fit"): { head, body, hc: [main, accent], bc: [main, accent] } with colours as '#rrggbb'.
@@ -9,7 +9,7 @@ import { getLang } from '../core/i18n.js';
 export const SLOTS = ['head', 'body'];
 
 // themes: base = the kit you came with
-export const THEMES = ['base', 'taiga', 'zone', 'halloween'];
+export const THEMES = ['base', 'taiga', 'zone', 'halloween', 'anime'];
 
 // c: default colours [main, accent]. glow: the accent is a light (carving, lenses) rather than a fabric
 export const ITEMS = {
@@ -18,12 +18,14 @@ export const ITEMS = {
     { id: 'ushanka', theme: 'taiga', c: ['#6b4a33', '#d4a63a'] },
     { id: 'gasmask', theme: 'zone', c: ['#4e6b3c', '#9cff6a'], glow: true },
     { id: 'pumpkin', theme: 'halloween', c: ['#e8731c', '#ffc94a'], glow: true },
+    { id: 'animehair', theme: 'anime', c: ['#e86aa0', '#e9e1d2'] },
   ],
   body: [
     { id: 'jacket', theme: 'base', c: ['#b5462a', '#4a5560'] },
     { id: 'tulup', theme: 'taiga', c: ['#8a6a48', '#e9e1d2'] },
     { id: 'hazmat', theme: 'zone', c: ['#d4a63a', '#232527'] },
     { id: 'scarecrow', theme: 'halloween', c: ['#a3170f', '#d4a63a'] },
+    { id: 'seifuku', theme: 'anime', c: ['#e9e1d2', '#2f4f8f'] },
   ],
 };
 
@@ -164,7 +166,7 @@ const TEXT = {
     title: 'ГАРДЕРОБ',
     sub: 'Таким тебя увидят друзья — в эхе и под рабочими лампами.',
     slot: { head: 'Головной убор', body: 'Костюм' },
-    theme: { base: 'Штатное', taiga: 'Тайга', zone: 'Зона', halloween: 'Хэллоуин' },
+    theme: { base: 'Штатное', taiga: 'Тайга', zone: 'Зона', halloween: 'Хэллоуин', anime: 'Аниме' },
     set: 'комплект',
     color: 'Цвет',
     custom: 'свой цвет',
@@ -185,17 +187,19 @@ const TEXT = {
       ushanka: { name: 'Ушанка', parts: ['Мех', 'Кокарда'], desc: 'Кроличий мех и кокарда с чужой фуражки. Уши можно опустить — но в этом лесу лучше слушать.' },
       gasmask: { name: 'Противогаз', parts: ['Резина', 'Стёкла'], desc: 'Шлем-маска со склада у вышки. Стёкла светятся в темноте. Никто не знает почему.' },
       pumpkin: { name: 'Тыква', parts: ['Тыква', 'Свеча'], desc: 'Вырезана ножом из ящика с инструментами. Внутри горит свеча, снаружи — темнота.' },
+      animehair: { name: 'Химэ-кат', parts: ['Волосы', 'Бант'], desc: 'Длинные, до пояса, прямые: ровная чёлка, пряди вдоль лица, непослушный хохолок и бант на затылке. Героиня первой серии тоже думала, что это просто лес.' },
       jacket: { name: 'Штормовка', parts: ['Куртка', 'Рюкзак'], desc: 'Куртка, рюкзак, спальник. Всё, с чем ты вышел из лагеря.' },
       tulup: { name: 'Тулуп', parts: ['Овчина', 'Опушка'], desc: 'Овчина до колен, кушак и валенки. Дед говорил: в таком и медведь за своего примет. Дед в лес больше не ходит.' },
       hazmat: { name: 'Химзащита', parts: ['Костюм', 'Снаряжение'], desc: 'Прорезиненный костюм, сапоги, баллон за спиной. Защищает от всего, кроме того, что живёт в этом лесу.' },
       scarecrow: { name: 'Пугало', parts: ['Рубаха', 'Солома'], desc: 'Рубаха в заплатах, солома из рукавов и ворона на плече. Ворона настоящая? Лучше не спрашивай.' },
+      seifuku: { name: 'Матроска', parts: ['Блузка', 'Юбка и воротник'], desc: 'Сэйлор-фуку: матросский воротник в полоску, бант, плиссированная юбка, гольфы и лоферы. Ближайшая школа — в трёхстах километрах. Чья это форма, лес не говорит.' },
     },
   },
   en: {
     title: 'WARDROBE',
     sub: 'This is how your friends will see you — in the echoes and under the work lamps.',
     slot: { head: 'Headwear', body: 'Outfit' },
-    theme: { base: 'Standard issue', taiga: 'Taiga', zone: 'The Zone', halloween: 'Halloween' },
+    theme: { base: 'Standard issue', taiga: 'Taiga', zone: 'The Zone', halloween: 'Halloween', anime: 'Anime' },
     set: 'full set',
     color: 'Colour',
     custom: 'custom colour',
@@ -216,10 +220,12 @@ const TEXT = {
       ushanka: { name: 'Ushanka', parts: ['Fur', 'Badge'], desc: "Rabbit fur and a badge off somebody else's cap. The flaps come down — but in this forest you'd better listen." },
       gasmask: { name: 'Gas mask', parts: ['Rubber', 'Lenses'], desc: 'A helmet-mask from the depot by the tower. The lenses glow in the dark. Nobody knows why.' },
       pumpkin: { name: 'Pumpkin', parts: ['Pumpkin', 'Candle'], desc: 'Carved with the knife from the tool bag. A candle burns inside; outside, the dark.' },
+      animehair: { name: 'Hime cut', parts: ['Hair', 'Bow'], desc: 'Waist-long and straight: blunt bangs, locks framing the face, a stubborn ahoge and a bow at the back. The heroine in episode one also thought it was just a forest.' },
       jacket: { name: 'Windbreaker', parts: ['Jacket', 'Backpack'], desc: 'Jacket, backpack, bedroll. Everything you left the camp with.' },
       tulup: { name: 'Sheepskin', parts: ['Coat', 'Trim'], desc: "Knee-length sheepskin, a sash and felt boots. Grandpa said in a coat like this even a bear takes you for kin. Grandpa doesn't go into the woods anymore." },
       hazmat: { name: 'Hazmat suit', parts: ['Suit', 'Gear'], desc: 'Rubberised suit, boots, a tank on the back. Protects you from everything except what lives in these woods.' },
       scarecrow: { name: 'Scarecrow', parts: ['Shirt', 'Straw'], desc: 'A patched shirt, straw out of the sleeves and a crow on the shoulder. Is the crow real? Better not ask.' },
+      seifuku: { name: 'Sailor fuku', parts: ['Blouse', 'Skirt & collar'], desc: "A sailor collar with stripes, a ribbon, a pleated skirt, knee socks and loafers. The nearest school is three hundred kilometres away. Whose uniform this was, the forest won't say." },
     },
   },
 };

@@ -263,6 +263,31 @@ try {
   })();
   check("B's part: granted by the host, thrown, lands on the host's machine", partOk === 'ok', partOk);
   facts.push(`UAZ part ${partOk === 'ok' ? 'synced' : partOk}`);
+  // the other side: the host's monster takes B, then the host. The two dead hear each other from anywhere
+  // ('beyond': close, not from where the body lies), and the host's panel lists them both
+  const beyond = await (async () => {
+    const spawned = await A.page.evaluate(() => {
+      const g = window.__hush.game;
+      g.teamOverAt = 1e9; // (keeps the night going after the last of them falls: the check needs it)
+      const m = g.spawnMonster('listener', 8, 14);
+      if (!m) return false;
+      window.__smokeM = m;
+      g.kill(m, [...g.remotes.values()][0]);
+      return true;
+    });
+    if (!spawned) return 'no room for a monster';
+    if (!(await until(() => B.page.evaluate(() => !window.__hush.game.player.alive), 20000))) return 'B never went down';
+    await A.page.evaluate(() => { const g = window.__hush.game; g.kill(window.__smokeM, g.player); });
+    const modeOnB = () => B.page.evaluate(() => { const h = window.__hush, v = h.audio.voices.get(h.coop.hostId); return v ? v.mode : 'no voice'; });
+    if (!(await until(async () => (await modeOnB()) === 'beyond', 20000))) return `B hears the dead host as '${await modeOnB()}'`;
+    const lv = await level(B.page, 'host');
+    // (the panel waits until the thing that got you is out of your face: the death cam, a few seconds)
+    const rows = await until(() => A.page.evaluate(() => document.querySelectorAll('#beyond .by-row').length === 2), 90000);
+    const why = rows ? '' : await A.page.evaluate(() => { const g = window.__hush.game; return `host ${g.state}, death cam ${g.localDeath}, ${document.querySelectorAll('#beyond .by-row').length} rows`; });
+    return lv > 0.05 && rows ? 'ok' : `level ${lv.toFixed(3)}, ${rows ? 'panel ok' : `the host's panel doesn't list both (${why})`}`;
+  })();
+  check('the dead hear each other from anywhere; the panel lists both', beyond === 'ok', beyond);
+  facts.push(`dead voice ${beyond === 'ok' ? 'ok' : beyond}`);
   check('no page errors', A.page.errors.length === 0 && B.page.errors.length === 0);
 } catch (e) {
   log('ERROR', e.message);

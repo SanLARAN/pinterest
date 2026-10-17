@@ -184,6 +184,7 @@ const HAT_TOUCH = {
   ushanka: [0.12, 0.13, 0.16],
   gasmask: [0.12, -0.03, 0.15],
   pumpkin: [0.22, 0.02, 0.06],
+  animehair: [0.14, -0.02, 0.1], // (a lock tucked back)
 };
 const FORE_DIR = new THREE.Vector3(0, -0.27, 0.06).normalize();
 const _v1 = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3(), _v4 = new THREE.Vector3(), _v5 = new THREE.Vector3();

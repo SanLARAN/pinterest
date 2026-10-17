@@ -4,17 +4,22 @@
 //
 // Alpha out is "how much of this is lit": the post pass leaves lit colours alone instead of turning them
 // to ash (see the world shader in sonar.js), so a friend standing under a lamp is simply a friend.
+//
+// Your own body (seen when you look down — see SelfBody) is the one person the echo lights directly, the way
+// it lights the forest: uEcho = 1. (A friend's echo is their afterimage instead.)
 import * as THREE from 'three';
 import { PULSE_GLSL, EDGE_GLSL, shared } from './sonar.js';
 
 const VERT = /* glsl */ `
 attribute vec4 data;
 varying vec3 vWorld;
+varying vec3 vLocal;
 varying vec3 vBary;
 varying float vKind;
 void main() {
   vec4 wp = modelMatrix * vec4(position, 1.0);
   vWorld = wp.xyz;
+  vLocal = position;
   vBary = data.xyz;
   vKind = floor(data.w * 255.0 + 0.5);
   gl_Position = projectionMatrix * viewMatrix * wp;
@@ -27,7 +32,9 @@ ${EDGE_GLSL}
 uniform vec3 uDye[4];  // headwear main / accent, outfit main / accent
 uniform vec3 uRim;     // their colour in the team
 uniform float uShow;   // fades them in and out
+uniform float uEcho;   // 1 = your own body: found by the echo like the trees are
 varying vec3 vWorld;
+varying vec3 vLocal;
 varying vec3 vBary;
 varying float vKind;
 
@@ -72,6 +79,19 @@ void main() {
     col = base * 1.45 * fl + vec3(0.25) * fl;
   }
   if (k == 9) col = base * 1.6;
+  float nat = clamp(lum * 1.6, 0.0, 1.0);
+  if (uEcho > 0.0) {
+    // the sonar's ash: grainy wire over dark faces, brighter on the wavefront (sonar.js, the world shader)
+    float ring;
+    vec3 L = sonarLight(vWorld, N, ring);
+    // (grain fixed to the cloth, not to the world it walks through: no crawl)
+    float dash = hash13(floor(vLocal * 30.0) + 7.0);
+    float e = edge * (0.4 + 0.6 * smoothstep(0.12, 0.62, dash));
+    vec3 ash = clamp(vec3(0.3) + base * 0.75, 0.0, 1.0);
+    float speck = smoothstep(0.82, 0.97, hash13(floor(vLocal * 55.0)));
+    vec3 echo = ash * L * (0.05 + 0.2 * speck + e * 1.4) + vec3(0.78, 0.85, 0.9) * ring * e * 0.42;
+    col += echo * uEcho * (1.0 - nat);
+  }
 
   // the dark eats distance; daylight has its haze
   col *= mix(exp(-camD * 0.015), 1.0, uDawn);
@@ -81,7 +101,6 @@ void main() {
     float l = dot(col, vec3(0.299, 0.587, 0.114));
     col = mix(col, vec3(l * 1.3, l * 0.22, l * 0.18), uFear * 0.85);
   }
-  float nat = clamp(lum * 1.6, 0.0, 1.0);
   gl_FragColor = vec4(col * uShow, 1.0 - nat * 0.95);
 }
 `;
@@ -93,6 +112,7 @@ export function createPersonMaterial(dyes, rimHex) {
       uDye: { value: dyes.map((c) => c.clone()) },
       uRim: { value: new THREE.Color(rimHex) },
       uShow: { value: 1 },
+      uEcho: { value: 0 },
     },
     vertexShader: VERT,
     fragmentShader: FRAG,

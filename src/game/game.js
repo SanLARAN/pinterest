@@ -5,7 +5,10 @@ import { RNG, Simplex2, clamp, lerp, smoothstep, damp } from '../core/rng.js';
 import { t } from '../core/i18n.js';
 import { settings, saveSettings } from '../core/storage.js';
 import { createMonster, ShadeRig, buildRig } from './monsters.js';
-import { RemotePlayer } from './remote.js';
+import { RemotePlayer, PLAYER_HEX } from './remote.js';
+import { SelfBody } from './selfbody.js';
+import { myFit } from './outfit.js';
+import { Beyond } from '../ui/beyond.js';
 import { NetSync } from './netsync.js';
 import { Objectives } from './objectives.js';
 import { Player } from './player.js';
@@ -51,6 +54,8 @@ export class Game {
     this.rescue = new Rescue(this);
     this.escape = new Escape(this); // the forestry yard, the УАЗ and its four parts, the way out
     this.cabinets = new Cabinets(this); // cupboards in the buildings (and the шкафандр)
+    this.selfBody = new SelfBody(this); // yours, when you look down
+    this.beyond = new Beyond(document.getElementById('beyond')); // co-op: the dead talk among themselves
     this.hud.onNoteClose = () => this.objectives.closeNote();
     this.events = [];
     this.monsters = [];
@@ -197,6 +202,7 @@ export class Game {
     this.timeline = [];
     this.player.reset(opts.slot || 0);
     this.player.alive = true;
+    this.selfBody.dress(myFit(), PLAYER_HEX[(opts.slot || 0) % 4]);
     this.spectate = null;
     this.localDeath = false;
     this.inputMuted = false;
@@ -1558,7 +1564,8 @@ export class Game {
     const watched = this.spectate && this.spectate.target;
     for (const r of this.remotes.values()) {
       r.update(dt);
-      // the dead are heard only by the dead
+      // the dead are heard only by the dead — and by each other from anywhere: close, everywhere at once
+      this.audio.voiceMode(r.id, !meAlive && !r.alive ? 'beyond' : 'forest');
       this.audio.voiceSet(r.id, r.x, r.y + (r.alive ? r.eyeCur : 0.35), r.z, r.alive || !meAlive ? 1 : 0);
       // in daylight — or in any real light: a lamp, a flare, a glow stick, the hut's lantern — they're simply
       // there, in their own clothes (not while you're behind their eyes, or they're on your shoulder)
@@ -2072,6 +2079,9 @@ export class Game {
     this.glows.placeView(camera, hands && !this.cabinets.busy);
     this.escape.placeView(camera, hands);
     this.cabinets.placeView(camera, hands);
+    // your own body, under your eyes
+    const st = this.state;
+    this.selfBody.place(!cutCam && !sp && this.player.alive && !this.cabinets.busy && (st === 'play' || st === 'dawn' || st === 'morning' || st === 'dusk'));
 
     const u = this.post.u;
     u.uAberr.value = 0.12 + fx.glitch * 0.9 + fx.danger * 0.25 + sh * 0.5;
@@ -2095,6 +2105,7 @@ export class Game {
   hudUpdate(dt) {
     const p = this.player;
     this.hud.update(this, dt, this.input.peekHeld);
+    this.beyond.update(this, dt);
     const sp = this.spectate;
     const self = this.online ? this.rescue.selfState() : null; // down / carried / cot / gone
     const key = sp ? `${sp.target ? sp.target.id : '-'}|${self}` : '';

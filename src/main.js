@@ -560,6 +560,8 @@ function toMenu(keepRoom = false) {
     game.escape.silence();
     game.cabinets.silence();
     game.flares.clear();
+    game.selfBody.hide();
+    game.beyond.hide();
     audio.setMorning(false);
     game.inputMuted = false;
     if (game.online) game.teardownOnline();
@@ -571,7 +573,7 @@ function toMenu(keepRoom = false) {
     else coop.leave();
   }
   mates.clear();
-  document.body.classList.remove('coop', 'coop-over', 'coop-guest', 'spectating', 'cutscene', 'in-car', 'holding', 'qte');
+  document.body.classList.remove('coop', 'coop-over', 'coop-guest', 'spectating', 'cutscene', 'in-car', 'holding', 'qte', 'beyond-on');
   shared.uDawn.value = 0;
   shared.uMorning.value = 0;
   pulses.clear();
