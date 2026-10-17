@@ -304,6 +304,15 @@ body.radar-on #radar { display: block; }
 #glows i { width: 3px; height: 10px; border-radius: 2px; border: 1px solid rgba(140, 255, 170, 0.4); }
 #glows i.on { background: #9dffb6; border-color: #9dffb6; box-shadow: 0 0 7px rgba(130, 255, 160, 0.8); }
 #beacon.med i { background: var(--red); box-shadow: 0 0 8px rgba(224, 54, 44, 0.9); height: 11px; }
+#beacon.car i { background: #d6e6f2; box-shadow: 0 0 8px rgba(190, 220, 255, 0.85); height: 11px; width: 3px; left: -1.5px; }
+
+/* the fly-by: letterbox bars, the HUD steps aside */
+#bars { position: fixed; inset: 0; pointer-events: none; z-index: 6; }
+#bars i { position: absolute; left: 0; right: 0; height: 11vh; background: #000; transform: scaleY(0); transition: transform 1.2s cubic-bezier(.2, .7, .2, 1); }
+#bars i:first-child { top: 0; transform-origin: top; }
+#bars i:last-child { bottom: 0; transform-origin: bottom; }
+body.cutscene #bars i { transform: scaleY(1); }
+body.cutscene #hud, body.cutscene #touch, body.cutscene #pauseBtn, body.cutscene #mates, body.cutscene #radar, body.cutscene #spect { opacity: 0 !important; pointer-events: none !important; transition: opacity 0.8s; }
 
 /* alerts: quiet, letter-spaced, a red ghost of the word behind it */
 #alert {
@@ -430,8 +439,12 @@ body.spectating #tFlare { display: none; }
 #tCarry { display: none; right: calc(214px + var(--safe-r)); bottom: calc(96px + var(--safe-b)); width: 60px; height: 60px; border-color: rgba(224, 54, 44, 0.45); color: rgba(255, 150, 130, 0.9); }
 body.can-carry #tCarry { display: grid; }
 #tCarry { font-size: 9px; letter-spacing: 0.08em; }
-#tCarry .b, body.carrying #tCarry .a { display: none; }
+#tCarry .b, #tCarry .c, body.carrying #tCarry .a { display: none; }
 body.carrying #tCarry .b { display: inline; }
+body.in-car #tCarry .b { display: none; }
+body.in-car #tCarry .c { display: inline; }
+#tStone .b, body.holding #tStone .a { display: none; }
+body.holding #tStone .b { display: inline; font-size: 10px; }
 #tGlow { display: none; right: calc(104px + var(--safe-r)); bottom: calc(184px + var(--safe-b)); width: 52px; height: 52px; border-color: rgba(140, 255, 170, 0.45); color: rgba(170, 255, 190, 0.9); }
 body.has-glow #tGlow { display: grid; }
 body.spectating #tCarry, body.spectating #tGlow { display: none; }

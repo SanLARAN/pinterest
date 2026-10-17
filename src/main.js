@@ -15,6 +15,7 @@ import { World } from './world/world.js';
 import { shared, createWorldMaterial, createMotes, createSky } from './render/sonar.js';
 import { Pulses } from './render/pulses.js';
 import { Post } from './render/post.js';
+import { OmniShadows } from './render/shadows.js';
 import { Ghosts } from './render/ghosts.js';
 import { Eyes } from './render/eyes.js';
 import { Particles } from './render/particles.js';
@@ -66,6 +67,7 @@ const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(CFG.FOV, innerWidth / innerHeight, 0.05, CFG.CAMERA_FAR);
 camera.rotation.order = 'YXZ';
 const post = new Post(renderer);
+const shadows = new OmniShadows(renderer); // walls stop light (filled with the forest once it's generated)
 
 // ---------------- systems ----------------
 const worldMat = createWorldMaterial();
@@ -460,7 +462,7 @@ function startRun(opts = {}) {
   hud.cache = {};
   input.reset();
   mates.clear();
-  document.body.classList.remove('coop-over', 'coop-guest', 'spectating');
+  document.body.classList.remove('coop-over', 'coop-guest', 'spectating', 'cutscene', 'in-car', 'holding');
   document.body.classList.toggle('coop', online);
   runOnline = online;
   if (online) {
@@ -555,6 +557,7 @@ function toMenu(keepRoom = false) {
     game.monsters = [];
     game.state = 'idle';
     game.objectives.silence();
+    game.escape.silence();
     game.flares.clear();
     audio.setMorning(false);
     game.inputMuted = false;
@@ -567,7 +570,7 @@ function toMenu(keepRoom = false) {
     else coop.leave();
   }
   mates.clear();
-  document.body.classList.remove('coop', 'coop-over', 'coop-guest', 'spectating');
+  document.body.classList.remove('coop', 'coop-over', 'coop-guest', 'spectating', 'cutscene', 'in-car', 'holding');
   shared.uDawn.value = 0;
   shared.uMorning.value = 0;
   pulses.clear();
@@ -603,6 +606,7 @@ function onEnd(res) {
   const stats = {
     ...game.stats,
     gens: game.objectives.count,
+    carParts: game.escape.count,
     time: game.time,
     score: game.score,
     loudestDb: -100,
@@ -752,14 +756,12 @@ function step(now, render) {
       document.body.classList.toggle('crouching', input.crouch);
     }
   } else if (state === 'over' && game && game.state === 'won') {
-    // daylight: look around the forest that was hunting you
-    game.player.yaw += rawDt * 0.05;
-    game.time += rawDt;
+    // behind the results: the УАЗ's taillights going away down the highway (or, the old way, the morning forest)
+    game.afterWon(rawDt, camera, now / 1000);
     shared.uTime.value = game.time;
     ghosts.update(game.time);
     eyes.update(game.time, pixScale());
     particles.update(rawDt, pixScale());
-    game.applyView(camera, now / 1000);
     shared.uCam.value.copy(camera.position);
   }
   if (state !== 'playing') document.body.classList.remove('needlock');
@@ -782,6 +784,7 @@ function step(now, render) {
   motes.material.uniforms.uPix.value = 9 * (post.h / 900);
   post.u.uTime.value = now / 1000;
   renderer.info.reset();
+  shadows.update(camera);
   post.render(scene, camera);
   if (state === 'menu' && !MENU_COVERS.some((id) => menus.isOpen(id))) wardrobe.menuFrame(rawDt);
 }
@@ -799,7 +802,8 @@ function boot() {
       $('bootText').textContent = 'world generation failed: ' + e.message;
       throw e;
     }
-    game = new Game({ scene, camera, world, pulses, ghosts, eyes, particles, audio, mic, input, hud, radar, post });
+    for (const g of world.occluders) shadows.addStatic(g);
+    game = new Game({ scene, camera, world, pulses, ghosts, eyes, particles, audio, mic, input, hud, radar, post, shadows });
     game.onEnd = onEnd;
     setupAttract();
     wardrobe.init(); // your survivor by the menu buttons (its own small canvas)
@@ -810,7 +814,7 @@ function boot() {
       perf.fpsEl.style.cssText = 'position:fixed;right:8px;top:64px;z-index:99;font:11px JetBrains Mono,monospace;color:#8ef0ff;opacity:.8;pointer-events:none';
       document.body.appendChild(perf.fpsEl);
     }
-    window.__hush = { world, game, shared, pulses, ghosts, eyes, renderer, perf, mic, audio, input, hud, post, coop, lobby, atlas, wardrobe, debug: DEBUG, startRun, pause, resume, toMenu, ensureGarage, get garage() { return garage; }, get state() { return state; } };
+    window.__hush = { world, game, shared, pulses, ghosts, eyes, renderer, perf, mic, audio, input, hud, post, shadows, coop, lobby, atlas, wardrobe, debug: DEBUG, startRun, pause, resume, toMenu, ensureGarage, get garage() { return garage; }, get state() { return state; } };
     state = 'menu';
     menuTime = 0;
     post.u.uFade.value = 0;

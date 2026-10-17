@@ -75,6 +75,7 @@ export class Doors {
       const mesh = new THREE.Mesh(b.toGeometry(), world.material);
       mesh.matrixAutoUpdate = false;
       game.scene.add(mesh);
+      if (game.shadows) game.shadows.addDynamic(mesh, spec.w + 0.3); // a shut door keeps a lantern's light in
       const d = {
         i, id: spec.id, spec, mesh,
         x: spec.x, z: spec.z, y: spec.y, ry: spec.ry, c: Math.cos(spec.ry), s: Math.sin(spec.ry),

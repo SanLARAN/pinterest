@@ -12,7 +12,7 @@
 import * as THREE from 'three';
 import { CFG } from '../core/config.js';
 import { MeshBuilder, KIND } from '../world/builder.js';
-import { shared } from '../render/sonar.js';
+import { shared, shadowLights, LAMP_SLOTS } from '../render/sonar.js';
 import { RNG, clamp, smoothstep, damp } from '../core/rng.js';
 import { t } from '../core/i18n.js';
 
@@ -22,6 +22,7 @@ const SEARCH_TIME = 1.1;
 const LAMP_I = 1.15;
 const NOTE_SECONDS = 11;
 const PH = ['dead', 'work', 'cord', 'spin', 'running'];
+const ESC_KINDS = new Set(['part', 'carNote', 'carDoor', 'carFit', 'carSeat']); // see Escape.consider
 
 const _m = new THREE.Matrix4();
 const _l = new THREE.Matrix4();
@@ -310,7 +311,10 @@ export class Objectives {
     this.count = 0;
     this.dirty = false;
     this.firstRevealDone = false;
-    for (let i = 0; i < 5; i++) shared.uLamp.value[i].w = 0;
+    for (let i = 0; i < 5; i++) {
+      shared.uLamp.value[i].w = 0;
+      shadowLights.lamp[i] = null;
+    }
     for (const gl of this.glows) gl.core.visible = gl.halo.visible = false;
   }
 
@@ -358,22 +362,29 @@ export class Objectives {
     }
     this.morningOn = false;
     this.closeNote();
-    for (let i = 0; i < 5; i++) shared.uLamp.value[i].w = 0;
+    for (let i = 0; i < 5; i++) {
+      shared.uLamp.value[i].w = 0;
+      shadowLights.lamp[i] = null;
+    }
     for (const gl of this.glows) gl.core.visible = gl.halo.visible = false;
   }
 
   // ---------------- queries ----------------
-  // how much lamp light falls at (x, z) — same falloff as the shader
-  lampAt(x, z) {
+  // how much lamp light falls at (x, z) — same falloff as the shader (and a wall in between stops it)
+  lampAt(x, z, y = null) {
     let best = 0;
     const R = CFG.LAMP_R;
-    for (let i = 0; i < 5; i++) {
+    const world = this.g.world;
+    for (let i = 0; i < LAMP_SLOTS; i++) {
       const L = shared.uLamp.value[i];
       if (L.w <= 0.001) continue;
       const d = Math.hypot(L.x - x, L.z - z);
       if (d > R * 1.5) continue;
       const f = 1 - smoothstep(R * 0.12, R * 1.5, d);
-      best = Math.max(best, f * f * Math.min(1, L.w / LAMP_I));
+      const v = f * f * Math.min(1, L.w / LAMP_I);
+      if (v <= best) continue;
+      if (world.losBlocked(L.x, L.y - 0.15, L.z, x, y ?? world.terrain.height(x, z) + 1.3, z, 0.6)) continue;
+      best = v;
     }
     return best;
   }
@@ -389,7 +400,7 @@ export class Objectives {
   // the line shown on Tab / when the task changes
   taskText() {
     const g = this.gens.find((q) => !q.running);
-    if (!g) return '';
+    if (!g) return this.g.escape ? this.g.escape.taskText() : '';
     if (g.phase === 'spin') return t('taskSpin');
     if (g.hasPart) return t('taskRepair').replace('{site}', this.siteAt(g.site));
     if (g.k === 0) return t('taskCamp');
@@ -417,6 +428,14 @@ export class Objectives {
       }
       const L = shared.uLamp.value[g.si];
       L.set(g.site.lamp.x, g.site.lamp.y, g.site.lamp.z, I * LAMP_I);
+      // its shadows are drawn from just under the shade (the shade itself doesn't count)
+      if (I > 0.004) {
+        const sl = shadowLights.lamp[g.si] || (shadowLights.lamp[g.si] = { x: 0, y: 0, z: 0, R: 0, near: 0.1 });
+        sl.x = g.site.lamp.x;
+        sl.y = g.site.lamp.y - 0.15;
+        sl.z = g.site.lamp.z;
+        sl.R = CFG.LAMP_R * 1.5;
+      } else shadowLights.lamp[g.si] = null;
       const gl = this.glows[g.si];
       gl.core.visible = gl.halo.visible = I > 0.01;
       gl.core.material.opacity = Math.min(1, I * 1.2);
@@ -500,7 +519,9 @@ export class Objectives {
     const p = game.player;
     const input = game.input;
     const f = p.forward();
-    const hands = !doorsOnly && !p.carrying; // (with someone on your shoulder you can still shove a door)
+    const es = game.escape;
+    const seated = !!es && es.mySeat >= 0;
+    const hands = !doorsOnly && !p.carrying && !(es && es.held) && !seated; // (with someone on your shoulder — or a part in your arms — you can still shove a door)
     // what's in front of you
     let best = null, bd = 1e9;
     const consider = (obj, x, z, r, kind) => {
@@ -518,7 +539,8 @@ export class Objectives {
       if (game.rescue) game.rescue.consider(consider);
       if (game.glows) game.glows.consider(consider);
     }
-    if (game.doors) game.doors.consider(consider);
+    if (es && !doorsOnly) es.consider(consider);
+    if (game.doors && !seated) game.doors.consider(consider);
     if (best && this.target && best.obj !== this.target.obj) this.searchT = 0;
     this.target = best;
 
@@ -528,13 +550,24 @@ export class Objectives {
     const hud = game.hud;
     const T = (key) => t(input.touch ? key + 'T' : key); // touch has no E key: name the button instead
     if (game.rescue && (!best || (best.kind !== 'mate' && best.kind !== 'cot'))) game.rescue.idle();
+    const escKind = !!best && ESC_KINDS.has(best.kind);
+    if (es && !escKind) es.idle(dt);
     if (!best) {
       this.searchT = 0;
-      // your hands are full: say what R does
-      hud.setUse(p.carrying && game.rescue ? game.rescue.carryPrompt(T) : null, 0, false);
+      // your hands are full: say what R does (and F, with a part)
+      let line = null;
+      if (es && es.held) line = T('usePartHeld');
+      else if (p.carrying && es && es.canLoad()) line = T('useLoadCar');
+      else if (p.carrying && game.rescue) line = game.rescue.carryPrompt(T);
+      hud.setUse(line, 0, false);
       return;
     }
     const o = best.obj;
+    if (escKind) {
+      this.searchT = 0;
+      es.interact(best, dt, held, pressed, still, T);
+      return;
+    }
     if (best.kind === 'door') {
       this.searchT = 0;
       hud.setUse(T(game.doors.prompt(o)), 0, true);

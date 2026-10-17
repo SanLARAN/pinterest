@@ -209,17 +209,24 @@ export class Menus {
 
   showOver(res, stats, rank, list, team = null) {
     const won = res.won;
+    const isEsc = !!res.escaped;
     $('over').classList.toggle('won', won);
-    $('overKicker').textContent = won ? `${t('winKicker')} · ${fmtTime(stats.time)}` : `${t('survived')} ${fmtTime(stats.time)} · ${t('generators')} ${stats.gens | 0}/5`;
+    $('overKicker').textContent = won
+      ? `${isEsc ? t('escKicker') : t('winKicker')} · ${fmtTime(stats.time)}`
+      : `${t('survived')} ${fmtTime(stats.time)} · ${t('generators')} ${stats.gens | 0}/5`;
     const titles = { scream: 'deadScream', crawler: 'deadCrawler', watcher: 'deadWatcher', howler: 'deadHowler' };
-    let title = won ? t('winTitle') : t(titles[res.cause] || 'deadTitle');
+    let title = won ? t(isEsc ? 'escTitle' : 'winTitle') : t(titles[res.cause] || 'deadTitle');
     const who = !won && res.cause !== 'scream' ? (t('deathBy')[res.cause] || '') : '';
-    let sub = won ? t('winSub') : who ? `— ${who}` : '';
-    if (res.coop) {
+    let sub = won ? t(isEsc ? (res.alive === false ? 'escSubHurt' : 'escSub') : 'winSub') : who ? `— ${who}` : '';
+    if (res.left) {
+      // the УАЗ went without you
+      title = t('leftTitle');
+      sub = t('leftSub');
+    } else if (res.coop) {
       if (res.hostLost) {
         title = t('hostLostTitle');
         sub = t('hostLostSub');
-      } else if (won && !res.alive) sub = t('teamWonDead');
+      } else if (won && !res.alive && !isEsc) sub = t('teamWonDead');
       else if (!won) sub = `${t('teamAllDead')}${who ? ` · ${who}` : ''}`;
     }
     $('overTitle').textContent = title;
@@ -233,13 +240,17 @@ export class Menus {
     $('overScore').textContent = fmtScore(stats.score);
     $('newRecord').classList.toggle('show', rank === 0 && stats.score > 0);
     const loud = `${Math.round((stats.loudest / 0.78) * 100)}%`;
-    $('overStats').innerHTML = [
+    const cells = [
       [`${stats.gens | 0}/5`, t('gensGot')],
+      ...(stats.gens >= 5 ? [[`${stats.carParts | 0}/4`, t('partsGot')]] : []),
       [stats.shards, t('shardsGot')],
       [stats.close, t('closeCalls')],
       [stats.escapes, t('escapes')],
       [loud, t('loudest')],
-    ].map(([v, l]) => `<div><b>${esc(v)}</b><span>${esc(l)}</span></div>`).join('');
+    ];
+    const grid = $('overStats');
+    grid.style.gridTemplateColumns = `repeat(${cells.length}, 1fr)`;
+    grid.innerHTML = cells.map(([v, l]) => `<div><b>${esc(v)}</b><span>${esc(l)}</span></div>`).join('');
     this.renderScores(rank, 'overTable');
     void list;
   }

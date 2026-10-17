@@ -18,13 +18,23 @@ export class Terrain {
     const n = this.noise;
     let h = n.fbm(x / 120, z / 120, 3) * 7.5 + n.noise(x / 40 + 11.3, z / 40 - 7.1) * 2.4 + n.noise(x / 13.7, z / 13.7) * 0.5;
     const e = Math.max(Math.abs(x), Math.abs(z));
-    const edge = smoothstep(this.half - 55, this.half, e);
+    // the hills that ring the forest (and, past the edge, fall away again to the lowland with the highway)
+    const edge = smoothstep(this.half - 55, this.half, e) * (1 - smoothstep(this.half + 12, this.half + 32, e));
     h += edge * edge * 30 + edge * n.noise(x / 9, z / 9) * 3;
+    // ...cut through north of the forestry yard: the old road out, running down to the highway
+    const P = CFG.PASS;
+    const dx = Math.abs(x - P.x);
+    if (z > P.z0 && dx < P.w + P.slope) {
+      const pass = (1 - smoothstep(P.w, P.w + P.slope, dx)) * smoothstep(P.z0, P.z0 + 17, z);
+      const floor = P.y0 + (CFG.ROAD.y - P.y0) * smoothstep(P.zA, P.zB, z) + n.noise(x / 13.7, z / 13.7) * 0.35;
+      h += (floor - h) * pass;
+    }
     return h;
   }
 
-  addFlat(x, z, r) {
-    this.flats.push({ x, z, r, h: this.rawHeight(x, z) });
+  // a flat patch (at the ground's own height there, or at h)
+  addFlat(x, z, r, h = null) {
+    this.flats.push({ x, z, r, h: h ?? this.rawHeight(x, z) });
   }
   addBasin(x, z, r, depth) {
     this.basins.push({ x, z, r, depth });

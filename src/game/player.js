@@ -51,7 +51,8 @@ export class Player {
   }
 
   // returns events: { step: {loud, intensity, mode} | null, bump: {nx,nz} | null, breath: bool }
-  update(dt, input, look, frozen = false) {
+  // load: a part of the УАЗ in your arms ({ walk, step }: see game/uaz.js) — slow, no running
+  update(dt, input, look, frozen = false, load = null) {
     const P = CFG.PLAYER;
     const ev = { step: null, bump: null, breath: false };
     this.yaw -= look.dx;
@@ -61,11 +62,12 @@ export class Player {
     let mx = frozen ? 0 : input.move.x, my = frozen ? 0 : input.move.y;
     const mag = Math.min(1, Math.hypot(mx, my));
     this.crouching = input.crouch && !frozen;
-    const heavy = !!this.carrying; // someone on your shoulder: no running, slow going
+    const heavy = !!this.carrying || !!load; // someone on your shoulder (or an engine part in your arms): no running
     const wantSprint = input.sprint && !heavy && !this.crouching && mag > 0.3 && !this.exhausted && this.stamina > 2;
     this.sprinting = wantSprint;
     const R = CFG.REVIVE;
-    const target = heavy ? (this.crouching ? R.carryCrouch : R.carry) : this.crouching ? P.crouch : wantSprint ? P.sprint : P.walk;
+    const carryV = load && !this.carrying ? load.walk : R.carry;
+    const target = heavy ? (this.crouching ? Math.min(R.carryCrouch, carryV * 0.55) : carryV) : this.crouching ? P.crouch : wantSprint ? P.sprint : P.walk;
 
     const sy = Math.sin(this.yaw), cy = Math.cos(this.yaw);
     // forward = (-sin, -cos), right = (cos, -sin)
@@ -149,7 +151,8 @@ export class Player {
         let intensity = mode === 'sprint' ? 0.85 : mode === 'walk' ? 0.4 : 0.12;
         if (heavy) {
           // two people's weight on the ground: every step is heavier (even crouched)
-          loud = this.crouching ? R.carryStep * 0.45 : R.carryStep;
+          const st = load && !this.carrying ? load.step : R.carryStep;
+          loud = this.crouching ? st * 0.45 : st;
           intensity = this.crouching ? 0.35 : 0.62;
           ev.step = { loud, mode: 'walk', intensity, heavy: true };
         } else ev.step = { loud, mode, intensity };
@@ -157,7 +160,7 @@ export class Player {
     } else {
       this.stepAcc = Math.min(this.stepAcc, stepLen * 0.6);
     }
-    const bobAmp = heavy ? clamp(this.speed / R.carry, 0, 1) * 0.06 : clamp(this.speed / P.sprint, 0, 1) * (this.sprinting ? 0.075 : 0.045);
+    const bobAmp = heavy ? clamp(this.speed / carryV, 0, 1) * 0.06 : clamp(this.speed / P.sprint, 0, 1) * (this.sprinting ? 0.075 : 0.045);
     this.bobY = -Math.abs(Math.sin(this.bobPhase)) * bobAmp;
     this.roll = damp(this.roll, Math.sin(this.bobPhase) * bobAmp * 0.35 - input.move.x * 0.012, 10, dt);
     return ev;

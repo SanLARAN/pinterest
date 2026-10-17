@@ -13,7 +13,7 @@ import { CFG } from '../core/config.js';
 import { t } from '../core/i18n.js';
 import { CAP } from '../world/world.js';
 import { Collision } from '../world/collision.js';
-import { shared, GLOW_SLOTS } from '../render/sonar.js';
+import { shared, shadowLights, GLOW_SLOTS } from '../render/sonar.js';
 import { clamp, smoothstep } from '../core/rng.js';
 
 const G = CFG.GLOW;
@@ -285,13 +285,14 @@ export class GlowSticks {
   _holdPos(s, holder) {
     const g = this.g;
     if (holder === g.player) {
-      // low in your right hand, a little ahead
+      // low in your right hand, a little ahead — but never further out than your own elbows reach
+      // (inside the circle you take up: up against a wall, the light stays on your side of it)
       const p = holder;
       const cy = Math.cos(p.yaw), sy = Math.sin(p.yaw), cp = Math.cos(p.pitch), sp = Math.sin(p.pitch);
       const fx = -sy * cp, fy = sp, fz = -cy * cp;
-      s.x = p.x + fx * 0.45 + cy * 0.2;
+      s.x = p.x + fx * 0.2 + cy * 0.12;
       s.y = p.y + p.eyeCur - 0.3 + fy * 0.3;
-      s.z = p.z + fz * 0.45 - sy * 0.2;
+      s.z = p.z + fz * 0.2 - sy * 0.12;
       return;
     }
     // a teammate: in their (right) hand
@@ -303,6 +304,11 @@ export class GlowSticks {
     rig.root.updateMatrixWorld(true);
     rig.nodes.elL.localToWorld(_v.set(0, -0.33, 0.08));
     s.x = _v.x; s.y = _v.y; s.z = _v.z;
+    const ox = s.x - holder.x, oz = s.z - holder.z, od = Math.hypot(ox, oz);
+    if (od > 0.28) {
+      s.x = holder.x + (ox / od) * 0.28;
+      s.z = holder.z + (oz / od) * 0.28;
+    }
   }
 
   update(dt) {
@@ -411,14 +417,14 @@ export class GlowSticks {
   // every small light, brightest first for the camera: [{ x, y, z, I, c, R, prio }]
   lightSources() {
     const out = [];
-    for (const L of this.lanterns) if (L.I > 0.001) out.push({ x: L.x, y: L.y, z: L.z, I: L.I, c: L.c, R: L.R, prio: 0 });
+    for (const L of this.lanterns) if (L.I > 0.001) out.push({ x: L.x, y: L.y, z: L.z, I: L.I, c: L.c, R: L.R, prio: 0, near: L.near ?? 0.15, id: L });
     const me = this.g.player.id;
     for (const s of this.list) {
       if (s.y < -50) continue;
       const I = G.light * this.power(s);
       if (I <= 0.001) continue;
       // (lying on the ground its light is lifted a little: from right at the ground it would only graze it)
-      out.push({ x: s.x, y: s.y + (s.state === 'ground' ? 0.35 : 0.1), z: s.z, I, c: G.color, R: G.radius, prio: s.state === 'held' && s.owner === me ? 2 : 0 });
+      out.push({ x: s.x, y: s.y + (s.state === 'ground' ? 0.35 : 0.1), z: s.z, I, c: G.color, R: G.radius, prio: s.state === 'held' && s.owner === me ? 2 : 0, near: 0.1, id: s });
     }
     return out;
   }
@@ -430,26 +436,56 @@ export class GlowSticks {
       for (const l of src) l.score = l.prio * 1e6 - Math.hypot(l.x - e.x, l.y - e.y, l.z - e.z) / Math.max(0.2, l.I);
       src.sort((a, b) => b.score - a.score);
     }
+    // keep a light in the slot it had (its shadow faces stay valid there); newcomers take the free ones
+    const slots = this._slots || (this._slots = new Array(GLOW_SLOTS).fill(null));
+    const chosen = src.slice(0, GLOW_SLOTS);
+    const placed = new Array(GLOW_SLOTS).fill(null);
+    for (let i = 0; i < GLOW_SLOTS; i++) {
+      const was = slots[i];
+      const k = was ? chosen.findIndex((l) => l && l.id === was) : -1;
+      if (k >= 0) {
+        placed[i] = chosen[k];
+        chosen[k] = null;
+      }
+    }
+    for (const l of chosen) {
+      if (!l) continue;
+      const i = placed.indexOf(null);
+      if (i < 0) break;
+      placed[i] = l;
+    }
     const U = shared.uGlow.value, C = shared.uGlowC.value;
     for (let i = 0; i < GLOW_SLOTS; i++) {
-      const l = src[i];
+      const l = placed[i];
+      slots[i] = l ? l.id : null;
       if (!l) {
         U[i].w = 0;
+        shadowLights.glow[i] = null;
         continue;
       }
       U[i].set(l.x, l.y, l.z, l.I);
       C[i].set(l.c[0], l.c[1], l.c[2], l.R);
+      const sl = shadowLights.glow[i] || (shadowLights.glow[i] = { x: 0, y: 0, z: 0, R: 0, near: 0 });
+      sl.x = l.x;
+      sl.y = l.y;
+      sl.z = l.z;
+      sl.R = l.R;
+      sl.near = l.near;
     }
   }
 
-  // how much small light falls at (x, y, z) — same falloff as the shader (0..1)
+  // how much small light falls at (x, y, z) — same falloff as the shader, and walls stop it too (0..1)
   lightAt(x, y, z) {
     let best = 0;
+    const world = this.g.world;
     for (const l of this._src) {
       const d = Math.hypot(l.x - x, l.y - y, l.z - z);
       if (d > l.R) continue;
       const f = 1 - smoothstep(l.R * 0.05, l.R, d);
-      best = Math.max(best, f * f * Math.min(1, l.I));
+      const v = f * f * Math.min(1, l.I);
+      if (v <= best) continue;
+      if (world.losBlocked && world.losBlocked(l.x, l.y, l.z, x, y, z, 0.3)) continue;
+      best = v;
     }
     return best;
   }

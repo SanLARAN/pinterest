@@ -81,7 +81,7 @@ export class HUD {
 
   show(on) {
     this.el.classList.toggle('hidden', !on);
-    if (!on) document.body.classList.remove('can-use', 'morning', 'note-open', 'can-carry', 'has-glow', 'carrying');
+    if (!on) document.body.classList.remove('can-use', 'morning', 'note-open', 'can-carry', 'has-glow', 'carrying', 'holding', 'in-car');
     if (on) {
       this.cache = {};
       this.lastMinute = -1;
@@ -128,7 +128,8 @@ export class HUD {
       const team = g.online ? ` · ${t('teamAlive').replace('{n}', g.livePlayers().length).replace('{m}', g.remotes.size + 1)}` : '';
       const calm = g.calmLeft ? Math.ceil(g.calmLeft()) : 0;
       const quiet = calm > 0 ? ` · ${t('calmLeft').replace('{s}', calm)}` : '';
-      this._set('ps', this.peekSub, `${t('generators')} ${gens}/5 · ${t('score')} ${fmtScore(g.score)} ×${g.mult.toFixed(1)}${team}${quiet}`);
+      const car = g.escape && g.escape.power ? ` · ${t('aCarParts').replace('{n}', g.escape.count)}` : '';
+      this._set('ps', this.peekSub, `${t('generators')} ${gens}/5${car} · ${t('score')} ${fmtScore(g.score)} ×${g.mult.toFixed(1)}${team}${quiet}`);
       this._set('ptask', this.peekTask, g.objectives.taskText());
       if (this.cache.pg !== gens) {
         this.cache.pg = gens;
@@ -221,6 +222,7 @@ export class HUD {
   beacon(rel, dist, kind = '') {
     const el = this.beaconEl;
     el.classList.toggle('med', kind === 'med');
+    el.classList.toggle('car', kind === 'car');
     el.style.setProperty('--a', `${rel.toFixed(3)}rad`);
     el.style.setProperty('--o', dist < 25 ? '1' : dist < 70 ? '0.8' : '0.55');
     el.classList.remove('go');

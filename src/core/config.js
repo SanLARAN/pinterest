@@ -12,6 +12,14 @@ export const CFG = {
   DUSK_SECONDS: 3.6, // ...and then the light dies
   CAMP_LEASH: 26, // in the morning you stay around the camp
 
+  // the way out: a fenced forestry yard by the north edge — a broken УАЗ behind sliding gates that run on the
+  // generators' power — and past it a cut through the hills down to the highway
+  YARD: { x: 96, z: 256, w: 32, d: 24 }, // centre, width (x) and depth (z) of the fence
+  // the cut: centre line, flat half-width, slopes; it begins at z0, and its floor runs down from the yard's
+  // level (y0 at zA) to the highway's (at zB)
+  PASS: { x: 96, w: 17, slope: 36, z0: 258, zA: 262, zB: 334, y0: -3.0 },
+  ROAD: { z: 344, y: -7.0, x0: -90, x1: 262, lampEvery: 32 }, // the highway: centre line, level, how far it's built, its lamps
+
   CAMERA_FAR: 150,
   FOV: 72,
 

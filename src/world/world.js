@@ -5,8 +5,9 @@ import { RNG, smoothstep } from '../core/rng.js';
 import { MeshBuilder, KIND } from './builder.js';
 import { Terrain } from './terrain.js';
 import { Collision } from './collision.js';
+import { buildYard, buildOutside, inYard } from './yard.js';
 
-export const CAP = { TREE: 0, ROCK: 1, WOOD: 2, METAL: 3, WATER: 4, EFFIGY: 5 };
+export const CAP = { TREE: 0, ROCK: 1, WOOD: 2, METAL: 3, WATER: 4, EFFIGY: 5, FENCE: 6 }; // FENCE: chain-link (you see and light through it)
 
 export const LANDMARKS = [
   { id: 'camp', x: 0, z: 0, r: 11 },
@@ -22,9 +23,19 @@ export const LANDMARKS = [
   { id: 'graves2', x: -210, z: 120, r: 14, ry: 0.7 },
   { id: 'wreck2', x: 30, z: -230, r: 11, ry: 0.2 },
   // the scouts' first-aid hut, a stone's throw from the camp, its door turned toward the fire.
-  // (last in the list: the atlas reads the first five as the generator sites)
+  // (late in the list: the atlas reads the first five as the generator sites)
   { id: 'medhut', x: 12, z: 22, r: 6.5, ry: -2.606 },
+  // the forestry yard by the north edge: the УАЗ, the sliding gate, the cut through the hills (see yard.js)
+  { id: 'yard', x: CFG.YARD.x, z: CFG.YARD.z, r: 21 },
 ];
+
+// the tracks that lead to and from the yard: no trees grow on them
+function onTrack(x, z) {
+  const Y = CFG.YARD, P = CFG.PASS;
+  if (Math.abs(x - P.x) < P.w - 1 && z > Y.z + Y.d / 2 - 2) return true; // the cut's floor (you see the highway down it)
+  if (Math.abs(x - Y.x) < 3.2 && z > Y.z - Y.d / 2 - 46 && z < Y.z) return true; // the old track up to the gate
+  return false;
+}
 
 const _m = new THREE.Matrix4();
 const _l = new THREE.Matrix4();
@@ -50,6 +61,30 @@ function localPlace(b, base, lx, ly, lz, rx = 0, ry = 0, rz = 0, sx = 1, sy = sx
 function rot(lx, lz, ry) {
   const c = Math.cos(ry), s = Math.sin(ry);
   return [lx * c + lz * s, -lx * s + lz * c];
+}
+
+// closest points of two 2D segments p(s) = a + s(b−a), q(u) = c + u(d−c): distance, s, and the point on q
+const _ss = { d: 0, s: 0, x: 0, z: 0 };
+function segSeg(ax, az, bx, bz, cx, cz, dx, dz) {
+  const ux = bx - ax, uz = bz - az, vx = dx - cx, vz = dz - cz, wx = ax - cx, wz = az - cz;
+  const a = ux * ux + uz * uz, b = ux * vx + uz * vz, c = vx * vx + vz * vz, d = ux * wx + uz * wz, e = vx * wx + vz * wz;
+  const D = a * c - b * b;
+  let s, u;
+  if (c < 1e-9) {
+    u = 0;
+    s = a > 1e-9 ? Math.min(1, Math.max(0, -d / a)) : 0;
+  } else {
+    s = D > 1e-9 ? Math.min(1, Math.max(0, (b * e - c * d) / D)) : 0;
+    u = (b * s + e) / c;
+    if (u < 0) { u = 0; s = a > 1e-9 ? Math.min(1, Math.max(0, -d / a)) : 0; }
+    else if (u > 1) { u = 1; s = a > 1e-9 ? Math.min(1, Math.max(0, (b - d) / a)) : 0; }
+  }
+  const px = ax + ux * s, pz = az + uz * s, qx = cx + vx * u, qz = cz + vz * u;
+  _ss.d = Math.hypot(px - qx, pz - qz);
+  _ss.s = s;
+  _ss.x = qx;
+  _ss.z = qz;
+  return _ss;
 }
 
 export class World {
@@ -79,7 +114,8 @@ export class World {
       if (L.id === 'lake') {
         terr.addFlat(L.x, L.z, L.r + 8);
         terr.addBasin(L.x, L.z, L.r * 0.95, 3.6);
-      } else terr.addFlat(L.x, L.z, L.r * 1.25);
+      } else if (L.id === 'yard') terr.addFlat(L.x, L.z, 34, CFG.PASS.y0); // (a wide flat: the whole fence stands level)
+      else terr.addFlat(L.x, L.z, L.r * 1.25);
     }
     terr.finalize();
 
@@ -93,6 +129,9 @@ export class World {
     this.genTrees(rng);
     this.genScatter(rng);
     this.buildChunks();
+    // past the edge: the cut through the hills, the lowland, the highway (meshes of their own)
+    this.outside = buildOutside(this, this.material);
+    for (const m of this.outside.meshes) this.scene.add(m);
     this.genTime = performance.now() - t0;
     return this;
   }
@@ -119,7 +158,7 @@ export class World {
       for (let gx = -half; gx < half; gx += step) {
         const x = gx + rng.float(-2.1, 2.1);
         const z = gz + rng.float(-2.1, 2.1);
-        if (this.inLandmark(x, z, 1)) continue;
+        if (this.inLandmark(x, z, 1) || onTrack(x, z)) continue;
         const dens = noise.noise(x / 70 + 40, z / 70 - 20) * 0.7 + noise.noise(x / 23, z / 23) * 0.3;
         const p = 0.12 + 0.82 * smoothstep(-0.45, 0.3, dens);
         if (!rng.chance(p)) continue;
@@ -213,7 +252,7 @@ export class World {
     // boulders
     for (let i = 0; i < 900; i++) {
       const x = rng.float(-half, half), z = rng.float(-half, half);
-      if (this.inLandmark(x, z, 2) || !this.col.free(x, z, 1.5)) continue;
+      if (this.inLandmark(x, z, 2) || onTrack(x, z) || !this.col.free(x, z, 1.5)) continue;
       const r = rng.chance(0.15) ? rng.float(1.4, 2.6) : rng.float(0.4, 1.0);
       const y = this.terrain.height(x, z);
       const seed = (rng.next() * 1e9) | 0;
@@ -228,7 +267,7 @@ export class World {
     // fallen logs
     for (let i = 0; i < 260; i++) {
       const x = rng.float(-half, half), z = rng.float(-half, half);
-      if (this.inLandmark(x, z, 3)) continue;
+      if (this.inLandmark(x, z, 3) || onTrack(x, z)) continue;
       const a = rng.float(0, 6.28), len = rng.float(3, 7);
       const x2 = x + Math.cos(a) * len, z2 = z + Math.sin(a) * len;
       if (!this.col.free(x, z, 1.0) || !this.col.free(x2, z2, 1.0) || !this.col.free((x + x2) / 2, (z + z2) / 2, 1.0)) continue;
@@ -581,6 +620,15 @@ export class World {
     };
   }
 
+  // the forestry yard: fence, gates, booth, floodlight, junk — and where the УАЗ stands (see yard.js)
+  lm_yard(L) {
+    buildYard(this, L);
+  }
+
+  inYard(x, z, pad = 0) {
+    return inYard(x, z, pad);
+  }
+
   lm_tower(L, rng) {
     const y = this.terrain.height(L.x, L.z);
     const ry = L.ry || 0;
@@ -907,11 +955,13 @@ export class World {
     }
     const b = new MeshBuilder(60000);
     let tris = 0;
+    this.occluders = []; // what casts shadows: each chunk's props, the ground left out (see render/shadows.js)
     for (let j = 0; j < n; j++) {
       for (let i = 0; i < n; i++) {
         b.reset();
         const x0 = -half + i * C, z0 = -half + j * C;
         this.terrain.build(b, x0, z0, x0 + C, z0 + C);
+        const ground = b.count;
         for (const p of buckets[j * n + i]) {
           b.identity();
           p.build(b);
@@ -924,10 +974,42 @@ export class World {
         this.scene.add(mesh);
         this.meshes.push(mesh);
         tris += b.count / 3;
+        if (b.count > ground) {
+          // the same vertex buffer, drawn from where the props start
+          const og = new THREE.BufferGeometry();
+          og.setAttribute('position', geo.attributes.position);
+          og.setAttribute('data', geo.attributes.data); // (chain-link lets light through: see shadows.js)
+          og.setDrawRange(ground, b.count - ground);
+          og.boundingSphere = geo.boundingSphere;
+          this.occluders.push(og);
+        }
       }
     }
     this.tris = tris;
     this.props = null; // free closures
+  }
+
+  // does a wall (a tree, a shut door, the fence...) stand between a light and a point? The colliders are 2D
+  // capsules with a height: whatever is taller than the line between the two where it crosses blocks it.
+  // (skip = how close to the light a thing has to be to count as its own fixture: a pole, a lamp's bracket)
+  losBlocked(ax, ay, az, bx, by, bz, skip = 0.45) {
+    const dx = bx - ax, dz = bz - az;
+    const len = Math.hypot(dx, dz);
+    if (len < 0.3) return false;
+    const col = this.col;
+    const list = col.query((ax + bx) / 2, (az + bz) / 2, len / 2 + 1);
+    for (let k = 0; k < list.length; k++) {
+      const c = col.caps[list[k]];
+      if (c.kind === CAP.WATER || c.kind === CAP.FENCE || c.h < 1.0) continue;
+      // closest approach between the sight line and the capsule's axis (2D segment–segment)
+      const t = segSeg(ax, az, bx, bz, c.ax, c.az, c.bx, c.bz);
+      if (t.d > c.r) continue;
+      if (t.s * len < skip) continue;
+      const lineY = ay + (by - ay) * t.s;
+      const topY = this.terrain.height(t.x, t.z) + c.h;
+      if (topY > lineY) return true;
+    }
+    return false;
   }
 
   randomOpenPoint(rng, minFromSpawn = 20, tries = 60) {
@@ -936,6 +1018,7 @@ export class World {
       const x = rng.float(-half, half), z = rng.float(-half, half);
       if (Math.hypot(x - this.spawn.x, z - this.spawn.z) < minFromSpawn) continue;
       if (this.lake && Math.hypot(x - this.lake.x, z - this.lake.z) < this.lake.r + 3) continue;
+      if (inYard(x, z, 2)) continue;
       if (!this.col.free(x, z, 1.2)) continue;
       return { x, z };
     }

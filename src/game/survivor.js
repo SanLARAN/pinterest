@@ -408,6 +408,51 @@ export function poseCarrier(rig) {
   n.elR.rotation.x = -1.25;
 }
 
+// a part for the УАЗ carried in both arms in front (after poseSurvivor): a lean back under the weight,
+// forearms under it. heavy: the battery, the wheel, the can (the carburettor is light)
+export function poseCarryPart(rig, heavy = true) {
+  const n = rig.nodes;
+  n.chest.rotation.x += heavy ? -0.1 : 0.02;
+  for (const [A, s] of [['L', -1], ['R', 1]]) {
+    n['sh' + A].rotation.set(heavy ? -0.55 : -0.75, 0, s * 0.32);
+    n['el' + A].rotation.x = heavy ? -1.05 : -1.2;
+  }
+}
+
+// sitting in the УАЗ: the caller puts the root at the seat (the hips) and turns it the way the car faces.
+// driver: hands up on the wheel (steer turns them a little); t breathes
+export function poseSeated(rig, driver = false, t = 0, steer = 0) {
+  const n = rig.nodes;
+  rig.root.rotation.x = 0;
+  n.hips.position.set(0, 0, 0);
+  n.hips.rotation.set(0, 0, 0);
+  n.chest.rotation.set(-0.08 + Math.sin(t * 1.6) * 0.012, 0, 0);
+  n.head.rotation.set(0.05, 0, 0);
+  for (const [A, s] of [['L', -1], ['R', 1]]) {
+    n['th' + A].rotation.set(-1.48, 0, s * 0.08);
+    n['kn' + A].rotation.x = 1.42;
+    if (driver) {
+      n['sh' + A].rotation.set(-1.05 + s * steer * 0.25, 0, s * 0.18);
+      n['el' + A].rotation.x = -0.75;
+    } else {
+      n['sh' + A].rotation.set(-0.35, 0, s * 0.12);
+      n['el' + A].rotation.x = -0.95;
+    }
+  }
+}
+
+// down, propped in a seat: slumped sideways, head lolling (the caller places the root as for poseSeated)
+export function poseSlumped(rig, t = 0) {
+  poseSeated(rig, false, 0);
+  const n = rig.nodes;
+  n.chest.rotation.set(0.3, 0, 0.32);
+  n.head.rotation.set(0.55 + Math.sin(t * 0.7) * 0.03, 0, 0.4);
+  n.shL.rotation.set(0.1, 0, -0.15);
+  n.shR.rotation.set(0.05, 0, 0.3);
+  n.elL.rotation.x = -0.2;
+  n.elR.rotation.x = -0.3;
+}
+
 // a glow stick held up in the other hand (after poseSurvivor)
 export function poseGlowHand(rig) {
   const n = rig.nodes;

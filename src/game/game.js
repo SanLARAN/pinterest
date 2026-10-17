@@ -16,19 +16,21 @@ import { Flares } from './flares.js';
 import { GlowSticks } from './glowsticks.js';
 import { MedHut } from './medhut.js';
 import { Rescue } from './rescue.js';
+import { Escape } from './escape.js';
 import { Dread } from './dread.js';
 import { CAP } from '../world/world.js';
 import { shared } from '../render/sonar.js';
 import { Pulses } from '../render/pulses.js';
 
 const RED = [1.0, 0.13, 0.08];
+const CUT_FADE = 13.9; // s into the fly-by when the screen starts going dark
 const SONAR = [0.84, 0.92, 1.0]; // cold, colourless light
 const STONE = [0.85, 0.95, 1.0];
 const HOWL = [1.0, 0.36, 0.1];
 const LAMPC = [1.0, 0.74, 0.42];
 const MORNING_LIGHT = 0.95;
 const NO_LOOK = { dx: 0, dy: 0 };
-const SRC_SELF = new Set(['voice', 'ping', 'step', 'bump', 'breath', 'repair', 'door', 'flare', 'glow']);
+const SRC_SELF = new Set(['voice', 'ping', 'step', 'bump', 'breath', 'repair', 'door', 'flare', 'glow', 'part', 'engine']);
 const _v = new THREE.Vector3();
 const escHtml = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -46,6 +48,7 @@ export class Game {
     this.glows = new GlowSticks(this);
     this.medhut = new MedHut(this); // (after the glow sticks: its lantern is one of their small lights)
     this.rescue = new Rescue(this);
+    this.escape = new Escape(this); // the forestry yard, the УАЗ and its four parts, the way out
     this.hud.onNoteClose = () => this.objectives.closeNote();
     this.events = [];
     this.monsters = [];
@@ -165,8 +168,10 @@ export class Game {
     if (!r) return;
     this.rescue.left(r);
     this.glows.dropFor(r.id, r.x, r.z);
+    this.escape.dropFor(r.id, r.x, r.z);
     this.remotes.delete(id);
     r.dispose();
+    this.escape.left(id);
     if (this.state !== 'over') this.hud.popup(t('mateLeft').replace('{name}', r.name), 'dim');
     if (this.spectate && this.spectate.target === r) this.nextSpectate();
     if (this.auth) this.checkTeam();
@@ -182,7 +187,7 @@ export class Game {
     this.time = 0;
     this.score = 0;
     this.mult = 1;
-    this.stats = { shards: 0, close: 0, escapes: 0, loudest: 0, hunts: 0, gens: 0, bodies: 0, thrown: 0, flares: 0, glows: 0, revives: 0, seen: {} }; // seen: creatures that showed themselves (the atlas)
+    this.stats = { shards: 0, close: 0, escapes: 0, loudest: 0, hunts: 0, gens: 0, bodies: 0, thrown: 0, flares: 0, glows: 0, revives: 0, parts: 0, seen: {} }; // seen: creatures that showed themselves (the atlas)
     this.state = 'morning';
     this.grace = true;
     this.fx = this._fxDefaults();
@@ -209,6 +214,7 @@ export class Game {
     this.monsters = [];
     this.shards.reset(this.world, this.rng);
     this.objectives.reset(this.rng);
+    this.escape.reset(new RNG((this.rng.next() * 4294967296) >>> 0)); // (its own stream: the same on every machine)
     this.setFlares(0, false);
     this.objectives.setMorning(true);
     this.charge = { active: false, t: 0 };
@@ -453,7 +459,7 @@ export class Game {
       const x = p.x + Math.cos(a) * d, z = p.z + Math.sin(a) * d;
       if (Math.abs(x) > w || Math.abs(z) > w) continue;
       if (this.online && !this._clearOfPlayers(x, z, dmin * 0.75)) continue;
-      if (!this.world.col.free(x, z, 1)) continue;
+      if (!this.world.col.free(x, z, 1) || this.world.inYard(x, z, 1.5)) continue;
       const L = this.world.lake;
       if (L && Math.hypot(x - L.x, z - L.z) < L.r + 3) continue;
       const m = createMonster(type, this);
@@ -470,7 +476,7 @@ export class Game {
     for (let k = 0; k < 30; k++) {
       const a = this.rng.float(0, Math.PI * 2), d = this.rng.float(55, 85);
       const x = p.x + Math.cos(a) * d, z = p.z + Math.sin(a) * d;
-      if (Math.abs(x) > w || Math.abs(z) > w || !this.world.col.free(x, z, 1)) continue;
+      if (Math.abs(x) > w || Math.abs(z) > w || !this.world.col.free(x, z, 1) || this.world.inYard(x, z, 1.5)) continue;
       if (this.online && !this._clearOfPlayers(x, z, 40)) continue;
       const L = this.world.lake;
       if (L && Math.hypot(x - L.x, z - L.z) < L.r + 3) continue;
@@ -551,7 +557,7 @@ export class Game {
       if (!best[sec] || d < best[sec].d) best[sec] = { d, x: cx, z: cz, k: c.kind };
       else if (extra.length < 14 && Math.random() < 0.05) extra.push({ d, x: cx, z: cz, k: c.kind });
     }
-    const kindMap = { [CAP.TREE]: 0, [CAP.ROCK]: 1, [CAP.WOOD]: 2, [CAP.METAL]: 3, [CAP.WATER]: 4, [CAP.EFFIGY]: 2 };
+    const kindMap = { [CAP.TREE]: 0, [CAP.ROCK]: 1, [CAP.WOOD]: 2, [CAP.METAL]: 3, [CAP.WATER]: 4, [CAP.EFFIGY]: 2, [CAP.FENCE]: 3 };
     for (const b of best.concat(extra)) {
       if (!b) continue;
       const gain = (0.22 + loud * 0.5) * Math.pow(1 - b.d / s.radius, 1.3);
@@ -616,6 +622,85 @@ export class Game {
     });
     this.radar.blip(h.x, h.z, 'stone');
     this.noise(h.x, h.z, h.water ? 0.5 : 0.46, 'stone', false, owner ?? this.player.id); // every machine simulates every stone; only the host's monsters listen
+  }
+
+  // ---------------- hands ----------------
+  // R: a part in your arms goes down; in the УАЗ, out of your seat; carrying a friend by the car, into the back
+  carryKey() {
+    const es = this.escape;
+    if (es.held) return es.putDown();
+    if (es.mySeat >= 0) return es.standUp();
+    if (this.player.carrying && es.canLoad() && es.loadBody()) return;
+    this.rescue.carryKey();
+  }
+
+  handsFull() {
+    this.hud.popup(t('aHandsFull'), 'dim');
+  }
+
+  // sitting in the УАЗ: no walking, just looking about
+  seatedLook(look) {
+    const p = this.player;
+    p.yaw -= look.dx;
+    p.pitch = clamp(p.pitch - look.dy, -1.1, 1.1);
+    p.crouching = false;
+    p.sprinting = false;
+    p.speed = 0;
+    p.bobY = 0;
+    return { step: null, bump: null, breath: false };
+  }
+
+  // ---------------- away in the УАЗ ----------------
+  // (every machine at once: the host said who's in the car — see Escape.depart)
+  startEscape(inCar) {
+    if (this.state !== 'play') return;
+    this.state = 'escape';
+    this.escaped = inCar;
+    this.charge.active = false;
+    this.hud.setUse(null);
+    this.hud.setHint(null);
+    this.hud.setIntro(null);
+    this.hud.intro.classList.remove('red');
+    this.objectives.closeNote();
+    document.body.classList.add('cutscene');
+    document.body.classList.remove('spectating');
+    this.spectLabel = null;
+    // the score: the night's bonus — whole if you're in the car, some of it if you're in it hurt,
+    // a little if the others got out without you
+    const tNight = this.role === 'client' && this.netT > 0 ? this.netT : this.time;
+    let bonus = CFG.SCORE.win + Math.max(0, Math.round(CFG.RUN_SECONDS - tNight)) * CFG.SCORE.speedBonus;
+    if (!inCar) bonus = Math.round(bonus * 0.3);
+    else if (!this.player.alive) bonus = Math.round(bonus * 0.6);
+    this.winBonus = bonus;
+    this.score += bonus;
+    this.stats.escaped = inCar ? 1 : 0;
+    for (const m of this.monsters) {
+      if (m.breath) { m.breath.stop(); m.breath = null; }
+      if (m.lampGhost) { this.ghosts.release(m.lampGhost); m.lampGhost = null; }
+    }
+    this.fx.danger = 0;
+    this.fx.trauma = 0;
+    this.audio.setAmbience(0.45, 0);
+  }
+
+  endEscape() {
+    if (this.state !== 'escape') return;
+    this.state = 'won'; // (the results screen still watches the road)
+    document.body.classList.remove('cutscene');
+    this.escape.endCut();
+    this.audio.setAmbience(0, 0);
+    const inCar = !!this.escaped;
+    if (this.onEnd) this.onEnd({ won: inCar, escaped: true, left: !inCar, coop: this.online, alive: this.player.alive });
+  }
+
+  // behind the results screen: the car keeps going, or (the old way) you look round the morning forest
+  afterWon(dt, camera, realT) {
+    this.time += dt;
+    if (this.escape.cut) {
+      this.escape.afterCut(dt);
+      this.fx.fade = Math.min(0.8, this.fx.fade + dt * 0.35); // (back up out of the dark, behind the results)
+    } else this.player.yaw += dt * 0.05;
+    this.applyView(camera, realT);
   }
 
   // ---------------- the flare gun ----------------
@@ -950,7 +1035,8 @@ export class Game {
     this.fx.white = Math.max(this.fx.white, 0.08);
     this.addTrauma(0.15);
     this.noise(g.x, g.z, g.spec.startLoud, 'repair'); // the engine roars — the host's monsters hear it whoever started it
-    if (count >= 5 && this.auth) this.timeline.push({ at: this.time + 1.4, fn: () => { if (this.state === 'play') this.startDawn(); } });
+    // all five: there's power at the forestry yard — its floodlight, its siren, its gate (every machine sees it)
+    if (count >= 5) this.timeline.push({ at: this.time + 1.8, fn: () => { if (this.state === 'play') this.escape.powerOn(); } });
   }
 
   // ---------------- death ----------------
@@ -1424,6 +1510,20 @@ export class Game {
       this._commonFx(dt);
       return;
     }
+    if (this.state === 'escape') {
+      // the УАЗ is leaving: everyone watches the same fly-by (see Escape.updateCut)
+      this.netFrame(dt);
+      this.time += dt;
+      this.doors.update(dt);
+      this.flares.update(dt);
+      this.glows.update(dt);
+      this.escape.update(dt);
+      for (const m of this.monsters) m.update(dt, this.time);
+      if (this.escape.updateCut(dt)) this.endEscape();
+      this.fx.fade = Math.max(0, Math.min(this.fx.fade, 1 - smoothstep(CUT_FADE, CUT_FADE + 1.6, this.escape.cut ? this.escape.cut.t : 99)));
+      this._commonFx(dt);
+      return;
+    }
     if (this.state === 'dawn') {
       this.netFrame(dt);
       this.updateDawn(dt);
@@ -1458,15 +1558,22 @@ export class Game {
     if (!this.player.alive) return this.updateDead(dt, raw);
 
     // ---- input events ----
+    const es = this.escape;
     for (const e of raw.events) {
       if (e === 'pingDown') {
         this.charge.active = true;
         this.charge.t = 0;
       } else if (e === 'pingUp') this.pingRelease();
-      else if (e === 'throw') this.throwStone();
-      else if (e === 'flare') this.fireFlare();
-      else if (e === 'glow') this.glows.use();
-      else if (e === 'carry') this.rescue.carryKey();
+      else if (e === 'throw') {
+        if (es.held) es.throwHeld(); // with a part in your arms, F throws that
+        else this.throwStone();
+      } else if (e === 'flare') {
+        if (es.held) this.handsFull();
+        else this.fireFlare();
+      } else if (e === 'glow') {
+        if (es.held && !this.glows.held) this.handsFull();
+        else this.glows.use();
+      } else if (e === 'carry') this.carryKey();
     }
     // E puts a note away
     if (this.objectives.note && raw.events.includes('useDown')) {
@@ -1481,7 +1588,8 @@ export class Game {
 
     // ---- player ----
     const p = this.player;
-    const pev = p.update(dt, input, look, this.inputMuted);
+    // (in the УАЗ you sit still and look about: see Escape._seated)
+    const pev = es.mySeat >= 0 ? this.seatedLook(look) : p.update(dt, input, look, this.inputMuted, es.load(p.id));
     if (pev.step) {
       const s = pev.step;
       this.audio.footstep(s.intensity);
@@ -1537,12 +1645,14 @@ export class Game {
     this.medhut.update(dt);
     this.glows.update(dt);
     this.rescue.update(dt);
+    es.update(dt);
     const nearest = this.updateMonsters(dt);
     if (this.state !== 'play') return; // killed this frame
     if (!this.player.alive) return; // co-op: caught this frame — the death plays from the next one
     this.shards.update(dt, this);
     this.objectives.update(dt, true);
-    if (this.state !== 'play') return;
+    if (this.state !== 'play') return; // (the car left)
+    es.beacons(dt);
     if (this.auth) this.updateArrivals();
     this.updateFronts();
     this.updateDirector(dt);
@@ -1604,6 +1714,7 @@ export class Game {
     this.medhut.update(dt);
     this.glows.update(dt);
     this.rescue.update(dt);
+    this.escape.update(dt);
     if (this.player.alive) return; // brought back this frame
     const nearest = this.updateMonsters(dt);
     if (this.state !== 'play') return;
@@ -1732,6 +1843,7 @@ export class Game {
       }
       this.shards.onFront(s, this);
       this.objectives.onFront(s);
+      this.escape.onFront(s);
     }
   }
 
@@ -1845,26 +1957,38 @@ export class Game {
     const p = sp || this.player;
     const fx = this.fx;
     const sh = fx.trauma * fx.trauma;
-    const n = this.noiseGen;
-    const tt = realT * 26;
-    const nx = n.noise(tt, 1.3), ny = n.noise(tt, 7.1), nr = n.noise(tt, 13.7), px = n.noise(tt, 21.4), py = n.noise(tt, 31.9);
-    // a held breath: the view is never perfectly still, and shakes more when it's close
-    const br = 0.0035 + fx.danger * 0.0045 + (p.exhausted ? 0.006 : 0);
-    const yaw = p.yaw + sh * 0.07 * nx + Math.sin(realT * 0.43) * br * 0.5;
-    const pitch = p.pitch + sh * 0.06 * ny + Math.sin(realT * 1.05) * br;
-    const roll = (p.roll || 0) + sh * 0.09 * nr + Math.sin(realT * 0.61 + 1.3) * br * 0.7;
-    camera.rotation.set(pitch, yaw, roll, 'YXZ');
-    const cy = Math.cos(p.yaw), sy = Math.sin(p.yaw);
-    camera.position.set(p.x + cy * sh * 0.08 * px, p.y + p.eyeCur + (p.bobY || 0) + sh * 0.06 * py, p.z - sy * sh * 0.08 * px);
-    const fov = CFG.FOV + fx.fovKick + (p.sprinting ? 5 : 0);
-    if (Math.abs(camera.fov - fov) > 0.01) {
-      camera.fov = damp(camera.fov, fov, 10, 1 / 60);
-      camera.updateProjectionMatrix();
+    const cutCam = (this.state === 'escape' || this.state === 'won') && this.escape.applyCutCamera(camera);
+    if (cutCam) {
+      // the fly-by's camera (a hit from the gate still shakes it)
+      if (sh > 0.001) {
+        const n = this.noiseGen, tt = realT * 26;
+        camera.rotateZ(sh * 0.05 * n.noise(tt, 13.7));
+        camera.rotateX(sh * 0.04 * n.noise(tt, 7.1));
+      }
+    } else {
+      const n = this.noiseGen;
+      const tt = realT * 26;
+      const nx = n.noise(tt, 1.3), ny = n.noise(tt, 7.1), nr = n.noise(tt, 13.7), px = n.noise(tt, 21.4), py = n.noise(tt, 31.9);
+      // a held breath: the view is never perfectly still, and shakes more when it's close
+      const br = 0.0035 + fx.danger * 0.0045 + (p.exhausted ? 0.006 : 0);
+      const yaw = p.yaw + sh * 0.07 * nx + Math.sin(realT * 0.43) * br * 0.5;
+      const pitch = p.pitch + sh * 0.06 * ny + Math.sin(realT * 1.05) * br;
+      const roll = (p.roll || 0) + sh * 0.09 * nr + Math.sin(realT * 0.61 + 1.3) * br * 0.7;
+      camera.rotation.set(pitch, yaw, roll, 'YXZ');
+      const cy = Math.cos(p.yaw), sy = Math.sin(p.yaw);
+      camera.position.set(p.x + cy * sh * 0.08 * px, p.y + p.eyeCur + (p.bobY || 0) + sh * 0.06 * py, p.z - sy * sh * 0.08 * px);
+      const fov = CFG.FOV + fx.fovKick + (p.sprinting ? 5 : 0);
+      if (Math.abs(camera.fov - fov) > 0.01) {
+        camera.fov = damp(camera.fov, fov, 10, 1 / 60);
+        camera.updateProjectionMatrix();
+      }
     }
+    camera.updateMatrixWorld();
     camera.getWorldDirection(_v);
     this.audio.setListener(camera.position.x, camera.position.y, camera.position.z, _v.x, _v.y, _v.z);
-    camera.updateMatrixWorld();
-    this.glows.placeView(camera, !sp && this.player.alive && (this.state === 'play' || this.state === 'dawn'));
+    const hands = !cutCam && !sp && this.player.alive && (this.state === 'play' || this.state === 'dawn');
+    this.glows.placeView(camera, hands);
+    this.escape.placeView(camera, hands);
 
     const u = this.post.u;
     u.uAberr.value = 0.12 + fx.glitch * 0.9 + fx.danger * 0.25 + sh * 0.5;
@@ -1907,8 +2031,10 @@ export class Game {
     }
     // touch: the buttons that only make sense right now
     const playing = this.state === 'play' && p.alive;
-    document.body.classList.toggle('can-carry', this.online && playing && (!!p.carrying || !!this.rescue.liftTarget()));
-    document.body.classList.toggle('carrying', playing && !!p.carrying);
+    const es = this.escape;
+    document.body.classList.toggle('can-carry', playing && ((this.online && (!!p.carrying || !!this.rescue.liftTarget())) || !!es.held || es.mySeat >= 0));
+    document.body.classList.toggle('carrying', playing && (!!p.carrying || !!es.held || es.mySeat >= 0));
+    document.body.classList.toggle('holding', playing && !!es.held);
     document.body.classList.toggle('has-glow', playing && (this.glows.count > 0 || !!this.glows.held));
     const chargeLvl = this.charge.active ? (this.charge.t < 0.18 ? 0.24 : lerp(0.32, 1, clamp((this.charge.t - 0.18) / 0.95, 0, 1))) : 0;
     this.hud.ring(dt, this.mic, this.state === 'play' ? chargeLvl : 0, this.mic.state === 'on');

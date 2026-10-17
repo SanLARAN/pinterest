@@ -17,7 +17,7 @@ import { PF } from './remote.js';
 
 const PS_HZ = 15;
 const SNAP_HZ = 10;
-export const NOISE_SRC = ['voice', 'ping', 'step', 'bump', 'breath', 'repair', 'door', 'flare', 'glow'];
+export const NOISE_SRC = ['voice', 'ping', 'step', 'bump', 'breath', 'repair', 'door', 'flare', 'glow', 'part', 'engine'];
 const r2 = (v) => Math.round(v * 100) / 100;
 const r3 = (v) => Math.round(v * 1000) / 1000;
 
@@ -102,7 +102,7 @@ export class NetSync {
       this.obT = 0.15;
       this.obBeat = 3;
       ob.dirty = false;
-      this.send('ob', { ...ob.netState(), d: g.doors.netState() });
+      this.send('ob', { ...ob.netState(), d: g.doors.netState(), e: g.escape.netState() });
     }
   }
 
@@ -143,6 +143,7 @@ export class NetSync {
         if (d) {
           g.objectives.netMerge(d, g.remotes.get(pid));
           g.doors.netMerge(d.d);
+          g.escape.netMerge(d.e, isHostMsg);
         }
         break;
       case 'nz': {
@@ -160,6 +161,19 @@ export class NetSync {
         break;
       case 'rr': // a guest finished working on someone on the cot
         if (this.host && typeof d === 'string') g.rescue.hostRevive(d, pid);
+        break;
+      // the УАЗ (see Escape): a guest asks for a part, a seat, to go; lays a friend in the back
+      case 'xq':
+        if (this.host && g.state === 'play') g.escape.grant(d | 0, pid);
+        break;
+      case 'xs':
+        if (this.host && g.state === 'play') g.escape.assign(d | 0, pid);
+        break;
+      case 'xd':
+        if (this.host && g.state === 'play') g.escape.hostDepart(pid);
+        break;
+      case 'xb':
+        if (this.host && typeof d === 'string' && g.state === 'play') g.escape.hostLoad(d, pid);
         break;
       case 'ev':
         if (Array.isArray(d)) this.event(d, pid, isHostMsg);
@@ -212,6 +226,24 @@ export class NetSync {
       case 'cd': // the one carrying someone put them down (here, or on the cot)
         if (r && typeof a === 'string') g.rescue.netPlace(pid, a, +b, +c, !!e);
         break;
+      case 'xt': // a part out of their arms: thrown, or set down
+        if (r) g.escape.netFling(pid, a, +b, +c, +e, +f, +d[6], +d[7], +d[8], +d[9], d[10] | 0);
+        break;
+      case 'xr': // ...where it came to rest
+        if (r) g.escape.netRest(a, +b, +c, +e, +f, +d[6], +d[7], +d[8], +d[9]);
+        break;
+      case 'xi': // ...fitted to the car
+        if (r) g.escape.netFit(pid, a, +b);
+        break;
+      case 'xw': // the sound of them fitting it
+        if (r) g.escape.remoteWork(a);
+        break;
+      case 'xk': // the starter grinding (or giving up)
+        if (r) g.escape.netCrank(a | 0);
+        break;
+      case 'xe': // it caught
+        if (r) g.escape.startEngine(false);
+        break;
       // ---- from the host only ----
       default: {
         if (!isHostMsg || this.host) break;
@@ -233,6 +265,10 @@ export class NetSync {
           case 'bo': g.rescue.netGone(a); break;
           case 'dk': g.doors.netKnock(a, b); break;
           case 'dn': if (g.state === 'play') g.startDawn(); break;
+          case 'xg': g.escape.netGrant(a, b, +c); break;
+          case 'xa': g.escape.netSeats(a); break;
+          case 'xl': g.escape.netLoaded(a, b); break;
+          case 'xx': if (g.state === 'play' && Array.isArray(a)) g.escape.depart(a); break;
           case 'en': g.endOnline(false); break;
         }
       }

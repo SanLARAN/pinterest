@@ -101,6 +101,10 @@ export class Rescue {
       p.carriedBy = null;
     }
     if (this.cotId === p.id) this.cotId = null;
+    if (g.escape) {
+      g.escape.onDown(p); // (knocked out of the УАЗ's seat: they fall by its door)
+      g.escape.dropFor(p.id, p.x, p.z); // a part in their arms falls where they fell
+    }
     if (g.glows) g.glows.dropFor(p.id, p.x, p.z);
   }
 
@@ -159,6 +163,7 @@ export class Rescue {
     }
     const b = this.liftTarget();
     if (!b) return;
+    if (g.escape && g.escape.held) return;
     if (g.auth) this.grant(b.id, p.id);
     else if (this.askT <= 0) {
       g.coop.toHost('rc', b.id);
@@ -190,6 +195,7 @@ export class Rescue {
     const g = this.g;
     const b = g.playerById(bodyId), c = g.playerById(carrierId);
     if (!b || !c || b === c || b.alive || !c.alive || b.carriedBy || c.carrying) return;
+    if (g.escape && g.escape.heldBy(carrierId)) return; // (arms full)
     if (Math.hypot(b.x - c.x, b.z - c.z) > RV.pick + 1.5) return;
     this.lift(b, c);
     g.sync.ev('cu', bodyId, carrierId);
@@ -211,6 +217,7 @@ export class Rescue {
     b.carriedBy = c.id;
     b.onCot = false;
     if (this.cotId === b.id) this.cotId = null;
+    if (g.escape) g.escape.onLifted(b);
     c.carrying = b.id;
     const me = g.player;
     g.audio.bodyLift(c.x, c.y + 1.2, c.z, c === me);

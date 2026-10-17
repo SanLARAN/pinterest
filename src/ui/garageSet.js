@@ -37,7 +37,7 @@ export const SPOTS = [
 const PI = Math.PI;
 
 // ---------------- helpers ----------------
-function boxAt(b, x, y, z, w, h, d, kind, ry = 0, rx = 0, rz = 0, opts) {
+export function boxAt(b, x, y, z, w, h, d, kind, ry = 0, rx = 0, rz = 0, opts) {
   b.place(x, y, z, rx, ry, rz);
   b.box(w, h, d, kind, opts);
 }
@@ -55,7 +55,7 @@ function ring(b, r0, r1, y, segs, kind) {
   }
 }
 // a tyre lying on its side (axis +y): tread, sidewalls, the hole
-function tyre(b, r, w, kind, segs = 12, treads = true) {
+export function tyre(b, r, w, kind, segs = 12, treads = true) {
   const ri = r * 0.58;
   b.cylinder(segs, r, r, w, kind, { y0: -w / 2, capTop: false });
   b.cylinder(segs, ri, ri, w, kind, { y0: -w / 2, capTop: false });
@@ -459,7 +459,10 @@ export const CARP = {
   horn: [-0.42, 1.24, 0.42],
 };
 
-export function buildCarBody() {
+// opts.forest: the one in the forestry yard — no spare wheel or can on its tail, and no hood (its hood is
+// its own mesh, propped open over an engine bay with things missing: see game/uaz.js)
+export function buildCarBody(opts = {}) {
+  const forest = !!opts.forest;
   const b = new MeshBuilder(8192);
   const P = GK.CARPAINT, D = GK.DARK;
   const W = 0.89;
@@ -494,19 +497,25 @@ export function buildCarBody() {
   boxAt(b, 2.0, 1.27, 0, 0.08, 0.05, 1.8, P);
   for (const [x, y, z] of CARP.tail) boxAt(b, x - 0.01, y, z, 0.03, 0.09, 0.12, GK.TAILLAMP);
   boxAt(b, 2.08, 0.52, 0, 0.1, 0.12, 1.76, D); // rear bumper
-  // the spare wheel on the tail, a jerry can beside it
-  b.place(2.18, 0.98, 0.3, 0, 0, PI / 2);
-  tyre(b, 0.36, 0.22, GK.RUBBER, 12, true);
-  b.place(2.18, 0.98, 0.3, 0, 0, PI / 2);
-  b.cylinder(10, 0.2, 0.2, 0.18, GK.CARPAINT, { y0: -0.09 });
-  boxAt(b, 2.14, 0.98, -0.5, 0.14, 0.44, 0.3, GK.CARPAINT);
-  boxAt(b, 2.14, 1.22, -0.44, 0.06, 0.05, 0.1, GK.CARPAINT);
+  // the spare wheel on the tail, a jerry can beside it (the forest's car: an empty bracket, an empty strap)
+  if (!forest) {
+    b.place(2.18, 0.98, 0.3, 0, 0, PI / 2);
+    tyre(b, 0.36, 0.22, GK.RUBBER, 12, true);
+    b.place(2.18, 0.98, 0.3, 0, 0, PI / 2);
+    b.cylinder(10, 0.2, 0.2, 0.18, GK.CARPAINT, { y0: -0.09 });
+    boxAt(b, 2.14, 0.98, -0.5, 0.14, 0.44, 0.3, GK.CARPAINT);
+    boxAt(b, 2.14, 1.22, -0.44, 0.06, 0.05, 0.1, GK.CARPAINT);
+  } else {
+    b.place(2.1, 0.98, 0.3, 0, 0, PI / 2);
+    b.cylinder(6, 0.04, 0.04, 0.16, GK.RUST, { y0: -0.02 }); // the stud the spare hung on
+    boxAt(b, 2.09, 0.98, -0.5, 0.03, 0.03, 0.34, GK.RUST);
+  }
   // exhaust pipe under the tail, right side
   b.place(1.55, 0.43, CARP.exhaust[2], 0, 0, PI / 2);
   b.cylinder(6, 0.03, 0.03, 1.1, D, { y0: -0.55 });
 
   // the front: flat hood, fenders like shelves, a slotted grille panel, round lamps
-  boxAt(b, -1.35, 1.06, 0, 1.28, 0.06, 1.32, P, 0, 0, 0.025);
+  if (!forest) boxAt(b, -1.35, 1.06, 0, 1.28, 0.06, 1.32, P, 0, 0, 0.025);
   boxAt(b, -1.35, 0.83, 0.64, 1.26, 0.42, 0.03, P);
   boxAt(b, -1.35, 0.83, -0.64, 1.26, 0.42, 0.03, P);
   for (const s of [-1, 1]) {

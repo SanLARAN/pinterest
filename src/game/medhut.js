@@ -32,8 +32,9 @@ export class MedHut {
     this.cot = h ? h.cot : null;
     this.stand = h ? h.stand : null;
     // the battery lantern by the door, and a camping lantern hung inside over the cot
-    this.light = h ? { x: h.lamp.x, y: h.lamp.y, z: h.lamp.z, I: 0.9, c: WARM, R: 8 } : null;
-    this.inner = h ? { x: h.lampIn.x, y: h.lampIn.y, z: h.lampIn.z, I: 0.8, c: [1.0, 0.88, 0.7], R: 5.5 } : null;
+    // (near: their own cages don't count as walls — see render/shadows.js)
+    this.light = h ? { x: h.lamp.x, y: h.lamp.y, z: h.lamp.z, I: 0.9, c: WARM, R: 8, near: 0.2 } : null;
+    this.inner = h ? { x: h.lampIn.x, y: h.lampIn.y, z: h.lampIn.z, I: 0.8, c: [1.0, 0.88, 0.7], R: 5.5, near: 0.2 } : null;
     this.core = new THREE.Sprite(haloMaterial(0xfff0dc, lampTexture()));
     this.halo = new THREE.Sprite(haloMaterial(0xffb070, lampTexture()));
     this.coreIn = new THREE.Sprite(haloMaterial(0xfff4e4, lampTexture()));

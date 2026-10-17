@@ -2426,6 +2426,467 @@ export class AudioEngine {
     const o = this._osc('sine', 1900); const g = this._gain(); o.connect(g).connect(this.ui);
     this._env(g, t, 0.002, 0.08, 0.04); o.start(t); o.stop(t + 0.08);
   }
+  // ---------- the forestry yard and the УАЗ ----------
+  // a positional source that carries: the yard's siren is meant to be heard across the north of the forest
+  _far(x, y, z, ref = 8, roll = 0.5, rev = 0.5) {
+    const pn = this._panner(x, y, z, ref, roll);
+    pn.connect(this.sfx);
+    if (rev > 0) {
+      const rs = this._gain(rev);
+      pn.connect(rs);
+      rs.connect(this.revSend);
+    }
+    return pn;
+  }
+
+  // the gate's siren: an old rotating-beacon wail, up and down, rough in the horn. Returns { stop(fade) }
+  gateSiren(x, y, z, dur = 8) {
+    if (!this.ready) return null;
+    const t = this.now;
+    const pn = this._far(x, y, z, 9, 0.42, 0.7);
+    const out = this._gain(0);
+    out.connect(pn);
+    const o = this._osc('sawtooth', 620);
+    const o2 = this._osc('square', 310);
+    const o2g = this._gain(0.35);
+    const bp = this._filter('bandpass', 1300, 0.9);
+    const sh = this._shaper(this.distSoft);
+    const post = this._gain(0.28);
+    o.connect(bp);
+    o2.connect(o2g).connect(bp);
+    bp.connect(sh).connect(post).connect(out);
+    const period = 1.7;
+    for (let tt = t, k = 0; tt < t + dur; tt += period, k++) {
+      for (const p of [o.frequency, o2.frequency]) {
+        const m = p === o.frequency ? 1 : 0.5;
+        p.setValueAtTime(520 * m, tt);
+        p.linearRampToValueAtTime(1180 * m, tt + period * 0.55);
+        p.linearRampToValueAtTime(520 * m, tt + period);
+      }
+    }
+    out.gain.setValueAtTime(0.0001, t);
+    out.gain.linearRampToValueAtTime(1, t + 0.5);
+    out.gain.setValueAtTime(1, t + dur - 0.9);
+    out.gain.linearRampToValueAtTime(0.0001, t + dur);
+    o.start(t);
+    o2.start(t);
+    o.stop(t + dur + 0.1);
+    o2.stop(t + dur + 0.1);
+    // a relay clacks as it powers up
+    this._noiseBurst(t, { type: 'highpass', f: 2800, a: 0.0005, d: 0.02, gain: 0.8, dest: pn });
+    this._tone(t, { f: 100, a: 0.02, d: 0.6, gain: 0.12, dest: pn });
+    let stopped = false;
+    return {
+      stop: (fade = 0.3) => {
+        if (stopped) return;
+        stopped = true;
+        const n = this.now;
+        out.gain.cancelScheduledValues(n);
+        out.gain.setValueAtTime(out.gain.value, n);
+        out.gain.linearRampToValueAtTime(0.0001, n + fade);
+        try { o.stop(n + fade + 0.05); o2.stop(n + fade + 0.05); } catch { /* */ }
+      },
+    };
+  }
+
+  // ...and as everyone else hears it: far off, muffled by the forest, from the yard's direction
+  gateFar(x, z, dur = 8) {
+    if (!this.ready) return;
+    const t = this.now;
+    const L = this.listener;
+    const d = Math.hypot(x - L.x, z - L.z);
+    if (d < 70) return; // (close enough to hear the real one)
+    const pan = this._stereo(this.panOf(x, z) * 0.8);
+    const lp = this._filter('lowpass', 700, 0.7);
+    const g = this._gain(0);
+    lp.connect(g).connect(pan).connect(this.sfx);
+    const rs = this._gain(0.9);
+    g.connect(rs).connect(this.revSend);
+    const o = this._osc('sawtooth', 520);
+    o.connect(lp);
+    for (let tt = t; tt < t + dur; tt += 1.7) {
+      o.frequency.setValueAtTime(520, tt);
+      o.frequency.linearRampToValueAtTime(1180, tt + 0.94);
+      o.frequency.linearRampToValueAtTime(520, tt + 1.7);
+    }
+    const lvl = 0.05 * Math.max(0.35, 1 - d / 600);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(lvl, t + 0.8);
+    g.gain.setValueAtTime(lvl, t + dur - 1);
+    g.gain.linearRampToValueAtTime(0.0001, t + dur);
+    o.start(t);
+    o.stop(t + dur + 0.1);
+  }
+
+  // the gate's drive: a motor's whine, the gear on the rack, the rollers rumbling, a rattle. { stop(fade) }
+  gateMotor(x, y, z, dur = 7.5) {
+    if (!this.ready) return null;
+    const t = this.now;
+    const pn = this._far(x, y, z, 5, 0.7, 0.4);
+    const out = this._gain(0);
+    out.connect(pn);
+    const m1 = this._osc('sawtooth', 96), m2 = this._osc('sine', 192);
+    const mlp = this._filter('lowpass', 600, 1.2);
+    const mg = this._gain(0.18);
+    m1.connect(mlp); m2.connect(mlp);
+    mlp.connect(mg).connect(out);
+    const gw = this._osc('triangle', 940);
+    const gwg = this._gain(0.025);
+    gw.connect(gwg).connect(out);
+    for (const [o, f0, f1] of [[m1, 60, 96], [m2, 120, 192], [gw, 600, 940]]) {
+      o.frequency.setValueAtTime(f0, t);
+      o.frequency.linearRampToValueAtTime(f1, t + 0.8);
+      o.frequency.setValueAtTime(f1, t + dur - 0.8);
+      o.frequency.linearRampToValueAtTime(f0 * 0.8, t + dur);
+    }
+    const rum = this._noise(this.brown);
+    const rlp = this._filter('lowpass', 220, 0.8);
+    const rg = this._gain(0.55);
+    const rl = this._osc('sine', 3.1);
+    const rlg = this._gain(0.25);
+    rl.connect(rlg).connect(rg.gain);
+    rum.connect(rlp).connect(rg).connect(out);
+    out.gain.setValueAtTime(0.0001, t);
+    out.gain.linearRampToValueAtTime(1, t + 0.4);
+    out.gain.setValueAtTime(1, t + dur - 0.5);
+    out.gain.linearRampToValueAtTime(0.0001, t + dur + 0.1);
+    const srcs = [m1, m2, gw, rum, rl];
+    for (const s of srcs) s.start(t);
+    for (const s of srcs) s.stop(t + dur + 0.2);
+    // the rack's teeth and the leaf's loose bolts
+    for (let tt = t + 0.3; tt < t + dur - 0.3; tt += 0.11 + Math.random() * 0.05) {
+      this._noiseBurst(tt, { type: 'bandpass', f: 1800 + Math.random() * 1600, q: 4, a: 0.0006, d: 0.02, gain: 0.08 + Math.random() * 0.06, dest: pn });
+    }
+    for (let i = 0; i < 5; i++) this._noiseBurst(t + 0.6 + Math.random() * (dur - 1.2), { type: 'bandpass', f: 600 + Math.random() * 500, q: 2, a: 0.002, d: 0.12, gain: 0.25, dest: pn });
+    let stopped = false;
+    return {
+      stop: (fade = 0.2) => {
+        if (stopped) return;
+        stopped = true;
+        const n = this.now;
+        out.gain.cancelScheduledValues(n);
+        out.gain.setValueAtTime(out.gain.value, n);
+        out.gain.linearRampToValueAtTime(0.0001, n + fade);
+      },
+    };
+  }
+
+  // the leaf hits its stop: a heavy steel clunk that rings
+  gateClunk(x, y, z) {
+    if (!this.ready) return;
+    const t = this.now;
+    const pn = this._far(x, y, z, 5, 0.8, 0.8);
+    this._tone(t, { f: 70, fEnd: 38, a: 0.002, d: 0.5, gain: 1.0, dest: pn });
+    this._noiseBurst(t, { buf: this.brown, type: 'lowpass', f: 900, a: 0.001, d: 0.25, gain: 1.6, dest: pn });
+    [[312, 0.9], [497, 0.7], [783, 0.5], [1240, 0.3]].forEach(([f, d]) => this._tone(t, { f, a: 0.001, d, gain: 0.07, dest: pn }));
+  }
+
+  // picked up: a grunt of effort, and the thing itself (own: it's in your arms)
+  partPick(x, y, z, key, own = false) {
+    if (!this.ready) return;
+    const t = this.now;
+    let dest = this.sfx;
+    if (!own) {
+      dest = this._panner(x, y, z, 3, 1.1);
+      dest.connect(this.sfx);
+    }
+    this._noiseBurst(t, { type: 'bandpass', f: 800, q: 0.8, a: 0.04, d: 0.18, gain: 0.12, dest }); // cloth
+    if (key === 'wheel') {
+      this._noiseBurst(t + 0.05, { buf: this.brown, type: 'lowpass', f: 300, a: 0.006, d: 0.18, gain: 0.5, dest });
+      this._tone(t + 0.06, { type: 'sawtooth', f: 420, fEnd: 360, a: 0.01, d: 0.08, gain: 0.02, dest }); // rubber squeak
+    } else if (key === 'battery') {
+      this._noiseBurst(t + 0.05, { buf: this.brown, type: 'lowpass', f: 260, a: 0.005, d: 0.14, gain: 0.55, dest });
+      this._slosh(t + 0.12, 0.6, dest);
+    } else if (key === 'can') {
+      this._tone(t + 0.04, { f: 380, fEnd: 340, a: 0.002, d: 0.25, gain: 0.06, dest }); // hollow tin
+      this._slosh(t + 0.1, 0.25, dest); // (all but empty)
+    } else {
+      [2300, 3100].forEach((f, i) => this._tone(t + 0.03 + i * 0.03, { f, a: 0.001, d: 0.08, gain: 0.04, dest }));
+    }
+    if (own) this._noiseBurst(t + 0.15, { type: 'bandpass', f: 500, fEnd: 380, q: 1.5, a: 0.05, d: 0.25, gain: 0.05, dest: this.body }); // your breath
+  }
+
+  _slosh(t, k, dest) {
+    for (let i = 0; i < 4; i++) {
+      const at = t + i * (0.07 + Math.random() * 0.05);
+      this._noiseBurst(at, { buf: this.pink, type: 'bandpass', f: 500 + Math.random() * 400, q: 2.2, a: 0.02, d: 0.09, gain: 0.12 * k, dest });
+      this._tone(at, { f: 220 + Math.random() * 120, fEnd: 360, a: 0.004, d: 0.05, gain: 0.04 * k, dest });
+    }
+  }
+
+  // it hits the ground (or a tree): what it's made of decides the sound. k: how hard; flat: just tips over
+  partLand(x, y, z, key, k = 1, flat = false) {
+    if (!this.ready) return;
+    const t = this.now;
+    const pn = this._panner(x, y, z, 4, 0.95);
+    pn.connect(this.sfx);
+    const rs = this._gain(0.4 * k);
+    pn.connect(rs);
+    rs.connect(this.revSend);
+    if (key === 'wheel') {
+      this._tone(t, { f: 95, fEnd: 52, a: 0.003, d: 0.28, gain: 0.9 * k, dest: pn }); // rubber, a boomy thump
+      this._noiseBurst(t, { buf: this.brown, type: 'lowpass', f: 420, a: 0.002, d: 0.18, gain: 1.0 * k, dest: pn });
+      if (flat) for (let i = 0; i < 6; i++) this._noiseBurst(t + 0.05 + i * (0.09 - i * 0.01), { buf: this.brown, type: 'lowpass', f: 300, a: 0.002, d: 0.05, gain: 0.35 * (1 - i / 7), dest: pn }); // the wobble down
+    } else if (key === 'battery') {
+      this._noiseBurst(t, { buf: this.brown, type: 'lowpass', f: 320, a: 0.002, d: 0.16, gain: 1.4 * k, dest: pn }); // dead weight
+      this._noiseBurst(t, { type: 'bandpass', f: 1200, q: 1.5, a: 0.001, d: 0.05, gain: 0.4 * k, dest: pn });
+      this._slosh(t + 0.05, 0.5 * k, pn);
+    } else if (key === 'can') {
+      this._tone(t, { f: 330, fEnd: 290, a: 0.001, d: 0.35, gain: 0.25 * k, dest: pn }); // a hollow tin bonk
+      this._tone(t, { f: 870, a: 0.001, d: 0.18, gain: 0.1 * k, dest: pn });
+      this._noiseBurst(t, { type: 'bandpass', f: 1600, q: 1.2, a: 0.001, d: 0.06, gain: 0.6 * k, dest: pn });
+      this._slosh(t + 0.06, 0.2 * k, pn);
+    } else {
+      [1850, 2700, 4100].forEach((f, i) => this._tone(t, { f: f * (0.95 + Math.random() * 0.1), a: 0.0008, d: 0.16 - i * 0.03, gain: 0.08 * k, dest: pn })); // cast alloy: clink
+      this._noiseBurst(t, { type: 'highpass', f: 2600, a: 0.0006, d: 0.03, gain: 0.5 * k, dest: pn });
+      this._noiseBurst(t + 0.09, { type: 'highpass', f: 3000, a: 0.0006, d: 0.02, gain: 0.25 * k, dest: pn });
+    }
+  }
+
+  // one step of the work at the car: the wheel brace on a nut, a clamp, a bolt, a glug of petrol
+  partWork(x, y, z, key) {
+    if (!this.ready) return;
+    const t = this.now;
+    const pn = this._panner(x, y, z, 2.5, 1.15);
+    pn.connect(this.sfx);
+    if (key === 'wheel') {
+      for (let i = 0; i < 3; i++) this._noiseBurst(t + i * 0.07, { type: 'bandpass', f: 3400, q: 5, a: 0.0005, d: 0.02, gain: 0.3, dest: pn }); // the brace's ratchet
+      this.clank(x, y, z, 0.75);
+    } else if (key === 'battery') {
+      this._noiseBurst(t, { type: 'bandpass', f: 2600, q: 3, a: 0.0006, d: 0.03, gain: 0.35, dest: pn });
+      this._tone(t + 0.02, { f: 1900, a: 0.001, d: 0.06, gain: 0.05, dest: pn });
+    } else if (key === 'carb') {
+      for (let i = 0; i < 4; i++) this._noiseBurst(t + i * 0.05, { type: 'bandpass', f: 4200, q: 6, a: 0.0004, d: 0.015, gain: 0.22, dest: pn });
+      this.clank(x, y, z, 0.35);
+    } else this.glug(x, y, z);
+  }
+
+  // it's in: the last turn of the brace, a spark off the terminal, the clip on the hose, the cap screwed down
+  partFitted(x, y, z, key) {
+    if (!this.ready) return;
+    const t = this.now;
+    const pn = this._panner(x, y, z, 3, 1.0);
+    pn.connect(this.sfx);
+    if (key === 'battery') {
+      this.spark(x, y, z);
+      this._tone(t + 0.25, { type: 'square', f: 3100, a: 0.001, d: 0.04, gain: 0.03, dest: pn });
+    } else if (key === 'wheel') {
+      this.clank(x, y, z, 1);
+      this._noiseBurst(t + 0.25, { buf: this.brown, type: 'lowpass', f: 260, a: 0.004, d: 0.25, gain: 1.0, dest: pn }); // the car settles onto it
+    } else if (key === 'can') {
+      for (let i = 0; i < 3; i++) this._noiseBurst(t + i * 0.06, { type: 'bandpass', f: 1500, q: 3, a: 0.001, d: 0.03, gain: 0.25, dest: pn });
+      this._tone(t + 0.3, { f: 330, fEnd: 300, a: 0.002, d: 0.3, gain: 0.1, dest: pn });
+    } else {
+      this._noiseBurst(t, { type: 'bandpass', f: 1800, q: 2, a: 0.001, d: 0.04, gain: 0.4, dest: pn });
+      this.clank(x, y, z, 0.5);
+    }
+    // and in your chest: one more step done
+    [261.6, 329.6, 392].forEach((f, i) => this._tone(t + 0.15 + i * 0.05, { type: 'triangle', f, a: 0.15, d: 1.0, gain: 0.025, dest: this.body, rev: 0.5 }));
+  }
+
+  // a УАЗ door: the handle, the clunk (in = getting in)
+  carDoor(x, y, z, entering = true) {
+    if (!this.ready) return;
+    const t = this.now;
+    const pn = this._panner(x, y, z, 3, 1.0);
+    pn.connect(this.sfx);
+    this._noiseBurst(t, { type: 'bandpass', f: 2400, q: 2.5, a: 0.001, d: 0.03, gain: 0.3, dest: pn });
+    const at = t + (entering ? 0.45 : 0.25);
+    this._tone(at, { f: 110, fEnd: 60, a: 0.002, d: 0.18, gain: 0.6, dest: pn });
+    this._noiseBurst(at, { buf: this.brown, type: 'lowpass', f: 700, a: 0.001, d: 0.12, gain: 1.0, dest: pn });
+    this._noiseBurst(at + 0.02, { type: 'bandpass', f: 1600, q: 3, a: 0.001, d: 0.04, gain: 0.3, dest: pn });
+  }
+
+  hoodSlam(x, y, z) {
+    if (!this.ready) return;
+    const t = this.now;
+    const pn = this._panner(x, y, z, 4, 0.9);
+    pn.connect(this.sfx);
+    const rs = this._gain(0.5);
+    pn.connect(rs);
+    rs.connect(this.revSend);
+    this._tone(t, { f: 140, fEnd: 70, a: 0.002, d: 0.3, gain: 0.8, dest: pn });
+    this._noiseBurst(t, { buf: this.brown, type: 'lowpass', f: 1100, a: 0.001, d: 0.2, gain: 1.3, dest: pn });
+    [520, 860, 1330].forEach((f) => this._tone(t, { f, a: 0.001, d: 0.3, gain: 0.04, dest: pn }));
+  }
+
+  // the starter: with a battery it drags the engine round (on and on, until you let go); without, the
+  // solenoid just clicks. Returns { stop(fade) }
+  uazCrank(x, y, z, battery = true) {
+    if (!this.ready) return null;
+    const t = this.now;
+    const pn = this._far(x, y, z, 4, 0.8, 0.35);
+    this._noiseBurst(t, { type: 'highpass', f: 3200, a: 0.001, d: 0.025, gain: 0.35, dest: pn }); // the key
+    if (!battery) {
+      for (let i = 0; i < 3; i++) this._noiseBurst(t + 0.1 + i * 0.22, { type: 'bandpass', f: 2100, q: 4, a: 0.0006, d: 0.025, gain: 0.3, dest: pn });
+      return { stop() {} };
+    }
+    const out = this._gain(1);
+    out.connect(pn);
+    const st = this._osc('sawtooth', 210);
+    const sbp = this._filter('bandpass', 1300, 1.4);
+    const sg = this._gain(0);
+    st.connect(sbp).connect(sg).connect(out);
+    sg.gain.setValueAtTime(0.0001, t + 0.06);
+    sg.gain.linearRampToValueAtTime(0.09, t + 0.12);
+    const end = t + 12;
+    for (let tt = t + 0.08; tt < end; tt += 0.17) {
+      st.frequency.setValueAtTime(235, tt);
+      st.frequency.linearRampToValueAtTime(160, tt + 0.11);
+      st.frequency.linearRampToValueAtTime(235, tt + 0.17);
+    }
+    // each compression: a cough through the dry pipe
+    const thumps = [];
+    for (let tt = t + 0.16; tt < t + 6; tt += 0.17) thumps.push(this._noiseBurst(tt, { buf: this.brown, type: 'lowpass', f: 240, a: 0.01, d: 0.09, gain: 0.7, dest: out }));
+    st.start(t + 0.06);
+    st.stop(end);
+    let stopped = false;
+    return {
+      stop: (fade = 0.12) => {
+        if (stopped) return;
+        stopped = true;
+        const n = this.now;
+        out.gain.cancelScheduledValues(n);
+        out.gain.setValueAtTime(out.gain.value, n);
+        out.gain.linearRampToValueAtTime(0.0001, n + fade);
+        try { st.stop(n + fade + 0.05); } catch { /* */ }
+      },
+    };
+  }
+
+  // it catches: a bang through the pipe, a rev, then a lumpy idle — in the world, where the car is.
+  // { stop(fade), rev(k 0..1, pos) } — rev: the engine's pitch, and where it is now (it drives away)
+  uazStart(x, y, z) {
+    if (!this.ready) return null;
+    const t = this.now;
+    const pn = this._far(x, y, z, 5, 0.75, 0.3);
+    const out = this._gain(1);
+    out.connect(pn);
+    this._noiseBurst(t, { buf: this.brown, type: 'lowpass', f: 520, a: 0.004, d: 0.3, gain: 1.4, dest: out });
+    const eng = this._gain(0);
+    const lp = this._filter('lowpass', 520, 0.9);
+    const sh = this._shaper(this.distSoft);
+    const post = this._gain(0.13);
+    eng.connect(sh).connect(lp).connect(post).connect(out);
+    const f = (rpm) => rpm / 30;
+    const o1 = this._osc('sawtooth', f(500));
+    const o2 = this._osc('square', f(500) / 2);
+    const o2g = this._gain(0.55);
+    o1.connect(eng);
+    o2.connect(o2g).connect(eng);
+    const ex = this._noise(this.pink);
+    const exg = this._gain(0);
+    const am = this._osc('sine', f(500));
+    const amg = this._gain(0.5);
+    am.connect(amg).connect(exg.gain);
+    const exlp = this._filter('lowpass', 650, 0.8);
+    const exo = this._gain(0.4);
+    ex.connect(exg).connect(exlp).connect(exo).connect(eng);
+    const revs = [[0.12, 1400], [0.38, 2300], [0.75, 1500], [1.5, 900], [2.4, 840]];
+    for (const p of [o1.frequency, am.frequency]) {
+      p.setValueAtTime(f(500), t);
+      for (const [dt, rpm] of revs) p.exponentialRampToValueAtTime(f(rpm), t + dt);
+    }
+    o2.frequency.setValueAtTime(f(500) / 2, t);
+    for (const [dt, rpm] of revs) o2.frequency.exponentialRampToValueAtTime(f(rpm) / 2, t + dt);
+    lp.frequency.setValueAtTime(380, t);
+    lp.frequency.linearRampToValueAtTime(1300, t + 0.38);
+    lp.frequency.linearRampToValueAtTime(560, t + 1.6);
+    eng.gain.setValueAtTime(0.0001, t);
+    eng.gain.linearRampToValueAtTime(1.2, t + 0.08);
+    eng.gain.linearRampToValueAtTime(0.65, t + 0.45);
+    eng.gain.linearRampToValueAtTime(0.32, t + 1.9);
+    const srcs = [o1, o2, ex, am];
+    for (const s of srcs) s.start(t);
+    let stopped = false;
+    let lastK = -1;
+    return {
+      rev: (k, pos) => {
+        if (stopped) return;
+        const n = this.now;
+        if (Math.abs(k - lastK) > 0.01) {
+          lastK = k;
+          const rpm = 840 + 3400 * k;
+          o1.frequency.setTargetAtTime(f(rpm), n, 0.12);
+          am.frequency.setTargetAtTime(f(rpm), n, 0.12);
+          o2.frequency.setTargetAtTime(f(rpm) / 2, n, 0.12);
+          lp.frequency.setTargetAtTime(560 + 1500 * k, n, 0.15);
+          eng.gain.setTargetAtTime(0.32 + 0.55 * k, n, 0.15);
+        }
+        if (pos && pn.positionX) {
+          pn.positionX.setTargetAtTime(pos.x, n, 0.03);
+          pn.positionY.setTargetAtTime(pos.y + 0.8, n, 0.03);
+          pn.positionZ.setTargetAtTime(pos.z, n, 0.03);
+        }
+      },
+      stop: (fade = 1) => {
+        if (stopped) return;
+        stopped = true;
+        const n = this.now;
+        out.gain.cancelScheduledValues(n);
+        out.gain.setValueAtTime(out.gain.value, n);
+        out.gain.linearRampToValueAtTime(0.0001, n + fade);
+        for (const s of srcs) {
+          try { s.stop(n + fade + 0.05); } catch { /* */ }
+        }
+      },
+    };
+  }
+
+  // the УАЗ through the chained back gate: the chain snaps, the leaves bang open, wire rattles
+  gateCrash(x, y, z) {
+    if (!this.ready) return;
+    const t = this.now;
+    const pn = this._far(x, y, z, 6, 0.7, 0.9);
+    this._tone(t, { f: 80, fEnd: 40, a: 0.002, d: 0.45, gain: 1.2, dest: pn });
+    this._noiseBurst(t, { buf: this.brown, type: 'lowpass', f: 1200, a: 0.001, d: 0.3, gain: 2.0, dest: pn });
+    for (let i = 0; i < 10; i++) this._noiseBurst(t + 0.01 + i * (0.02 + Math.random() * 0.03), { type: 'bandpass', f: 1500 + Math.random() * 3500, q: 4, a: 0.0006, d: 0.04 + Math.random() * 0.05, gain: 0.7, dest: pn });
+    [[0.0, 2900], [0.03, 3700]].forEach(([d, f]) => this._tone(t + d, { f, a: 0.0005, d: 0.25, gain: 0.08, dest: pn })); // the chain
+    for (let i = 0; i < 14; i++) this._noiseBurst(t + 0.15 + i * 0.05, { type: 'bandpass', f: 2600 + Math.random() * 2000, q: 6, a: 0.001, d: 0.03, gain: 0.25 * (1 - i / 15), dest: pn });
+    this._noiseBurst(t + 0.35, { buf: this.brown, type: 'lowpass', f: 600, a: 0.002, d: 0.3, gain: 1.0, dest: pn }); // a leaf slams round
+    this._noiseBurst(t + 0.5, { buf: this.brown, type: 'lowpass', f: 600, a: 0.002, d: 0.25, gain: 0.7, dest: pn });
+  }
+
+  // a car on the highway, going by (far: a hiss of tyres and an engine note that drops as it passes)
+  carPass(x, y, z, dir, v) {
+    if (!this.ready) return;
+    const t = this.now;
+    const dur = 80 / v;
+    const pn = this._panner(x, y, z, 14, 1.0);
+    pn.connect(this.amb);
+    if (pn.positionX) {
+      pn.positionX.setValueAtTime(x, t);
+      pn.positionX.linearRampToValueAtTime(x + dir * v * dur, t + dur);
+    }
+    const g = this._gain(0);
+    g.connect(pn);
+    const n = this._noise(this.pink);
+    const bp = this._filter('bandpass', 900, 0.7);
+    n.connect(bp).connect(g);
+    const o = this._osc('sawtooth', 95);
+    const olp = this._filter('lowpass', 400, 1);
+    const og = this._gain(0.25);
+    o.connect(olp).connect(og).connect(g);
+    o.frequency.setValueAtTime(102, t);
+    o.frequency.linearRampToValueAtTime(102, t + dur * 0.45);
+    o.frequency.linearRampToValueAtTime(84, t + dur * 0.6);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(0.5, t + dur * 0.48);
+    g.gain.linearRampToValueAtTime(0.0001, t + dur);
+    n.start(t, Math.random() * 2);
+    o.start(t);
+    n.stop(t + dur + 0.1);
+    o.stop(t + dur + 0.1);
+  }
+
+  // out on the highway: a long warm chord that finally resolves
+  escapeChord() {
+    if (!this.ready) return;
+    const t = this.now;
+    [196, 246.9, 293.7, 392, 493.9].forEach((f, i) => this._tone(t + i * 0.12, { type: 'triangle', f, a: 1.4, d: 5.5, hold: 1.5, gain: 0.04, dest: this.body, rev: 0.8 }));
+    this._tone(t + 2.2, { type: 'sine', f: 587.3, a: 1.2, d: 4, hold: 1, gain: 0.025, dest: this.body, rev: 0.9 });
+  }
+
   // ---------- the garage (co-op lobby) ----------
   // its own buses straight to the master: the menu isn't "paused", but the garage shouldn't go through the
   // night's stun/duck either. Transient garage sounds feed the mic's self-gate (the engine isn't your voice).

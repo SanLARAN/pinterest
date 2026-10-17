@@ -5,6 +5,11 @@ import { CFG } from '../core/config.js';
 
 const N = CFG.PULSE.slots;
 export const GLOW_SLOTS = 6; // small lights: glow sticks, the first-aid hut's lantern
+export const LAMP_SLOTS = 6; // work lamps: the five generators' + the floodlight over the forestry yard
+// omni shadows (see render/shadows.js): every small light and every lamp has six faces of distances in one
+// atlas — a row per light, a tile per face
+export const SHADOW_TILE = 192;
+export const SHADOW_ROWS = GLOW_SLOTS + LAMP_SLOTS;
 
 export const shared = {
   uTime: { value: 0 },
@@ -16,8 +21,8 @@ export const shared = {
   uMorning: { value: 0 }, // 1 = the calm morning (high sun, blue sky), 0 = the victory dawn
   uFear: { value: 0 }, // 0..1 — when something hunts you, the forest bleeds red
   uSun: { value: new THREE.Vector3(0.5, 0.35, -0.8).normalize() },
-  // work lamps of running generators: xyz + intensity (0 = off)
-  uLamp: { value: Array.from({ length: 5 }, () => new THREE.Vector4(0, -100, 0, 0)) },
+  // work lamps of running generators (and the yard's floodlight): xyz + intensity (0 = off)
+  uLamp: { value: Array.from({ length: LAMP_SLOTS }, () => new THREE.Vector4(0, -100, 0, 0)) },
   uLampR: { value: CFG.LAMP_R },
   // burning signal flares (the two brightest): xyz + intensity (0 = none)
   uFlare: { value: Array.from({ length: 2 }, () => new THREE.Vector4(0, -100, 0, 0)) },
@@ -25,11 +30,32 @@ export const shared = {
   // small lights (glow sticks, a battery lantern): xyz + intensity (0 = off), and colour + reach (m)
   uGlow: { value: Array.from({ length: GLOW_SLOTS }, () => new THREE.Vector4(0, -100, 0, 0)) },
   uGlowC: { value: Array.from({ length: GLOW_SLOTS }, () => new THREE.Vector4(1, 1, 1, 8)) },
+  // the shadow atlas, and for each light where its six faces were drawn from + its reach (w = 0: no shadows)
+  uShadowMap: { value: null },
+  uShG: { value: Array.from({ length: GLOW_SLOTS }, () => new THREE.Vector4(0, 0, 0, 0)) },
+  uShL: { value: Array.from({ length: LAMP_SLOTS }, () => new THREE.Vector4(0, 0, 0, 0)) },
+  // the highway beyond the hills: first lamp x, spacing, the lamps' z and height; intensity (0 = off), x range
+  uRoad: { value: new THREE.Vector4(0, 30, 0, 8) },
+  uRoadK: { value: new THREE.Vector3(0, 0, 0) },
+  // the УАЗ's headlights: between the two lamps + intensity, and which way they point
+  uHead: { value: new THREE.Vector4(0, -100, 0, 0) },
+  uHeadD: { value: new THREE.Vector3(0, 0, 1) },
+};
+
+// who casts which shadow this frame (filled by whoever owns the light; read by render/shadows.js):
+// { x, y, z, R, near } — where the six faces are drawn from (a lamp's from just under its shade), how far
+// the light reaches, and how close to the light nothing counts (its own cage / shade / hand)
+export const shadowLights = {
+  glow: new Array(GLOW_SLOTS).fill(null),
+  lamp: new Array(LAMP_SLOTS).fill(null),
 };
 
 export const PULSE_GLSL = /* glsl */ `
 #define MAXP ${N}
 #define MAXG ${GLOW_SLOTS}
+#define MAXL ${LAMP_SLOTS}
+#define SH_T ${SHADOW_TILE}.0
+#define SH_ROWS ${SHADOW_ROWS}.0
 uniform float uTime;
 uniform vec4 uPA[MAXP];
 uniform vec4 uPB[MAXP];
@@ -39,12 +65,93 @@ uniform float uDawn;
 uniform float uMorning;
 uniform float uFear;
 uniform vec3 uSun;
-uniform vec4 uLamp[5];
+uniform vec4 uLamp[MAXL];
 uniform float uLampR;
 uniform vec4 uFlare[2];
 uniform float uFlareR;
 uniform vec4 uGlow[MAXG];
 uniform vec4 uGlowC[MAXG];
+uniform sampler2D uShadowMap;
+uniform vec4 uShG[MAXG];
+uniform vec4 uShL[MAXL];
+uniform vec4 uRoad;
+uniform vec3 uRoadK;
+uniform vec4 uHead;
+uniform vec3 uHeadD;
+
+// ---- shadows: walls stop light. Each light has a row of six cube faces in the atlas; a texel holds how
+// far from the light the nearest thing is in that direction (16 bits over the light's reach)
+float shTap(vec3 v, float row, float R, float d) {
+  vec3 a = abs(v);
+  float face;
+  vec2 st;
+  float m;
+  if (a.x >= a.y && a.x >= a.z) {
+    m = a.x;
+    if (v.x > 0.0) { face = 0.0; st = vec2(v.z, v.y); } else { face = 1.0; st = vec2(-v.z, v.y); }
+  } else if (a.y >= a.z) {
+    m = a.y;
+    if (v.y > 0.0) { face = 2.0; st = vec2(v.x, v.z); } else { face = 3.0; st = vec2(v.x, -v.z); }
+  } else {
+    m = a.z;
+    if (v.z > 0.0) { face = 4.0; st = vec2(-v.x, v.y); } else { face = 5.0; st = vec2(v.x, v.y); }
+  }
+  st = clamp(st / max(m, 1e-5), -1.0 + 1.0 / SH_T, 1.0 - 1.0 / SH_T) * 0.5 + 0.5;
+  vec4 c = texture2D(uShadowMap, vec2((face + st.x) / 6.0, (row + st.y) / SH_ROWS));
+  return (c.r + c.g / 255.0) * R >= d ? 1.0 : 0.0;
+}
+
+// how much of a light gets to P (1 = all of it). sh: where the light's faces were drawn from + its reach
+float omniShadow(vec4 sh, float row, vec3 P, vec3 Nrm) {
+  if (sh.w <= 0.0) return 1.0;
+  vec3 v = P - sh.xyz;
+  float d = length(v);
+  if (d >= sh.w || d < 0.001) return 1.0;
+  float texel = d * 2.0 / SH_T;
+  if (dot(Nrm, Nrm) > 0.5) v += Nrm * (0.015 + texel * 1.5); // off the surface, so it doesn't shadow itself
+  d = length(v);
+  float dd = d - (0.025 + texel * 1.8);
+#ifdef SH_FAST
+  return shTap(v, row, sh.w, dd);
+#else
+  vec3 w = v / d;
+  vec3 t1 = normalize(cross(w, abs(w.y) < 0.9 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0)));
+  vec3 t2 = cross(w, t1);
+  float s = texel * 1.25;
+  return 0.25 * (shTap(v + (t1 + t2) * s, row, sh.w, dd) + shTap(v + (t1 - t2) * s, row, sh.w, dd)
+               + shTap(v + (t2 - t1) * s, row, sh.w, dd) + shTap(v - (t1 + t2) * s, row, sh.w, dd));
+#endif
+}
+
+// the highway beyond the hills: sodium lamps on tall arms, one every uRoad.y metres
+vec3 roadLight(vec3 P, vec3 Nrm) {
+  if (uRoadK.x <= 0.0 || abs(P.z - uRoad.z) > 26.0) return vec3(0.0);
+  float k0 = floor((P.x - uRoad.x) / uRoad.y + 0.5);
+  float acc = 0.0;
+  for (int j = -1; j <= 1; j++) {
+    float lx = uRoad.x + (k0 + float(j)) * uRoad.y;
+    if (lx < uRoadK.y || lx > uRoadK.z) continue;
+    vec3 dv = vec3(lx, uRoad.w, uRoad.z) - P;
+    float d = length(dv);
+    float fall = 1.0 - smoothstep(1.5, 19.0, d);
+    float facing = dot(Nrm, Nrm) > 0.5 ? 0.3 + 0.7 * max(dot(Nrm, dv / max(d, 0.001)), 0.0) : 1.0;
+    acc += fall * fall * facing;
+  }
+  return vec3(1.0, 0.58, 0.22) * acc * uRoadK.x;
+}
+
+// the УАЗ's headlights, once its engine runs: a wide cone ahead of it
+vec3 headLight(vec3 P, vec3 Nrm) {
+  if (uHead.w <= 0.001) return vec3(0.0);
+  vec3 dv = P - uHead.xyz;
+  float d = length(dv);
+  if (d > 36.0 || d < 0.05) return vec3(0.0);
+  vec3 l = dv / d;
+  float cone = smoothstep(0.76, 0.93, dot(l, uHeadD));
+  float fall = 1.0 - smoothstep(1.0, 36.0, d);
+  float facing = dot(Nrm, Nrm) > 0.5 ? 0.25 + 0.75 * max(dot(Nrm, -l), 0.0) : 1.0;
+  return vec3(1.0, 0.92, 0.76) * uHead.w * cone * fall * facing;
+}
 
 // a signal flare: hard red light from above, over a whole stretch of forest. surfaces turned away
 // from it stay dark (it's the only thing out here that casts a direction)
@@ -63,10 +170,11 @@ vec3 flareLight(vec3 P, vec3 Nrm) {
   return acc;
 }
 
-// steady warm light pooled under the work lamps of running generators
+// steady warm light pooled under the work lamps of running generators (and the yard's floodlight) —
+// plus the far-off highway's lamps and the УАЗ's headlights
 vec3 lampLight(vec3 P, vec3 Nrm) {
   vec3 acc = vec3(0.0);
-  for (int i = 0; i < 5; i++) {
+  for (int i = 0; i < MAXL; i++) {
     vec4 Lm = uLamp[i];
     if (Lm.w <= 0.001) continue;
     vec3 dv = Lm.xyz - P;
@@ -74,9 +182,9 @@ vec3 lampLight(vec3 P, vec3 Nrm) {
     if (d > uLampR * 1.5) continue;
     float fall = 1.0 - smoothstep(uLampR * 0.12, uLampR * 1.5, d);
     float facing = dot(Nrm, Nrm) > 0.5 ? 0.35 + 0.65 * abs(dot(Nrm, dv / max(d, 0.001))) : 1.0;
-    acc += vec3(1.0, 0.72, 0.4) * Lm.w * fall * fall * facing;
+    acc += vec3(1.0, 0.72, 0.4) * Lm.w * fall * fall * facing * omniShadow(uShL[i], float(MAXG + i), P, Nrm);
   }
-  return acc;
+  return acc + roadLight(P, Nrm) + headLight(P, Nrm);
 }
 
 // small coloured lights close by: a cracked glow stick (in a hand, or lying where it was thrown), a lantern
@@ -91,7 +199,7 @@ vec3 glowLight(vec3 P, vec3 Nrm) {
     if (d > C.w) continue;
     float fall = 1.0 - smoothstep(C.w * 0.05, C.w, d);
     float facing = dot(Nrm, Nrm) > 0.5 ? 0.45 + 0.55 * max(dot(Nrm, dv / max(d, 0.001)), 0.0) : 1.0;
-    acc += C.rgb * G.w * fall * fall * facing;
+    acc += C.rgb * G.w * fall * fall * facing * omniShadow(uShG[i], float(i), P, Nrm);
   }
   return acc;
 }
@@ -142,6 +250,23 @@ float edgeFactor(vec3 b, float w) {
 }
 `;
 
+// the garage's materials (kinds 19…49): the УАЗ comes out to the forest in its own paint (see ui/garageSet.js GK)
+export const GARAGE_PAL_GLSL = /* glsl */ `
+const vec3 XPAL[31] = vec3[31](
+  vec3(0.30, 0.30, 0.29), vec3(0.46, 0.45, 0.42), vec3(0.15, 0.23, 0.23), vec3(0.25, 0.29, 0.16),
+  vec3(0.72, 0.74, 0.76), vec3(0.07, 0.07, 0.075), vec3(0.09, 0.09, 0.095), vec3(0.75, 0.74, 0.66),
+  vec3(0.42, 0.05, 0.04), vec3(1.00, 0.85, 0.60), vec3(1.00, 0.45, 0.15), vec3(0.17, 0.27, 0.19),
+  vec3(0.36, 0.20, 0.11), vec3(0.07, 0.11, 0.21), vec3(0.12, 0.16, 0.12), vec3(0.80, 0.75, 0.62),
+  vec3(0.30, 0.33, 0.22), vec3(0.62, 0.62, 0.60), vec3(0.60, 0.09, 0.06), vec3(0.17, 0.11, 0.08),
+  vec3(0.035, 0.035, 0.04), vec3(0.24, 0.17, 0.11), vec3(1.00, 0.70, 0.35), vec3(1.00, 0.60, 0.22),
+  vec3(0.0, 0.0, 0.0), vec3(1.00, 0.75, 0.35), vec3(0.55, 0.62, 0.66), vec3(0.70, 0.52, 0.12),
+  vec3(0.75, 0.10, 0.08), vec3(1.00, 0.85, 0.60), vec3(0.045, 0.065, 0.12)
+);
+// ...in the sonar's ash: pale, but dark rubber stays darker than chrome
+vec3 xNight(int k) { return clamp(vec3(0.3) + XPAL[clamp(k - 19, 0, 30)] * 1.2, 0.0, 1.0); }
+vec3 xDay(int k) { return XPAL[clamp(k - 19, 0, 30)] * 1.25; }
+`;
+
 // night palette per material kind (shared with the atlas portraits)
 export const KIND_COLORS_GLSL = /* glsl */ `
 // cold, ashen palette: the forest is grey bone and frost, only flesh is red
@@ -178,11 +303,14 @@ void main() {
 const WORLD_FRAG = /* glsl */ `
 ${PULSE_GLSL}
 ${EDGE_GLSL}
+#ifdef SELF_LIT
+uniform float uSelfLit; // (what's in your arms: you can always just about make it out)
+#endif
 varying vec3 vWorld;
 varying vec3 vBary;
 varying float vKind;
 
-${KIND_COLORS_GLSL}// daylight palette: what the forest looks like when you can actually see it
+${KIND_COLORS_GLSL}${GARAGE_PAL_GLSL}// daylight palette: what the forest looks like when you can actually see it
 const vec3 DC[12] = vec3[12](
   vec3(0.34, 0.38, 0.22),  // ground: moss and needles
   vec3(0.42, 0.33, 0.25),  // bark
@@ -206,7 +334,22 @@ void main() {
   float camD = length(toCam);
   if (dot(Nrm, toCam) < 0.0) Nrm = -Nrm;
   int k = int(vKind + 0.5); // (an interpolated constant can land a hair under the integer)
-  vec3 base = KC[k];
+  // chain-link (kind 50): the diamonds are cut out of the panel here; what's left is wire. Finer than a pixel,
+  // it breaks up into grain instead of shimmering
+  float wire = 0.0;
+  if (k == 50) {
+    float sc = vWorld.x + vWorld.z;
+    vec2 q = vec2(sc + vWorld.y, sc - vWorld.y) * 5.5;
+    vec2 dl = min(fract(q), 1.0 - fract(q));
+    vec2 fw = fwidth(q);
+    vec2 cv = 1.0 - smoothstep(vec2(0.09) - fw * 0.5, vec2(0.09) + fw * 0.75, dl);
+    wire = max(cv.x, cv.y);
+    float dither = fract(sin(dot(floor(gl_FragCoord.xy), vec2(12.9898, 78.233))) * 43758.5453);
+    if (wire < dither * 0.92 + 0.04) discard;
+    k = 36; // galvanised wire
+  }
+  vec3 base = k < 12 ? KC[min(k, 11)] : xNight(k);
+  vec3 dayC = k < 12 ? DC[min(k, 11)] : xDay(k);
 
   float ring;
   vec3 L = sonarLight(vWorld, Nrm, ring);
@@ -214,8 +357,11 @@ void main() {
   vec3 glow = glowLight(vWorld, Nrm);
   vec3 flare = flareLight(vWorld, Nrm);
   L += lamp + glow + flare;
+#ifdef SELF_LIT
+  L += vec3(uSelfLit);
+#endif
 
-  float edge = edgeFactor(vBary, k == 0 ? 0.75 : 1.0);
+  float edge = wire > 0.0 ? 0.85 : edgeFactor(vBary, k == 0 ? 0.75 : 1.0);
   float distEdge = 1.0 - smoothstep(14.0, 90.0, camD) * 0.82;
   float grazing = smoothstep(0.02, 0.25, abs(dot(Nrm, toCam / camD)));
   edge *= distEdge * mix(0.3, 1.0, grazing);
@@ -243,7 +389,7 @@ void main() {
   // in the morning: you can see where you are. (alpha tells the post pass to leave these colours alone)
   vec3 near = lamp * vec3(1.0, 1.2, 1.55) + glow; // the lamp's bulb, a little less orange than its pool
   float nat = clamp(max(near.r, max(near.g, near.b)) * 1.4, 0.0, 1.0);
-  vec3 seen = DC[k] * near * (0.78 + 0.3 * st) * 1.3;
+  vec3 seen = dayC * near * (0.78 + 0.3 * st) * (wire > 0.0 ? 0.75 : 1.3); // (thin wire takes less of the light)
   if (k == 10) seen *= 0.75 + 0.5 * face; // water still moves
   col = mix(col, seen + col * 0.35, nat);
 
@@ -258,7 +404,7 @@ void main() {
 
   // daylight (the morning, or the dawn you earned): the forest becomes visible
   if (uDawn > 0.0) {
-    vec3 dbase = DC[k];
+    vec3 dbase = dayC;
     float sunL = max(dot(Nrm, uSun), 0.0);
     float sky = 0.5 + 0.5 * Nrm.y;
     vec3 warm = mix(vec3(1.0, 0.8, 0.62), vec3(1.0, 0.93, 0.82), uMorning);
@@ -390,6 +536,7 @@ export function createGhostMaterial(color) {
 
 // ---------------- floating dust motes revealed by the waves ----------------
 const MOTE_VERT = /* glsl */ `
+#define SH_FAST
 ${PULSE_GLSL}
 attribute vec4 aSeed;
 uniform float uBox;
