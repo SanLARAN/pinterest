@@ -36,7 +36,7 @@ const HOWL = [1.0, 0.36, 0.1];
 const LAMPC = [1.0, 0.74, 0.42];
 const MORNING_LIGHT = 0.95;
 const NO_LOOK = { dx: 0, dy: 0 };
-const SRC_SELF = new Set(['voice', 'ping', 'step', 'bump', 'breath', 'repair', 'door', 'flare', 'glow', 'part', 'engine']);
+const SRC_SELF = new Set(['voice', 'ping', 'step', 'bump', 'breath', 'repair', 'door', 'flare', 'glow', 'part', 'engine', 'torch']);
 const _v = new THREE.Vector3();
 const escHtml = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 

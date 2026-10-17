@@ -1112,6 +1112,8 @@ export class Watcher extends Monster {
     let speed = 0;
     if (!lit) {
       speed = cfg.stalk * g.speedScale * (pd < 4 ? 0.8 : 1);
+      // a flashlight that has just gone out for a moment: it lunges (the dark between two flickers)
+      if (g.torch && g.torch.dipping) speed *= 2.2;
       // it will not step into a lamp's light
       const la = Math.min(1.2, speed * 0.4);
       const ax = this.x + Math.sin(this.yaw) * la, az = this.z + Math.cos(this.yaw) * la;

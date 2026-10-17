@@ -3,10 +3,14 @@
 // it. Take it (E), and T switches it: a cone of real light wherever you look, for as long as the battery
 // lasts (it flickers when it's nearly gone; spare batteries turn up in cupboards).
 //
-// Light is a two-edged thing here. What the beam shows, you see as it is — and a thing caught in the beam
-// sees you: every so often it comes to look where the light came from. On a co-op night your friends see
-// your beam, and you theirs (the 'ps' state carries it; the light itself is one of the small lights: see
-// GlowSticks.lightSources — a beam is a small light with a direction).
+// Light is a two-edged thing here — and in a game about being blind it mustn't be a way out of it: it's
+// for a quick look. What the beam shows, you see as it is, but a lit flashlight is a beacon in the dark:
+// a thing caught in the beam comes to look, and so does any thing near enough that nothing stands between
+// it and you. The battery is short. And when it's nearly flat the light stutters and goes out for moments
+// at a time — the Watcher moves in those moments (the dark between two flickers is all it needs).
+// On a co-op night your friends see your beam, and you theirs (the 'ps' state carries it, and its dips;
+// the light itself is one of the small lights: see GlowSticks.lightSources — a beam is a small light with
+// a direction).
 import * as THREE from 'three';
 import { MeshBuilder, KIND } from '../world/builder.js';
 import { createWorldMaterial } from '../render/sonar.js';
@@ -15,17 +19,20 @@ import { haloMaterial } from './glowsticks.js';
 import { t } from '../core/i18n.js';
 
 export const TORCH = {
-  battery: 105, // s of light on a full battery
+  battery: 60, // s of light on a full battery
   light: 1.65, // intensity in the hand
-  radius: 21, // m
-  cone: 0.84, // cos of the beam's edge (~33°)
+  radius: 14, // m
+  cone: 0.88, // cos of the beam's edge (~28°)
   color: [1.0, 0.93, 0.8],
-  found: 0.8, // charge it's found with
-  spare: 0.45, // a spare battery from a cupboard
-  low: 0.18, // below this it flickers
-  see: 18, // a thing in the beam this close (and in the clear) notices it...
+  found: 0.5, // charge it's found with
+  spare: 0.3, // a spare battery from a cupboard
+  low: 0.25, // below this it stutters, and goes out for moments
+  dipI: 0.015, // ...this bright, in one of those moments
+  see: 13, // a thing in the beam this close (and in the clear) notices it...
   every: 1.4, // ...checked this often (s)
-  loud: 0.42, // ...and comes as if to a noise this loud, where you stand
+  loud: 0.42, // ...and comes as if to a noise this loud, where you stand (heard ~25 m)
+  beacon: 25, // and a lit flashlight is seen from this far by anything with nothing in the way...
+  beaconEvery: 2.2, // ...checked this often
   pickR: 1.7,
   lying: 0.85, // the one lying out there: still on, weakly
   lyingR: 10,
@@ -83,7 +90,10 @@ export class Torches {
     this.charge = 0;
     this.spare = 0;
     this.flick = 1;
+    this.dip = false; // gone out for a moment (a nearly flat battery)
+    this.dipT = 0;
     this.noiseT = 0;
+    this.beaconT = 0;
     this.t = 0;
     // the view model: in your left hand, the world's material with a breath of light of its own
     this.viewMat = createWorldMaterial();
@@ -110,6 +120,8 @@ export class Torches {
     this.charge = 0;
     this.spare = 0;
     this.flick = 1;
+    this.dip = false;
+    this.beaconT = TORCH.beaconEvery;
     const pool = SPOTS.slice();
     const n = online ? 2 : 1;
     for (let i = 0; i < n && pool.length; i++) {
@@ -222,30 +234,56 @@ export class Torches {
         this._click(false, true);
       }
     }
-    // nearly flat: it stutters
+    // nearly flat: it stutters — and every so often it goes out altogether for a moment (longer and more
+    // often the flatter it gets). Those moments are real dark: the Watcher moves in them.
     if (this.on && this.charge < TORCH.low) {
-      const k = this.charge / TORCH.low;
-      this.flick = Math.random() < 0.06 + 0.1 * (1 - k) ? 0.12 : (0.55 + 0.45 * Math.random()) * (0.45 + 0.55 * k);
-    } else this.flick = 1;
-    // what the beam shows can see it
-    if (this.on && g.state === 'play') {
-      this.noiseT -= dt;
-      if (this.noiseT <= 0) {
-        this.noiseT = TORCH.every;
-        const B = beamFrom(p.x, p.y + p.eyeCur, p.z, p.yaw, p.pitch);
-        for (const m of g.monsters) {
-          if (!m.alive && m.alive !== undefined) continue;
-          if (m.state === 'lurk') continue;
-          const dx = m.x - B.x, dy = (m.y || 0) + 1.2 - B.y, dz = m.z - B.z;
-          const d = Math.hypot(dx, dy, dz);
-          if (d > TORCH.see || d < 0.5) continue;
-          if ((dx * B.dir[0] + dy * B.dir[1] + dz * B.dir[2]) / d < TORCH.cone - 0.04) continue;
-          if (g.world.losBlocked && g.world.losBlocked(B.x, B.y, B.z, m.x, (m.y || 0) + 1.2, m.z, 0.3)) continue;
-          g.playerNoise(p.x, p.z, TORCH.loud, 'torch');
-          break;
-        }
+      const k = this.charge / TORCH.low; // 1 → 0
+      this.dipT -= dt;
+      if (this.dipT <= 0) {
+        this.dip = !this.dip;
+        this.dipT = this.dip ? 0.14 + Math.random() * (0.18 + 0.3 * (1 - k)) : 0.45 + Math.random() * (0.5 + 2.2 * k);
       }
+      this.flick = this.dip ? TORCH.dipI : (0.6 + 0.4 * Math.random()) * (0.5 + 0.5 * k);
+    } else {
+      this.flick = 1;
+      this.dip = false;
+      this.dipT = 0.6;
     }
+    // what the beam shows can see it; and anything near enough with nothing in the way sees the light
+    if (this.on && !this.dip && g.state === 'play') {
+      this.noiseT -= dt;
+      this.beaconT -= dt;
+      const beam = this.noiseT <= 0, beacon = this.beaconT <= 0;
+      if (beam) this.noiseT = TORCH.every;
+      if (beacon) this.beaconT = TORCH.beaconEvery;
+      if ((beam || beacon) && this._seen(beam, beacon)) g.playerNoise(p.x, p.z, TORCH.loud, 'torch');
+    }
+  }
+
+  // is there a thing that sees your light? (beam: one caught in the beam; beacon: one near, nothing in the way)
+  _seen(beam, beacon) {
+    const g = this.g, p = g.player;
+    const B = beamFrom(p.x, p.y + p.eyeCur, p.z, p.yaw, p.pitch);
+    for (const m of g.monsters) {
+      if (!m.alive && m.alive !== undefined) continue;
+      if (m.state === 'lurk') continue;
+      if (m.cfg && m.cfg.hearing === 0) continue; // (the Watcher has its own way with light: it freezes in it)
+      const dx = m.x - B.x, dy = (m.y || 0) + 1.2 - B.y, dz = m.z - B.z;
+      const d = Math.hypot(dx, dy, dz);
+      if (d < 0.5 || d > Math.max(TORCH.beacon, TORCH.see)) continue;
+      const inBeam = d <= TORCH.see && (dx * B.dir[0] + dy * B.dir[1] + dz * B.dir[2]) / d >= TORCH.cone - 0.04;
+      if (!(beam && inBeam) && !(beacon && d <= TORCH.beacon)) continue;
+      if (g.world.losBlocked && g.world.losBlocked(B.x, B.y, B.z, m.x, (m.y || 0) + 1.2, m.z, 0.3)) continue;
+      return true;
+    }
+    return false;
+  }
+
+  // is any flashlight out there in one of its dark moments right now? (yours, or a friend's: the Watcher's chance)
+  get dipping() {
+    if (this.on && this.dip) return true;
+    for (const r of this.g.remotes.values()) if (r.alive && r.torchOn && r.torchDip) return true;
+    return false;
   }
 
   // small lights for GlowSticks: the ones lying out there, yours, your friends'
@@ -266,7 +304,7 @@ export class Torches {
     for (const r of g.remotes.values()) {
       if (!r.alive || !r.torchOn) continue;
       const B = beamFrom(r.x, r.y + r.eyeCur, r.z, r.yaw, r.pitch);
-      const low = (r.torchCharge ?? 1) < TORCH.low ? 0.5 + 0.5 * Math.random() : 1;
+      const low = r.torchDip ? TORCH.dipI : (r.torchCharge ?? 1) < TORCH.low ? 0.5 + 0.5 * Math.random() : 1;
       out.push({ x: B.x, y: B.y, z: B.z, I: TORCH.light * low, c: C, R: TORCH.radius, prio: 1, near: 0.3, id: r, dir: B.dir, cone: TORCH.cone });
     }
     return out;
@@ -284,6 +322,6 @@ export class Torches {
 
   // the state that goes over the network with yours
   state() {
-    return { on: this.on, charge: this.charge };
+    return { on: this.on, charge: this.charge, dip: this.dip };
   }
 }

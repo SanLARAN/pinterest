@@ -266,7 +266,37 @@ try {
   await A.page.evaluate(() => { const g = window.__hush.game; const k = g.shards.items.findIndex((s) => s.alive); const s = g.shards.items[k]; s.alive = false; g.onShard(s, k); });
   const paid = await until(async () => (await purseB()) === before + 1, 20000);
   check('a shard the host picks up pays B too', !!paid, `${before} → ${await purseB()}`);
-  facts.push(`flashlight ${torch === 'ok' ? 'synced' : 'NOT synced'} · shared shard ${paid ? 'ok' : 'NOT ok'}`);
+  // B's flashlight (a guest's): a thing near B with nothing in the way sees the light, and the host's
+  // monster comes to look — the guest's light has to reach the host as a noise
+  const lit = await (async () => {
+    const spot = await A.page.evaluate(() => {
+      const g = window.__hush.game, [bid, r] = [...g.remotes.entries()][0];
+      for (let a = 0; a < 360; a += 5) {
+        const ang = (a * Math.PI) / 180, x = r.x + Math.sin(ang) * 16, z = r.z + Math.cos(ang) * 16;
+        if (!g.world.col.free(x, z, 1) || g.world.losBlocked(r.x, r.y + 1.4, r.z, x, g.world.terrain.height(x, z) + 1.2, z, 0.3)) continue;
+        const m = g.spawnMonster('listener', 30, 40);
+        if (!m) return null;
+        m.spawn(x, z, 'wander');
+        window.__litM = m;
+        window.__litHeard = false;
+        const nz = g.noise.bind(g);
+        g.noise = (...q) => { if (q[3] === 'torch' && q[5] === bid) window.__litHeard = true; return nz(...q); };
+        return `${x.toFixed(1)},${z.toFixed(1)}`;
+      }
+      return null;
+    });
+    if (!spot) return 'no clear spot near B';
+    // (B has to know it's there first: the host's monster snapshots)
+    await until(() => B.page.evaluate(() => { const g = window.__hush.game, p = g.player; return g.monsters.some((m) => Math.hypot(m.x - p.x, m.z - p.z) < 20); }), 15000);
+    await B.page.evaluate(() => { const T = window.__hush.game.torch; T.has = true; T.charge = 1; T.on = true; T.noiseT = 0; T.beaconT = 0; });
+    const heard = await until(() => A.page.evaluate(() => (window.__litHeard && ['investigate', 'hunt'].includes(window.__litM.state) ? 'ok' : null)), 30000);
+    await B.page.evaluate(() => { window.__hush.game.torch.on = false; });
+    const why = heard || (await A.page.evaluate(() => `heard ${window.__litHeard}, monster ${window.__litM.state}`));
+    await A.page.evaluate(() => { const g = window.__hush.game, m = window.__litM, i = g.monsters.indexOf(m); if (i >= 0) { m.dispose(); g.monsters.splice(i, 1); } });
+    return why;
+  })();
+  check("a thing near B sees B's flashlight (the host's monster comes to look)", lit === 'ok', lit);
+  facts.push(`flashlight ${torch === 'ok' ? 'synced' : 'NOT synced'} · guest's light ${lit === 'ok' ? 'seen' : 'NOT seen'} · shared shard ${paid ? 'ok' : 'NOT ok'}`);
   const partOk = await (async () => {
     const P = await A.page.evaluate(() => { const q = window.__hush.game.escape.parts[2]; return [q.x, q.z]; });
     await B.page.evaluate(([x, z]) => { const g = window.__hush.game; g.player.x = x + 0.8; g.player.z = z; g.player.vx = g.player.vz = 0; }, P);

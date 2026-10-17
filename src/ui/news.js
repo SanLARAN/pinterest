@@ -7,6 +7,27 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v: '1.9', date: '2026-10-17',
+    ru: {
+      title: 'Фонарик — для того, чтобы глянуть',
+      items: [
+        'Фонарик ослаблен: батарейки на минуту, найден полуразряженным, луч короче и уже, запасные батарейки в шкафах реже',
+        'Включённый фонарь видно издалека: тварь поблизости, которой ничто тебя не загораживает, идёт на свет',
+        'Когда батарейка почти села, фонарь гаснет на мгновения — и в эти мгновения Наблюдатель делает рывок',
+        'Бойкиссер больше не скручивается, когда наклоняет голову, а руки не остаются вывернутыми после жестов',
+      ],
+    },
+    en: {
+      title: 'The flashlight is for a quick look',
+      items: [
+        'A weaker flashlight: a minute of battery, found half flat, a shorter and narrower beam, spare batteries rarer in the cupboards',
+        'A lit flashlight is seen from far off: anything near with nothing between you comes to the light',
+        'When the battery is nearly flat, the light goes out for moments — and the Watcher lunges in those moments',
+        "The Boykisser no longer screws itself round when it tilts its head, and its arms don't stay twisted after a gesture",
+      ],
+    },
+  },
+  {
     v: '1.8', date: '2026-10-17',
     ru: {
       title: 'Бойкиссер, магазин и фонарик',

@@ -17,7 +17,7 @@ import { PF } from './remote.js';
 
 const PS_HZ = 15;
 const SNAP_HZ = 10;
-export const NOISE_SRC = ['voice', 'ping', 'step', 'bump', 'breath', 'repair', 'door', 'flare', 'glow', 'part', 'engine'];
+export const NOISE_SRC = ['voice', 'ping', 'step', 'bump', 'breath', 'repair', 'door', 'flare', 'glow', 'part', 'engine', 'torch'];
 const r2 = (v) => Math.round(v * 100) / 100;
 const r3 = (v) => Math.round(v * 1000) / 1000;
 
@@ -74,6 +74,7 @@ export class NetSync {
       if (g.charge && g.charge.active && g.charge.t > 0.3) f |= PF.charging;
       if (g.input.useHeld) f |= PF.use;
       if (g.torch && g.torch.on) f |= PF.torch;
+      if (g.torch && g.torch.on && g.torch.dip) f |= PF.dip;
       const loud = g.mic.state === 'on' ? g.mic.loud : 0;
       this.send('ps', [r2(p.x), r2(p.y), r2(p.z), r3(p.yaw), r3(p.pitch), r2(p.speed), f, r2(loud), Math.floor(g.score), g.torch ? r2(g.torch.charge) : 0]);
     }

@@ -14,7 +14,7 @@ export const PLAYER_HEX = [0x8ef0ff, 0xa6ff9e, 0xd2a8ff, 0xffe08a];
 const DELAY = 110; // ms
 
 // flags in the player-state message
-export const PF = { crouch: 1, sprint: 2, alive: 4, charging: 8, use: 16, morning: 32, torch: 64 };
+export const PF = { crouch: 1, sprint: 2, alive: 4, charging: 8, use: 16, morning: 32, torch: 64, dip: 128 };
 
 // slot → spawn offset around the camp (right, back) in metres
 export const SLOT_OFFSET = [[0, 0], [1.5, 0.55], [-1.5, 0.55], [0, 1.6]];
@@ -86,6 +86,7 @@ export class RemotePlayer {
     this.loud = +a[7] || 0;
     // a flashlight on (its light is drawn from where they are: see Torches.lightSources)
     this.torchOn = !!(f & PF.torch);
+    this.torchDip = !!(f & PF.dip); // its flat battery's moment of dark
     this.torchCharge = a[9] !== undefined ? +a[9] || 0 : 1;
     if (a[8] !== undefined) this.score = +a[8] || 0;
     // note: "alive" only ever changes through the host's word (a kill event), never from a state packet
