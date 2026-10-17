@@ -1,24 +1,32 @@
 // The co-op panel: create a room or join one, see who's in it, start the night.
+// In a room it becomes the garage (garage.js, drawn behind): everyone's name tag floats over their place —
+// your own opens the wardrobe, a friend's holds your volume for their voice; an empty place invites someone.
 import { t } from '../core/i18n.js';
 import { settings, saveSettings } from '../core/storage.js';
 import { PLAYER_COLORS } from '../game/remote.js';
 import { cleanCode, MAX_PLAYERS } from '../net/net.js';
 import { cleanName } from '../net/coop.js';
-import { wt, item } from '../game/outfit.js';
+import { wt, myFit } from '../game/outfit.js';
 
 const $ = (id) => document.getElementById(id);
-const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const esc = (s) => String(s).replace(/[&<>\"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', "'": '&#39;' }[c]));
 const MIC_ON = '<svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>';
 const MIC_OFF = '<svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M4 4l16 16"/></svg>';
+const HANGER = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7.2a1.9 1.9 0 1 0-1.9-1.9"/><path d="M12 7.2v1.3L3.2 15a1.3 1.3 0 0 0 .8 2.4h16a1.3 1.3 0 0 0 .8-2.4L12 8.5"/></svg>';
+const SPEAKER = (muted) =>
+  `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z"/>${
+    muted ? '<path d="M15.5 9.5l5 5M20.5 9.5l-5 5"/>' : '<path d="M15.5 9.2a4 4 0 0 1 0 5.6M18 6.8a7.5 7.5 0 0 1 0 10.4"/>'
+  }</svg>`;
 
 export class Lobby {
-  constructor({ coop, mic, audio, mix, onMicToggle, uiSound, onWardrobe = null }) {
+  constructor({ coop, mic, audio, mix, onMicToggle, uiSound, onWardrobe = null, beforeOpen = null }) {
     this.coop = coop;
-    this.onWardrobe = onWardrobe; // your own outfit line opens the wardrobe
+    this.beforeOpen = beforeOpen; // (main builds the garage the first time)
+    this.onWardrobe = onWardrobe; // your own tag (or figure) opens the wardrobe
     this.mic = mic;
     this.audio = audio;
     this.mix = mix; // per-friend voice volume
-    this.rows = new Map(); // roster rows, keyed: p:<id> seated · e:<slot> free seat · w:<id> connecting
+    this.rows = new Map(); // tags, keyed: p:<id> seated · e:<slot> free place · w:<id> connecting
     this.onMicToggle = onMicToggle;
     this.uiSound = uiSound;
     this.el = $('coopPanel');
@@ -26,6 +34,10 @@ export class Lobby {
     this.homeMsg = '';
     this.timer = 0;
     this.copiedUntil = 0;
+    this.garage = null; // set by main once it exists
+    this.starting = false;
+    this.openVol = null; // the friend whose volume popover is open
+    this.inviteCopied = 0;
     this._bind();
   }
 
@@ -34,16 +46,32 @@ export class Lobby {
   }
 
   open() {
+    if (this.beforeOpen) this.beforeOpen();
     $('coopName').value = settings.name || '';
     this.el.classList.add('show');
+    document.body.classList.add('in-lobby');
     this.render();
     clearInterval(this.timer);
     this.timer = setInterval(() => this.tick(), 120);
   }
 
   close() {
+    if (this.starting) return; // the engine's running: we're going
     this.el.classList.remove('show');
+    document.body.classList.remove('in-lobby');
     clearInterval(this.timer);
+    if (this.garage) {
+      this.garage.close();
+      this.garage.restorePost();
+    }
+  }
+
+  // the car is starting: nothing to press, nowhere to go
+  setStarting(on) {
+    this.starting = !!on;
+    this.el.classList.toggle('starting', this.starting);
+    this.openVol = null;
+    this.render();
   }
 
   _bind() {
@@ -51,6 +79,7 @@ export class Lobby {
       const el = $(id);
       el.addEventListener('click', (e) => {
         e.preventDefault();
+        if (this.starting) return;
         if (this.uiSound) this.uiSound('click');
         fn(e);
       });
@@ -58,10 +87,26 @@ export class Lobby {
     };
     click('btnCreate', () => this._go(() => this.coop.create()));
     $('coopList').addEventListener('click', (e) => {
-      if (!e.target.closest('[data-wardrobe]') || !this.onWardrobe) return;
-      e.preventDefault();
-      if (this.uiSound) this.uiSound('click');
-      this.onWardrobe();
+      if (this.starting) return;
+      const row = e.target.closest('.row');
+      if (!row) return;
+      if (e.target.closest('[data-wardrobe]')) {
+        e.preventDefault();
+        if (this.uiSound) this.uiSound('click');
+        if (this.onWardrobe) this.onWardrobe();
+        return;
+      }
+      if (e.target.closest('.vbtn') || (row.classList.contains('mate') && !e.target.closest('.vol'))) {
+        e.preventDefault();
+        if (this.uiSound) this.uiSound('click');
+        this._toggleVol(row.dataset.id);
+        return;
+      }
+      if (row.classList.contains('empty')) {
+        e.preventDefault();
+        if (this.uiSound) this.uiSound('click');
+        this._copy(() => { this.inviteCopied = performance.now() + 1600; });
+      }
     });
     $('coopJoinForm').addEventListener('submit', (e) => {
       e.preventDefault();
@@ -77,12 +122,13 @@ export class Lobby {
     });
     click('btnCopy', () => this._copy());
     click('btnStart', () => {
-      if (this.coop.isHost && this.coop.active) this.coop.startRun();
+      if (this.coop.isHost && this.coop.active) this.coop.startRun({ cut: true });
     });
     click('btnLeave', () => {
       this.coop.leave().then(() => this.render());
     });
     click('btnCoopBack', () => this.close());
+    click('btnRoomBack', () => this.close());
     click('btnCoopMic', () => this.onMicToggle && this.onMicToggle());
     const name = $('coopName');
     let nameT = 0;
@@ -95,6 +141,44 @@ export class Lobby {
       nameT = setTimeout(() => this.coop.active && this.coop.announce(), 400);
     });
     for (const id of ['coopName', 'coopCode']) $(id).addEventListener('keydown', (e) => e.stopPropagation());
+    // the garage itself: your figure under the pointer lights up — click it to dress up; a friend's opens their volume
+    const bare = (e) => e.target === this.el || e.target.id === 'coopRoom' || e.target.id === 'coopList' || e.target.classList.contains('form-panel');
+    this.el.addEventListener('pointermove', (e) => {
+      if (!this.garage || !this._inRoom() || e.pointerType === 'touch') return;
+      const s = this.garage.pointer(e.clientX, e.clientY, true);
+      const me = this.coop.me();
+      this.el.classList.toggle('over-me', !!me && s === me.slot && bare(e) && !this.starting);
+      this.el.classList.toggle('over-mate', s >= 0 && (!me || s !== me.slot) && bare(e) && !this.starting);
+    });
+    this.el.addEventListener('pointerleave', () => {
+      if (this.garage) this.garage.pointer(0, 0, false);
+      this.el.classList.remove('over-me', 'over-mate');
+    });
+    this.el.addEventListener('click', (e) => {
+      if (!this.garage || !this._inRoom() || this.starting || !bare(e)) return;
+      const s = this.garage.hit(e.clientX, e.clientY);
+      const me = this.coop.me();
+      if (s < 0) {
+        if (this.openVol) this._toggleVol(null);
+        return;
+      }
+      if (this.uiSound) this.uiSound('click');
+      if (me && s === me.slot) {
+        if (this.onWardrobe) this.onWardrobe();
+      } else {
+        const p = this.coop.players().find((q) => q.slot === s);
+        if (p) this._toggleVol(p.id);
+      }
+    });
+  }
+
+  _inRoom() {
+    return this.coop.active && !!this.coop.code;
+  }
+
+  _toggleVol(id) {
+    this.openVol = id && this.openVol !== id ? id : null;
+    for (const [k, el] of this.rows) el.classList.toggle('open', !!this.openVol && k === `p:${this.openVol}`);
   }
 
   async _go(fn) {
@@ -112,10 +196,11 @@ export class Lobby {
     this.render();
   }
 
-  _copy() {
+  _copy(after = null) {
     const link = this.coop.inviteLink();
     const done = () => {
       this.copiedUntil = performance.now() + 1600;
+      if (after) after();
       this.render();
     };
     if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -147,11 +232,15 @@ export class Lobby {
   render() {
     const c = this.coop;
     this.menuLabel();
-    const inRoom = c.active && !!c.code;
+    const inRoom = this._inRoom();
     this.el.classList.toggle('room', inRoom);
     this.el.classList.toggle('home', !inRoom);
     $('btnCreate').disabled = this.busy;
     $('btnJoin').disabled = this.busy;
+    if (this.garage && this.isOpen()) {
+      this.garage.open(inRoom ? 'room' : 'home');
+      this.garage.setPlayers(inRoom ? c.players().map((p) => ({ slot: p.slot, id: p.id, name: p.name, self: p.self, host: p.host, fit: p.self ? myFit() : p.fit })) : []);
+    }
     if (!inRoom) {
       let msg = this.homeMsg;
       if (!msg && this.busy) msg = esc(t('coopJoining'));
@@ -171,10 +260,22 @@ export class Lobby {
     $('btnCoopMic').textContent = t('coopMicAsk');
     const start = $('btnStart');
     start.classList.toggle('hidden-host', !c.isHost);
-    start.disabled = !c.isHost || c.status === 'joining';
+    start.disabled = !c.isHost || c.status === 'joining' || this.starting;
+    this._measure();
   }
 
-  // rows are kept and updated in place (a slider being dragged must survive the ping refreshes)
+  // tell the garage how much of the screen the top bar and the dock take
+  _measure() {
+    if (!this.garage || !this.isOpen() || !this._inRoom()) return;
+    const top = this.el.querySelector('.coop-top');
+    const dock = this.el.querySelector('.coop-dock');
+    if (!top || !dock) return;
+    const a = top.getBoundingClientRect(), b = dock.getBoundingClientRect();
+    if (a.height < 1 || b.height < 1) return;
+    this.garage.setSafe(Math.round(a.bottom + 34), Math.round(innerHeight - b.top + 6));
+  }
+
+  // tags are kept and updated in place (a slider being dragged must survive the ping refreshes)
   _renderList() {
     const c = this.coop;
     const seated = c.players();
@@ -193,13 +294,15 @@ export class Lobby {
         this.rows.delete(k);
       }
     }
+    if (this.openVol && !keys.has(`p:${this.openVol}`)) this.openVol = null;
     let prev = null;
     for (const w of want) {
       let el = this.rows.get(w.key);
       if (!el) {
         el = document.createElement('div');
-        el.innerHTML = '<i class="dot"></i><span class="n"></span><span class="mic"></span><span class="p"></span>';
+        el.innerHTML = '<span class="pill"><i class="dot"></i><span class="n"></span><span class="mic"></span><span class="p"></span><span class="act"></span></span>';
         if (w.p && !w.wait) el.dataset.id = w.p.id;
+        el.dataset.slot = w.s ?? -1;
         this.rows.set(w.key, el);
       }
       this._fillRow(el, w);
@@ -210,7 +313,8 @@ export class Lobby {
   }
 
   _fillRow(el, w) {
-    const [dot, n, mic, ping] = el.children;
+    const pill = el.firstChild;
+    const [dot, n, mic, ping, act] = pill.children;
     const set = (node, html) => {
       if (node._html !== html) {
         node._html = html;
@@ -220,7 +324,8 @@ export class Lobby {
     const p = w.p;
     if (!p) {
       el.className = 'row empty';
-      set(n, esc(t('coopFree')));
+      const copied = performance.now() < this.inviteCopied;
+      set(n, `<b>+</b>${esc(copied ? t('coopCopied') : t('coopInvite'))}<small>${esc(t('coopSeats')[w.s] || t('coopFree'))}</small>`);
       return;
     }
     if (w.wait) {
@@ -229,21 +334,29 @@ export class Lobby {
       set(ping, '…');
       return;
     }
-    el.className = `row${p.self ? ' self' : ' mate'}${p.mic ? '' : ' nomic'}`;
+    el.className = `row${p.self ? ' self' : ' mate'}${p.mic ? '' : ' nomic'}${this.openVol === p.id ? ' open' : ''}`;
     dot.style.setProperty('--c', PLAYER_COLORS[w.s]);
+    el.style.setProperty('--c', PLAYER_COLORS[w.s]);
     const tags = [];
     if (p.self) tags.push(t('coopYou'));
     if (p.host) tags.push(t('coopHost'));
-    set(n, `${esc(p.name)}${tags.map((x) => `<em>${esc(x)}</em>`).join('')}${this._fitLine(p)}`);
+    set(n, `${esc(p.name)}${tags.map((x) => `<em>${esc(x)}</em>`).join('')}`);
     mic.className = `mic ${p.mic ? 'on' : 'off'}`;
     set(mic, p.mic ? MIC_ON : MIC_OFF);
     const rtt = p.self ? null : this.coop.rtt(p.id);
     set(ping, rtt != null ? `${rtt} ${esc(t('ms'))}` : '');
-    // a friend: how loud you hear them
-    if (!p.self && this.mix) {
+    if (p.self) {
+      set(act, this.onWardrobe ? `<button class="fit" data-wardrobe title="${esc(wt().title)}" aria-label="${esc(t('coopDress'))}">${HANGER}</button>` : '');
+      return;
+    }
+    // a friend: how loud you hear them (the popover opens from the speaker, or by clicking them)
+    if (this.mix) {
       this.mix.bind(p.id, p.name);
+      const muted = this.mix.get(p.id) <= 0.001;
+      set(act, `<button class="vbtn${muted ? ' muted' : ''}" title="${esc(t('coopVolume'))}" aria-label="${esc(t('coopVolume'))}">${SPEAKER(muted)}</button>`);
       if (!el._vol) {
         el._vol = this.mix.control(p.id);
+        el._vol.classList.add('pop');
         el.appendChild(el._vol);
       }
       el._vol.style.setProperty('--c', PLAYER_COLORS[w.s]);
@@ -251,31 +364,21 @@ export class Lobby {
     }
   }
 
-  // what they wear (yours: a button into the wardrobe)
-  _fitLine(p) {
-    const f = p.fit;
-    if (!f || !item(f.head) || !item(f.body)) return '';
-    const T = wt();
-    const inner = `<i style="--c:${f.hc[0]}"></i>${esc(T.items[f.head].name)}<b>·</b><i style="--c:${f.bc[0]}"></i>${esc(T.items[f.body].name)}`;
-    return p.self && this.onWardrobe
-      ? `<button class="fit" data-wardrobe title="${esc(T.title)}">${inner}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7.2a1.9 1.9 0 1 0-1.9-1.9"/><path d="M12 7.2v1.3L3.2 15a1.3 1.3 0 0 0 .8 2.4h16a1.3 1.3 0 0 0 .8-2.4L12 8.5"/></svg></button>`
-      : `<small class="fit">${inner}</small>`;
-  }
-
   _renderStatus() {
     const c = this.coop;
     const r = c.relayStatus();
     const since = (performance.now() - c.joinedAt) / 1000;
     let main = '';
-    if (c.status === 'version') main = `<span class="bad">${esc(t('coopVersion'))}</span>`;
+    if (this.starting) main = `<span class="go">${esc(t('coopGo'))}</span>`;
+    else if (c.status === 'version') main = `<span class="bad">${esc(t('coopVersion'))}</span>`;
     else if (c.status === 'joining') main = esc(t('coopJoining'));
-    else if (c.isHost) main = esc(c.players().length > 1 ? t('coopReadyHost') : t('coopWaitFriends'));
+    else if (c.isHost) main = esc(c.players().length > 1 ? (this.garage ? t('coopReadyHostCar') : t('coopReadyHost')) : t('coopWaitFriends'));
     else if (c.status === 'hostLost') main = `<span class="warn">${esc(t('coopHostLeft'))}</span>`;
     else if (!c.hostId) main = since > 14 ? `<span class="warn">${esc(t('coopNoHost'))}</span>` : esc(t('coopSearching'));
     else if (c.phase === 'game' && !(c.me() && c.me().inRun)) main = esc(t('coopInRun'));
     else main = esc(t('coopWaitHost'));
     let sub = '';
-    if (r.total > 0) {
+    if (r.total > 0 && !this.starting) {
       if (r.open === 0 && since > 6) sub = `<span class="dim warn">${esc(t('coopNoRelays'))}</span>`;
       else sub = `<span class="dim">${esc(t('coopRelays'))} ${r.open}/${r.total}</span>`;
     }
@@ -284,6 +387,66 @@ export class Lobby {
     if (el._html !== html) {
       el._html = html;
       el.innerHTML = html;
+    }
+  }
+
+  // every frame while the garage is drawn: hang each tag over its place (CSS px from garage.anchors())
+  place(anchors) {
+    if (!this._inRoom() || !anchors || !anchors.length) return;
+    const W = innerWidth, H = innerHeight;
+    const top = this.garage ? this.garage.safe.top - 26 : 60;
+    const bottom = H - (this.garage ? this.garage.safe.bottom : 180);
+    const boxes = [];
+    for (const [k, el] of this.rows) {
+      const slot = +el.dataset.slot;
+      if (k.startsWith('w:')) continue;
+      const a = anchors[slot];
+      if (!a || !a.on) {
+        el.style.visibility = 'hidden';
+        continue;
+      }
+      el.style.visibility = '';
+      if (!el._w || el._sizeAt !== el.className + (el.firstChild.firstChild ? el.textContent.length : 0)) {
+        el._w = el.firstChild.offsetWidth || 120;
+        el._h = el.firstChild.offsetHeight || 26;
+        el._sizeAt = el.className + el.textContent.length;
+      }
+      boxes.push({ el, x: a.x, y: a.y, w: el._w, h: el._h, appear: a.here ? a.appear : 1 });
+    }
+    // keep them on screen, and off each other (the higher one gives way upward)
+    for (const b of boxes) {
+      b.x = Math.min(W - b.w / 2 - 8, Math.max(b.w / 2 + 8, b.x));
+      b.y = Math.min(bottom, Math.max(top + b.h, b.y));
+    }
+    boxes.sort((a, b) => b.y - a.y);
+    for (let i = 0; i < boxes.length; i++) {
+      for (let j = 0; j < i; j++) {
+        const A = boxes[i], B = boxes[j];
+        if (Math.abs(A.x - B.x) < (A.w + B.w) / 2 + 4 && A.y > B.y - B.h - 4) A.y = B.y - B.h - 4;
+      }
+    }
+    // the connecting ones stack under the top bar, on the right
+    let wy = top + 4;
+    for (const [k, el] of this.rows) {
+      if (!k.startsWith('w:')) continue;
+      el.style.visibility = '';
+      const x = W - 14, y = wy;
+      wy += 32;
+      const tr = `translate(${x}px, ${y}px) translate(-100%, 0)`;
+      if (el._tr !== tr) { el._tr = tr; el.style.transform = tr; }
+    }
+    for (const b of boxes) {
+      const x = Math.round(b.x), y = Math.round(b.y);
+      const tr = `translate(${x}px, ${y}px) translate(-50%, -100%)`;
+      if (b.el._tr !== tr) {
+        b.el._tr = tr;
+        b.el.style.transform = tr;
+      }
+      const op = (Math.min(1, b.appear * 1.5)).toFixed(2);
+      if (b.el._op !== op) {
+        b.el._op = op;
+        b.el.style.opacity = op;
+      }
     }
   }
 
@@ -296,13 +459,22 @@ export class Lobby {
     this._renderList();
     for (const row of $('coopList').querySelectorAll('.row[data-id]')) {
       const id = row.dataset.id;
-      const lv = id === c.selfId ? (this.mic.state === 'on' ? Math.min(1, this.mic.meter) : 0) : this.audio.voiceLevel(id);
+      const lv = this.level(id);
       const dot = row.querySelector('.dot');
       if (dot) dot.style.setProperty('--lv', lv.toFixed(2));
+      row.classList.toggle('talk', lv > 0.12);
     }
     if (this.copiedUntil && performance.now() > this.copiedUntil) {
       this.copiedUntil = 0;
       $('btnCopyText').textContent = t('coopCopy');
     }
+    this._measure();
+  }
+
+  // how loud someone in the room is right now (you: your mic)
+  level(id) {
+    const c = this.coop;
+    if (id === c.selfId) return this.mic.state === 'on' ? Math.min(1, this.mic.meter) : 0;
+    return this.audio.voiceLevel(id);
   }
 }

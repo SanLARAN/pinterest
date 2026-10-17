@@ -7,6 +7,7 @@ export const CFG = {
   TERRAIN_CELL: 2.5,
   RUN_SECONDS: 30 * 60, // after this the forest wakes up: everything starts closing in on you
   GRACE_SECONDS: 12, // at the start of the night monsters can't hunt you
+  SPAWN_DELAY: 45, // ...and for the first 45 s the forest sleeps: no monsters at all, look around in peace
   MORNING_SECONDS: 32, // the calm before: daylight, birds, a humming generator
   DUSK_SECONDS: 3.6, // ...and then the light dies
   CAMP_LEASH: 26, // in the morning you stay around the camp

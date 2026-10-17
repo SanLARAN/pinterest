@@ -205,6 +205,7 @@ export class NetSync {
           case 'hb': if (m) g.fxBark(m); break;
           case 'ar': g.fxArrive(a); break;
           case 'wk': g.fxWake(); break;
+          case 'aw': g.fxAwake(Number.isFinite(a) ? a : null, Number.isFinite(b) ? b : null); break;
           case 'ki': g.netKill(a, b, c, +e, +f); break;
           case 'dk': g.doors.netKnock(a, b); break;
           case 'dn': if (g.state === 'play') g.startDawn(); break;

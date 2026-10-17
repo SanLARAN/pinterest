@@ -2204,6 +2204,71 @@ export class AudioEngine {
     this._env(mix, t, 0.015, 0.6, 0.3, 0.05);
   }
 
+  // the calm is over: something far off calls out, something else answers, and the birds go up
+  forestWake(x, y, z) {
+    if (!this.ready) return;
+    const t = this.now;
+    const ctx = this.ctx;
+    const L = this.listener;
+    const call = (at, px, pz, pitch, len, gain) => {
+      const pn = this._panner(px, y, pz, 30, 0.6);
+      pn.connect(this.sfx);
+      const dist = Math.hypot(px - L.x, pz - L.z);
+      const wet = Math.sqrt(30 / (30 + 0.6 * Math.max(0, dist - 30)));
+      const dl = ctx.createDelay(1.5);
+      dl.delayTime.value = 0.48 + Math.random() * 0.12;
+      const elp = this._filter('lowpass', 900, 0.7);
+      const fb = this._gain(0.42);
+      dl.connect(elp).connect(fb).connect(dl);
+      const eg = this._gain(0.5 * wet);
+      elp.connect(eg);
+      eg.connect(this.sfx);
+      eg.connect(this.revSend);
+      if (!this.offline) setTimeout(() => { try { dl.disconnect(); fb.disconnect(); } catch { /* */ } }, 9000);
+      const mix = this._gain(0);
+      const sh = this._shaper(this.distSoft);
+      const lp = this._filter('lowpass', 1500, 0.7); // far away: the trees eat the top
+      const post = this._gain(0.2);
+      mix.connect(sh).connect(lp).connect(post);
+      post.connect(pn);
+      post.connect(dl);
+      const rs = this._gain(1.0 * wet); post.connect(rs); rs.connect(this.revSend);
+      const f = 170 * pitch;
+      const v = this._voice(at, {
+        f0: [[0, f * 0.8], [0.45 * len, f * 1.45], [0.75 * len, f * 1.25], [len, f * 0.62]],
+        vowel: [[0, 'u'], [0.35 * len, 'o'], [0.6 * len, 'A'], [len, 'u']],
+        dur: len, vib: [4.6, 55], jitter: 45, rasp: 0.4, q: 6, fg: 3,
+      });
+      const vg = this._gain(0.75); v.connect(vg).connect(mix);
+      const hi = this._voice(at, { // a thin, wrong overtone riding on top
+        f0: [[0, f * 2.4], [0.45 * len, f * 3.6], [len, f * 1.9]],
+        vowel: [[0, 'i'], [len, 'e']],
+        dur: len, vib: [6.2, 70], jitter: 40, rasp: 0.15, q: 8, fg: 3,
+      });
+      const hg = this._gain(0.18); hi.connect(hg).connect(mix);
+      this._env(mix, at, 0.25 * len, 0.5 * gain, 0.55 * len, 0.2 * len);
+    };
+    call(t, x, z, 1, 2.6, 1);
+    // the answer comes from the other side of you
+    call(t + 1.5, L.x - (x - L.x) * 0.8 + (z - L.z) * 0.5, L.z - (z - L.z) * 0.8 - (x - L.x) * 0.5, 0.82, 2.0, 0.8);
+    // under it all, the ground itself seems to shift
+    const sub = this._noise(this.brown);
+    const slp = this._filter('lowpass', 85, 0.8);
+    const sg = this._gain(0);
+    sub.connect(slp).connect(sg).connect(this.sfx);
+    this._env(sg, t, 1.4, 0.3, 2.4, 0.6);
+    sub.start(t, Math.random() * 2);
+    sub.stop(t + 4.6);
+    // the birds that were sleeping in the tops go up all at once
+    for (let i = 0; i < 16; i++) {
+      const at = t + 0.25 + Math.random() * 1.1;
+      const pan = this._stereo(Math.random() * 1.6 - 0.8);
+      pan.connect(this.sfx);
+      this._noiseBurst(at, { f: 900 + Math.random() * 900, q: 1.4, a: 0.006, d: 0.05, gain: 0.05 + Math.random() * 0.04, dest: pan, rev: 0.3 });
+      this._noiseBurst(at + 0.07, { f: 800 + Math.random() * 700, q: 1.4, a: 0.006, d: 0.045, gain: 0.04, dest: pan, rev: 0.3 });
+    }
+  }
+
   // ---------- the wardrobe ----------
   // a wire hanger on the rail, cloth, a hat being settled, a drop of dye, the stage's own echo
   wardrobe(kind) {
@@ -2239,6 +2304,327 @@ export class AudioEngine {
     const o = this._osc('sine', 1900); const g = this._gain(); o.connect(g).connect(this.ui);
     this._env(g, t, 0.002, 0.08, 0.04); o.start(t); o.stop(t + 0.08);
   }
+  // ---------- the garage (co-op lobby) ----------
+  // its own buses straight to the master: the menu isn't "paused", but the garage shouldn't go through the
+  // night's stun/duck either. Transient garage sounds feed the mic's self-gate (the engine isn't your voice).
+  _gbus() {
+    if (this.gSfx || !this.ctx) return;
+    const ctx = this.ctx;
+    this.gAmbBus = this._gain(0);
+    this.gAmbBus.connect(this.master);
+    this.gSfx = this._gain(0.9);
+    this.gSfx.connect(this.master);
+    if (this.gateAnalyser) this.gSfx.connect(this.gateAnalyser);
+    this.gRev = ctx.createConvolver();
+    this.gRev.buffer = makeIR(ctx, 0.9, 3.4); // a small concrete box
+    this.gRevSend = this._gain(1);
+    const out = this._gain(0.45);
+    this.gRevSend.connect(this.gRev);
+    this.gRev.connect(out);
+    out.connect(this.gSfx);
+  }
+
+  // rain on the tin roof, wind in the gap of the wicket door, the bulb's hum, now and then a drip
+  garageAmb(on) {
+    if (!this.ctx) return;
+    this._gbus();
+    const t = this.now;
+    const g = this.gAmbBus.gain;
+    g.cancelScheduledValues(t);
+    g.setValueAtTime(g.value, t);
+    g.linearRampToValueAtTime(on ? 1 : 0, t + (on ? 1.2 : 0.4));
+    clearTimeout(this._gAmbOff);
+    if (!on) {
+      this._gAmbOff = setTimeout(() => this._garageAmbStop(), 700);
+      return;
+    }
+    if (this._gAmb) return;
+    const ctx = this.ctx;
+    const nodes = [];
+    const keep = (n) => (nodes.push(n), n);
+    // rain: pink noise, the roof's ring, a slow swell
+    const rain = keep(this._noise(this.pink));
+    const hp = this._filter('highpass', 700, 0.7);
+    const pk = this._filter('peaking', 3600, 0.8);
+    pk.gain.value = 6;
+    const rg = this._gain(0.03);
+    const lfo = keep(this._osc('sine', 0.11));
+    const lg = this._gain(0.008);
+    lfo.connect(lg).connect(rg.gain);
+    rain.connect(hp).connect(pk).connect(rg).connect(this.gAmbBus);
+    // drips and ticks on the roof: a pre-rendered loop
+    const len = Math.floor(ctx.sampleRate * 6);
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let k = 0; k < 150; k++) {
+      const at = Math.floor(Math.random() * (len - 2000));
+      const a = 0.05 + Math.random() * 0.25;
+      for (let i = 0; i < 300; i++) d[at + i] += (Math.random() * 2 - 1) * a * Math.exp(-i / 40);
+    }
+    for (let k = 0; k < 3; k++) {
+      // a fat drop into a puddle by the gate
+      const at = Math.floor(Math.random() * (len - 9000));
+      const f = 900 + Math.random() * 700;
+      for (let i = 0; i < 8000; i++) {
+        const tt = i / ctx.sampleRate;
+        d[at + i] += Math.sin(2 * Math.PI * f * tt * (1 + tt * 3)) * 0.35 * Math.exp(-tt * 28);
+      }
+    }
+    const drips = keep(ctx.createBufferSource());
+    drips.buffer = buf;
+    drips.loop = true;
+    const dbp = this._filter('bandpass', 2600, 0.6);
+    const dg = this._gain(0.07);
+    drips.connect(dbp).connect(dg).connect(this.gAmbBus);
+    const dr = this._gain(0.25);
+    dg.connect(dr).connect(this.gRevSend);
+    // wind through the gap
+    const wind = keep(this._noise(this.brown));
+    const wbp = this._filter('bandpass', 380, 0.9);
+    const wlfo = keep(this._osc('sine', 0.07));
+    const wl = this._gain(160);
+    wlfo.connect(wl).connect(wbp.frequency);
+    const wg = this._gain(0.04);
+    const wlfo2 = keep(this._osc('sine', 0.045));
+    const wl2 = this._gain(0.02);
+    wlfo2.connect(wl2).connect(wg.gain);
+    wind.connect(wbp).connect(wg).connect(this.gAmbBus);
+    // the bulb: mains hum and a filament buzz
+    const h1 = keep(this._osc('sine', 100));
+    const h1g = this._gain(0.006);
+    h1.connect(h1g).connect(this.gAmbBus);
+    const bz = keep(this._osc('sawtooth', 100));
+    const bbp = this._filter('bandpass', 2400, 6);
+    const bg = this._gain(0.0025);
+    bz.connect(bbp).connect(bg).connect(this.gAmbBus);
+    for (const n of nodes) {
+      try { n.start(t, n.buffer && n.loop && n !== drips ? Math.random() * 1.5 : 0); } catch { n.start(t); }
+    }
+    this._gAmb = nodes;
+  }
+
+  _garageAmbStop() {
+    if (!this._gAmb) return;
+    for (const n of this._gAmb) {
+      try { n.stop(); } catch { /* */ }
+    }
+    this._gAmb = null;
+  }
+
+  // far-off thunder, after the gap and the window flash
+  garageThunder() {
+    if (!this.ready) return;
+    this._gbus();
+    const t = this.now;
+    const n = this._noise(this.brown);
+    const lp = this._filter('lowpass', 150, 0.8);
+    lp.frequency.setValueAtTime(420, t);
+    lp.frequency.exponentialRampToValueAtTime(110, t + 3.5);
+    const g = this._gain(0);
+    n.connect(lp).connect(g).connect(this.gSfx);
+    this._env(g, t, 0.35, 0.38, 3.6, 0.3);
+    n.start(t, Math.random() * 2);
+    n.stop(t + 4.5);
+    for (let i = 0; i < 3; i++) this._noiseBurst(t + 0.05 + Math.random() * 0.5, { buf: this.brown, type: 'lowpass', f: 700, a: 0.01, d: 0.4, gain: 0.25, dest: this.gSfx });
+  }
+
+  // something heavy walks past outside, on wet gravel, left to right (or back)
+  garageSteps(dur, dir = 1) {
+    if (!this.ready) return;
+    this._gbus();
+    const t = this.now;
+    const pan = this._stereo(-0.8 * dir);
+    pan.pan.linearRampToValueAtTime(0.8 * dir, t + dur);
+    const wall = this._filter('lowpass', 650, 0.7); // through the blocks
+    const g = this._gain(0.9);
+    wall.connect(g).connect(pan).connect(this.gSfx);
+    const n = Math.max(3, Math.round(dur / 0.95));
+    for (let i = 0; i < n; i++) {
+      const at = t + 0.2 + i * (dur / n) + Math.random() * 0.08;
+      const near = 1 - Math.abs(i / (n - 1) - 0.5) * 1.2;
+      this._noiseBurst(at, { buf: this.brown, type: 'lowpass', f: 260, a: 0.006, d: 0.22, gain: 0.5 * near, dest: wall });
+      this._noiseBurst(at + 0.01, { type: 'bandpass', f: 1600 + Math.random() * 600, q: 1.2, a: 0.004, d: 0.12, gain: 0.12 * near, dest: wall });
+    }
+    // halfway, by the window: a long, low breath out
+    this._noiseBurst(t + dur * 0.5, { buf: this.brown, type: 'bandpass', f: 380, q: 1.5, a: 0.5, d: 0.9, hold: 0.2, gain: 0.35, dest: wall });
+  }
+
+  // the УАЗ: key, starter, a cough, it catches, revs and settles into a lumpy idle. Returns { stop(fade) }
+  carStart() {
+    if (!this.ready) return null;
+    this._gbus();
+    const ctx = this.ctx;
+    const t = this.now;
+    const out = this._gain(1);
+    out.connect(this.gSfx);
+    const rs = this._gain(0.35);
+    out.connect(rs).connect(this.gRevSend);
+    // the key, the solenoid
+    this._noiseBurst(t, { type: 'highpass', f: 3200, a: 0.001, d: 0.025, gain: 0.3, dest: out });
+    this._tone(t, { f: 2700, a: 0.001, d: 0.04, gain: 0.04, dest: out });
+    this._noiseBurst(t + 0.06, { buf: this.brown, type: 'lowpass', f: 700, a: 0.002, d: 0.06, gain: 0.6, dest: out });
+    // the starter dragging the engine round: a whine that sags on each compression
+    const ts = t + 0.08, te = t + 0.9;
+    const st = this._osc('sawtooth', 210);
+    const sbp = this._filter('bandpass', 1300, 1.4);
+    const sg = this._gain(0);
+    st.connect(sbp).connect(sg).connect(out);
+    sg.gain.setValueAtTime(0.0001, ts);
+    sg.gain.linearRampToValueAtTime(0.07, ts + 0.05);
+    sg.gain.setValueAtTime(0.07, te - 0.05);
+    sg.gain.linearRampToValueAtTime(0.0001, te + 0.03);
+    for (let k = 0, tt = ts; tt < te; k++, tt += 0.15) {
+      st.frequency.setValueAtTime(235, tt);
+      st.frequency.linearRampToValueAtTime(165, tt + 0.1);
+      st.frequency.linearRampToValueAtTime(235, tt + 0.15);
+      this._noiseBurst(tt + 0.08, { buf: this.brown, type: 'lowpass', f: 240, a: 0.01, d: 0.09, gain: 0.55, dest: out });
+    }
+    st.start(ts);
+    st.stop(te + 0.1);
+    // it catches: a bang through the pipe, then the engine's own voice
+    const tc = t + 0.9;
+    this._noiseBurst(tc, { buf: this.brown, type: 'lowpass', f: 520, a: 0.004, d: 0.3, gain: 1.1, dest: out });
+    const eng = this._gain(0);
+    const lp = this._filter('lowpass', 500, 0.9);
+    const sh = this._shaper(this.distSoft);
+    const post = this._gain(0.1); // (the shaper runs hot; this sets the level)
+    eng.connect(sh).connect(lp).connect(post).connect(out);
+    const f = (rpm) => rpm / 30; // four cylinders: two firings per revolution
+    const o1 = this._osc('sawtooth', f(500));
+    const o2 = this._osc('square', f(500) / 2);
+    const o2g = this._gain(0.55);
+    o1.connect(eng);
+    o2.connect(o2g).connect(eng);
+    // the exhaust: noise chopped by the firing
+    const ex = this._noise(this.pink);
+    const exg = this._gain(0);
+    const am = this._osc('sine', f(500));
+    const amg = this._gain(0.5);
+    am.connect(amg).connect(exg.gain);
+    const exlp = this._filter('lowpass', 600, 0.8);
+    const exo = this._gain(0.35);
+    ex.connect(exg).connect(exlp).connect(exo).connect(eng);
+    const rev = [[0, 500], [0.12, 1300], [0.38, 2250], [0.7, 1500], [1.5, 900], [2.4, 830]];
+    for (const p of [o1.frequency, am.frequency]) {
+      p.setValueAtTime(f(500), tc);
+      for (const [dt, rpm] of rev.slice(1)) p.exponentialRampToValueAtTime(f(rpm), tc + dt);
+    }
+    o2.frequency.setValueAtTime(f(500) / 2, tc);
+    for (const [dt, rpm] of rev.slice(1)) o2.frequency.exponentialRampToValueAtTime(f(rpm) / 2, tc + dt);
+    lp.frequency.setValueAtTime(380, tc);
+    lp.frequency.linearRampToValueAtTime(1300, tc + 0.38);
+    lp.frequency.linearRampToValueAtTime(520, tc + 1.6);
+    eng.gain.setValueAtTime(0.0001, tc);
+    eng.gain.linearRampToValueAtTime(1.2, tc + 0.08);
+    eng.gain.linearRampToValueAtTime(0.6, tc + 0.45);
+    eng.gain.linearRampToValueAtTime(0.1, tc + 1.9);
+    // a lumpy idle: the revs hunt a little
+    for (let tt = tc + 2.5; tt < tc + 30; tt += 0.35 + Math.random() * 0.3) {
+      const r = f(830 * (0.96 + Math.random() * 0.08));
+      o1.frequency.linearRampToValueAtTime(r, tt);
+      am.frequency.linearRampToValueAtTime(r, tt);
+      o2.frequency.linearRampToValueAtTime(r / 2, tt);
+    }
+    // valve tick
+    const tick = this._noise(this.white);
+    const tg = this._gain(0);
+    const tam = this._osc('square', f(830) * 2);
+    const tamg = this._gain(0.004);
+    tam.connect(tamg).connect(tg.gain);
+    const thp = this._filter('highpass', 4000, 0.7);
+    tick.connect(thp).connect(tg).connect(out);
+    const nodes = [o1, o2, ex, am, tick, tam];
+    for (const n of nodes) n.start(tc);
+    let stopped = false;
+    return {
+      stop: (fade = 1) => {
+        if (stopped) return;
+        stopped = true;
+        const n = this.now;
+        out.gain.cancelScheduledValues(n);
+        out.gain.setValueAtTime(out.gain.value, n);
+        out.gain.linearRampToValueAtTime(0.0001, n + fade);
+        for (const x of nodes) {
+          try { x.stop(Math.max(n, tc) + fade + 0.05); } catch { /* */ }
+        }
+        try { st.stop(n + 0.05); } catch { /* */ }
+        if (!this.offline) setTimeout(() => { try { out.disconnect(); } catch { /* */ } }, (fade + 0.3) * 1000);
+      },
+    };
+  }
+
+  // two notes of an old Soviet horn: "come on, get in"
+  carHorn(second = false) {
+    if (!this.ready) return;
+    this._gbus();
+    const t = this.now;
+    const mix = this._gain(0);
+    const bp = this._filter('bandpass', 950, 0.9);
+    const sh = this._shaper(this.distSoft);
+    const post = this._gain(0.45);
+    mix.connect(sh).connect(bp).connect(post).connect(this.gSfx);
+    const rs = this._gain(0.5);
+    post.connect(rs).connect(this.gRevSend);
+    for (const fq of [405, 508]) {
+      const o = this._osc('sawtooth', fq * (second ? 0.995 : 1));
+      o.connect(mix);
+      o.start(t);
+      o.stop(t + 0.4);
+    }
+    this._env(mix, t, 0.012, 0.22, 0.06, second ? 0.22 : 0.11);
+  }
+
+  // a petrol lighter: the lid, the wheel, the flame catching, the lid shut
+  lighter() {
+    if (!this.ready) return;
+    this._gbus();
+    const t = this.now;
+    this._tone(t, { f: 3300, a: 0.001, d: 0.09, gain: 0.025, dest: this.gSfx });
+    this._tone(t, { f: 4150, a: 0.001, d: 0.07, gain: 0.018, dest: this.gSfx });
+    this._noiseBurst(t + 0.28, { type: 'bandpass', f: 2600, q: 1.5, a: 0.002, d: 0.05, gain: 0.18, dest: this.gSfx });
+    this._noiseBurst(t + 0.3, { type: 'lowpass', f: 1300, a: 0.06, d: 0.4, gain: 0.07, dest: this.gSfx });
+    this._noiseBurst(t + 1.25, { type: 'bandpass', f: 1900, q: 2, a: 0.002, d: 0.04, gain: 0.12, dest: this.gSfx });
+    this._tone(t + 1.25, { f: 2500, a: 0.001, d: 0.05, gain: 0.02, dest: this.gSfx });
+  }
+
+  // a rucksack's zip, tooth by tooth
+  zipper(fast = false) {
+    if (!this.ready) return;
+    this._gbus();
+    const t = this.now;
+    const dur = fast ? 0.28 : 0.5;
+    const n = fast ? 16 : 26;
+    for (let i = 0; i < n; i++) {
+      const at = t + dur * Math.pow(i / n, 0.8);
+      this._noiseBurst(at, { type: 'highpass', f: 2600, a: 0.0008, d: 0.007, gain: 0.07, dest: this.gSfx });
+    }
+    this._noiseBurst(t, { type: 'bandpass', f: 3400, fEnd: 4600, q: 2, a: 0.04, d: 0.12, hold: dur - 0.1, gain: 0.03, dest: this.gSfx });
+  }
+
+  // a rucksack set down on concrete
+  softThud() {
+    if (!this.ready) return;
+    this._gbus();
+    const t = this.now;
+    this._noiseBurst(t, { buf: this.brown, type: 'lowpass', f: 240, a: 0.003, d: 0.14, gain: 0.9, dest: this.gSfx });
+    this._noiseBurst(t, { type: 'bandpass', f: 1300, q: 0.8, a: 0.004, d: 0.16, gain: 0.08, dest: this.gSfx });
+  }
+
+  // someone takes their place: a step, a breath of the echo
+  garageArrive() {
+    if (!this.ready) return;
+    this._gbus();
+    const t = this.now;
+    this._noiseBurst(t, { buf: this.brown, type: 'lowpass', f: 300, a: 0.004, d: 0.1, gain: 0.25, dest: this.gSfx });
+    this._tone(t + 0.04, { f: 1320, fEnd: 1290, a: 0.004, d: 0.7, gain: 0.018, dest: this.gSfx, rev: 0 });
+    const g = this._gain(0.4);
+    const o = this._osc('sine', 1320);
+    o.connect(g).connect(this.gRevSend);
+    this._env(g, t + 0.04, 0.004, 0.02, 0.5);
+    o.start(t + 0.04);
+    o.stop(t + 0.7);
+  }
+
   uiClick() {
     if (!this.ready) return;
     const t = this.now;

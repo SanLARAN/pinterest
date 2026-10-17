@@ -121,7 +121,9 @@ export class HUD {
     if (show) {
       this._set('pt', this.peekTime, fmtTime(g.time));
       const team = g.online ? ` · ${t('teamAlive').replace('{n}', g.livePlayers().length).replace('{m}', g.remotes.size + 1)}` : '';
-      this._set('ps', this.peekSub, `${t('generators')} ${gens}/5 · ${t('score')} ${fmtScore(g.score)} ×${g.mult.toFixed(1)}${team}`);
+      const calm = g.calmLeft ? Math.ceil(g.calmLeft()) : 0;
+      const quiet = calm > 0 ? ` · ${t('calmLeft').replace('{s}', calm)}` : '';
+      this._set('ps', this.peekSub, `${t('generators')} ${gens}/5 · ${t('score')} ${fmtScore(g.score)} ×${g.mult.toFixed(1)}${team}${quiet}`);
       this._set('ptask', this.peekTask, g.objectives.taskText());
       if (this.cache.pg !== gens) {
         this.cache.pg = gens;

@@ -300,12 +300,13 @@ export class Coop {
 
   // ---------------- runs ----------------
   // host: everyone seated right now goes into a new night
-  startRun() {
+  // cut: from the garage — everyone watches the car start before the night begins (a restart is instant)
+  startRun({ cut = false } = {}) {
     if (!this.isHost) return null;
     const list = this.players();
     for (const p of list) p.inRun = true;
     this.phase = 'game';
-    const msg = { seed: (Math.random() * 2 ** 31) >>> 0, players: list.map((p) => ({ id: p.id, name: p.name, slot: p.slot, fit: p.self ? myFit() : p.fit })) };
+    const msg = { seed: (Math.random() * 2 ** 31) >>> 0, players: list.map((p) => ({ id: p.id, name: p.name, slot: p.slot, fit: p.self ? myFit() : p.fit })), cut: cut ? 1 : 0 };
     this.net.send('start', msg);
     this._broadcastRoster();
     this._onStart(msg);

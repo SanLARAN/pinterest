@@ -201,17 +201,26 @@
           <div id="coopHomeMsg" class="coop-msg"></div>
           <div class="coop-note" data-i18n="coopNote"></div>
         </div>
+        <!-- in a room: the garage (3D, behind) — everyone's name tag floats over their place -->
         <div id="coopRoom" class="coop-view">
-          <div class="coop-code">
-            <span class="k" data-i18n="coopRoom">КОМНАТА</span>
-            <b id="coopCodeOut">-----</b>
-            <button class="chip" id="btnCopy"><span id="btnCopyText" data-i18n="coopCopy">скопировать ссылку</span></button>
+          <div class="coop-top">
+            <div class="coop-kicker"><span data-i18n="coopTitle">С ДРУЗЬЯМИ</span> · <span data-i18n="coopGarage">гараж</span></div>
+            <div class="coop-code">
+              <span class="k" data-i18n="coopRoom">КОМНАТА</span>
+              <b id="coopCodeOut">-----</b>
+              <button class="chip" id="btnCopy"><span id="btnCopyText" data-i18n="coopCopy">скопировать ссылку</span></button>
+            </div>
           </div>
           <div id="coopList"></div>
-          <div id="coopStatus" class="coop-msg"></div>
-          <div id="coopMicRow" class="coop-mic"><span id="coopMicText"></span><button class="chip" id="btnCoopMic"></button></div>
-          <button class="btn primary" id="btnStart"><span data-i18n="coopStart">НАЧАТЬ</span></button>
-          <button class="btn" id="btnLeave"><span data-i18n="coopLeave">ВЫЙТИ ИЗ КОМНАТЫ</span></button>
+          <div class="coop-dock">
+            <div id="coopStatus" class="coop-msg"></div>
+            <div id="coopMicRow" class="coop-mic"><span id="coopMicText"></span><button class="chip" id="btnCoopMic"></button></div>
+            <div class="coop-btns">
+              <button class="btn" id="btnLeave"><span data-i18n="coopLeave">ВЫЙТИ ИЗ КОМНАТЫ</span></button>
+              <button class="btn primary" id="btnStart"><span data-i18n="coopStart">НАЧАТЬ</span></button>
+              <button class="btn" id="btnRoomBack"><span data-i18n="back"></span></button>
+            </div>
+          </div>
         </div>
         <button class="btn" id="btnCoopBack"><span data-i18n="back"></span></button>
       </div>

@@ -172,13 +172,26 @@ try {
   }), 15000);
   check("B's outfit reaches the host", !!seenFit, seenFit || fitB);
 
-  await A.page.evaluate(() => window.__hush.coop.startRun());
+  // the lobby is a garage: B (in the room through the link) sees the host at the wheel and itself on the chair
+  const seats = await until(() => B.page.evaluate(() => {
+    const h = window.__hush, g = h.garage;
+    if (!g) return null;
+    const s = g.figs.map((f) => (f ? (f.self ? 'me' : f.id === h.coop.hostId ? 'host' : 'mate') : '-')).join(' ');
+    return s === 'host me - -' ? s : null;
+  }), 15000);
+  check('the garage seats the host at the wheel and B on the chair', !!seats, seats || '');
+
+  // START from the garage: the car starts on both screens, then the night
+  const t0 = Date.now();
+  await A.page.evaluate(() => window.__hush.coop.startRun({ cut: true }));
+  const cut = await until(() => B.page.evaluate(() => window.__hush.lobby.starting || window.__hush.state === 'playing'), 15000);
+  check('the car starts for the guest too', !!cut);
   const both = await until(async () => {
     const a = await A.page.evaluate(() => `${window.__hush.state}/${window.__hush.game.state}/${window.__hush.game.role}`);
     const b = await B.page.evaluate(() => `${window.__hush.state}/${window.__hush.game.state}/${window.__hush.game.role}`);
     return a === 'playing/morning/host' && b === 'playing/morning/client' ? `${a} ${b}` : null;
-  }, 20000);
-  check('host starts the night for both', !!both, both || '');
+  }, 60000);
+  check('host starts the night for both', !!both, `${both || ''} (${((Date.now() - t0) / 1000).toFixed(1)} s with the car)`);
   // ...and on B's body in the night
   const rigKey = await A.page.evaluate(() => { const r = [...window.__hush.game.remotes.values()][0]; return r ? r.rig.key : null; });
   check("the host's teammate wears B's outfit", rigKey === 'survivor:pumpkin+jacket', rigKey || 'no teammate');

@@ -30,6 +30,7 @@ import { PLAYER_COLORS } from './game/remote.js';
 import { Coop, myName } from './net/coop.js';
 import { cleanCode } from './net/net.js';
 import { Lobby } from './ui/lobby.js';
+import { Garage } from './ui/garage.js';
 import { Mates } from './ui/mates.js';
 import { VoiceMix, VoiceList } from './ui/voicemix.js';
 import { Atlas } from './ui/atlas.js';
@@ -129,6 +130,7 @@ function resize() {
   camera.updateProjectionMatrix();
   post.setSize(w, h, perf.scale);
   radar.resize();
+  if (garage) garage.resize(w, h);
 }
 window.addEventListener('resize', resize);
 
@@ -206,8 +208,26 @@ const menus = new Menus({
 });
 
 // ---------------- co-op ----------------
+// the lobby's garage: one scene on the main renderer, built the first time it's needed
+let garage = null;
+let garageFailed = false;
+function ensureGarage() {
+  if (garage || garageFailed) return garage;
+  try {
+    garage = new Garage({ renderer, post, audio });
+    garage.resize(innerWidth, innerHeight);
+    garage.voice = (id) => lobby.level(id);
+    lobby.garage = garage;
+  } catch (e) {
+    console.warn('[garage] could not be built — the lobby stays flat', e);
+    garageFailed = true;
+    garage = null;
+  }
+  return garage;
+}
 const lobby = new Lobby({
   coop, mic, audio, mix: voiceMix,
+  beforeOpen: () => ensureGarage(),
   onMicToggle: () => toggleMic(),
   onWardrobe: () => {
     if (state === 'menu') wardrobe.open(); // (over the lobby: you stay in the room)
@@ -219,11 +239,40 @@ const lobby = new Lobby({
   },
 });
 coop.on('change', () => lobby.render());
-coop.on('start', (d) => startRun({ coop: d }));
+coop.on('start', (d) => beginCoopRun(d));
 coop.on('hostLost', () => {
   if (runOnline && game && (state === 'playing' || state === 'paused')) game.hostLost();
+  if (garage && garage.starting) {
+    garage.abortStart();
+    lobby.setStarting(false);
+  }
   lobby.render();
 });
+
+// the host pressed START in the garage: the car starts first (everyone sees it), then the night.
+// A restart from the results screen (no cut) goes straight in, as before.
+function beginCoopRun(d) {
+  if (d.cut && state === 'menu' && ensureGarage()) {
+    if (atlas.isOpen()) atlas.close();
+    if (wardrobe.isOpen()) wardrobe.close();
+    for (const id of ['settingsPanel', 'howPanel', 'scoresPanel']) menus.show(id, false);
+    if (!lobby.isOpen()) lobby.open();
+    lobby.setStarting(true);
+    const ok = garage.startCar(() => {
+      lobby.setStarting(false);
+      if (!coop.active || !coop.inRun || coop.status === 'hostLost' || state !== 'menu') {
+        garage.abortStart();
+        lobby.render();
+        return;
+      }
+      garage.releaseEngine(2.4); // it idles on under the first seconds of the morning
+      startRun({ coop: d });
+    });
+    if (ok) return;
+    lobby.setStarting(false);
+  }
+  startRun({ coop: d });
+}
 
 function updateMicUI() {
   menus.setMicStatus(mic.state, Mic.inIframe());
@@ -360,6 +409,29 @@ function updateAttract(dt) {
   u.uAsh.value = 0.62;
   shared.uDawn.value = 0;
   shared.uFear.value = 0;
+}
+
+// the lobby's garage: your voice (and your friends') light it up like an echo
+const voiceSeen = new Map(); // peer id -> { lv, t }
+function updateGarage(dt) {
+  menuTime += dt;
+  const me = coop.me();
+  if (mic.state === 'on') {
+    const ev = mic.update(dt, audio.outputDb());
+    if (ev.pulse > 0 && me) garage.voicePing(me.slot, Math.max(0.35, ev.pulse));
+  }
+  const now = performance.now();
+  for (const p of coop.players()) {
+    if (p.self) continue;
+    const lv = audio.voiceLevel(p.id);
+    const v = voiceSeen.get(p.id) || { lv: 0, t: 0 };
+    if (lv > 0.32 && v.lv <= 0.32 && now - v.t > 1500) {
+      v.t = now;
+      garage.voicePing(p.slot, lv);
+    }
+    v.lv = lv;
+    voiceSeen.set(p.id, v);
+  }
 }
 
 // ---------------- state transitions ----------------
@@ -575,8 +647,9 @@ function handleEvents(events) {
       case 'pause':
         if (atlas.isOpen()) atlas.close();
         else if (wardrobe.isOpen()) wardrobe.close();
-        else if (lobby.isOpen()) lobby.close();
-        else if (menus.isOpen('settingsPanel')) menus.closeSettings();
+        else if (lobby.isOpen()) {
+          if (!lobby.starting) lobby.close();
+        } else if (menus.isOpen('settingsPanel')) menus.closeSettings();
         else if (menus.isOpen('howPanel')) menus.show('howPanel', false);
         else if (menus.isOpen('scoresPanel')) menus.show('scoresPanel', false);
         else if (state === 'playing') pause();
@@ -636,8 +709,10 @@ function step(now, render) {
   if (state === 'boot') return;
   handleEvents(events);
 
+  const garageOn = state === 'menu' && !atlasOpen && !wardrobeOpen && !!garage && lobby.isOpen();
   if (state === 'menu') {
-    updateAttract(rawDt);
+    if (garageOn) updateGarage(rawDt);
+    else updateAttract(rawDt);
   } else if (state === 'playing' || (state === 'paused' && runOnline && game && game.state !== 'over')) {
     const dt = Math.min(rawDt, 0.05) * (runOnline ? 1 : game.fx.timeScale) * DEBUG.speed;
     game.update(dt, state === 'paused' ? { look: { dx: 0, dy: 0 }, events: [] } : { look, events });
@@ -697,6 +772,11 @@ function step(now, render) {
     wardrobe.frame(rawDt);
     return;
   }
+  if (garageOn) {
+    garage.frame(rawDt);
+    lobby.place(garage.anchors());
+    return;
+  }
 
   sky.position.copy(camera.position);
   motes.material.uniforms.uPix.value = 9 * (post.h / 900);
@@ -730,7 +810,7 @@ function boot() {
       perf.fpsEl.style.cssText = 'position:fixed;right:8px;top:64px;z-index:99;font:11px JetBrains Mono,monospace;color:#8ef0ff;opacity:.8;pointer-events:none';
       document.body.appendChild(perf.fpsEl);
     }
-    window.__hush = { world, game, shared, pulses, ghosts, eyes, renderer, perf, mic, audio, input, hud, post, coop, lobby, atlas, wardrobe, debug: DEBUG, startRun, pause, resume, toMenu, get state() { return state; } };
+    window.__hush = { world, game, shared, pulses, ghosts, eyes, renderer, perf, mic, audio, input, hud, post, coop, lobby, atlas, wardrobe, debug: DEBUG, startRun, pause, resume, toMenu, ensureGarage, get garage() { return garage; }, get state() { return state; } };
     state = 'menu';
     menuTime = 0;
     post.u.uFade.value = 0;
@@ -739,6 +819,11 @@ function boot() {
     if (DEBUG.autostart) startRun();
     if (params.has('sfx')) import('./ui/sfxtest.js').then((m) => m.mountSfxPanel(audio));
     lobby.menuLabel();
+    setTimeout(() => {
+      if (state === 'menu' && ensureGarage()) {
+        try { renderer.compile(garage.scene, garage.camera); } catch { /* it'll compile on first draw */ }
+      }
+    }, 1200);
     // an invite link (?room=CODE): straight into your friend's room
     const room = cleanCode(params.get('room'));
     if (room.length >= 4) {

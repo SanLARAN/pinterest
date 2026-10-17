@@ -231,7 +231,9 @@ export class Game {
     this.firstPingT = -1;
     this.lastPulseT = -9;
     this.intro = { t: 0, phase: 0, autoSnap: false, revealDone: false, itHearsT: -1 };
-    this.tut = { step: 0, t: 0, done: settings.tutorialDone };
+    this.tut = { step: 0, t: 0, wait: 2.2, done: settings.tutorialDone };
+    this.awake = false; // the first SPAWN_DELAY seconds of the night nothing is out there yet
+    this.calmHintOff = 0;
     this.lastMultStep = 1;
     this.endgame = false;
     this.wakeT = 0;
@@ -351,27 +353,47 @@ export class Game {
     this.hud.setSkip(false);
     this.hud.setIntro(null);
     this.hud.setHint(null);
-    if (!this.auth) {
-      // a guest's monsters arrive with the host's first snapshot
-      for (const m of this.monsters) m.dispose();
-      this.monsters = [];
-      return;
+    // nothing is out there yet: the forest sleeps for SPAWN_DELAY seconds (see updateDirector → wake)
+    for (const m of this.monsters) m.dispose();
+    this.monsters = [];
+  }
+
+  // seconds of quiet left at the start of the night (0 once they're up)
+  calmLeft() {
+    return this.state === 'play' && !this.awake ? Math.max(0, CFG.SPAWN_DELAY - this.time) : 0;
+  }
+
+  // the calm is over: the first two of them get up, far off, and the forest lets you know
+  wake() {
+    this.awake = true;
+    const a = this.spawnMonster('listener', 70, 95);
+    const b = this.spawnMonster('listener', 75, 100);
+    const m = a || b;
+    if (this.role === 'host') {
+      if (m) this.sync.ev('aw', Math.round(m.x), Math.round(m.z));
+      else this.sync.ev('aw');
     }
-    // the first thing you'll ever see in the dark: something standing in the trees, facing you
-    const p = this.player;
-    const f = p.forward();
-    let mx = p.x + f.x * 17 + f.z * 2.5, mz = p.z + f.z * 17 - f.x * 2.5;
-    for (let k = 0; k < 20 && !this.world.col.free(mx, mz, 0.8); k++) {
-      mx += this.rng.float(-2, 2);
-      mz += this.rng.float(-2, 2);
+    this.fxAwake(m ? m.x : null, m ? m.z : null);
+    this.dirT = 1.2;
+  }
+
+  fxAwake(x = null, z = null) {
+    this.awake = true;
+    if (this.state !== 'play') return;
+    const p = this.ears();
+    let wx = x, wz = z;
+    if (wx === null || wz === null) {
+      const a = this.rng.float(0, Math.PI * 2);
+      wx = p.x + Math.cos(a) * 85;
+      wz = p.z + Math.sin(a) * 85;
     }
-    const m = createMonster('listener', this);
-    m.spawn(mx, mz, 'idle');
-    m.yaw = Math.atan2(p.x - mx, p.z - mz);
-    m.scripted = 'freeze';
-    m.intro = true;
-    this.monsters.push(m);
-    this.spawnMonster('listener', 75, 100);
+    this.audio.forestWake(wx, this.world.terrain.height(wx, wz) + 2.5, wz);
+    if (this.player.alive || this.spectate) {
+      this.hud.flashAlert(t('aTheyWake'), 'warn', 2.8);
+      this.hud.peek(3.5);
+      this.addTrauma(0.12);
+    }
+    this.radar.blip(wx, wz, 'unknown');
   }
 
   // how brightly the sound waves light (x, y, z) right now
@@ -671,17 +693,17 @@ export class Game {
     }
   }
 
-  onFirstPing(p = this.player) {
+  onFirstPing() {
     this.hud.setIntro(null);
-    const m = this.auth ? this.monsters.find((q) => q.intro) : null;
-    if (m) {
-      m.scripted = null;
+    // the forest is still asleep: say so, once — the first night is hard enough to begin
+    if (this.calmLeft() > 8 && this.player.alive) {
+      this.tut.wait = 6.2; // the first tutorial line waits for this one
       this.timeline.push({
-        at: this.time + 1.1,
+        at: this.time + 0.7,
         fn: () => {
-          // it walks to where the sound was... but misses you by a few steps
-          const f = p.forward();
-          m.investigate(p.x - f.z * 3.2, p.z + f.x * 3.2, true);
+          if (this.awake || !this.player.alive) return;
+          this.hud.setHint(t('hintCalm'));
+          this.calmHintOff = this.time + 4.8;
         },
       });
     }
@@ -1250,7 +1272,7 @@ export class Game {
     const y = this.world.terrain.height(x, z);
     this.audio.branchSnap(x, y + 1.2, z, 1.7, true); // ...then one slow step, and a breath
     this.pulses.emit(x, y + 1.0, z, this.time, { radius: 9, strength: 0.9, decay: 0.9, color: [0.85, 0.9, 1], kind: 'scare' });
-    if (this.rng.chance(0.45)) {
+    if (this.awake && this.rng.chance(0.45)) {
       this.shade.place(x, y, z, Math.atan2(p.x - x, p.z - z));
       this.stats.seen.shade = 1;
       this.ghosts.spawn(this.shade.rig, this.time, { strength: 1.0, life: 1.6, decay: 1.4, color: 0xff3a2a });
@@ -1353,7 +1375,7 @@ export class Game {
     if (this.state !== 'play') return;
 
     this.time += dt;
-    this.grace = this.time < CFG.GRACE_SECONDS || (this.firstPingT >= 0 && this.time < this.firstPingT + 8) || this.firstPingT < 0;
+    this.grace = this.time < Math.max(CFG.GRACE_SECONDS, CFG.SPAWN_DELAY + 5) || (this.firstPingT >= 0 && this.time < this.firstPingT + 8) || this.firstPingT < 0;
     this.netFrame(dt);
     if (this.state !== 'play') return; // the host ended the night
     if (this.teamOverAt && this.time >= this.teamOverAt) return this.endOnline(false);
@@ -1600,7 +1622,7 @@ export class Game {
           }
           this.radar.blip(m.x, m.z, 'monster', m.state === 'hunt');
           if (s.kind !== 'monster') this.audio.monsterReturn(0, m.x, m.y + 2, m.z, 0.25 + str * 0.3);
-          if (m.intro && !this.intro.revealDone && s.kind === 'player' && this.player.alive) {
+          if (!this.intro.revealDone && s.kind === 'player' && this.player.alive && Math.hypot(m.x - this.player.x, m.z - this.player.z) < 45) {
             this.intro.revealDone = true;
             this.intro.itHearsT = this.time;
             this.hud.setIntro(t('itHears'), null);
@@ -1637,6 +1659,10 @@ export class Game {
     const prog = this.time / CFG.RUN_SECONDS;
     this.hearingScale = 1 + prog * 0.35;
     this.speedScale = 1 + prog * 0.18;
+    if (!this.awake) {
+      if (this.time < CFG.SPAWN_DELAY) return; // the forest is still asleep
+      this.wake();
+    }
     this.dirT = (this.dirT || 0) - dt;
     if (this.dirT > 0) return;
     this.dirT = 1.0;
@@ -1676,6 +1702,10 @@ export class Game {
       it.cleared = true;
       hud.setIntro(null);
     }
+    if (this.calmHintOff && (this.time > this.calmHintOff || this.awake)) {
+      this.calmHintOff = 0;
+      if (this.tut.done || this.tut.step === 0) hud.setHint(null);
+    }
     if (it.itHearsT >= 0 && this.time - it.itHearsT > 2.4) {
       hud.setIntro(null);
       hud.intro.classList.remove('red');
@@ -1687,7 +1717,7 @@ export class Game {
     tut.t += dt;
     const touch = this.input.touch;
     if (tut.step === 0) {
-      if (tut.t > 2.2) { tut.step = this.morningT < 17 ? 1 : 2; tut.t = 0; }
+      if (tut.t > tut.wait) { tut.step = this.morningT < 17 ? 1 : 2; tut.t = 0; }
     } else if (tut.step === 1) {
       hud.setHint(touch ? t('tutMoveTouch') : t('tutMove'));
       if (tut.t > 7) { tut.step = 2; tut.t = 0; }

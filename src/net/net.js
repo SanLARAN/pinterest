@@ -8,7 +8,7 @@
 import { ICE_SERVERS } from './ice.js';
 
 const APP_ID = 'hush-echolocation-horror'; // must stay stable: relay selection is derived from it
-export const PROTOCOL = 2; // 2: doors, flares
+export const PROTOCOL = 3; // 2: doors, flares · 3: the garage (the car starts the night), the calm at the start
 export const MAX_PLAYERS = 4;
 
 const ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // no 0/O, 1/I/L
