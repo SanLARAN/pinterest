@@ -201,7 +201,8 @@ export function buildZarya(world, L) {
   ];
   world.addProp(x,z,b=>{
     for(const L of world.zarya.lights.slice(0,6)){
-      if(!L.inside){b.identity();b.limb([L.x+.4,y,L.z],[L.x+.4,L.y+.25,L.z],.045,.035,GK.RUST,5);b.limb([L.x+.4,L.y+.2,L.z],[L.x,L.y+.2,L.z],.025,.025,GK.RUST,4);}
+      if(L.inside){b.identity();b.limb([L.x,L.y+.15,L.z],[L.x,y+3.96,L.z],.006,.006,GK.RUBBER,4);}
+      else {b.identity();b.limb([L.x+.4,y,L.z],[L.x+.4,L.y+.25,L.z],.045,.035,GK.RUST,5);b.limb([L.x+.4,L.y+.2,L.z],[L.x,L.y+.2,L.z],.025,.025,GK.RUST,4);}
       boxAt(b,L.x,L.y+.11,L.z,.28,.09,.22,GK.TIN);
       boxAt(b,L.x,L.y+.025,L.z,.18,.06,.12,GK.BONE);
     }
