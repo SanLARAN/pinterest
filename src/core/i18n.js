@@ -3,6 +3,7 @@ const STR = {
   ru: {
     wardrobeItems: "ВЕЩИ", wardrobePaintTab: "КРАСКА",
     homeSolo: "ОДНОМУ",
+    homeTraining: "ПОЛИГОН",
     homeWardrobe: "ГАРДЕРОБ",
     homeSector: "ЛЕСХОЗ № 14 / ГАРАЖ",
     homeNight: "НОЧНАЯ СМЕНА · 02:17",
@@ -48,6 +49,7 @@ const STR = {
     bagInHands: "в руках",
     bagLit: "горит",
     bagFull: "Рюкзак полон · I — освободить карман",
+    rackHeld: "Это уже у тебя в руках",
     bagTip: "ПКМ по предмету → взять в руки / выбросить",
     bagTipT: "Коснись предмета → взять в руки / выбросить",
     bagWorld: "Лес не ждёт. Детали УАЗ — в обеих руках; записки и детали генераторов общие для отряда.",
@@ -459,7 +461,7 @@ const STR = {
 <p><b>Пожарная вышка</b> стоит на северо-западе: держи E пять секунд, чтобы подняться по скрипучей лестнице. Наверху E — бинокль на 10 секунд (затем 25 секунд остывания), R — спуститься. Он показывает настоящий лес, огни генераторов и движение тварей, но не светит на них и не останавливает Наблюдателя. Стены и деревья остаются непрозрачными.</p>
 <p><b>Пионерлагерь «Зорька»</b> на юго-западе: два спальных корпуса и столовая, в шкафчиках вещи. <b>Лом</b> лежит у лагерных ворот и у пожарной вышки: удерживай E у замка 2,8 секунды; взлом слышно далеко. В столовой и у вышки есть <b>кассетный магнитофон</b>: возьми его в руки через I, ПКМ — записать 2 секунды с микрофона, ЛКМ — оставить на земле. Через 3 секунды он 20 секунд повторяет запись и отвлекает тварей; E — забрать (две прокрутки на батарейках). Без микрофона на нём стук. Запись хранится только до конца этой игры и передаётся друзьям напрямую, когда ставишь приманку. Громкоговоритель на лагерной площади включается кнопкой E, играет 35 секунд один раз за ночь — уходи до того, как все соберутся.</p>
 <p><b>Светящаяся палочка</b> — у каждого одна на ночь. ЛКМ с палочкой в руках — переломить: пару минут она светит зелёным у тебя в руке, ЛКМ ещё раз — бросить вперёд (E — подобрать с земли). В её свете, как и под лампой генератора, лес виден таким, какой он есть, — легко понять, где ты. Наблюдатель в такой свет не шагнёт.</p>
-<p><b>Интерфейса почти нет.</b> Кольцо вокруг точки — твоя громкость. Tab — время, генераторы и текущая задача. Полоска сверху заполняется с каждым генератором. Через 45 минут лес просыпается окончательно.</p>
+<p><b>Интерфейса почти нет.</b> Кольцо вокруг точки — твоя громкость. Tab — время, генераторы и текущая задача. Полоска сверху заполняется с каждым генератором. Смена — четыре дня: ночь идёт 8 минут, утро — 1:45, и только на четвёртой ночи, через 4 минуты после её начала, лес просыпается окончательно.</p>
 <p><b>Очки:</b> время × множитель опасности, найденные тела, генераторы, осколки, проходы впритык, отрывы. За победу — бонус, и тем больше, чем быстрее.</p>
 <p><b>С друзьями:</b> «С ДРУЗЬЯМИ» › «СОЗДАТЬ» и отправь ссылку (или код) — до 4 игроков в одном лесу. Голоса слышно с той стороны, где стоит друг, и тише издалека; <span class="red">монстры слышат их так же</span> — но вполголоса рядом друг с другом говорить можно: такое они слышат только вплотную. Эхо друзей тоже освещает лес. Пойманный друг не умирает сразу — он падает и медленно истекает кровью. Подойди и проверь пульс (удерживай E): узнаешь, сколько ему осталось, — и каждый раз придётся проверять заново. Подними его на плечо (R) — бежать с ним нельзя, шаги тяжёлые — и неси в <b>заброшенную мед-хижину скаутов</b> у лагеря: только на её койке (R) и только руками (удерживай E) его можно вернуть. Упавший смотрит глазами живых, и живые его не слышат. Лобби — гараж: у каждого своё место (клик по своей фигуре — гардероб, по другу — его громкость), а когда хост жмёт НАЧАТЬ, заводится машина.</p>
 <table class="keys">
@@ -568,10 +570,44 @@ const STR = {
     ms: 'мс',
     stAlive: 'жив',
     stDead: 'мёртв',
+    dayBig: 'ДЕНЬ {n}',
+    daySmall: 'светло ещё {n} минут. потом снова ночь',
+    dayBreak: 'ДЕНЬ {n} ИЗ {m} · СВЕТ ВЕРНУЛСЯ',
+    dayHint: 'днём твари спят. почини, что не успел, и вернись до темноты',
+    nightLeft: 'до темноты',
+    dayShort: 'ДЕНЬ {n}',
+    motoMount: 'E — сесть на мотоцикл',
+    motoRide: 'W/S — газ и тормоз · A/D — руль · Shift — оттолкнуться · E — слезть',
+    motoT: 'МОТО — сесть · газ вперёд · руль в стороны · слезть',
+    bikeName: 'Эндуро',
+    trainingTitle: 'ТРЕНИРОВОЧНАЯ БАЗА',
+    trainingSub: 'все предметы на стенде · мотоциклы у лагеря · выйди через паузу',
+    trainingHint: 'стенд с предметами прямо от лагеря. мотоциклы — за ним',
+    trainingHintT: 'стенд с предметами прямо от лагеря, мотоциклы за ним',
+    trainingAlert: 'ТРЕНИРОВКА · БЕЗ ОПАСНОСТИ',
+    trainingExit: 'выйти в гараж',
+    rackTake: 'E — взять предмет',
+    rackTakeT: 'РУКИ — взять предмет',
+    adrName: 'Шприц с адреналином',
+    adrShort: 'шприц',
+    adrUse: 'E на лежащем — уколоть адреналином',
+    adrUseT: 'РУКИ на лежащем — укол адреналина',
+    adrWork: 'ВВОДИМ АДРЕНАЛИН',
+    adrBack: '{name} снова на ногах — но пять минут не бежит',
+    adrTaken: 'шприц с адреналином · в рюкзак',
+    adrEmpty: 'шприцев больше нет',
+    adrSelf: 'себя не уколоть',
+    debuff: 'НЕДОМОГАНИЕ',
+    debuffHint: 'адреналин: {s} с до нормального бега',
+    gateHint: 'нажми на ворота — выехать на тренировку',
+    gateLeave: 'ВОРОТА',
+    departure1: 'Смена закончена. Ворота открываются.',
+    departure2: 'Мотор схватился. Все в машину.',
   },
   en: {
     wardrobeItems: "CLOTHES", wardrobePaintTab: "PAINT",
     homeSolo: "SOLO",
+    homeTraining: "TRAINING",
     homeWardrobe: "WARDROBE",
     homeSector: "FORESTRY No. 14 / GARAGE",
     homeNight: "NIGHT SHIFT · 02:17",
@@ -617,6 +653,7 @@ const STR = {
     bagInHands: "in hands",
     bagLit: "lit",
     bagFull: "Backpack full · I — free a pocket",
+    rackHeld: "You already have it in hand",
     bagTip: "RMB on an item → equip / drop",
     bagTipT: "Tap an item → equip / drop",
     bagWorld: "The forest does not wait. UAZ parts need both hands; notes and generator parts are shared by the team.",
@@ -1019,7 +1056,7 @@ const STR = {
 <p><b>The fire lookout</b> stands in the northwest: hold E for five seconds to climb the creaking ladder. At the top, E — binoculars for 10 seconds (then 25 seconds to cool), R — down. They show the real forest, generator lights and moving creatures, but cast no light and do not freeze the Watcher. Trees and walls still block the view.</p>
 <p><b>Zarya pioneer camp</b> in the southwest: two dormitories and a dining hall, cupboards with supplies. A <b>crowbar</b> lies at its gate and by the lookout: hold E at a padlock for 2.8 seconds; prying is loud. A <b>cassette recorder</b> is in the dining hall and by the lookout: equip from I, RMB — record 2 seconds from your mic, LMB — place it. After 3 seconds it loops for 20 seconds, luring creatures; E — retrieve it (two playbacks per battery). No mic? The tape has knocks. Recordings live only for this game and go directly to friends when you place a lure. E at the square’s loudspeaker switch starts a 35-second assembly call, once per night — leave before the guests arrive.</p>
 <p><b>The glow stick</b> — one each per night. LMB with it equipped — crack it: for a couple of minutes it glows green in your hand; LMB again — throw it ahead (E — pick it up off the ground). In its light, as under a generator's lamp, the forest looks the way it really is — easy to tell where you are. The Watcher won't step into that light.</p>
-<p><b>There is almost no interface.</b> The ring around the dot is your loudness. Tab shows time, generators and the current task. The hairline at the top fills with each generator. After 45 minutes the forest wakes up for good.</p>
+<p><b>There is almost no interface.</b> The ring around the dot is your loudness. Tab shows time, generators and the current task. The hairline at the top fills with each generator. The shift lasts four days: a night runs 8 minutes, a morning 1:45, and only on the fourth night, four minutes in, does the forest wake for good.</p>
 <p><b>Score:</b> time × danger multiplier, bodies found, generators, shards, close calls, escapes. Winning gives a bonus — bigger the faster you are.</p>
 <p><b>With friends:</b> WITH FRIENDS › CREATE and send the link (or code) — up to 4 players in one forest. Voices come from where your friends stand and fade with distance; <span class="red">the monsters hear them just as well</span> — but talking quietly side by side is fine: they only hear that from up close. Their echoes light the forest too. A friend who gets caught doesn't die at once — they go down and slowly bleed out. Kneel and feel for a pulse (hold E): you'll know how long they have left — and you'll have to check again to know again. Lift them onto your shoulder (R) — no running with them, heavy steps — and carry them to <b>the scouts' abandoned first-aid hut</b> by the camp: only on its cot (R) and only by hand (hold E) can they be brought back. The fallen watch through the eyes of the living — and the living can't hear them. The lobby is a garage: everyone has their own place (click yourself for the wardrobe, a friend for their volume), and when the host presses START, the car starts.</p>
 <table class="keys">
@@ -1128,6 +1165,39 @@ const STR = {
     ms: 'ms',
     stAlive: 'alive',
     stDead: 'dead',
+    dayBig: 'DAY {n}',
+    daySmall: '{n} minutes of light. then the night again',
+    dayBreak: 'DAY {n} OF {m} · THE LIGHT IS BACK',
+    dayHint: 'the creatures sleep by day. fix what you left, and be back before dark',
+    nightLeft: 'until dark',
+    dayShort: 'DAY {n}',
+    motoMount: 'E — get on the bike',
+    motoRide: 'W/S — throttle and brake · A/D — steer · Shift — push off · E — step off',
+    motoT: 'BIKE — get on · throttle forward · steer sideways · step off',
+    bikeName: 'Enduro',
+    trainingTitle: 'TRAINING GROUND',
+    trainingSub: 'every item on the rack · bikes by the camp · leave from the pause menu',
+    trainingHint: 'the item rack is straight out of camp. the bikes are behind it',
+    trainingHintT: 'the item rack is straight out of camp, bikes behind it',
+    trainingAlert: 'TRAINING · NOTHING HUNTS YOU',
+    trainingExit: 'back to the garage',
+    rackTake: 'E — take the item',
+    rackTakeT: 'HANDS — take the item',
+    adrName: 'Adrenaline syringe',
+    adrShort: 'syringe',
+    adrUse: 'E on someone down — give adrenaline',
+    adrUseT: 'HANDS on someone down — adrenaline',
+    adrWork: 'GIVING ADRENALINE',
+    adrBack: '{name} is up again — and cannot run for five minutes',
+    adrTaken: 'adrenaline syringe · into the pack',
+    adrEmpty: 'no syringes left',
+    adrSelf: 'you cannot stab yourself',
+    debuff: 'COME-DOWN',
+    debuffHint: 'adrenaline: {s}s until you can run again',
+    gateHint: 'click the gates — drive out to the training ground',
+    gateLeave: 'GATES',
+    departure1: 'The shift is over. The gates open.',
+    departure2: 'The engine catches. Everybody in.',
   },
 };
 

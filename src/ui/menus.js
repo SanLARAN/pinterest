@@ -58,6 +58,7 @@ export class Menus {
     };
     click('btnPlay', () => this.h.onPlay());
     click('btnCoop', () => this.h.onCoop && this.h.onCoop());
+    click('btnTraining', () => this.h.onTraining && this.h.onTraining());
     click('btnLobby', () => this.h.onLobby && this.h.onLobby());
     click('btnHow', () => this.show('howPanel'));
     click('btnHowBack', () => this.show('howPanel', false));

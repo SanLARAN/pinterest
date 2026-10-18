@@ -5,12 +5,21 @@ export const CFG = {
   WORLD_WALL: 286, // player / monsters can't go past this
   CHUNK: 40,
   TERRAIN_CELL: 2.5,
-  RUN_SECONDS: 45 * 60, // after this the forest wakes up: everything starts closing in on you
+  // The shift is four days long. Each day is a short morning (1:45) and a long night (8:00). Everything
+  // you fix lives through the days: generators stay running, the УАЗ keeps its parts, and you can try the
+  // gates again tomorrow. On the fourth night the forest does not let you go back to sleep.
+  CYCLE: {
+    days: 4,
+    night: 8 * 60, // 8:00 of darkness per day
+    morning: 60 + 45, // 1:45 of light: prep, loot, get back on your feet
+    lastWake: 240, // on the last night the forest wakes for good after 4 minutes of it
+  },
+  RUN_SECONDS: 8 * 60, // one night (kept as the name old code knows); the whole shift is CFG.CYCLE
   GRACE_SECONDS: 12, // at the start of the night monsters can't hunt you
   SPAWN_DELAY: 45, // ...and for the first 45 s the forest sleeps: no monsters at all, look around in peace
-  MORNING_SECONDS: 32, // the calm before: daylight, birds, a humming generator
+  MORNING_SECONDS: 60 + 45, // the calm before: daylight, birds, a humming generator
   DUSK_SECONDS: 3.6, // ...and then the light dies
-  CAMP_LEASH: 26, // in the morning you stay around the camp
+  CAMP_LEASH: 26, // on the first morning you stay around the camp
 
   // the way out: a fenced forestry yard by the north edge — a broken УАЗ behind sliding gates that run on the
   // generators' power — and past it a cut through the hills down to the highway
@@ -130,6 +139,47 @@ export const CFG = {
   },
   MAX_LISTENERS: 3, // never more than this many Listeners in the forest, however long the night or big the team
 
+  // Adrenaline: a syringe brings a downed teammate back on the spot — no cot, no carrying — but for five
+  // minutes their legs are rubber: the sprint and the walk both sag, and the stamina drains faster.
+  ADRENALINE: {
+    duration: 300, // s of the come-down
+    walk: 0.8, // speed multiplier while it lasts
+    sprint: 0.72,
+    staminaDrain: 1.65, // ...and the legs burn faster
+    reach: 2.2, // m — how close the downed friend has to be
+    use: 1.6, // s on one knee, working the needle in
+  },
+
+  // The driving school behind the forestry gates: every item on a rack, and an enduro per survivor.
+  TRAINING: {
+    spawn: { x: 6, z: 14 }, // the pad just outside the camp
+    rack: { x: 2, z: 14 }, // the long table of test items (flat ground straight out of camp)
+    bikes: 4, // one per survivor, parked in a row
+    area: 120, // where the bikes are allowed (from the camp)
+  },
+
+  // Enduro bikes: arcade weight, real attitude. Nose up on the throttle, dive under the brake, and the
+  // suspension eats the ground it lands on.
+  MOTO: {
+    seat: 1.06, // eye height above the ground while sitting
+    wheelR: 0.36,
+    wheelbase: 1.34,
+    mass: 118,
+    power: 8.6, // m/s² at the rear wheel from rest
+    top: 21, // m/s (about 76 km/h)
+    reverse: 2.2,
+    brake: 12.5,
+    drag: 0.34,
+    steer: 1.25, // rad/s at low speed
+    steerHigh: 0.46,
+    grip: 7.5,
+    lean: 0.62, // how far it lies over in a turn
+    airDrag: 0.06,
+    jump: 5.2, // upward kick off a rise
+    standDist: 2.4, // how close you must be to swing a leg over
+    mount: 0.45, // s to get on
+  },
+
   SCORE: {
     perSecond: 10,
     shard: 250,
@@ -138,8 +188,9 @@ export const CFG = {
     corpse: 400,
     generator: 2000,
     revive: 1500, // you brought someone back
-    win: 25000, // + speedBonus for every second left before RUN_SECONDS
+    win: 25000, // + speedBonus for every second left in the night
     speedBonus: 10,
+    day: 12000, // ...and for every whole day of the shift still ahead of you
   },
 
   SHARDS: 46,

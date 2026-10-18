@@ -10,7 +10,7 @@
 // Nothing here goes over the network: your friends see your remote body, as always.
 import { CFG } from '../core/config.js';
 import { clamp, lerp } from '../core/rng.js';
-import { buildSurvivor, poseCarrier, poseFur } from './survivor.js';
+import { buildSurvivor, poseCarrier, poseFur, poseSeated } from './survivor.js';
 import { fitKey } from './outfit.js';
 import { createPersonMaterial, dressPerson, undressPerson } from '../render/people.js';
 
@@ -98,6 +98,15 @@ export class SelfBody {
     }
     const g = this.game, p = g.player, es = g.escape, n = rig.nodes;
     root.visible = true;
+    if (g.moto?.riding) {
+      // on the bike: seated, hands on the bars (seen from the chase camera)
+      const b = g.moto.bike;
+      poseSeated(rig, true, g.time + g.moto.mountT, b.steer * 0.55);
+      root.position.set(b.x, b.y + 0.78, b.z);
+      root.rotation.set(0, b.yaw + PI, 0);
+      this._arms(true, true);
+      return;
+    }
     if (es.mySeat >= 0) {
       es._seatRig(rig, es.mySeat, false, es.mySeat === 0);
       root.translateZ(-this._clear(n.chest.rotation.x));
@@ -107,7 +116,7 @@ export class SelfBody {
     const P = CFG.PLAYER;
     const k = clamp((P.eye - p.eyeCur) / (P.eye - P.crouchEye), 0, 1); // standing 0 → squatting 1
     const amp = clamp(p.speed / 3.2, 0, 1.4) * (1 - 0.5 * k);
-    poseSelf(rig, p.bobPhase || 0, amp, k);
+    poseSelf(rig, p.bobPhase || 0, amp, k, g.fieldView?.workK || 0);
     const now = performance.now();
     poseFur(rig, Math.min(0.1, (now - (this._t || now)) / 1000), p.speed); // (a tail behind you, as it should be)
     this._t = now;
@@ -133,18 +142,18 @@ export class SelfBody {
 
 // standing → walking → a deep squat. k: how far down the crouch is (follows your eye height). The hips don't
 // bob here: your eyes bob with the whole body (the root), so the body under them holds still as you walk
-function poseSelf(rig, phase, amp, k) {
+function poseSelf(rig, phase, amp, k, work = 0) {
   const n = rig.nodes;
   const s = Math.sin(phase);
   rig.root.rotation.x = 0;
-  n.hips.position.set(0, lerp(0.94, 0.42, k), 0);
+  n.hips.position.set(0, lerp(0.94, 0.42, k) - work * 0.2, 0);
   n.hips.rotation.set(0, 0, 0);
-  n.chest.rotation.set(lerp(0.05 * amp, 0.4, k), 0, 0);
+  n.chest.rotation.set(lerp(0.05 * amp, 0.4, k) + work * 0.3, 0, 0);
   n.head.rotation.set(0, 0, 0);
-  n.thL.rotation.set(s * 0.55 * amp - 1.45 * k, 0, -0.07 * k);
-  n.thR.rotation.set(-s * 0.55 * amp - 1.45 * k, 0, 0.07 * k);
-  n.knL.rotation.x = Math.max(0, -s) * 0.7 * amp + 2.25 * k;
-  n.knR.rotation.x = Math.max(0, s) * 0.7 * amp + 2.25 * k;
+  n.thL.rotation.set(s * 0.55 * amp - 1.45 * k - work * 0.5, 0, -0.07 * k);
+  n.thR.rotation.set(-s * 0.55 * amp - 1.45 * k - work * 0.5, 0, 0.07 * k);
+  n.knL.rotation.x = Math.max(0, -s) * 0.7 * amp + 2.25 * k + work * 0.75;
+  n.knR.rotation.x = Math.max(0, s) * 0.7 * amp + 2.25 * k + work * 0.75;
   n.shL.rotation.set(-s * 0.45 * amp - 0.5 * k, 0, -0.07 - 0.12 * k);
   n.shR.rotation.set(s * 0.45 * amp - 0.5 * k, 0, 0.07 + 0.12 * k);
   n.elL.rotation.x = -0.25 - amp * 0.2 - 0.55 * k;

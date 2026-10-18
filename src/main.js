@@ -220,6 +220,7 @@ const menus = new Menus({
   onRestart: () => restartRun(),
   onMenu: () => toMenu(),
   onCoop: () => lobby.open(),
+  onTraining: () => departToTraining(),
   onAtlas: () => {
     if (state === 'menu') home.openAtlas();
   },
@@ -286,6 +287,13 @@ const lobby = new Lobby({
   onWardrobe: () => {
     if (state === 'menu') wardrobe.open(); // (over the lobby: you stay in the room)
   },
+  onDepart: () => {
+    if (!garage || state !== 'menu' || garage.departing || garage.cut) return;
+    lobby.setStarting(true);
+    document.body.classList.add('departing');
+    const ok = garage.startDeparture(() => startTraining());
+    if (!ok) { lobby.setStarting(false); document.body.classList.remove('departing'); }
+  },
   uiSound: (k) => {
     if (!audio.ready) return;
     if (k === 'hover') audio.uiHover();
@@ -349,6 +357,40 @@ function beginCoopRun(d) {
     lobby.setStarting(false);
   }
   startRun({ coop: d });
+}
+
+// the gates from the main menu: solo players get the same film and the same school
+function departToTraining() {
+  if (state !== 'menu' || lobby.starting) return;
+  const g = ensureGarage();
+  if (!g || g.departing || g.cut) return;
+  account.close();
+  if (atlas.isOpen()) atlas.close();
+  if (wardrobe.isOpen()) wardrobe.close();
+  menus.only(null);
+  audio.init();
+  audio.setVolume(settings.volume);
+  home.leave();
+  lobby.setStarting(true);
+  document.body.classList.add('departing');
+  const ok = g.startDeparture(() => startTraining());
+  if (!ok) {
+    lobby.setStarting(false);
+    document.body.classList.remove('departing');
+    home.enter();
+  }
+}
+
+// the gates in the lobby: the shift ends, the car leaves, and the driving school begins
+function startTraining() {
+  if (state !== 'menu' || !game) return;
+  account.close();
+  if (atlas.isOpen()) atlas.close();
+  if (wardrobe.isOpen()) wardrobe.close();
+  if (coop.active) coop.leave();
+  lobby.setStarting(false);
+  document.body.classList.remove('departing', 'in-lobby');
+  startRun({ training: true });
 }
 
 function updateMicUI() {
@@ -552,7 +594,7 @@ function startRun(opts = {}) {
     game.setupOnline(coop, opts.coop.players);
   } else {
     game.setupSolo();
-    game.reset();
+    game.reset({ training: !!opts.training });
     if (DEBUG.night || DEBUG.t > 0) game.startNight();
     if (DEBUG.t > 0) {
       game.time = DEBUG.t;
@@ -560,7 +602,7 @@ function startRun(opts = {}) {
       game.tut.done = true;
     }
   }
-  beginRewards();
+  if (!opts.training) beginRewards(); // the driving school pays nothing
   state = 'playing';
   cloud.presenceChanged();
   setBodyState();
@@ -628,7 +670,7 @@ function toMenu(keepRoom = false) {
   account.close();endRewards({reason:'menu',time:game?.time,score:game?.score,gens:game?.objectives.count});overReward=null;
   const wasOnline = runOnline;
   // walking away from a night still leaves it in the atlas (what you met, what you started)
-  if (game && (state === 'playing' || state === 'paused') && (game.state === 'play' || game.state === 'dying')) {
+  if (game && !game.training && (state === 'playing' || state === 'paused') && (game.state === 'play' || game.state === 'dying')) {
     try {
       const started = game.objectives.gens.filter((g) => g.running).map((g) => ({ k: g.k, site: g.site && g.site.id }));
       recordNight({ ...game.stats, time: game.time }, { won: false, cause: game.player && !game.player.alive ? game.cause : null }, started);
@@ -658,6 +700,7 @@ function toMenu(keepRoom = false) {
     game.setupSolo();
   }
   runOnline = false;
+  document.body.classList.remove('training', 'departing');
   if (wasOnline || coop.active) {
     if (keepRoom && coop.active) coop.leaveRun();
     else coop.leave();

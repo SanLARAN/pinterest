@@ -7,6 +7,27 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v:'2.1',date:'2026-10-19',
+    ru:{title:'Четыре дня и полигон',items:[
+      'Смена вместо одной ночи: четыре дня. Ночь длится 8 минут, утро — 1:45, и его можно пропустить. Пятый генератор по-прежнему поднимает рассвет. На четвёртой ночи через 4 минуты лес просыпается окончательно и уже не засыпает; переживи её — и это победа',
+      'Рюкзак больше не плоская сетка: открой его, и перед тобой объёмный рюкзак с четырьмя карманами. Вращай мышью или пальцем, наведи на карман — вещь поднимается из ткани и поворачивается к свету. Слоты и кнопки остались внизу, так что тач и клавиатура работают как раньше',
+      'Анимации рук: доставая рюкзак, персонаж тянется за спину и опускает его перед собой. У генератора руки работают инструментом, тело приседает и наклоняется вместе с ходом ремонта — и в кадре, и в фигуре напарника',
+      'Шприц адреналина: подойди к упавшему другу вплотную (до 2,2 м), открой рюкзак и примени шприц — он встаёт на месте, без койки и переноски. Пять минут ноги чужие: бег −28 %, шаг −20 %, выносливость садится в 1,65 раза быстрее. Шприц лежит в кармане с самого начала, ещё до трёх гаек',
+      'Ворота в лобби теперь открываются: нажми на створки — помощник идёт к засову, створки расходятся, машина заводится, все садятся и уезжают. Следом начинается полигон',
+      'Полигон за воротами: стенд со всеми предметами поля (гайки, химсвет, фонарь, ракетница, батарейка, кассета, лом, карта, адреналин) и по мотоциклу на каждого игрока. Эндуро с настоящей физикой: тяга с места, тормоз, крен в поворот, подвеска и прыжки с гребней. W/S — газ и тормоз, A/D — руль, Shift — оттолкнуться, E — сесть/слезть. Выйти с полигона — через паузу',
+      'Кооп: протокол 14. Обновите страницу у всех участников комнаты',
+    ]},
+    en:{title:'Four days and a proving ground',items:[
+      'A shift instead of one night: four days. A night runs 8 minutes, a morning 1:45 and can be skipped. The fifth generator still brings the dawn. On the fourth night the forest wakes for good after four minutes and never sleeps again; survive it and the shift is won',
+      'The backpack is no longer a flat grid: open it and a real rucksack hangs in front of you, four pockets and all. Turn it with the mouse or a finger, point at a pocket and the item lifts out of the cloth and turns to the light. The slots and buttons stay underneath, so touch and keyboard work as before',
+      'Hand animation: pulling out the pack, your survivor reaches behind and swings it down in front of them. At a generator the hands work a tool and the body kneels and leans with the progress — in first person and in the figure a friend sees',
+      'Adrenaline syringe: get close to a downed friend (within 2.2 m), open the bag and use it — they get up on the spot, no cot, no carrying. For five minutes their legs are rubber: sprint −28%, walk −20%, stamina drains 1.65× faster. The syringe is in a pocket from the start, before the three nuts',
+      'The lobby gates open now: click the leaves — the help walks to the latch, the gates swing, the car starts, everybody gets in and drives away. The training ground begins right after',
+      'The training ground behind the gates: a rack of every field item (stones, glow stick, torch, flare gun, battery, tape, crowbar, parts map, adrenaline) and one bike per player. Enduro physics: pull from rest, brakes, lean into a turn, suspension and jumps off crests. W/S throttle and brake, A/D steer, Shift push off, E mount/step off. Leave through the pause menu',
+      'Co-op: protocol 14. Everybody must refresh',
+    ]},
+  },
+  {
     v:'2.0',date:'2026-10-18',
     ru:{title:'Большая починка смены',items:[
       'Социальный уголок вместо ссылки «Профиль»: квадрат с твоим настоящим персонажем, «Добавить друга» и список друзей ниже. На очень низком экране уголок сворачивается до портрета, чтобы не перекрывать управление',
