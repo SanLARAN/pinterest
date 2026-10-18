@@ -115,7 +115,7 @@ export function tyre(b, r, w, kind, segs = 12, treads = true) {
 const _m = new THREE.Matrix4(), _p = new THREE.Vector3(), _q = new THREE.Quaternion(), _s = new THREE.Vector3(1, 1, 1), _e = new THREE.Euler();
 
 // ---------------- the room ----------------
-export function buildRoom() {
+export function buildRoom(opts = {}) {
   const b = new MeshBuilder(8192);
   const r = new RNG(77);
   const { X0, X1, Z0, Z1, H, T } = ROOM;
@@ -244,15 +244,17 @@ export function buildRoom() {
       boxAt(b, fx, gh * 0.31, (za + zb) / 2, 0.05, 0.06, L, GK.GATE, 0, Math.atan2(gh * 0.4, zb - za - 0.1));
     }
   };
-  sheet(gz0 + 0.08, gm - 0.01);
-  sheet(gm + 0.01, gz1 - 0.08, [[GATE.wz0, GATE.wz1, GATE.wy0, GATE.wy1]]);
-  // the wicket's own frame in the leaf
-  const wzc = (GATE.wz0 + GATE.wz1) / 2;
-  boxAt(b, gx - 0.01, GATE.wy1 + 0.03, wzc, 0.06, 0.06, GATE.wz1 - GATE.wz0 + 0.12, GK.GATE);
-  boxAt(b, gx - 0.01, (GATE.wy0 + GATE.wy1) / 2, GATE.wz0 - 0.03, 0.06, GATE.wy1 - GATE.wy0, 0.06, GK.GATE);
+  if (opts.gates !== false) {
+    sheet(gz0 + 0.08, gm - 0.01);
+    sheet(gm + 0.01, gz1 - 0.08, [[GATE.wz0, GATE.wz1, GATE.wy0, GATE.wy1]]);
+  }
+  // the wicket's own frame in the leaf (drawn on the moving leaf itself, see buildGateLeaf)
   // a vertical latch bar between the leaves, the big hinges, a padlock hanging open
-  boxAt(b, gx + 0.03, 1.2, gm, 0.05, 1.9, 0.06, GK.METAL);
-  boxAt(b, gx + 0.09, 1.05, gm - 0.06, 0.06, 0.09, 0.06, GK.RUST);
+  // (with moving leaves the latch travels with the near one — see buildGateLeaf)
+  if (opts.gates !== false) {
+    boxAt(b, gx + 0.03, 1.2, gm, 0.05, 1.9, 0.06, GK.METAL);
+    boxAt(b, gx + 0.09, 1.05, gm - 0.06, 0.06, 0.09, 0.06, GK.RUST);
+  }
   for (const z of [gz0 + 0.1, gz1 - 0.1]) for (const y of [0.45, 2.05]) boxAt(b, gx + 0.03, y, z, 0.06, 0.18, 0.1, GK.RUST);
   // outside: moonlit ground, pines against the night sky (big: you look out through the gap at a slant)
   quad(b, [gx - 0.06, 0.0, -30], [gx - 4.2, 0.0, -30], [gx - 4.2, 0.0, 6], [gx - 0.06, 0.0, 6], GK.MOONLIT);
@@ -265,6 +267,57 @@ export function buildRoom() {
       b.cone(5, hh * (0.34 - k * 0.08), hh * 0.42, GK.SILHOUETTE);
     }
     boxAt(b, x, hh * 0.1, z, 0.12, hh * 0.22, 0.12, GK.SILHOUETTE);
+  }
+  return b.toArrays();
+}
+
+// ---------------- a gate leaf on its own hinge (so the gates can open) ----------------
+// side 'a' is the far leaf (hinge at GATE.z0), 'b' the near one with the wicket door (hinge at GATE.z1).
+// Local frame: the hinge is at the origin, the leaf runs along +z.
+export function buildGateLeaf(side) {
+  const b = new MeshBuilder(640);
+  const gh = GATE.h;
+  const far = side === 'a';
+  const L = far ? (GATE.mid - 0.01) - (GATE.z0 + 0.08) : (GATE.z1 - 0.08) - (GATE.mid + 0.01);
+  const sx = -0.05;
+  const hole = far ? null : [ (GATE.z1 - 0.08) - GATE.wz1, (GATE.z1 - 0.08) - GATE.wz0, GATE.wy0, GATE.wy1 ];
+  const q = (z0, z1, y0, y1) => {
+    if (z1 - z0 < 0.005 || y1 - y0 < 0.005) return;
+    quad(b, [sx, y0, z0], [sx, y0, z1], [sx, y1, z1], [sx, y1, z0], GK.GATE);
+  };
+  if (!hole) q(0.06, L - 0.06, 0.06, gh - 0.08);
+  else {
+    q(0.06, L - 0.06, 0.06, hole[2]);
+    q(0.06, L - 0.06, hole[3], gh - 0.08);
+    q(0.06, hole[0], hole[2], hole[3]);
+    q(hole[1], L - 0.06, hole[2], hole[3]);
+  }
+  // ribs, split around the wicket hole
+  for (let z = 0.09; z < L - 0.05; z += 0.16) {
+    const inHole = hole && z > hole[0] - 0.02 && z < hole[1] + 0.02;
+    if (inHole) {
+      boxAt(b, sx + 0.012, (0.08 + hole[2]) / 2, z, 0.024, hole[2] - 0.08, 0.035, GK.GATE);
+      boxAt(b, sx + 0.012, (hole[3] + gh - 0.1) / 2, z, 0.024, gh - 0.1 - hole[3], 0.035, GK.GATE);
+    } else boxAt(b, sx + 0.012, gh / 2 - 0.02, z, 0.024, gh - 0.16, 0.035, GK.GATE);
+  }
+  // the leaf's frame and braces
+  const fx = -0.01;
+  boxAt(b, fx, 0.1, (0.06 + L - 0.06) / 2, 0.06, 0.07, L - 0.12, GK.GATE);
+  boxAt(b, fx, gh - 0.13, (0.06 + L - 0.06) / 2, 0.06, 0.07, L - 0.12, GK.GATE);
+  boxAt(b, fx, gh / 2, 0.055, 0.06, gh - 0.2, 0.07, GK.GATE);
+  boxAt(b, fx, gh / 2, L - 0.055, 0.06, gh - 0.2, 0.07, GK.GATE);
+  if (!hole) {
+    boxAt(b, fx, gh * 0.52, L / 2, 0.05, 0.06, L - 0.16, GK.GATE);
+    const D = Math.hypot(L - 0.1, gh * 0.4);
+    boxAt(b, fx, gh * 0.31, L / 2, 0.05, 0.06, D, GK.GATE, 0, Math.atan2(gh * 0.4, L - 0.1));
+  } else {
+    // the wicket frame travels with its leaf
+    const wzc = (hole[0] + hole[1]) / 2;
+    boxAt(b, -0.01, GATE.wy1 + 0.03, wzc, 0.06, 0.06, hole[1] - hole[0] + 0.12, GK.GATE);
+    boxAt(b, -0.01, (GATE.wy0 + GATE.wy1) / 2, hole[0] - 0.03, 0.06, GATE.wy1 - GATE.wy0, 0.06, GK.GATE);
+    // ...and so does the latch at the meeting edge
+    boxAt(b, -0.01, 1.2, L - 0.045, 0.05, 1.9, 0.06, GK.METAL);
+    boxAt(b, 0.05, 1.05, L - 0.1, 0.06, 0.09, 0.06, GK.RUST);
   }
   return b.toArrays();
 }

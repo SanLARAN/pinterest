@@ -15,7 +15,7 @@ import { buildSurvivor, dyeColors, poseFur } from '../game/survivor.js';
 import { cleanFit, shapeKey, item } from '../game/outfit.js';
 import {
   ROOM, GATE, WIN, CAR, BULB, BULB_LOCAL, BULB2, BULB2_LOCAL, CARP, SPOTS, LANTERN_AT, DRUM_AT, ITEM_SPOTS, PACK,
-  buildRoom, buildCeiling, buildWicket, buildProps, buildBulb, buildBulb2, buildSteering, CAR_MODELS, GPAL_GLSL,
+  buildRoom, buildCeiling, buildWicket, buildProps, buildBulb, buildBulb2, buildSteering, buildGateLeaf, CAR_MODELS, GPAL_GLSL,
   buildItems, buildPack, buildPackFlap, buildCigarette, buildCup, buildLighter, buildFlame, buildPasser,
 } from './garageSet.js';
 
@@ -547,6 +547,7 @@ export class Garage {
     this._build();
     this.figs = [null, null, null, null];
     this.cut = null; // the engine start
+    this.departure = null; // the gates, the car, everybody in — and out
     this.events = { flash: 0, nextFlash: rnd(25, 45), flashes: [], passer: null, nextPasser: rnd(40, 70) };
     this.ptr = { x: 0, y: 0, on: false, nx: 0, ny: 0 };
     this.hoverSlot = -1;
@@ -627,7 +628,19 @@ export class Garage {
 
   _build() {
     const S = this.scene;
-    this._mesh(buildRoom());
+    this._mesh(buildRoom({ gates: false }));
+    // the two gate leaves, on their own hinges: the departure swings them wide
+    this.gateHingeA = new THREE.Group();
+    this.gateHingeA.position.set(ROOM.X0, 0, GATE.z0 + 0.08);
+    S.add(this.gateHingeA);
+    this.gateLeafA = this._mesh(buildGateLeaf('a'), this.matSet, this.gateHingeA);
+    this.gateHingeB = new THREE.Group();
+    this.gateHingeB.position.set(ROOM.X0, 0, GATE.z1 - 0.08);
+    this.gateHingeB.rotation.y = PI;
+    S.add(this.gateHingeB);
+    this.gateLeafB = this._mesh(buildGateLeaf('b'), this.matSet, this.gateHingeB);
+    this.gateOpen = 0;
+    this.gateMeshes = [this.gateLeafA, this.gateLeafB];
     this.ceiling = this._mesh(buildCeiling());
     this._mesh(buildProps());
     this._buildRulesPoster();
@@ -905,6 +918,7 @@ export class Garage {
     this.ambReady=false;
     if (this.audio) this.audio.garageAmb(false);
     if (this.cut && !this.cut.done) this.cut = null;
+    if (this.departure) this.abortDeparture(); // the gate is shut again for the next visit
     this._stopEngine(0.4);
   }
 
@@ -955,6 +969,35 @@ export class Garage {
     // the driver changes cars too
     const f = this.figs && this.figs[0];
     if (f && f.rig) f.rig.root.position.set(...M.driver.pos);
+  }
+
+  // clicking the gates: a short film — the help opens them, the engine catches, everyone gets in,
+  // and the УАЗ rolls out. onDone fires when the screen has gone dark.
+  startDeparture(onDone) {
+    if (this.departure || this.cut) return false;
+    this.departure = { t: 0, onDone, fired: false, keyed: false, caught: false, boarded: false, said: false, cam0: this.camera.position.clone() };
+    this.gateOpen = 0;
+    return true;
+  }
+  get departing() { return !!this.departure; }
+  abortDeparture() {
+    if (!this.departure) return;
+    this.departure = null;
+    this.gateOpen = 0;
+    if (this.gateHingeA) this.gateHingeA.rotation.y = 0;
+    if (this.gateHingeB) this.gateHingeB.rotation.y = PI;
+    this.wicket.visible = true;
+    this._stopEngine(0.6);
+    this.fade = 1;
+    this.carRoot.position.set(CAR.x, 0, CAR.z);
+    this.carRoot.rotation.y = 0;
+    this.u.uHeadI.value = 0; this.u.uTail.value.w = 0; this.u.uDash.value.w = 0;
+    for (const s of [1, 3]) {
+      const f = this.figs[s];
+      if (!f || !f.rig) continue;
+      f.rig.root.visible = true;
+      f.st = { phase: 'idle', t: 0, next: rnd(1, 3), nextTap: 5 };
+    }
   }
 
   startCar(onDone) {
@@ -1044,6 +1087,104 @@ export class Garage {
     }
   }
 
+  // the film: the smoker gets up and opens the gates, the car wakes, the others climb in, and it leaves
+  _departure(dt) {
+    const D = this.departure;
+    if (!D) return;
+    D.t += dt;
+    const t = D.t;
+    const A = this.audio;
+    const f = this.figs[2] || this.figs[1] || this.figs[3];
+    // 0.2 – 1.7: the help walks to the gate and takes the latch
+    if (f) {
+      const k = seg(t, 0.2, 1.7);
+      const from = SPOTS[f.slot].pos;
+      const to = [ROOM.X0 + 0.62, 0, (GATE.wz0 + GATE.wz1) / 2 + 0.9];
+      f.rig.root.position.set(lerp(from[0], to[0], k), 0, lerp(from[2], to[2], k));
+      f.rig.root.rotation.y = lerp(SPOTS[f.slot].yaw, -1.35, k);
+      if (f.rig.nodes.shR) f.rig.nodes.shR.rotation.x = -k * 1.25;
+      if (f.rig.nodes.shL) f.rig.nodes.shL.rotation.x = -k * 0.5;
+      f.rig.root.visible = true;
+    }
+    // 1.6 – 3.6: both leaves swing out on their hinges (and the wicket stops being the only way through)
+    const open = seg(t, 1.6, 3.8);
+    this.gateOpen = open;
+    if (this.gateHingeA) this.gateHingeA.rotation.y = -open * 1.52;
+    if (this.gateHingeB) this.gateHingeB.rotation.y = PI + open * 1.52;
+    this.wicket.visible = open < 0.08;
+    // 2.1: the engine — the same start the START button uses
+    if (!D.keyed && t >= 2.1) { D.keyed = true; if (A) this.engine = A.carStart(); }
+    if (!D.caught && t >= 3.0) {
+      D.caught = true;
+      this.idle = 1;
+      this.shake.vroll += 0.5; this.shake.vy += 0.22; this.camShake = 0.4;
+      this.u.uHeadI.value = 1; this.u.uTail.value.w = 0.7;
+      if (A && A.carHorn) A.carHorn(false);
+      const ex = this._carPoint(this.CP.exhaust, _w);
+      for (let i = 0; i < 12; i++) this.smoke.emit(ex.x + 0.05, ex.y, ex.z, rnd(0.6, 1.4), rnd(0, 0.35), rnd(-0.3, 0.3), { life: 2.4, s0: 0.12, s1: 0.85, a: 0.3, rise: 0.24, drag: 1.6, col: [0.42, 0.42, 0.44], jitter: 0.5 });
+    }
+    this.u.uDash.value.w = t < 2.1 ? 0 : t < 3.0 ? 0.5 : 1;
+    // 3.2 – 4.9: the others walk to the car and get in
+    if (!D.boarded && t >= 3.2) {
+      D.boarded = true;
+      for (const s of [1, 3]) {
+        const g = this.figs[s];
+        if (!g) continue;
+        g.st = { phase: 'idle', t: 0, next: 99, nextTap: 99 };
+        g.rig.root.visible = true;
+      }
+    }
+    if (t > 3.2 && t < 5.1) {
+      const k = seg(t, 3.2, 4.9);
+      for (const s of [1, 3]) {
+        const g = this.figs[s];
+        if (!g) continue;
+        const from = SPOTS[s].pos;
+        const to = [CAR.x + 0.4, 0, CAR.z + (s === 1 ? 1.35 : -1.45)];
+        g.rig.root.position.set(lerp(from[0], to[0], k), Math.sin(k * Math.PI) * 0.02, lerp(from[2], to[2], k));
+        g.rig.root.rotation.y = lerp(SPOTS[s].yaw, s === 1 ? 2.3 : 0.9, k);
+        if (k > 0.92) g.rig.root.visible = false; // in through the doors
+      }
+    }
+    // 5.2 – 8.0: the car rolls out through the open gates, up the moonlit track
+    const drive = seg(t, 5.2, 7.9);
+    if (this.carRoot) {
+      this.carRoot.position.x = CAR.x - drive * 13.5;
+      this.carRoot.position.z = CAR.z + drive * 0.2;
+      this.carRoot.rotation.y = -drive * 0.14;
+    }
+    // the wheels turn, the headlights catch the gateposts as it goes
+    for (const m of this.carParts) if (m.geometry?.boundingSphere) { /* (wheels live in the wheels mesh) */ }
+    if (drive > 0) this.fade = Math.min(1, drive * 1.5);
+    if (t > 7.2) this.fade = Math.max(0, 1 - (t - 7.2) / 1.2);
+    // out
+    if (!D.fired && t >= 8.1) {
+      D.fired = true;
+      const fn = D.onDone;
+      D.onDone = null;
+      if (fn) fn();
+    }
+  }
+
+  // where the gates are on screen (for the lobby's invisible button), or null
+  gateRect() {
+    if (!this.gateMeshes) return null;
+    const pts = [];
+    for (const z of [GATE.z0 + 0.2, GATE.z1 - 0.2]) for (const y of [0.2, GATE.h - 0.2]) {
+      const v = new THREE.Vector3(ROOM.X0, y, z).project(this.camera);
+      if (v.z > 1 || v.z < -1) return null;
+      pts.push({ x: (v.x * 0.5 + 0.5) * this.w, y: (0.5 - v.y * 0.5) * this.h });
+    }
+    const x = Math.min(...pts.map((p) => p.x)), y = Math.min(...pts.map((p) => p.y));
+    return { x, y, w: Math.max(...pts.map((p) => p.x)) - x, h: Math.max(...pts.map((p) => p.y)) - y };
+  }
+  hitGate(clientX, clientY) {
+    if (!this.gateMeshes || this.departure) return false;
+    const ray = new THREE.Raycaster();
+    ray.setFromCamera(new THREE.Vector2((clientX / this.w) * 2 - 1, 1 - (clientY / this.h) * 2), this.camera);
+    return ray.intersectObjects(this.gateMeshes, false).length > 0;
+  }
+
   _carPoint(p, out) {
     return this.carMesh.localToWorld(out.set(p[0], p[1], p[2]));
   }
@@ -1055,7 +1196,7 @@ export class Garage {
     dt *= this.timeScale; // (tests freeze it for stills)
     this.t += dt;
     const u = this.u;
-    if (!this.cut || this.cut.t < 2.95) this.fade = Math.min(1, this.fade + dt * 1.4);
+    if ((!this.cut || this.cut.t < 2.95) && !this.departure) this.fade = Math.min(1, this.fade + dt * 1.4);
     u.uFade.value = 1;
     u.uTime.value = this.t;
     this.homeK = damp(this.homeK ?? 1, this.view === 'home' ? 1 : 0, 2.2, dt);
@@ -1063,6 +1204,7 @@ export class Garage {
     this._ambient(dt);
     this._car(dt);
     this._figures(dt);
+    this._departure(dt);
     this.studio?.frame(dt);
     this._camera(dt);
     this._blobs();
@@ -1242,6 +1384,7 @@ export class Garage {
 
   // ---------------- people ----------------
   _figures(dt) {
+    if (this.departure) return;
     for (let s = 0; s < 4; s++) {
       const f = this.figs[s];
       if (!f) continue;
@@ -1915,7 +2058,29 @@ export class Garage {
       cam.updateMatrixWorld(true);
       return;
     }
-    if(this.studio && (this.view==='menu'||this.view==='dressing')) {this.studio.camera(dt);return;}
+    if(this.studio && (this.view==='menu'||this.view==='dressing') && !this.departure) {this.studio.camera(dt);return;}
+    if (this.departure && this.base) {
+      // the camera steps in toward the gate as the car comes through, then holds on the dark
+      const t = this.departure.t;
+      const push = seg(t, 0.2, 4.6);
+      const near = seg(t, 3.6, 7.4);
+      const cam = this.camera;
+      const P = new THREE.Vector3(
+        lerp(this.base.target.x - this.base.dir.x * this.base.d, -1.75, push),
+        lerp(1.55, 1.18, push) + near * 0.08,
+        lerp(this.base.target.z - this.base.dir.z * this.base.d + 4.2, 2.65, push) - near * 0.5,
+      );
+      cam.position.lerp(P, Math.min(1, dt * 3.4));
+      const look = new THREE.Vector3(
+        lerp(-2.2, -3.4, near),
+        lerp(1.2, 1.0, near),
+        lerp(-0.2, 0.15, near),
+      );
+      cam.lookAt(look);
+      cam.updateMatrixWorld(true);
+      this.ceiling.visible = cam.position.y < ROOM.H - 0.05;
+      return;
+    }
     let { target } = this.base;
     const { dir, d } = this.base;
     const P = this.ptr;

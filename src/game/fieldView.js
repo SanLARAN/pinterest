@@ -31,6 +31,8 @@ export class FieldView {
     this.left=this.arm(-1);this.right=this.arm(1);this.root.add(this.left,this.right);
     this.watchCase=this.buildWatch(); this.watchCase.scale.setScalar(.73); this.left.add(this.watchCase);
     this.bag=this.buildBag();this.root.add(this.bag);
+    this.wrench=this.buildWrench();this.root.add(this.wrench);
+    this.workK=0;this.repairT=0;this.repairMode=null;this.workT=0;
     this.prop=new THREE.Group();this.root.add(this.prop);
     this.props={};
     for(const kind of ['stones','battery','flare','flareAmmo']) {
@@ -84,8 +86,25 @@ export class FieldView {
     cube(g,this.box,this.mat.leather,0,.286,-.01,.15,.022,.025);
     return g;
   }
+  // a ring spanner for the generators: two jaws, a shaft — read as a tool in a gloved hand
+  buildWrench() {
+    const g=new THREE.Group();
+    cube(g,this.box,this.mat.steel,0,0,0,.028,.34,.022);
+    for(const s of [-1,1]) cube(g,this.box,this.mat.steel,s*.048,.19,0,.075,.02,.024);
+    cube(g,this.box,this.mat.steel,0,.176,0,.052,.024,.024);
+    cube(g,this.box,this.mat.steel,0,-.19,0,.05,.06,.03);
+    g.visible=false;
+    return g;
+  }
+  // the objectives tell the hands what they are working on (called every frame the hold is good)
+  repairing(mode) { this.repairMode=mode; this.repairT=0.22; }
+
   update(dt) {
     const g=this.g;
+    this.repairT=Math.max(0,this.repairT-dt);
+    this.workK=damp(this.workK,this.repairT>0?1:0,10,dt);
+    if(this.workK<.001) this.workK=0;
+    this.workT+=dt;
     const held=g.input.peekHeld || performance.now()<g.input.peekTouchUntil;
     const can=g.player.alive && !g.partMap?.active && !g.inventory.active && !g.inputMuted && !g.cabinets.busy && !g.player.carrying && !g.escape.held && !g.expedition.onTower && g.escape.mySeat<0 && ['play','morning','dawn'].includes(g.state);
     this.watch=damp(this.watch,can&&held?1:0,can&&held?9:12,dt);
@@ -98,7 +117,7 @@ export class FieldView {
     if(!this.lcd) return;
     const task=g.objectives.taskText()||t('watchFind');
     const calm=Math.ceil(g.calmLeft?.()||0),state=g.state;
-    const info={time:fmtTime(g.time||0),gens:g.objectives.count||0,parts:g.escape.count||0,score:Math.floor(g.score||0),mult:(g.mult||1).toFixed(1),team:g.online?`${g.livePlayers().length}/${g.remotes.size+1}`:'1/1',calm,task,torch:g.torch.has?Math.ceil(g.torch.charge*100):null};
+    const info={time:fmtTime(g.time||0),day:g.day||1,gens:g.objectives.count||0,parts:g.escape.count||0,score:Math.floor(g.score||0),mult:(g.mult||1).toFixed(1),team:g.online?`${g.livePlayers().length}/${g.remotes.size+1}`:'1/1',calm,task,torch:g.torch.has?Math.ceil(g.torch.charge*100):null};
     const key=JSON.stringify(info)+t('watchTime')+state;if(key===this.lcdKey) return;this.lcdKey=key;this.data=info;
     const c=this.lcd;c.fillStyle='#151c1d';c.fillRect(0,0,512,672);
     c.fillStyle='#ccd5cd';c.font='bold 40px monospace';c.fillText('HUSH',34,64);
@@ -106,7 +125,7 @@ export class FieldView {
     c.fillStyle='#95443d';c.fillRect(32,86,448,3);c.fillStyle='#8aaba8';c.font='bold 20px monospace';c.textAlign='center';c.fillText('ILLUMINATOR',256,119);c.textAlign='left';
     c.fillStyle='#3b453c';c.fillRect(30,140,452,422);
     const bg=c.createLinearGradient(0,145,0,558);bg.addColorStop(0,'#9da78b');bg.addColorStop(.5,'#c0ceb0');bg.addColorStop(1,'#8caa98');c.fillStyle=bg;c.fillRect(36,146,440,410);
-    c.fillStyle='#1e322a';c.font='bold 20px monospace';c.fillText(`${t('watchTime')} / ${t(state==='morning'?'watchDay':'watchNight')}`,51,177);
+    c.fillStyle='#1e322a';c.font='bold 20px monospace';c.fillText(`${t('dayShort').replace('{n}',info.day)} · ${t(state==='morning'||g.training?'watchDay':'watchNight')}`,51,177);
     c.font='bold 76px monospace';c.fillText(info.time,46,254);
     c.font='bold 23px monospace';c.fillText(`${t('watchGens')} ${info.gens}/5`,51,291);
     for(let i=0;i<5;i++){c.globalAlpha=i<info.gens?1:.18;c.fillRect(301+i*29,270,20,21);}c.globalAlpha=1;
@@ -127,23 +146,45 @@ export class FieldView {
     const g=this.g,bag=g.inventory,reach=bag.progress,k=ease(clamp(this.watch,0,1));
     this.root.visible=!!show;if(!show) return;
     this.root.position.copy(camera.position);this.root.quaternion.copy(camera.quaternion);
-    this.left.visible=k>.005||reach>.005;this.right.visible=reach>.005 || (!!bag.equipped && bag.equipT<=0 && !bag.active && !g.player.carrying && !g.escape.held && k<.1);
-    this.watchCase.visible=k>.005;
-    this.bag.visible=reach>.22;
-    this.prop.visible=this.right.visible && reach<.01 && k<.1;
+    const work=this.workK;
+    this.left.visible=work>.01||k>.005||reach>.005;
+    this.right.visible=work>.01||reach>.005 || (!!bag.equipped && bag.equipT<=0 && !bag.active && !g.player.carrying && !g.escape.held && k<.1);
+    this.watchCase.visible=k>.005&&work<.01;
+    this.bag.visible=reach>.22&&work<.01;
+    this.prop.visible=this.right.visible && reach<.01 && k<.1 && work<.01;
+    this.wrench.visible=work>.02;
     const reachBack=Math.sin(clamp(reach/.48,0,1)*Math.PI);
     const wide=smoothstep(.8,1.3,camera.aspect); // keep the full wrist inside a portrait phone too
     this.left.position.set(lerp(-.46,lerp(-.012,-.09,wide),k),lerp(-.62,lerp(-.04,-.025,wide),k),lerp(-.25,lerp(-.3,-.26,wide),k));
     this.left.rotation.set(lerp(-.8,-.035,k),lerp(.6,-.04,k),lerp(-1.2,.035,k));
     this.right.position.set(.215,-.27,-.4);this.right.rotation.set(-1.05,-.1,-.1);
     if(reach>.001) {
-      const pull=smoothstep(.24,.88,reach);
-      this.right.position.set(lerp(-.22,.25,pull),lerp(.10,-.22,pull),lerp(.04,-.48,pull));
+      // staged: the right hand goes back and finds the shoulder strap, the pack swings round into both
+      // hands, the flap is thumbed open, then the pack settles as a lap tray for the four pockets
+      const pull=smoothstep(.16,.72,reach);
+      const open=smoothstep(.5,.94,reach);
+      const settle=smoothstep(.74,1,reach);
+      const sway=Math.sin(reach*Math.PI)*.03;
+      this.right.position.set(lerp(-.22,.25,pull)+sway,lerp(.10,-.22,pull)+settle*.012,lerp(.04,-.48,pull));
       this.right.rotation.set(lerp(-2.1,-.3,pull),-.3,lerp(-.8,.1,pull));
-      this.left.position.set(-.29-reachBack*.12,lerp(-.6,-.24,pull),lerp(-.18,-.5,pull));
+      this.left.position.set(-.29-reachBack*.12,lerp(-.6,-.24,pull)+settle*.01,lerp(-.18,-.5,pull));
       this.left.rotation.set(-.2,.1,-.25);
-      this.bag.position.set(0,lerp(-.85,-.3,pull),-.64);this.bag.rotation.set(-.12+reachBack*.3,reachBack*.2,reachBack*-.13);
-      this.flap.rotation.x=-smoothstep(.45,1,reach)*1.25;
+      this.bag.position.set(0,lerp(-.95,-.32,pull)+sway,lerp(-.8,-.57,pull));
+      this.bag.rotation.set(lerp(-.22,-.06,pull)-open*.1,reachBack*.22,reachBack*-.12);
+      this.flap.rotation.x=-open*1.4;
+    }
+    if(work>.01) {
+      // one knee in the dirt, both hands on the machine: a wrench if there is one, a cord if there is one
+      const mode=this.repairMode||'hold';
+      const ph=this.workT*(mode==='cord'?3.4:mode==='spark'?13:6.2);
+      const push=mode==='cord'?Math.sin(ph)*.09:mode==='spark'?Math.sin(ph)*.014:Math.sin(ph)*.05;
+      this.left.position.set(-.19,-.33,-.42);this.left.rotation.set(-.75,.18,.55);
+      this.right.position.set(.17,-.31-push*.4,-.44);this.right.rotation.set(-.92+push*.7,-.12,-.42);
+      this.wrench.position.set(.16,-.35-push*.35,-.55);
+      this.wrench.rotation.set(.65+push*.9,.1,-.28);
+      this.wrench.scale.setScalar(.9);
+      this.wrench.visible=mode!=='cord';
+      this.prop.visible=false;this.bag.visible=false;this.watchCase.visible=false;
     }
     this.prop.position.set(.2,-.25,-.43);this.prop.rotation.set(-.12,-.1,-.1);
     for(const [kind,m] of Object.entries(this.props)) {
