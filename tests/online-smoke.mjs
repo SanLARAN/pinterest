@@ -252,6 +252,15 @@ try {
   const pb = await B.page.evaluate(() => { const r = [...window.__hush.game.remotes.values()][0]; return r ? [r.x, r.z] : [NaN, NaN]; });
   check('movement syncs', Math.hypot(pa[0] - pb[0], pa[1] - pb[1]) < 0.5, `A (${pa.map((v) => v.toFixed(2))}) seen by B at (${pb.map((v) => v.toFixed(2))})`);
 
+  // Finish morning before visiting out-of-camp fixtures. The real camp leash correctly
+  // pulls a teleported player back while it is still morning; never rely on GPU/network slowness.
+  await A.page.evaluate(() => window.__hush.game.startDusk());
+  const night = await until(async () => (await A.page.evaluate(() => window.__hush.game.state)) === 'play' && (await B.page.evaluate(() => window.__hush.game.state)) === 'play', 90000);
+  check('the night falls for both', !!night);
+  const runRules=await B.page.evaluate(()=>window.__hush.game.roomRules.hideNames);
+  check('hideNames is copied into the run, not just the roster',runRules);
+  for(const P of[A,B])await P.page.evaluate(()=>{window.__hush.game.voiceMimic.wait=1e9});
+
   // a cabin door: B swings it open from outside (it opens away from B: inward); the host sees the same
   const bDoor = await B.page.evaluate(() => {
     const g = window.__hush.game, d = g.doors.list[0], p = g.player;
@@ -268,8 +277,7 @@ try {
     g.cabinets.open(c);
     return {i:c.i,k:c.items.findIndex(q=>!q.taken&&q.kind!=='nuts')};
   });
-  // This test teleports B. Wait for the host's interpolated body to arrive INSIDE the cabin,
-  // not merely within 2m on the other side of its wall: hostClaim correctly rejects that sightline.
+  // The host must receive the teleported position before it can authorize the claim.
   const cabinetReady=await until(() => A.page.evaluate(i=>{
     const g=window.__hush.game,c=g.cabinets.list[i],r=[...g.remotes.values()][0];
     return c.opened&&r&&Math.hypot(r.x-c.front.x,r.z-c.front.z)<.2&&Math.abs(r.y-c.spec.y)<.5;
@@ -282,24 +290,15 @@ try {
   check("B's cupboard pickup is awarded once by the host",!!cabinetOk,JSON.stringify(cab));
   // the flare gun: B fires; the flare flies on the host's machine too (owned by B)
   await B.page.evaluate(() => {
-    const g = window.__hush.game, was = g.state;
-    g.state = 'play'; // (it can only be fired at night; the shot itself is what we're after)
+    const g = window.__hush.game;
     g.setFlares(2, true);
     g.inventory.reconcile();g.inventory.equipped='flare';g.inventory.equipT=0;
     g.player.pitch = 0.8;
     g.inventory.primary();
-    g.state = was;
   });
   const aFlare = await until(() => A.page.evaluate(() => { const g = window.__hush.game, f = g.flares.list[0]; return f ? (f.owner === g.remotes.keys().next().value ? 'B' : 'someone else') : null; }), 20000);
   check("B's flare flies on the host's machine", aFlare === 'B', String(aFlare));
   facts.push(`door ${aDoor === bDoor ? 'synced' : 'NOT synced'} · cupboard ${cabinetOk ? 'synced' : 'NOT synced'} · flare ${aFlare === 'B' ? 'synced' : 'NOT synced'}`);
-  // the night, and one of the UAZ's parts: B asks for it (the host decides), throws it; it lands for the host too
-  await A.page.evaluate(() => window.__hush.game.startDusk());
-  const night = await until(async () => (await A.page.evaluate(() => window.__hush.game.state)) === 'play' && (await B.page.evaluate(() => window.__hush.game.state)) === 'play', 90000);
-  check('the night falls for both', !!night);
-  const runRules=await B.page.evaluate(()=>window.__hush.game.roomRules.hideNames);
-  check('hideNames is copied into the run, not just the roster',runRules);
-  for(const P of[A,B])await P.page.evaluate(()=>{window.__hush.game.voiceMimic.wait=1e9});
   // the host's flashlight: B sees it on (and taken); a shard the host picks up pays B as well
   const torch = await (async () => {
     const hostId = await B.page.evaluate(() => window.__hush.coop.hostId);
