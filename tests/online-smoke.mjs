@@ -316,6 +316,17 @@ try {
   // B's flashlight (a guest's): a thing near B with nothing in the way sees the light, and the host's
   // monster comes to look — the guest's light has to reach the host as a noise
   const lit = await (async () => {
+    // Keep this fixture independent of the preceding cupboard/flare: stand in the open,
+    // not with the real, hand-offset flashlight inside the cabin wall, and level the beam.
+    const at=await B.page.evaluate(()=>{
+      const g=window.__hush.game,p=g.player,s=g.world.spawn,pos={x:s.x+.8,z:s.z+.6};
+      g.world.col.resolve(pos,.35);p.x=pos.x;p.z=pos.z;p.y=g.tools.groundHeight(p.x,p.z);
+      p.vx=p.vz=0;p.yaw=p.pitch=0;return pos;
+    });
+    const arrived=await until(()=>A.page.evaluate(at=>{
+      const r=[...window.__hush.game.remotes.values()][0];return r&&Math.hypot(r.x-at.x,r.z-at.z)<.2;
+    },at),15000);
+    if(!arrived)return 'host never saw B reach the open light-test fixture';
     const spot = await A.page.evaluate(() => {
       const g = window.__hush.game, [bid, r] = [...g.remotes.entries()][0];
       for (let a = 0; a < 360; a += 5) {
