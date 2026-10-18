@@ -408,11 +408,17 @@ try {
       p.vx = p.vz = p.speed = 0; window.__hush.input.useHeld = true;
       return c.i;
     });
+    // The 2.8s pry uses simulation dt (capped at .05/frame), not wall-clock time.
+    // As with cassette playback, leave enough time for software-rendered CI to advance the game.
     const opened = await until(() => A.page.evaluate((ci) => {
       const c = window.__hush.game.cabinets.list[ci]; return !c.locked && c.opened;
-    }, ci), 30000);
+    }, ci), 90000);
+    const diag=opened?'':await B.page.evaluate(ci=>{
+      const g=window.__hush.game,c=g.cabinets.list[ci];
+      return `client ${g.state}, muted ${g.inputMuted}, pry ${g.cabinets.pry?.t}, clock ${g.time.toFixed(2)}, off ${Math.hypot(g.player.x-c.front.x,g.player.z-c.front.z).toFixed(2)}`;
+    },ci);
     await B.page.evaluate(() => { window.__hush.input.useHeld = false; });
-    return opened ? 'ok' : 'locked cabinet did not open on host';
+    return opened ? 'ok' : `locked cabinet did not open on host (${diag})`;
   })();
   check("B's crowbar pries a locked camp cabinet on the host too", pryOk === 'ok', pryOk);
   const speakerOk = await (async () => {
