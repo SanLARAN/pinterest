@@ -593,7 +593,7 @@ export class Objectives {
       game.tools.interact(best, pressed, T);
       return;
     }
-    if (best.kind === 'lookout' || best.kind === 'campSpeaker') {
+    if (best.kind === 'lookout' || best.kind === 'campSpeaker' || best.kind === 'campGenerator') {
       this.searchT = 0;
       game.expedition.interact(best, dt, held, pressed, T);
       return;

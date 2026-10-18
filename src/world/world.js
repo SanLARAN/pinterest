@@ -6,6 +6,7 @@ import { MeshBuilder, KIND } from './builder.js';
 import { Terrain } from './terrain.js';
 import { Collision } from './collision.js';
 import { ForestTrails } from './trails.js';
+import { Meadow } from './meadow.js';
 import { buildYard, buildOutside, inYard } from './yard.js';
 import { FIRETOWER, ZARYA, buildFiretower, buildZarya, buildWaymarks } from './expedition.js';
 
@@ -145,6 +146,7 @@ export class World {
     this.genTrees(rng);
     this.genScatter(rng);
     this.buildChunks();
+    this.grass=new Meadow(this).generate();
     // past the edge: the cut through the hills, the lowland, the highway (meshes of their own)
     this.outside = buildOutside(this, this.material);
     for (const m of this.outside.meshes) this.scene.add(m);

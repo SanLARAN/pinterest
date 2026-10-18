@@ -54,7 +54,7 @@ void main() {
   vec3 V = toCam / camD;
   if (dot(N, V) < 0.0) N = -N;
   int k = int(vKind + 0.5);
-  vec3 base = k >= 13 ? (k == 13 ? uDye[0] : (k == 14 || k == 17) ? uDye[1] : k == 15 ? uDye[2] : uDye[3]) : PAL[k];
+  vec3 base = k == 12 ? vec3(.008,.014,.011) : k >= 13 ? (k == 13 ? uDye[0] : (k == 14 || k == 17) ? uDye[1] : k == 15 ? uDye[2] : uDye[3]) : PAL[min(k,11)];
   float st = hash13(floor(vWorld * 26.0));
 
   // real light only

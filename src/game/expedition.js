@@ -7,6 +7,7 @@ import { t } from '../core/i18n.js';
 import { shared } from '../render/sonar.js';
 import { FIRETOWER, ZARYA, buildBinoculars } from '../world/expedition.js';
 import { geometryOf } from './uaz.js';
+import { CampPower } from './campPower.js';
 
 const _v = new THREE.Vector3();
 export class Expedition {
@@ -27,6 +28,7 @@ export class Expedition {
     this.timer = this.el.querySelector('.bino-time');
     this.exit = this.el.querySelector('.bino-exit');
     this.ghosts = new Map();
+    this.power=new CampPower(game);
     this.reset();
   }
   get onTower() { return this.tower !== null; }
@@ -40,8 +42,10 @@ export class Expedition {
     this.speaker = { rev: 0, used: false, end: 0 };
     this.speakerNoiseT = 0;
     this.discovered = new Set();
+    this.power?.reset();
   }
   silence() {
+    this.power?.silence();
     this.closeView();
     if (this.sound) this.sound.stop();
     this.sound = null;
@@ -64,12 +68,14 @@ export class Expedition {
   consider(fn) {
     const g = this.g;
     if (this.onTower || !g.player.alive || g.inputMuted || g.player.carrying || g.escape.held || g.escape.mySeat >= 0 || g.cabinets.busy) return;
+    this.power?.consider(fn);
     fn(this.F, this.F.ladder.x, this.F.ladder.z, 1.9, 'lookout');
     const S = this.C.switch;
     fn(this.C, S.x, S.z, 1.7, 'campSpeaker');
   }
   interact(best, dt, held, pressed, T) {
     const g = this.g;
+    if(best.kind==='campGenerator'){this.power.interact(dt,held,T);return;}
     if (best.kind === 'lookout') {
       g.hud.setUse(T('useLookout'), this.climbT / 0.35, true);
       if (held && g.player.speed < 0.6 && !g.inputMuted) this.climbT += dt;
@@ -139,15 +145,18 @@ export class Expedition {
     if (g.sync) g.sync.ev('spe', this.netState());
     return true;
   }
-  netState() { const s = this.speaker; return [s.rev, s.used ? 1 : 0, Math.round(s.end * 100) / 100]; }
+  netState() { const s = this.speaker; return [s.rev, s.used ? 1 : 0, Math.round(s.end * 100) / 100, ...(this.power?.netState()||[0,0])]; }
   netMerge(a) {
-    if (!Array.isArray(a) || a.length !== 3 || !a.every(Number.isFinite) || a[0] <= this.speaker.rev) return;
+    if (!Array.isArray(a) || a.length < 3 || !a.every(Number.isFinite)) return;
+    if(a.length===5)this.power?.netMerge(a.slice(3));
+    if(a[0] <= this.speaker.rev)return;
     this.speaker = { rev: a[0], used: !!a[1], end: a[2] };
     this.speakerNoiseT = 0;
   }
 
   update(dt) {
     const g = this.g, p = g.player, tw = this.tower;
+    this.power?.update(dt);
     this.cooldown = Math.max(0, this.cooldown - dt);
     if (tw) {
       if (g.state !== 'play' || !p.alive || g.cabinets.busy) {

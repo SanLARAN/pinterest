@@ -137,9 +137,9 @@ export class ForestTrails {
           soilQuad(arr,[v(a,0),v(a,half),v(b,half),v(b,0)],[.5,1,1,.5]);
           if(rng.chance(.25)) {const off=rng.float(-.3,.3),width=rng.float(.035,.075);arr.quadN(v(a,off-width),v(b,off-width),v(b,off+width),v(a,off+width),[0,1,0],KIND.TRAIL_RUT,15);}
         }
-        const tufts=overgrown?7:4;
+        const tufts=overgrown?3:1;
         for(let g=0;g<tufts;g++) {
-          const t=rng.next(),side=g===0&&overgrown?rng.float(-half,half):(g%2?1:-1)*rng.float(half*.7,half+ .42),x=a.x+(b.x-a.x)*t+nx*side,z=a.z+(b.z-a.z)*t+nz*side,y=terr.height(x,z)+.025;
+          const t=rng.next(),side=g===0&&overgrown?rng.float(-half,half):((i+g)%2?1:-1)*rng.float(half*.7,half+ .42),x=a.x+(b.x-a.x)*t+nx*side,z=a.z+(b.z-a.z)*t+nz*side,y=terr.height(x,z)+.025;
           const h=rng.float(.09,overgrown?.25:.19),wid=rng.float(.045,.09),yaw=rng.float(0,Math.PI);
           for(const angle of[yaw,yaw+Math.PI*.48]) {const dx=Math.cos(angle)*wid,dz=Math.sin(angle)*wid;arr.triN([x-dx,y,z-dz],[x+dx,y,z+dz],[x+dx*.7,y+h,z+dz*.7],[0,1,0],KIND.TRAIL_GRASS);}
         }

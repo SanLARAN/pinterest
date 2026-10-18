@@ -480,6 +480,7 @@ function placeGeometry(id, world) {
       const props = [];
       const fake = {
         terrain: { height: () => 0, flats: [] }, col: { add() {}, circle() {} }, addProp: (x, z, fn) => props.push(fn), spawn: null, lake: null, effigies: [], doors: [],
+        genProp: World.prototype.genProp,
         cabinets: [], addCabinet(id, kind, x, y, z, yaw) { this.cabinets.push({ kind, x, y, z, yaw }); },
       };
       World.prototype['lm_' + kind].call(fake, { ...L, x: 0, z: 0 }, rng);

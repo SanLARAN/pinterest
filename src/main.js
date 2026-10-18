@@ -8,6 +8,7 @@ import '@fontsource/jetbrains-mono/cyrillic-700.css';
 import '@fontsource/jetbrains-mono/latin-700.css';
 import './style.css';
 import './garage-home.css';
+import './screen-editor.css';
 
 import * as THREE from 'three';
 import { CFG } from './core/config.js';

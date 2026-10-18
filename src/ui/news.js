@@ -7,6 +7,23 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v:'1.14',date:'2026-10-18',
+    ru:{title:'Зорька включает свет',items:[
+      'Трава теперь растёт пятнами по полянам и лесу, а не только по краям троп. Разная густота, мягкое покачивание и затухание вдали; та же настоящая подсветка, без свечения',
+      'Аптечный шкаф «Зорьки» закреплён на стене столовой, а не висит посреди комнаты',
+      'У «Зорьки» отдельный местный генератор: удерживай E у панели шесть секунд. Он питает семь ламп — в обоих корпусах, столовой и на улице. Шум привлекает тварей; основная цепочка из пяти генераторов не стала длиннее',
+      'Бесплатная голова-экран: рисунок 32 × 24, карандаш, ластик, отмена, надпись до 24 знаков и пиксельные портреты Слушателя, Ползуна, Наблюдателя, Ревуна и Тени. Рисуй мышью или пальцем, цвет люминофора меняется покраской',
+      'Оформление экрана сохраняется и передаётся друзьям — в лобби, игре и эхо. Старые покупки, одежда и цвета сохранены',
+    ]},
+    en:{title:'Zarya switches the lights on',items:[
+      'Patchy grass now fills open fields and forest floors, not just the trail edges. Varied density, gentle wind and distance fading; the same real lighting, no emissive route',
+      'Zarya’s first-aid cabinet is mounted against the dining-room wall instead of floating in the room',
+      'An independent local generator at Zarya: hold E at its panel for six seconds to power seven indoor and outdoor lamps. Repairs are noisy; the main five-generator quest remains unchanged',
+      'Free CRT head: a 32 by 24 drawing, pencil, eraser, undo, up to 24 caption characters and pixel portraits of the Listener, Crawler, Watcher, Howler and Shade. Mouse and touch editing; dye the phosphor in Paint',
+      'Your display is saved and shared with friends in the lobby, forest and echoes. Existing outfits, dyes and purchases are preserved',
+    ]},
+  },
+  {
     v:'1.13',date:'2026-10-18',
     ru:{title:'Чай перед сменой',items:[
       'Зеркало вместе с рамой, дополнительный шкаф и помост убраны из гаража: игрок на стуле больше не перекрыт, а бочка свободна',

@@ -2,6 +2,7 @@
 // dress it: headwear and an outfit, the standard kit or one of three themed pieces for each, two dyes
 // per piece. What you pick is saved here and sent to your friends: it's how they'll see you out there.
 import { Mannequin } from './mannequin.js';
+import { ScreenEditor } from './screenEditor.js';
 import { t } from '../core/i18n.js';
 import {
   SLOTS, ITEMS, PALETTE, SHOP, item, product, owns, wardrobe, saveWardrobe, colorsOf, setColor, resetColors, isDefaultColors,
@@ -56,6 +57,9 @@ export class Wardrobe {
     this.touched = false;
     this.lastFit = fitKey(myFit());
     this.shopSel = SHOP[0].id; // the product looked at in the shop
+    this.screenEditor=new ScreenEditor({getValue:()=>wardrobe.screen,getColor:()=>colorsOf('screen')[1],onApply:screen=>{
+      wardrobe.screen=screen;saveWardrobe();this.mq?.setFit(myFit());this._queueStills();this._renderInfo();this.coop?.active&&this.coop.announce();
+    }});
     this._bind();
     onWallet(() => {
       this._renderWallet();
@@ -125,6 +129,7 @@ export class Wardrobe {
 
   close() {
     if (!this.shown) return;
+    this.screenEditor?.close();
     this.shown = false;
     this.el.classList.remove('show');
     this.el.setAttribute('aria-hidden', 'true');
@@ -149,7 +154,7 @@ export class Wardrobe {
 
   // the main loop, while the wardrobe is open (the forest isn't drawn meanwhile)
   frame(dt) {
-    if (!this.shown) return;
+    if (!this.shown || this.screenEditor?.opened) return;
     if (this.mq) {
       this.mq.frame(dt);
       // your callsign floats over your head, like your friends' do out there
@@ -527,7 +532,8 @@ export class Wardrobe {
     }
     const it = item(wardrobe[this.slot]);
     const tx = T.items[it.id];
-    $('wrInfo').innerHTML = `<div class="wr-info-head"><span class="wr-worn-label">${esc(t('wardrobeWorn'))}</span><h3>${esc(tx.name)}</h3><span class="wr-theme t-${it.theme}">${esc(T.theme[it.theme])}</span></div><p>${esc(tx.desc)}</p>`;
+    $('wrInfo').innerHTML = `<div class="wr-info-head"><span class="wr-worn-label">${esc(t('wardrobeWorn'))}</span><h3>${esc(tx.name)}</h3><span class="wr-theme t-${it.theme}">${esc(T.theme[it.theme])}</span></div><p>${esc(tx.desc)}</p>`
+      + (it.id==='screen'?`<button type="button" id="wrScreenEdit" class="btn">${esc(t('editScreen'))}</button>`:'');
   }
 
   _renderPaint() {
@@ -691,6 +697,7 @@ export class Wardrobe {
         this._click();
         this.setPart(+t.dataset.part);
       } else if (t.dataset.hex) this.paint(t.dataset.hex);
+      else if (t.id === 'wrScreenEdit') this.screenEditor.open();
       else if (t.id === 'wrRandom') this.randomize();
       else if (t.id === 'wrReset') this.resetItem();
       else if (t.id === 'wrDone' || t.id === 'wrClose') {

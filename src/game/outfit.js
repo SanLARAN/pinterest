@@ -8,12 +8,13 @@
 // what you had. Shop pieces (shop: product id) can only be worn once bought (see wallet.js).
 import { getLang } from '../core/i18n.js';
 import { hasProduct } from './wallet.js';
+import { cleanScreen, screenKey, DEFAULT_SCREEN } from './screenFace.js';
 
 export const SLOTS = ['head', 'body', 'car'];
 export const WEAR = ['head', 'body']; // what a survivor wears (the car stays in the garage)
 
 // themes: base = the kit you came with
-export const THEMES = ['base', 'taiga', 'zone', 'halloween', 'anime', 'furry', 'leshy', 'plague', 'cosmos', 'tuning'];
+export const THEMES = ['base', 'taiga', 'zone', 'halloween', 'anime', 'furry', 'leshy', 'plague', 'cosmos', 'tuning', 'signal'];
 
 // c: default colours [main, accent]. glow: the accent is a light (carving, lenses) rather than a fabric
 export const ITEMS = {
@@ -24,6 +25,7 @@ export const ITEMS = {
     { id: 'pumpkin', theme: 'halloween', c: ['#e8731c', '#ffc94a'], glow: true },
     { id: 'animehair', theme: 'anime', c: ['#e86aa0', '#e9e1d2'] },
     { id: 'boykisser', theme: 'furry', c: ['#e9e1d2', '#e86aa0'] },
+    { id: 'screen', theme: 'signal', c: ['#232527', '#9cffb0'], glow: true },
     { id: 'leshyhead', theme: 'leshy', c: ['#4e6b3c', '#9cff6a'], glow: true, shop: 'leshy' },
     { id: 'plaguemask', theme: 'plague', c: ['#e9e1d2', '#232527'], shop: 'plague' },
     { id: 'helmet', theme: 'cosmos', c: ['#e9e1d2', '#ffc94a'], glow: true, shop: 'cosmos' },
@@ -108,7 +110,7 @@ export function cleanFit(f) {
     head, body,
     hc: [cleanHex(hc[0], hd[0]), cleanHex(hc[1], hd[1])],
     bc: [cleanHex(bc[0], bd[0]), cleanHex(bc[1], bd[1])],
-    car,
+    car, screen:cleanScreen(o.screen),
     cc: [cleanHex(cc[0], cd[0]), cleanHex(cc[1], cd[1])],
   };
 }
@@ -117,10 +119,10 @@ export const DEFAULT_FIT = cleanFit(null);
 
 // the pieces that change the geometry (colours are just uniforms)
 export function shapeKey(fit) {
-  return `${fit.head}+${fit.body}`;
+  return `${fit.head}+${fit.body}${fit.head==='screen'?'@'+screenKey(fit.screen):''}`;
 }
 export function fitKey(fit) {
-  return `${fit.head}:${fit.hc.join(',')}|${fit.body}:${fit.bc.join(',')}|${fit.car}:${fit.cc.join(',')}`;
+  return `${fit.head}:${fit.hc.join(',')}|${fit.body}:${fit.bc.join(',')}|${fit.car}:${fit.cc.join(',')}|${screenKey(fit.screen)}`;
 }
 
 // ---------------- your wardrobe (localStorage) ----------------
@@ -133,12 +135,13 @@ function load() {
   } catch {
     raw = null;
   }
-  const w = { head: ITEMS.head[0].id, body: ITEMS.body[0].id, car: ITEMS.car[0].id, colors: {} };
+  const w = { head: ITEMS.head[0].id, body: ITEMS.body[0].id, car: ITEMS.car[0].id, colors: {}, screen:{...DEFAULT_SCREEN} };
   if (raw && typeof raw === 'object') {
     for (const slot of SLOTS) {
       const id = cleanId(slot, raw[slot]);
       w[slot] = owns(id) ? id : ITEMS[slot][0].id; // (a shop piece that isn't yours: back to the standard one)
     }
+    w.screen=cleanScreen(raw.screen);
     const c = raw.colors && typeof raw.colors === 'object' ? raw.colors : {};
     for (const id of Object.keys(byId)) {
       if (Array.isArray(c[id])) w.colors[id] = [cleanHex(c[id][0], byId[id].c[0]), cleanHex(c[id][1], byId[id].c[1])];
@@ -181,7 +184,7 @@ export function isDefaultColors(id) {
 export function myFit() {
   return cleanFit({
     head: wardrobe.head, body: wardrobe.body, hc: colorsOf(wardrobe.head), bc: colorsOf(wardrobe.body),
-    car: wardrobe.car, cc: colorsOf(wardrobe.car),
+    car: wardrobe.car, cc: colorsOf(wardrobe.car), screen:wardrobe.screen,
   });
 }
 
@@ -210,7 +213,7 @@ const TEXT = {
     title: 'ГАРДЕРОБ',
     sub: 'Таким тебя увидят друзья — в эхе и под рабочими лампами.',
     slot: { head: 'Голова', body: 'Костюм', car: 'Машина', shop: 'Магазин' },
-    theme: { base: 'Штатное', taiga: 'Тайга', zone: 'Зона', halloween: 'Хэллоуин', anime: 'Аниме', furry: 'Фурри', leshy: 'Леший', plague: 'Чума', cosmos: 'Космос', tuning: 'Тюнинг' },
+    theme: { base: 'Штатное', taiga: 'Тайга', zone: 'Зона', halloween: 'Хэллоуин', anime: 'Аниме', furry: 'Фурри', leshy: 'Леший', plague: 'Чума', cosmos: 'Космос', tuning: 'Тюнинг', signal:'Сигнал' },
     set: 'комплект',
     color: 'Цвет',
     custom: 'свой цвет',
@@ -245,6 +248,7 @@ const TEXT = {
       pumpkin: 'тыквенный', rust: 'ржавчина', blood: 'кровь', rose: 'роза', plum: 'слива', night: 'ночь', ice: 'лёд', pine: 'хвоя', toxic: 'кислота',
     },
     items: {
+      screen:{name:'Голова-экран',parts:['Корпус','Люминофор'],desc:'Старый ЭЛТ. Рисуй, пиши или выводи пиксельные портреты лесных тварей. Бесплатно; друзья видят то же изображение.'},
       hood: { name: 'Капюшон', parts: ['Ткань', 'Шнурки'], desc: 'Штатный, от штормовки. Шнурки затянуты до упора — так почти не слышно собственного дыхания.' },
       ushanka: { name: 'Ушанка', parts: ['Мех', 'Кокарда'], desc: 'Кроличий мех и кокарда с чужой фуражки. Уши можно опустить — но в этом лесу лучше слушать.' },
       gasmask: { name: 'Противогаз', parts: ['Резина', 'Стёкла'], desc: 'Шлем-маска со склада у вышки. Стёкла светятся в темноте. Никто не знает почему.' },
@@ -271,7 +275,7 @@ const TEXT = {
     title: 'WARDROBE',
     sub: 'This is how your friends will see you — in the echoes and under the work lamps.',
     slot: { head: 'Head', body: 'Outfit', car: 'Car', shop: 'Shop' },
-    theme: { base: 'Standard issue', taiga: 'Taiga', zone: 'The Zone', halloween: 'Halloween', anime: 'Anime', furry: 'Furry', leshy: 'Leshy', plague: 'Plague', cosmos: 'Cosmos', tuning: 'Tuning' },
+    theme: { base: 'Standard issue', taiga: 'Taiga', zone: 'The Zone', halloween: 'Halloween', anime: 'Anime', furry: 'Furry', leshy: 'Leshy', plague: 'Plague', cosmos: 'Cosmos', tuning: 'Tuning', signal:'Signal' },
     set: 'full set',
     color: 'Colour',
     custom: 'custom colour',
@@ -306,6 +310,7 @@ const TEXT = {
       pumpkin: 'pumpkin', rust: 'rust', blood: 'blood', rose: 'rose', plum: 'plum', night: 'night', ice: 'ice', pine: 'pine', toxic: 'toxic',
     },
     items: {
+      screen:{name:'Screen head',parts:['Case','Phosphor'],desc:'A battered CRT. Draw, type a caption or stamp pixel portraits of the forest’s monsters. Free; your friends see the same display.'},
       hood: { name: 'Hood', parts: ['Fabric', 'Drawstrings'], desc: 'Standard, off the windbreaker. Drawstrings pulled all the way — you barely hear your own breathing.' },
       ushanka: { name: 'Ushanka', parts: ['Fur', 'Badge'], desc: "Rabbit fur and a badge off somebody else's cap. The flaps come down — but in this forest you'd better listen." },
       gasmask: { name: 'Gas mask', parts: ['Rubber', 'Lenses'], desc: 'A helmet-mask from the depot by the tower. The lenses glow in the dark. Nobody knows why.' },

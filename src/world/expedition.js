@@ -1,4 +1,4 @@
-// Optional detours, not generator sites. Their own random stream keeps the old landmarks unchanged.
+// Optional detours; Zarya also has an independent local power grid. Their own random stream keeps the old landmarks unchanged.
 // Shared by the forest and the atlas: the plates show the very same buildings, not stand-ins.
 import * as THREE from 'three';
 import { MeshBuilder, KIND } from './builder.js';
@@ -186,9 +186,30 @@ export function buildZarya(world, L) {
       for (const xx of [-5.2, 0, 5.2]) world.col.add(bx + xx - 0.68, bz + 0.7, bx + xx + 0.68, bz + 0.7, 0.7, 0.85, WOOD);
       world.col.add(bx + 2.2, bz - 2.65, bx + 6.8, bz - 2.65, 0.57, 0.9, METAL);
       world.addCabinet('zarya:kitchen', 'cupboard', bx - 5.3, y + 0.18, bz - 3.9, 0, false, { locked: true, loot: ['glow', 'shard', 'flare'] });
-      world.addCabinet('zarya:aid', 'firstaid', bx - 7.2, y + 0.18, bz - 1.4, PI / 2, false, { loot: ['glow', 'battery'] });
+      world.addCabinet('zarya:aid', 'firstaid', bx - W/2 + T/2 + .11 + .015, y + 0.18, bz - 1.4, PI / 2, false, { loot: ['glow', 'battery'], wallMounted: true });
+      world.addProp(bx-W/2,bz-1.4,b=>{for(const zz of[-1.64,-1.16])for(const yy of[1.29,1.92])boxAt(b,bx-W/2+.085,y+yy,bz+zz,.025,.055,.055,GK.RUST);});
     }
   }
+  // Local service generator. Its pole is the SAME model as the main generators, not a prop box.
+  const gen={id:'zarya-local',x:x-23,y,z:z+4,yaw:0,front:{x:x-23.3,z:z+5.4}};
+  gen.lamp={x:gen.x+1.2,y:y+3,z:gen.z-.32};world.zarya.generator=gen;
+  world.genProp(gen);world.col.add(gen.x-.5,gen.z,gen.x+.5,gen.z,.48,1.2,METAL);
+  world.col.circle(gen.x+.78,gen.z-.32,.1,3.2,METAL);
+  world.zarya.lights=[
+    {x:x-14,y:y+2.58,z:z-6,inside:true},{x:x+14,y:y+2.58,z:z-6,inside:true},
+    {x:x-5.2,y:y+2.58,z:z-23,inside:true},{x:x+5.2,y:y+2.58,z:z-23,inside:true},{x,y:y+3.5,z:z+16},{x,y:y+3.5,z:z+1},gen.lamp,
+  ];
+  world.addProp(x,z,b=>{
+    for(const L of world.zarya.lights.slice(0,6)){
+      if(!L.inside){b.identity();b.limb([L.x+.4,y,L.z],[L.x+.4,L.y+.25,L.z],.045,.035,GK.RUST,5);b.limb([L.x+.4,L.y+.2,L.z],[L.x,L.y+.2,L.z],.025,.025,GK.RUST,4);}
+      boxAt(b,L.x,L.y+.11,L.z,.28,.09,.22,GK.TIN);
+      boxAt(b,L.x,L.y+.025,L.z,.18,.06,.12,GK.BONE);
+    }
+    // Cable from the engine to the low distribution cabinet.
+    b.identity();b.limb([gen.x+.5,y+.35,gen.z],[gen.x+1.6,y+.08,gen.z],.016,.016,GK.RUBBER,4);
+    boxAt(b,gen.x+1.7,y+.45,gen.z,.3,.85,.24,GK.GATE);
+  });
+  for(const L of world.zarya.lights.slice(4,6))world.col.circle(L.x+.4,L.z,.065,3.8,METAL);
   world.addProp(x, z, (b) => {
     const box = (xx, yy, zz, w, h, d, mat = KIND.WOOD) => boxAt(b, x + xx, y + yy, z + zz, w, h, d, mat);
     // gate / faded camp name

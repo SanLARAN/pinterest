@@ -9,6 +9,7 @@ import * as THREE from 'three';
 import { MeshBuilder, KIND } from '../world/builder.js';
 import { RNG, clamp, lerp } from '../core/rng.js';
 import { cleanFit, shapeKey } from './outfit.js';
+import { screenRects } from './screenFace.js';
 
 export const DYE = { HA: 13, HB: 14, BA: 15, BB: 16, HG: 17, BG: 18 };
 const { HA, HB, BA, BB, HG } = DYE;
@@ -501,6 +502,21 @@ const BODY = {
 
 // ---------------- headwear ----------------
 const HEAD = {
+  screen(R) {
+    part(R,R.nodes.head,b=>{
+      b.place(0,.02,-.025);b.box(.44,.35,.30,HA);
+      b.place(0,.02,.13);b.box(.397,.307,.035,HA);
+      b.place(-.018,.034,.153);b.box(.344,.257,.016,12); // unlit black glass
+      for(const s of[-1,1]){b.place(.187,.075+s*.06,.16);b.cylinder(6,.019,.019,.024,HB,{capBottom:true});}
+      for(let i=0;i<5;i++){b.place(-.115+i*.055,.025,-.18);b.box(.025,.20,.012,12);}
+      b.place(0,-.185,-.03);b.cylinder(6,.052,.04,.075,5);
+      b.identity();b.limb([.14,.193,-.06],[.21,.35,-.10],.008,.006,5,4);
+      for(const r of screenRects(R.fit.screen)){
+        const x0=-.184+r.x*.0103,x1=x0+r.w*.0103-.0008,y1=.154-r.y*.0103,y0=y1-.0095;
+        b.identity();b.quadN([x0,y0,.164],[x1,y0,.164],[x1,y1,.164],[x0,y1,.164],[0,0,1],HG,15);
+      }
+    });
+  },
   // the windbreaker's hood, drawstrings pulled tight
   hood(R) {
     face(R);

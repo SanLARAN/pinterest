@@ -456,7 +456,7 @@ const TEXT = {
         "tips": [
           "Корпуса открыты, шкафчики в глубине. В запертых гарантированы припасы.",
           "Громкоговоритель включается E у флагштока; там же его можно выключить раньше, но уже не запустить второй раз.",
-          "Это не новый обязательный генератор: приходи за лутом или сделай здесь шумную приманку."
+          "Местный генератор слева от корпусов: удерживай E шесть секунд у панели, чтобы включить семь ламп внутри и снаружи. Он не заменяет пять основных генераторов; шум запуска привлекает тварей."
         ],
         "facts": [
           [
@@ -1012,7 +1012,7 @@ const TEXT = {
         "tips": [
           "Open dormitories, lockers at the back. Locked ones have guaranteed supplies.",
           "E at the same switch stops the horn early, but it will not restart.",
-          "Not a mandatory new generator: come for loot, or make a diversion."
+          "A local generator stands left of the dormitories: hold E at its panel for six seconds to power seven indoor/outdoor lamps. It is separate from the five main generators; starting it draws attention."
         ],
         "facts": [
           [

@@ -2138,6 +2138,7 @@ export class Game {
     camera.getWorldDirection(_v);
     this.audio.setListener(camera.position.x, camera.position.y, camera.position.z, _v.x, _v.y, _v.z);
     this.expedition.applyView(camera);
+    this.world.grass?.update(camera);
     const hands = !cutCam && !sp && !this.expedition.onTower && this.player.alive && (this.state === 'play' || this.state === 'dawn');
     const gear = hands && !this.cabinets.busy && !this.inventory.active && this.inventory.equipT <= 0 && this.fieldView.watch < 0.1 && !this.escape.held && !this.player.carrying;
     const active = this.inventory.equipped;

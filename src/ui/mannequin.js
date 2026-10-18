@@ -80,8 +80,8 @@ void main() {
   if (dot(N, V) < 0.0) N = -N;
   int k = int(vKind + 0.5); // (an interpolated constant can land a hair under the integer)
   bool glow = k == 17 || k == 18;
-  vec3 base = k >= 52 ? (k == 52 ? uCarDye[0] : uCarDye[1]) : k >= 19 ? GPAL[clamp(k - 19, 0, 30)]
-            : k >= 13 ? (k == 13 ? uDye[0] : (k == 14 || k == 17) ? uDye[1] : k == 15 ? uDye[2] : uDye[3]) : PAL[k];
+  vec3 base = k == 12 ? vec3(.008,.014,.011) : k >= 52 ? (k == 52 ? uCarDye[0] : uCarDye[1]) : k >= 19 ? GPAL[clamp(k - 19, 0, 30)]
+            : k >= 13 ? (k == 13 ? uDye[0] : (k == 14 || k == 17) ? uDye[1] : k == 15 ? uDye[2] : uDye[3]) : PAL[min(k,11)];
   float facing = clamp(dot(N, V), 0.0, 1.0);
 
   // the echo: a wavefront, a quick flash, a long afterglow
@@ -872,6 +872,7 @@ export class Mannequin {
     if (!rig) {
       rig = dressRig(fit, this.tmat);
       this.trigs.set(key, rig);
+      if(this.trigs.size>48){const oldest=this.trigs.keys().next().value,old=this.trigs.get(oldest);this.trigs.delete(oldest);old.root.removeFromParent();old.root.traverse(o=>o.geometry?.dispose());}
     }
     for (const r of this.trigs.values()) r.root.visible = r === rig;
     for (const c of this.tcars.values()) c.visible = false;

@@ -5,7 +5,7 @@ import { CFG } from '../core/config.js';
 
 const N = CFG.PULSE.slots;
 export const GLOW_SLOTS = 6; // small lights: glow sticks, the first-aid hut's lantern
-export const LAMP_SLOTS = 6; // work lamps: the five generators' + the floodlight over the forestry yard
+export const LAMP_SLOTS = 13; // five main sites, yard floodlight, seven lamps on Zarya’s independent local grid
 // omni shadows (see render/shadows.js): every small light and every lamp has six faces of distances in one
 // atlas — a row per light, a tile per face
 export const SHADOW_TILE = 192;
@@ -525,6 +525,7 @@ void main() {
     fillK = 1.0 + 0.7 * uDyeK;
     glow = k >= 17;
   }
+  if(k==12){c=vec3(.008);fillC=c;fillK=.1;}
   // stuttering, not smooth: it flickers like a bad signal
   float fl = 0.72 + 0.28 * step(0.35, fract(sin(floor(uTime * 24.0) * 12.9898 + floor(vWorld.y * 4.0) * 78.233) * 43758.5453));
   float dist = exp(-camD * 0.011);

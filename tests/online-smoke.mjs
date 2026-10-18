@@ -80,6 +80,8 @@ try {
     const s=window.__hush.garage.studio;return!s.mirror&&!s.mirrorTarget&&!s.reflection&&!s.reflect;
   }));
   check('patch notes are anchored in the footer',await A.page.$eval('#news',e=>e.parentElement.classList.contains('menu-foot')));
+  check('grass fills independent field chunks, not only path borders',await A.page.evaluate(()=>window.__hush.world.grass.tufts>100000&&window.__hush.world.grass.meshes.length===225));
+  check('Zarya has its local engine, seven fixtures and a wall-mounted medicine cabinet',await A.page.evaluate(()=>{const w=window.__hush.world;return w.sites.length===5&&w.zarya.generator.id==='zarya-local'&&w.zarya.lights.length===7&&w.cabinets.find(c=>c.id==='zarya:aid').wallMounted}));
   await A.page.evaluate(async () => { const h = window.__hush; h.audio.init(); await h.mic.start(h.audio); });
   // public trackers / relays sometimes just don't pass an offer along: one more try with a fresh room
   // before calling it broken (a real break fails both)

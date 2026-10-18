@@ -106,7 +106,7 @@ void main() {
   vec3 toCam = uCam - vWorld;
   vec3 V = normalize(toCam);
   if (dot(N, V) < 0.0) N = -N;
-  vec3 base = k < 12 ? PAL[k] : k < 19 ? ((k == 13) ? uDye[0] : (k == 14 || k == 17) ? uDye[1] : (k == 15) ? uDye[2] : uDye[3]) : k >= 52 ? (k == 52 ? uCarDye[0] : uCarDye[1]) : GPAL[clamp(k - 19, 0, 30)];
+  vec3 base = k == 12 ? vec3(.008,.014,.011) : k < 12 ? PAL[k] : k < 19 ? ((k == 13) ? uDye[0] : (k == 14 || k == 17) ? uDye[1] : (k == 15) ? uDye[2] : uDye[3]) : k >= 52 ? (k == 52 ? uCarDye[0] : uCarDye[1]) : GPAL[clamp(k - 19, 0, 30)];
 
   // the echo: a wavefront, a flash, an afterglow (a voice doesn't light the whole garage)
   float age = uTime - uPing.w;
