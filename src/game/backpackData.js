@@ -1,8 +1,8 @@
 // The four pockets are the only storage for usable field items. Small consumables stack;
 // mission parts/notes belong to the shared objective, heavy UAZ parts occupy both hands.
 export const BAG_SIZE = 4;
-export const BAG_KINDS = ['stones', 'glow', 'torch', 'flare', 'battery', 'tape', 'crowbar'];
-export const BAG_LIMIT = { stones: 3, glow: 3, torch: 1, flare: 6, battery: 3, tape: 1, crowbar: 1 };
+export const BAG_KINDS = ['stones', 'glow', 'torch', 'flare', 'battery', 'tape', 'crowbar', 'map'];
+export const BAG_LIMIT = { stones: 3, glow: 3, torch: 1, flare: 6, battery: 3, tape: 1, crowbar: 1, map:1 };
 export const LOOT_KIND = { nuts: 'stones', glow: 'glow', battery: 'battery', flare: 'flare' };
 export const kindIndex = (kind) => BAG_KINDS.indexOf(kind);
 export function fitsPocket(slots, kind) {
@@ -25,6 +25,7 @@ export function cleanParcel(d) {
   return { kind: d.kind, n: d.n, ...(d.kind === 'torch' ? { charge: d.charge } : {}), ...(d.kind === 'flare' ? { gun: !!d.gun } : {}) };
 }
 export const BAG_ICON = {
+  map:'<path d="m6 14 17-5 18 6 17-6v42l-17 5-18-6-17 5Z"/><path d="M23 9v41M41 15v41M13 26l7 7M20 26l-7 7M31 37l5 5M36 37l-5 5"/>',
   stones: '<path d="m17 15 17-7 16 12-4 23-23 4-11-17Z"/><circle cx="32" cy="28" r="9"/><path d="m23 47 5 8 15-3 10-12-7-7"/>',
   glow: '<path d="m37 7 9 5-20 45-9-5Z"/><path d="m34 13 9 5M20 45l9 5M22 38l13-27"/>',
   torch: '<path d="m23 29 15 4-6 23-15-4Z"/><path d="m23 29-5-10 6-12 24 7-1 13-9 6M20 18l25 7M24 9l-1 10M43 14l-4 9"/><path d="m27 36 4 1-2 8-4-1Z"/>',

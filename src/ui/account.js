@@ -3,13 +3,15 @@ import {scopeSnapshot} from '../cloud/snapshot.js';
 import {getScope,isAccountScope} from '../core/persistence.js';
 import {wallet} from '../game/wallet.js';
 import {reliableTouchButtons} from './touchButtons.js';
+import {socialWords} from './socialWords.js';
+import {copyText} from './clipboard.js';
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export class AccountUI {
- constructor({cloud,canOpen=()=>true,canChange=()=>true,getRoom=()=>null,onJoin=()=>{}}){
-  this.cloud=cloud;this.canOpen=canOpen;this.canChange=canChange;this.getRoom=getRoom;this.onJoin=onJoin;this.opened=false;this.view='profile';this.mode='login';this.draft={};this.edited=new Set();this.results=null;this.query='';this.busy=false;this.message='';this.error='';this.lastUser=cloud.user?.id||null;
+ constructor({cloud,canOpen=()=>true,canChange=()=>true,getRoom=()=>null,getInviteLink=()=>null,onJoin=()=>{}}){
+  this.cloud=cloud;this.canOpen=canOpen;this.canChange=canChange;this.getRoom=getRoom;this.getInviteLink=getInviteLink;this.onJoin=onJoin;this.opened=false;this.view='profile';this.mode='login';this.draft={};this.edited=new Set();this.results=null;this.query='';this.busy=false;this.message='';this.error='';this.lastUser=cloud.user?.id||null;
   this.el=document.createElement('section');this.el.id='accountPanel';this.el.className='account-panel';this.el.hidden=true;this.el.setAttribute('role','dialog');this.el.setAttribute('aria-modal','true');this.el.setAttribute('aria-labelledby','cloudTitle');document.body.append(this.el);
   this.disposeTouch=reliableTouchButtons(this.el,()=>this.opened,()=>this.cloud.user?.id||'guest');
-  this.nav=document.getElementById('btnAccount');this.lobbyNav=document.getElementById('btnLobbyFriends');this.nav?.addEventListener('click',()=>this.open());this.lobbyNav?.addEventListener('click',()=>this.open('friends'));
+  this.nav=document.getElementById('btnAccount');this.lobbyNav=document.getElementById('btnLobbyFriends');this.nav?.addEventListener('click',()=>this.open());this.lobbyNav?.addEventListener('click',()=>this.open('invite'));
   this.el.addEventListener('keydown',e=>{e.stopPropagation();if(e.code==='Escape'){e.preventDefault();this.close();}if(e.code==='Tab'){const a=[...this.el.querySelectorAll('button,input,textarea')].filter(x=>!x.disabled&&x.getClientRects().length),i=a.indexOf(document.activeElement);if(a.length){e.preventDefault();a[(i+(e.shiftKey?-1:1)+a.length)%a.length].focus();}}});this.el.addEventListener('keyup',e=>e.stopPropagation());
   this.el.addEventListener('submit',e=>{e.preventDefault();e.stopPropagation();if(!this.busy)this.submit(e.target);});
   this.el.addEventListener('click',e=>{const b=e.target.closest('button');if(!b||b.disabled||!b.dataset.action)return;if(b.dataset.action==='close'){this.close();return;}if(!this.busy)this.action(b.dataset.action,b.dataset.id);});
@@ -32,13 +34,13 @@ export class AccountUI {
  render(){
   if(this.opened&&(this.pointerActive||this.composing)){this.renderPending=true;return;}if(this.renderFrame){cancelAnimationFrame(this.renderFrame);this.renderFrame=null;}this.renderPending=false;
   const W=cloudWords(),c=this.cloud,count=c.social.invites.length+c.social.requests.filter(r=>r.recipient_id===c.user?.id).length;
-  if(this.nav){this.nav.innerHTML=`<i class="cloud-indicator ${esc(c.status)}"></i><span>${esc(W.nav)}</span>${count?`<b class="cloud-badge">${count}</b>`:''}`;this.nav.title=W.states[c.status]||W.states.guest;}
-  if(this.lobbyNav)this.lobbyNav.textContent=W.friendsNav+(count?` · ${count}`:'');if(!this.opened)return;
+  if(this.nav&&!this.nav.dataset.portrait){this.nav.innerHTML=`<i class="cloud-indicator ${esc(c.status)}"></i><span>${esc(W.nav)}</span>${count?`<b class="cloud-badge">${count}</b>`:''}`;this.nav.title=W.states[c.status]||W.states.guest;}
+  if(this.lobbyNav)this.lobbyNav.textContent=socialWords().send;if(!this.opened)return;
   const scroll=this.scrollReset?0:(this.el.querySelector('.account-card')?.scrollTop||0);this.scrollReset=false;
   const active=document.activeElement,focus=active?.closest?.('#accountPanel')?{name:active.name,action:active.dataset?.action,id:active.dataset?.id,start:active.selectionStart,end:active.selectionEnd}:null;this.capture();
-  let body=this.view==='friends'&&c.user?this.friendsHTML(W):c.user&&!c.recovery?this.profileHTML(W):this.authHTML(W);
+  let body=this.view==='invite'?this.inviteHTML(W):this.view==='friends'&&c.user?this.friendsHTML(W):c.user&&!c.recovery?this.profileHTML(W):this.authHTML(W);
   if(this.confirm)body=`<div class="cloud-confirm"><p>${esc(this.confirm.text)}</p>${this.button('confirm',W.yes,'','primary')}${this.button('cancelConfirm',W.no)}</div>`+body;
-  this.el.innerHTML=`<div class="account-card"><header><div><h2 id="cloudTitle">${W.title}</h2><p>${W.sub}</p></div><button type="button" data-action="close" aria-label="${W.close}">×</button></header><nav class="account-tabs">${this.button('profile',W.profile,'',this.view==='profile'?'selected':'')}${this.button('friends',W.friends+(count?` · ${count}`:''),'',this.view==='friends'?'selected':'')}</nav>${this.status()}<div id="cloudMessage" role="status" aria-live="polite" class="cloud-message${this.error?' error':''}">${esc(this.error||this.message)}</div>${body}<footer><small>${esc(W.localCache)}</small>${this.button('close',W.close)}</footer></div>`;
+  this.el.innerHTML=`<div class="account-card"><header><div><h2 id="cloudTitle">${this.view==='invite'?socialWords().invite:W.title}</h2><p>${this.view==='invite'?socialWords().choose:W.sub}</p></div><button type="button" data-action="close" aria-label="${W.close}">×</button></header><nav class="account-tabs"${this.view==='invite'?' hidden':''}>${this.button('profile',W.profile,'',this.view==='profile'?'selected':'')}${this.button('friends',W.friends+(count?` · ${count}`:''),'',this.view==='friends'?'selected':'')}</nav>${this.status()}<div id="cloudMessage" role="status" aria-live="polite" class="cloud-message${this.error?' error':''}">${esc(this.error||this.message)}</div>${body}<footer><small>${esc(W.localCache)}</small>${this.button('close',W.close)}</footer></div>`;
   this.el.querySelector('.account-card').scrollTop=scroll;
   if(focus){const a=[...this.el.querySelectorAll('input,button')],next=a.find(e=>focus.name?e.name===focus.name:e.dataset.action===focus.action&&e.dataset.id===focus.id);if(next&&!next.disabled){next.focus({preventScroll:true});if(focus.name&&typeof focus.start==='number')try{next.setSelectionRange(focus.start,focus.end);}catch{}}}
  }
@@ -49,7 +51,7 @@ export class AccountUI {
   if(mode!=='recover')fields+=this.field(mode==='password'?W.password:W.pass,'password','password',this.draft.password||'',`required minlength="${mode==='login'?1:8}" maxlength="128" autocomplete="${mode==='login'?'current-password':'new-password'}"`);
   if(mode==='register'||mode==='password')fields+=this.field(W.passwordAgain,'again','password',this.draft.again||'','required minlength="8" maxlength="128" autocomplete="new-password"');
   const label=mode==='register'?W.register:mode==='recover'?W.reset:mode==='password'?W.setPassword:W.login;
-  return`${this.view==='friends'?`<p class="cloud-note">${W.loginFriends}</p>`:''}<form data-kind="${mode}" class="cloud-form">${fields}<button type="submit" class="primary"${this.busy||!can?' disabled':''}>${this.busy?'…':esc(label)}</button></form><p class="cloud-note">${can?W.verifyNote:W.leaveRoom}</p><div class="cloud-links">${this.button('login',W.login)}${this.button('register',W.register)}${this.button('recover',W.recover)}${this.button('resend',W.resend)}</div><div class="cloud-guest"><p>${W.guestNote}</p>${this.button('guest',W.guest)}</div>`;
+  return`${mode!=='password'?`<button type="button" data-action="google" class="google-login"><b aria-hidden="true">G</b>${esc(socialWords().google)}</button><p class="auth-or">${esc(socialWords().or)}</p>`:''}${this.view==='friends'?`<p class="cloud-note">${W.loginFriends}</p>`:''}<form data-kind="${mode}" class="cloud-form">${fields}<button type="submit" class="primary"${this.busy||!can?' disabled':''}>${this.busy?'…':esc(label)}</button></form><p class="cloud-note">${can?W.verifyNote:W.leaveRoom}</p><div class="cloud-links">${this.button('login',W.login)}${this.button('register',W.register)}${this.button('recover',W.recover)}${this.button('resend',W.resend)}${this.button('mailHelp',socialWords().mail)}</div><div class="cloud-guest"><p>${W.guestNote}</p>${this.button('guest',W.guest)}</div>`;
  }
  profileHTML(W){
   const c=this.cloud,p=c.profile,can=this.canChange();let html=`<p class="cloud-email">${esc(c.user.email||'')}</p>`;
@@ -60,6 +62,7 @@ export class AccountUI {
   html+=`<div class="cloud-wallet"><b>${getScope()===c.user.id?wallet.shards:'—'}</b> ${W.shards}${c.pending?`<small>+${c.pending} · ${W.pending}</small>`:''}</div><form class="cloud-form profile-form" data-kind="profile">${this.field(W.name,'profile_name','text',this.draft.profile_name??p.display_name,'required maxlength="14" autocomplete="nickname"')}${this.field(W.handle,'profile_handle','text',this.draft.profile_handle??p.handle,'required minlength="3" maxlength="20" pattern="[A-Za-z0-9_]{3,20}" autocomplete="off" spellcheck="false"')}<button type="submit"${this.busy||!can?' disabled':''}>${W.saveProfile}</button></form>${!can?`<p class="cloud-note">${W.leaveRoom}</p>`:''}<div class="cloud-links">${this.button('retry',W.retry)}${this.button('logout',W.logout)}</div>`;
   if(c.lastSync)html+=`<p class="cloud-note">${W.lastSync}: ${esc(new Date(c.lastSync).toLocaleString())}</p>`;return html;
  }
+ inviteHTML(W){const S=socialWords(),c=this.cloud;return `<button type="button" data-action="copyInvite" class="invite-copy">${S.copy}</button>`+(c.user?`<section class="cloud-list"><h3>${S.friends}</h3>${c.social.friends.map(f=>this.row(f,this.button('invite',S.send,f.id),`<small>${W.presence[f.state]||W.presence.offline}</small>`)).join('')||`<p class="cloud-note">${S.empty}</p>`}</section>`:`<p class="cloud-note">${S.signin}</p>${this.button('inviteLogin',S.login)}`);}
  row(person,buttons,extra=''){return`<div class="cloud-person"><div><b>${esc(person.display_name)}</b><span>@${esc(person.handle)}</span>${extra}</div><div class="cloud-row-actions">${buttons}</div></div>`;}
  friendsHTML(W){
   const c=this.cloud,u=c.user.id,s=c.social;let html=`<form data-kind="search" class="cloud-search"><label>${W.search}<input name="query" value="${esc(this.query)}" maxlength="21" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="@putnik" /></label><button type="submit"${this.busy?' disabled':''}>${W.find}</button></form><p class="cloud-note">${W.searchHint}</p>`;
@@ -85,6 +88,10 @@ export class AccountUI {
   if(action==='confirm'){const c=this.confirm;this.confirm=null;if(c)this.action(c.action,c.id,true);return;}
   if(!confirmed&&(['remove','block'].includes(action)||['acceptInvite','joinFriend'].includes(action)&&this.getRoom())){this.confirm={action,id,text:action==='block'?W.confirmBlock:action==='remove'?W.confirmRemove:W.confirmJoin};this.render();return;}
   this.perform(async()=>{
+   if(action==='google'){await this.cloud.googleLogin();return;}
+   if(action==='mailHelp'){this.message=socialWords().mailHelp;return;}
+   if(action==='copyInvite'){const link=this.getInviteLink();if(!link)throw new Error('not_in_lobby');await copyText(link);this.message=socialWords().copied;return;}
+   if(action==='inviteLogin'){this.view='profile';this.mode='login';return;}
    if(action==='guest'){if(this.cloud.user||isAccountScope())await this.cloud.logout();this.close();return;}
    if(action==='logout'){await this.cloud.logout();return;}
    if(action==='retry'){await this.cloud.retry();return;}

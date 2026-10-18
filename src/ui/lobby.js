@@ -7,6 +7,8 @@ import { PLAYER_COLORS } from '../game/remote.js';
 import { cleanCode, MAX_PLAYERS } from '../net/net.js';
 import { cleanName } from '../net/coop.js';
 import { wt, myFit } from '../game/outfit.js';
+import {currentIdentity} from '../core/identity.js';
+import {socialWords} from './socialWords.js';
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>\"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', "'": '&#39;' }[c]));
@@ -128,7 +130,7 @@ export class Lobby {
       if (row.classList.contains('empty')) {
         e.preventDefault();
         if (this.uiSound) this.uiSound('click');
-        this._copy(() => { this.inviteCopied = performance.now() + 1600; });
+        if(this.onInvite)this.onInvite();else this._copy(() => { this.inviteCopied = performance.now() + 1600; });
       }
     });
     $('coopJoinForm').addEventListener('submit', (e) => {
@@ -156,6 +158,7 @@ export class Lobby {
     const name = $('coopName');
     let nameT = 0;
     name.addEventListener('input', () => {
+      const identity=currentIdentity();if(identity?.locked){name.value=identity.name;return;}
       settings.name = cleanName(name.value) === '???' ? '' : name.value.trim().slice(0, 14);
       saveSettings();
       const other = $('nameInput');
@@ -285,6 +288,7 @@ export class Lobby {
   }
 
   render() {
+    const identity=currentIdentity(),name=$('coopName');name.readOnly=!!identity?.locked;if(identity?.locked)name.value=identity.name;name.title=identity?.locked?socialWords().locked:'';const hint=$('coopNameHint');if(hint){hint.textContent=identity?.locked?socialWords().locked:'';hint.hidden=!identity?.locked;}
     const c = this.coop;
     this.menuLabel();
     this.renderRules();

@@ -3,12 +3,12 @@ import {getScope,isAccountScope,onSave,readMeta,writeMeta,writeJSON,hydrate,newS
 import {capturePayload,scopeSnapshot,activateSnapshot,cleanPayload,cleanWallet} from './snapshot.js';
 import {wallet,applyWallet,setPurchaseBackend} from '../game/wallet.js';
 import {rewardRows,removeReward,recoverAbandonedRewards,pendingRewards} from './rewards.js';
-import {createCloudClient,authRedirect,hasStoredSession,isAuthReturn} from './client.js';
+import {createCloudClient,authRedirect,hasStoredSession,isAuthReturn,readAuthProviders,SUPABASE_URL} from './client.js';
 const emptySocial=()=>({friends:[],requests:[],invites:[],blocked:[]});
 const err=e=>e instanceof Error?e:Object.assign(new Error(e?.message||'cloud_error'),{code:e?.code,status:e?.status});
 export class CloudController {
- constructor({clientFactory=createCloudClient,canApply=()=>true,onApplied=()=>{},getPresence=()=>({state:'online',room:null,strategy:'default'}),onNotice=()=>{}}={}){
-  this.clientFactory=clientFactory;this.canApply=canApply;this.onApplied=onApplied;this.getPresence=getPresence;this.onNotice=onNotice;
+ constructor({clientFactory=createCloudClient,providers=readAuthProviders,navigate=url=>globalThis.location.assign(url),canApply=()=>true,onApplied=()=>{},getPresence=()=>({state:'online',room:null,strategy:'default'}),onNotice=()=>{}}={}){
+  this.providers=providers;this.navigate=navigate;this.clientFactory=clientFactory;this.canApply=canApply;this.onApplied=onApplied;this.getPresence=getPresence;this.onNotice=onNotice;
   this.user=null;this.profile=null;this.client=null;this.ready=false;this.status=isAccountScope()?'cached':'guest';this.epoch=0;this.version=0;this.serverVersion=0;this.dirty=false;this.revision=0;this.social=emptySocial();this.listeners=new Set();this.clientId=newSaveId();this.lastSync=null;this.lastError=null;this.pendingSnapshot=null;this.importPending=false;this.conflict=null;this.recovery=false;this.disposed=false;this.fromEmailLink=isAuthReturn();
   this.unsubscribe=onSave(e=>this.changed(e));setPurchaseBackend(id=>this.purchase(id));
  }
@@ -40,7 +40,7 @@ export class CloudController {
   const next=session?.user||null,uid=next?.id||null;
   if(uid===this.user?.id){this.user=next;if(this.loading)return this.loading;if(this.profile||!uid)return;}
   else if(!uid&&!this.user&&getScope()==='guest'){this.status='guest';this.emit();return;}
-  this.epoch++;const epoch=this.epoch;this.stopChannel();this.saving=false;this.savePromise=null;this.rewardsBusy=false;this.rewardPromise=null;this.pendingGuest=false;this.refreshPromise=null;this.refreshPending=false;this.user=next;if(!uid)this.recovery=false;this.profile=null;this.ready=false;this.importPending=false;this.conflict=null;this.pendingSnapshot=null;this.social=emptySocial();this.lastError=null;this.dirty=false;this.revision=0;this.serverVersion=0;
+  this.epoch++;const epoch=this.epoch;this.stopChannel();this.saving=false;this.savePromise=null;this.rewardsBusy=false;this.rewardPromise=null;this.pendingGuest=false;this.refreshPromise=null;this.refreshPending=false;this.user=next;if(!uid)this.recovery=false;this.profile=null;this.ready=false;this.importPending=false;this.conflict=null;this.pendingSnapshot=null;this.social=emptySocial();this.socialPrimed=false;this.lastError=null;this.dirty=false;this.revision=0;this.serverVersion=0;
   if(!uid){this.status='guest';this.pendingGuest=true;this.safePoint();this.emit();return;}
   this.status='loading';this.emit();
   this.loading=(async()=>{const snapshot=await this.rpc('hush_bootstrap');if(epoch!==this.epoch)return;this.receive(snapshot);recoverAbandonedRewards(uid);await this.refreshSocial();this.subscribe();this.heartbeat().catch(()=>{});this.flushRewards().catch(()=>{});})();
@@ -125,6 +125,14 @@ export class CloudController {
    this.acceptWallet(r.snapshot.wallet);removeReward(owner,row.nonce);
   }}catch(e){this.failed(e);throw e;}finally{if(epoch===this.epoch){this.rewardsBusy=false;this.emit();}}
  }
+ async googleLogin(){
+  if(!this.canApply())throw new Error('leave_room');const c=await this.ensure();if(this.user)return;
+  const epoch=this.epoch,info=await this.providers();if(epoch!==this.epoch)throw new Error('stale_session');
+  if(!info.external?.google)throw new Error('google_setup_required');
+  const{data,error}=await c.auth.signInWithOAuth({provider:'google',options:{redirectTo:authRedirect(),skipBrowserRedirect:true,queryParams:{prompt:'select_account'}}});if(error)throw err(error);
+  const url=new URL(data.url);if(url.origin!==new URL(SUPABASE_URL).origin||url.pathname!=='/auth/v1/authorize'||url.searchParams.get('provider')!=='google')throw new Error('google_redirect');
+  if(epoch!==this.epoch)throw new Error('stale_session');if(!this.canApply())throw new Error('leave_room');this.navigate(url.href);
+ }
  async authenticate(kind,{email,password,name}={}){
   if(!this.canApply())throw new Error('leave_room');const c=await this.ensure();let r;
   if(kind==='register')r=await c.auth.signUp({email,password,options:{emailRedirectTo:authRedirect(),data:{display_name:name}}});
@@ -144,7 +152,12 @@ export class CloudController {
  async updateProfile(handle,name){if(!this.canApply())throw new Error('leave_room');const owner=this.user?.id,epoch=this.epoch;await this.flush();if(owner!==this.user?.id||epoch!==this.epoch)throw new Error('stale_session');if(this.conflict)throw new Error('cloud_conflict');const s=await this.rpc('hush_profile_update',{p_owner:owner,p_handle:handle,p_name:name});writeMeta({version:Number(s.save.version),dirty:false,rev:0},owner);this.dirty=false;this.receive(s);}
  async search(query){return await this.rpc('hush_search',{p_query:query});}
  async friendAction(action,target=null,request=null){this.social=await this.rpc('hush_friend_action',{p_owner:this.user.id,p_action:action,p_target:target,p_request:request});this.subscribe();this.emit();}
- async refreshSocial(){if(!this.user)return;const old=this.social.friends.map(f=>f.id).join(',');this.social=await this.rpc('hush_social');if(!this.channel||old!==this.social.friends.map(f=>f.id).join(','))this.subscribe();this.emit();}
+ async refreshSocial(){if(!this.user)return;const before=this.social,old=before.friends.map(f=>f.id).join(',');const after=await this.rpc('hush_social');this.social=after;
+  const requests=new Set(before.requests.map(r=>r.id)),invites=new Set(before.invites.map(r=>r.id)),friends=new Set(before.friends.map(f=>f.id));
+  for(const item of after.requests.filter(r=>r.recipient_id===this.user.id&&!requests.has(r.id)).slice(0,3))this.onNotice({type:'friend_request',item});
+  for(const item of after.invites.filter(r=>!invites.has(r.id)).slice(0,3))this.onNotice({type:'room_invite',item});
+  if(this.socialPrimed)for(const item of after.friends.filter(f=>!friends.has(f.id)).slice(0,2))this.onNotice({type:'friend_accept',item});this.socialPrimed=true;
+  if(!this.channel||old!==after.friends.map(f=>f.id).join(','))this.subscribe();this.emit();}
  async heartbeat(state=null){if(!this.user||!this.client)return;const p=this.getPresence();await this.rpc('hush_heartbeat',{p_owner:this.user.id,p_client:this.clientId,p_state:state||p.state,p_room:state==='offline'?null:p.room,p_strategy:p.strategy||'default'});}
  presenceChanged(){clearTimeout(this.presenceTimer);this.presenceTimer=setTimeout(()=>this.heartbeat().catch(()=>{}),500);}
  async invite(friend){await this.heartbeat();const r=await this.rpc('hush_send_invite',{p_owner:this.user.id,p_client:this.clientId,p_friend:friend});return r;}
@@ -160,7 +173,7 @@ export class CloudController {
    else{clearTimeout(this.socialTimer);this.socialTimer=setTimeout(()=>this.refreshSocial().catch(()=>{}),500);}
   };
   this.subscriptionSeq=(this.subscriptionSeq||0)+1;
-  let ch=this.client.channel(`hush-social:${this.user.id}:${this.clientId}:${this.subscriptionSeq}`).on('postgres_changes',{event:'INSERT',schema:'public',table:'hush_events',filter:`user_id=eq.${this.user.id}`},e=>{if(epoch!==this.epoch)return;if(e.new?.kind==='invite')this.onNotice('invite');refresh();});
+  let ch=this.client.channel(`hush-social:${this.user.id}:${this.clientId}:${this.subscriptionSeq}`).on('postgres_changes',{event:'INSERT',schema:'public',table:'hush_events',filter:`user_id=eq.${this.user.id}`},e=>{if(epoch!==this.epoch)return;refresh();});
   if(ids.length)for(const event of['INSERT','UPDATE'])ch=ch.on('postgres_changes',{event,schema:'public',table:'hush_presence',filter:`user_id=in.(${ids.join(',')})`},presence);
   this.channel=ch;ch.subscribe();
  }

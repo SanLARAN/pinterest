@@ -181,6 +181,7 @@ export class NetSync {
         if (this.host && typeof d === 'string' && g.state === 'play') g.escape.hostLoad(d, pid);
         break;
       // the шкафандр (see Cabinets): a guest grabs a hand of whoever's caught; a guest's press on a beat
+      case 'zq': if(this.host&&Number.isInteger(d))g.cabinets.hostSpring(d,pid);break;
       case 'zg':
         if (this.host) g.cabinets.hostGrab(pid);
         break;
@@ -288,14 +289,13 @@ export class NetSync {
       case 'ct': // ...something taken out of it
         g.cabinets.netTake(a, b);
         break;
-      case 'zs': // ...it was the шкафандр, and it has them
-        if (r) g.cabinets.netSpring(pid, a);
-        break;
+      case 'zs': break; // legacy unauthenticated capture announcements are never trusted
       // ---- from the host only ----
       default: {
         if (!isHostMsg || this.host) break;
         const m = typeof a === 'number' ? g.monsterById(a) : null;
         switch (name) {
+          case 'zsh': if(Number.isInteger(a)&&typeof b==='string')g.cabinets.netSpring(b,a);break;
           case 'ix': g.tools.apply(a); break;
           case 'itape': g.tools.setClip(a, b); break;
           case 'iu': g.cabinets.netUnlock(a); break;

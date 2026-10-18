@@ -10,6 +10,7 @@ import './style.css';
 import './garage-home.css';
 import './screen-editor.css';
 import './cloud.css';
+import './social.css';
 
 import * as THREE from 'three';
 import { CFG } from './core/config.js';
@@ -38,6 +39,11 @@ import {beginRewards,endRewards} from './cloud/rewards.js';
 import {CloudController} from './cloud/controller.js';
 import {cloudWords} from './cloud/words.js';
 import {AccountUI} from './ui/account.js';
+import {SocialDock} from './ui/socialDock.js';
+import {SocialToasts} from './ui/socialToasts.js';
+import {socialWords} from './ui/socialWords.js';
+import {currentIdentity,setIdentityProvider} from './core/identity.js';
+import {getScope,isAccountScope,readJSON} from './core/persistence.js';
 import { News } from './ui/news.js';
 import { MicCal } from './ui/miccal.js';
 import { Coop, myName } from './net/coop.js';
@@ -240,7 +246,7 @@ const menus = new Menus({
       atlas.applyI18n();
       wardrobe.applyI18n();
       news.render();
-      account.render();
+      account.render();social.update();syncIdentityFields();
       updateMicUI();
       lobby.render();
       $('lockHint').textContent = input.lockFailed ? t('dragToLook') : t('clickToLook');
@@ -291,13 +297,19 @@ const home=new GarageHome({ensureGarage,atlas,onWardrobe:()=>wardrobe.open()});
 const canApplyAccount=()=>state==='menu'&&!coop.active&&!lobby.starting&&!wardrobe.isOpen()&&!atlas.isOpen()&&!micCal.isOpen()&&!['settingsPanel','howPanel','scoresPanel'].some(id=>menus.isOpen(id));
 const cloud=new CloudController({
  canApply:canApplyAccount,
- onApplied:()=>{setLang(settings.lang);menus.applyI18n();menus.loadSettingsForm();$('nameInput').value=settings.name;if(!coop.active)$('coopName').value=settings.name;atlas.applyI18n();atlas.refreshBadge();wardrobe.applyI18n();news.render();audio.setVolume(settings.volume);mic.setEcho(settings.voiceEcho);updateMicUI();lobby.menuLabel();if(garage?.view==='menu'){const f=myFit();garage.setCar(f.car,f.cc);garage.studio.setFit(f);}account?.render();},
+ onApplied:()=>{setLang(settings.lang);menus.applyI18n();menus.loadSettingsForm();$('nameInput').value=settings.name;if(!coop.active)$('coopName').value=settings.name;atlas.applyI18n();atlas.refreshBadge();wardrobe.applyI18n();news.render();audio.setVolume(settings.volume);mic.setEcho(settings.voiceEcho);updateMicUI();lobby.menuLabel();if(garage?.view==='menu'){const f=myFit();garage.setCar(f.car,f.cc);garage.studio.setFit(f);}syncIdentityFields();account?.render();social.update();},
  getPresence:()=>{const room=coop.active&&!coop.inRun&&coop.phase==='lobby'?coop.code:null;return{state:['playing','paused'].includes(state)?'playing':room?'lobby':'online',room,strategy:coop.signalling?.only||'default'};},
- onNotice:()=>{if(state==='playing')hud.popup(cloudWords().inboxNotice,'dim');}
+ onNotice:notice=>notifications.push(notice)
 });
-const account=new AccountUI({cloud,canOpen:()=>state==='menu'&&!wardrobe.isOpen()&&!atlas.isOpen()&&!micCal.isOpen()&&!lobby.rulesOpen&&!lobby.starting,canChange:canApplyAccount,getRoom:()=>coop.active&&!coop.inRun?coop.code:null,onJoin:async room=>{
+setIdentityProvider(()=>{const owner=getScope(),p=cloud.profile?.id===owner?cloud.profile:isAccountScope(owner)?readJSON('hush.cloud-profile.v1',null,owner):null;if(p?.id===owner||owner==='guest'&&cloud.user&&cloud.profile)return{locked:true,name:p?.display_name||cloud.profile.display_name};return null;});
+function syncIdentityFields(){const p=currentIdentity();for(const id of['nameInput','coopName']){const input=$(id);input.readOnly=!!p?.locked;input.title=p?.locked?socialWords().locked:'';if(p?.locked)input.value=p.name;}}
+const account=new AccountUI({cloud,canOpen:()=>state==='menu'&&!wardrobe.isOpen()&&!atlas.isOpen()&&!micCal.isOpen()&&!lobby.rulesOpen&&!lobby.starting,canChange:canApplyAccount,getRoom:()=>coop.active&&!coop.inRun?coop.code:null,getInviteLink:()=>coop.active?coop.inviteLink():null,onJoin:async room=>{
  if(state!=='menu'||lobby.starting)throw new Error('leave_room');account.close();lobby.open();if(coop.active&&coop.code===room.room_code)return;await coop.join(room.room_code,{strategy:room.strategy});lobby.render();
 }});
+const social=new SocialDock({cloud,account,portrait:(fit,canvas)=>{if(!wardrobe.mq)return false;wardrobe.mq.still(fit,'head',canvas);return true;}});
+const notifications=new SocialToasts({cloud,account});
+lobby.onInvite=()=>account.open('invite');
+cloud.on(()=>syncIdentityFields());
 let overReward=null;
 function renderOverWallet(){const el=$('overWallet');if(!el||!overReward)return;const{earned,escBonus}=overReward;el.textContent=earned>0?t('walletNight').replace('{n}',earned).replace('{escape}',escBonus?t('walletEscape').replace('{n}',escBonus):'').replace('{total}',wallet.shards):'';if(pendingRewards()>0)el.textContent+=' · '+cloudWords().pending;}
 onWallet(()=>{if(state==='over')renderOverWallet();});cloud.on(()=>{if(state==='over')renderOverWallet();});
@@ -751,6 +763,7 @@ function handleEvents(events) {
         if (state === 'playing') game.inventory.toggle();
         break;
       case 'pause':
+        if(state==='playing'&&game?.partMap?.active){game.partMap.fold(true);break;}
         if (state === 'playing' && game?.inventory.opened) { game.inventory.close(); break; }
         if(account.isOpen())account.close();
         else if (atlas.isOpen()) atlas.close();
@@ -928,7 +941,7 @@ function boot() {
       perf.fpsEl.style.cssText = 'position:fixed;right:8px;top:64px;z-index:99;font:11px JetBrains Mono,monospace;color:#8ef0ff;opacity:.8;pointer-events:none';
       document.body.appendChild(perf.fpsEl);
     }
-    window.__hush = { world, game, shared, pulses, ghosts, eyes, renderer, perf, mic, audio, input, hud, post, shadows, coop, lobby, atlas, wardrobe, micCal, news, home, debug: DEBUG, startRun, pause, resume, toMenu, ensureGarage, cloud, account, get garage() { return garage; }, get state() { return state; } };
+    window.__hush = { world, game, shared, pulses, ghosts, eyes, renderer, perf, mic, audio, input, hud, post, shadows, coop, lobby, atlas, wardrobe, micCal, news, home, debug: DEBUG, startRun, pause, resume, toMenu, ensureGarage, cloud, account, social, notifications, get garage() { return garage; }, get state() { return state; } };
     state = 'menu';
     menuTime = 0;
     post.u.uFade.value = 0;
@@ -938,7 +951,7 @@ function boot() {
     if (DEBUG.autostart) startRun();
     if (params.has('sfx')) import('./ui/sfxtest.js').then((m) => m.mountSfxPanel(audio));
     lobby.menuLabel();
-    cloud.start();
+    cloud.start();social.update();syncIdentityFields();
     setTimeout(() => {
       if (state === 'menu' && ensureGarage()) {
         try { renderer.compile(garage.scene, garage.camera); } catch { /* it'll compile on first draw */ }

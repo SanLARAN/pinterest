@@ -90,14 +90,14 @@ export class ForestTrails {
   generate(landmarks) {
     const fixed={camp:[0,13],west:[-40,26],north:[-55,-48],east:[32,-26],south:[24,77],cross:[23,140],lookoutFork:[-130,113],zaryaFork:[-125,-130],yardFork:[96,210]};
     for(const [id,[x,z]]of Object.entries(fixed))this.nodes.set(id,this.nearestFree({x,z}));
-    const destinations=[['tower','west'],['wreck','north'],['cabin','east'],['stones','south'],['firetower','lookoutFork'],['zarya','zaryaFork'],['yard','yardFork'],['medhut','camp'],['cabin2','cross']];
+    const destinations=[['tower','west'],['wreck','north'],['cabin','east'],['stones','south'],['firetower','lookoutFork'],['zarya','zaryaFork'],['yard','yardFork'],['medhut','camp'],['cabin2','cross'],['cabin3','north'],['cabin4','east'],['cabin5','west']];
     for(const [id,parent]of destinations) {
       const L=landmarks.find(l=>l.id===id),from=this.nodes.get(parent);if(!L||!from)continue;
       const d=Math.max(1,Math.hypot(from.x-L.x,from.z-L.z)),r=id==='yard'?19:id==='zarya'?29:Math.max(4,L.r-2);
       const p=id==='yard'?{x:96,z:236}:id==='zarya'?{x:L.x,z:L.z+29}:{x:L.x+(from.x-L.x)/d*r,z:L.z+(from.z-L.z)/d*r};
       this.nodes.set(id,this.nearestFree(p));
     }
-    const edges=[['camp','west'],['west','north'],['camp','east'],['camp','south'],['west','tower'],['north','wreck'],['east','cabin'],['south','stones'],['south','cross'],['tower','lookoutFork'],['lookoutFork','firetower'],['north','zaryaFork'],['zaryaFork','zarya'],['cross','yardFork'],['yardFork','yard'],['camp','medhut'],['cross','cabin2']];
+    const edges=[['camp','west'],['west','north'],['camp','east'],['camp','south'],['west','tower'],['north','wreck'],['east','cabin'],['south','stones'],['south','cross'],['tower','lookoutFork'],['lookoutFork','firetower'],['north','zaryaFork'],['zaryaFork','zarya'],['cross','yardFork'],['yardFork','yard'],['camp','medhut'],['cross','cabin2'],['north','cabin3'],['east','cabin4'],['west','cabin5']];
     for(const [from,to]of edges) {
       const a=this.nodes.get(from),b=this.nodes.get(to);if(!a||!b)continue;
       const points=this.route(a,b);if(!points)continue;

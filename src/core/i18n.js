@@ -15,6 +15,7 @@ const STR = {
     useCampGenerator:'E — удерживай: починить генератор «Зорьки»',
     useCampGeneratorT:'РУКИ — удерживай: починить генератор лагеря',
     campPowerOn:'ЗОРЬКА · МЕСТНАЯ СЕТЬ ВКЛЮЧЕНА',
+    partMapName:'Карта деталей УАЗа',partMapTitle:'ЛЕСХОЗ · ДЕТАЛИ УАЗ',partMapLegend:'Отметки сторожа до пропажи деталей · не GPS',partMapCamp:'ЛАГЕРЬ',partMapYard:'ЛЕСХОЗ',partMapCloseHint:'ЛКМ / ПРЕДМЕТ — сложить · Esc — сложить · север наверху',partMapTaken:'Карта деталей · убрана в карман',usePartMap:'E · взять карту деталей УАЗа',usePartMapT:'РУКИ · взять карту деталей УАЗа',trapBusy:'Сначала помоги тому, кто уже попался в шкафандр',
     wardrobeNeutral: "НЕЙТРАЛЬНАЯ РАБОЧАЯ ЛАМПА",
     closetStamp: "ЛИЧНОЕ СНАРЯЖЕНИЕ / ВЫЖИВШИЙ 014",
     wardrobeWorn: "НАДЕТО",
@@ -189,7 +190,7 @@ const STR = {
     touchSkip: 'ПРОПУСТИТЬ',
     touchUse: 'РУКИ',
     // generators, bodies, notes
-    siteAt: { camp: 'в лагере', cabin: 'у охотничьей избушки', tower: 'у старой вышки', stones: 'у каменного круга', wreck: 'у разбитой машины' },
+    siteAt: { cabin3:'у южной охотничьей хижины',cabin4:'у восточной хижины',cabin5:'у западной хижины',camp: 'в лагере', cabin: 'у охотничьей избушки', tower: 'у старой вышки', stones: 'у каменного круга', wreck: 'у разбитой машины' },
     parts: { fuel: 'канистра бензина', plug: 'свеча зажигания', fuses: 'предохранители', belt: 'приводной ремень', battery: 'аккумулятор' },
     actions: { fuel: 'залить бензин', plug: 'вкрутить свечу', fuses: 'поменять предохранители', belt: 'натянуть ремень', battery: 'подключить аккумулятор' },
     noteKicker: 'записка',
@@ -305,7 +306,7 @@ const STR = {
     hintCotTouch: 'держи РУКИ — вернуть к жизни',
     // the forestry yard, the УАЗ, the way out
     placeAt: {
-      camp: 'в лагере', cabin: 'у охотничьей избушки', tower: 'у старой вышки', stones: 'у каменного круга', wreck: 'у разбитой машины',
+      cabin3:'у южной охотничьей хижины',cabin4:'у восточной хижины',cabin5:'у западной хижины',camp: 'в лагере', cabin: 'у охотничьей избушки', tower: 'у старой вышки', stones: 'у каменного круга', wreck: 'у разбитой машины',
       lake: 'у озера, у мостков', graves: 'на старом кладбище', cabin2: 'у северной избушки', stones2: 'у малого каменного круга, на северо-востоке',
       tower2: 'у южной вышки', graves2: 'у заросших могил на западе', wreck2: 'у второй разбитой машины, на юге', medhut: 'у мед-хижины', yard: 'на площадке лесхоза',
     },
@@ -583,6 +584,7 @@ const STR = {
     useCampGenerator:'E — hold to repair Zarya’s local generator',
     useCampGeneratorT:'HANDS — hold to repair the camp generator',
     campPowerOn:'ZARYA · LOCAL POWER RESTORED',
+    partMapName:'UAZ parts map',partMapTitle:'FORESTRY · UAZ PARTS',partMapLegend:'The guard’s original hiding places · not a GPS',partMapCamp:'CAMP',partMapYard:'FORESTRY',partMapCloseHint:'LMB / ITEM — fold · Esc — fold · north at the top',partMapTaken:'Parts map · stored in a pocket',usePartMap:'E · take the UAZ parts map',usePartMapT:'HANDS · take the UAZ parts map',trapBusy:'Help the person already caught in a Shkafandr first',
     wardrobeNeutral: "NEUTRAL WORK LIGHT",
     closetStamp: "PERSONAL EQUIPMENT / SURVIVOR 014",
     wardrobeWorn: "EQUIPPED",
@@ -754,7 +756,7 @@ const STR = {
     skipHint: 'Enter — skip',
     touchSkip: 'SKIP',
     touchUse: 'HANDS',
-    siteAt: { camp: 'at the camp', cabin: 'by the hunting cabin', tower: 'by the old tower', stones: 'by the stone circle', wreck: 'by the wrecked truck' },
+    siteAt: { cabin3:'by the south hunting hut',cabin4:'by the east hut',cabin5:'by the west hut',camp: 'at the camp', cabin: 'by the hunting cabin', tower: 'by the old tower', stones: 'by the stone circle', wreck: 'by the wrecked truck' },
     parts: { fuel: 'a can of fuel', plug: 'a spark plug', fuses: 'fuses', belt: 'a drive belt', battery: 'a battery' },
     actions: { fuel: 'pour the fuel', plug: 'fit the spark plug', fuses: 'replace the fuses', belt: 'fit the belt', battery: 'connect the battery' },
     noteKicker: 'note',
@@ -868,7 +870,7 @@ const STR = {
     flareCharges: '{n} shots',
     // the forestry yard, the UAZ, the way out
     placeAt: {
-      camp: 'at the camp', cabin: 'by the hunting cabin', tower: 'by the old tower', stones: 'by the stone circle', wreck: 'by the wrecked truck',
+      cabin3:'by the south hunting hut',cabin4:'by the east hut',cabin5:'by the west hut',camp: 'at the camp', cabin: 'by the hunting cabin', tower: 'by the old tower', stones: 'by the stone circle', wreck: 'by the wrecked truck',
       lake: 'by the lake, at the jetty', graves: 'in the old graveyard', cabin2: 'by the north cabin', stones2: 'by the small stone circle, to the north-east',
       tower2: 'by the south tower', graves2: 'by the overgrown graves to the west', wreck2: 'by the second wreck, to the south', medhut: 'by the first-aid hut', yard: 'at the forestry yard',
     },

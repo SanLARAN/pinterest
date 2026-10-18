@@ -7,6 +7,33 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v:'2.0',date:'2026-10-18',
+    ru:{title:'Большая починка смены',items:[
+      'Социальный уголок вместо ссылки «Профиль»: квадрат с твоим настоящим персонажем, «Добавить друга» и список друзей ниже. На очень низком экране уголок сворачивается до портрета, чтобы не перекрывать управление',
+      '«Позвать друга» на свободном месте в лобби теперь открывает выбор: отправить приглашение другу или скопировать ссылку. Входящие заявки и инвайты всплывают сбоку, не уводят из забега и не присоединяют автоматически',
+      'Позывной вошедшего аккаунта нельзя подменить полем создания комнаты. Он меняется только в личном деле; сохранение обычных настроек на сервере не переименовывает профиль',
+      'Добавлен быстрый вход Google с проверкой настройки провайдера. Владелец должен указать OAuth Client ID/Secret в Supabase. Лимит 2 у встроенной почты — письма в час, не аккаунты: для публичной рассылки нужен собственный SMTP, подтверждение адресов не отключено',
+      'Исправлены чёрные руки: рукава брали цвет головы вместо костюма, а тёмные материалы проваливались в чёрный. Собственные руки и руки спасения получили локальную подсветку без освещения леса',
+      'Три новые хижины: теперь пять, 26 шкафчиков по лесу и 20 соединяющих троп. В подходящих шкафах за ночь 2–3 шкафандра; запертый гарантированный лут не подменяется. Захват разрешает хозяин: два открытия больше не меняют жертву друг другу',
+      'На верстаке лесхоза лежит одна физическая карта деталей УАЗа. Она занимает один карман, раскрывается ПРЕДМЕТОМ/ЛКМ, складывается Esc, выбрасывается и передаётся. После ухода владельца остаётся единственный подбираемый экземпляр. Это отметки исходных тайников, не GPS',
+      'ИИ ищет путь вокруг стен и мебели, проходит проёмы, выходит из корпусов «Зорьки», давит и выламывает закрытые двери. Поиск ограничен по работе на кадр. Удары не проходят через стены и этажи',
+      'Фонарик усилен: 21 м, полный аккумулятор 135 с, найденный 60 % ≈ 81 с, запасная батарейка +45 %. Свет по-прежнему выдаёт тебя тварям',
+      'Кооп: протокол 13. Обновите страницу у всех участников комнаты',
+    ]},
+    en:{title:'Major shift repair',items:[
+      'A social corner replaces the Profile link: your actual survivor portrait, Add Friend, and the friends list below. Very short screens collapse it to the portrait to protect the controls',
+      'Invite a Friend at an empty lobby seat opens a chooser: send to a friend or copy the link. Friend requests and room invitations appear at the side without auto-joining or interrupting a run',
+      'Signed-in account callsigns cannot be replaced by a lobby field. Change them in the personnel file; ordinary settings saves cannot rename the server profile',
+      'Google sign-in checks provider configuration. The owner must configure OAuth Client ID/Secret in Supabase. The built-in email limit of 2 means emails per hour, not accounts; public email delivery needs custom SMTP, not disabled confirmation',
+      'Black hands fixed: sleeves used the head dye instead of outfit dye and dark materials were crushed to black. Camera-local hand fill never lights the forest',
+      'Three new huts: five total, 26 cabinets and 20 linked paths. Two or three eligible mimics per night, never replacing locked guaranteed loot. Host capture grants prevent simultaneous opens from swapping victims',
+      'One physical UAZ parts map on the forestry workbench: one pocket, LMB/ITEM to unfold, Esc to fold, drop/pass/recover after disconnect. Original seeded hiding places, not a live GPS',
+      'Bounded AI pathfinding around walls/furniture, narrow doorways and Zarya interiors. Monsters push/break closed doors. Attacks do not pass through walls or floors',
+      'Flashlight buff: 21m reach, 135s full battery, 60% found charge ≈81s, spare battery +45%. Light still attracts creatures',
+      'Co-op protocol 13: everybody must refresh',
+    ]},
+  },
+  {
     v:'1.15',date:'2026-10-18',
     ru:{title:'Личное дело',items:[
       '«Профиль» в меню: регистрация, вход по почте и паролю, подтверждение адреса, восстановление пароля. Гостевая игра и комнаты по коду по-прежнему доступны без аккаунта',

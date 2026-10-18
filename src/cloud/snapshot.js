@@ -3,6 +3,7 @@ import {readJSON,writeJSON,hydrate,setScope} from '../core/persistence.js';
 import {settings,atlasLog,getScores,freshAtlas,defaultSettings,reloadStorageState} from '../core/storage.js';
 import {wardrobe,ITEMS,cleanHex,reloadWardrobe} from '../game/outfit.js';
 import {wallet,reloadWallet} from '../game/wallet.js';
+import {currentIdentity} from '../core/identity.js';
 import {cleanScreen} from '../game/screenFace.js';
 const obj=v=>v&&typeof v==='object'&&!Array.isArray(v)?v:{};
 const n=(v,max=1e9)=>Math.max(0,Math.min(max,Math.floor(Number.isFinite(+v)?+v:0)));
@@ -15,7 +16,7 @@ export function cleanAtlas(raw){const v=obj(raw),out=freshAtlas();for(const k of
 export function cleanOutfit(raw){const v=obj(raw),out={colors:{},screen:cleanScreen(v.screen)};for(const slot of['head','body','car'])out[slot]=ITEMS[slot].some(it=>it.id===v[slot])?v[slot]:ITEMS[slot][0].id;for(const slot of['head','body','car'])for(const it of ITEMS[slot]){const c=obj(v.colors)[it.id];if(Array.isArray(c))out.colors[it.id]=[cleanHex(c[0],it.c[0]),cleanHex(c[1],it.c[1])];}return out;}
 export function cleanScores(raw){return(Array.isArray(raw)?raw:[]).slice(0,100).map(v=>{v=obj(v);return{name:name(v.name)||'???',score:n(v.score),time:n(v.time,86400),won:!!v.won,shards:n(v.shards,256),gens:n(v.gens,5),coop:n(v.coop,4),date:n(v.date,Date.now()+86400000)}}).sort((a,b)=>b.score-a.score||a.time-b.time).slice(0,10);}
 export function cleanPayload(raw){const v=obj(raw);if(Number(v.v)>1)throw new Error('cloud_version');return{v:1,settings:cleanSettings(v.settings),outfit:cleanOutfit(v.outfit),atlas:cleanAtlas(v.atlas),scores:cleanScores(v.scores)};}
-export function capturePayload(){return cleanPayload({settings,outfit:wardrobe,atlas:atlasLog,scores:getScores()});}
+export function capturePayload(){return cleanPayload({settings:{...settings,name:currentIdentity()?.name||settings.name},outfit:wardrobe,atlas:atlasLog,scores:getScores()});}
 export function scopeSnapshot(owner){return{payload:cleanPayload({settings:readJSON('hush.settings.v1',{},owner),outfit:readJSON('hush.outfit.v1',{},owner),atlas:readJSON('hush.atlas.v1',{},owner),scores:readJSON('hush.scores.v1',[],owner)}),wallet:cleanWallet(readJSON('hush.wallet.v1',{},owner))};}
 export function cacheSnapshot(owner,payload,coins=null){const p=cleanPayload(payload);for(const[key,data]of[['hush.settings.v1',p.settings],['hush.outfit.v1',p.outfit],['hush.atlas.v1',p.atlas],['hush.scores.v1',p.scores]])writeJSON(key,data,null,owner);if(coins)writeJSON('hush.wallet.v1',cleanWallet(coins),null,owner);return p;}
 export function activateSnapshot(owner,payload,coins){cacheSnapshot(owner,payload,coins);hydrate(()=>{setScope(owner);reloadWallet();reloadStorageState();reloadWardrobe();});}

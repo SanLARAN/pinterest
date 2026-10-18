@@ -126,6 +126,7 @@ export function buildZarya(world, L) {
   };
   for (const B of buildings) {
     const bx = x + B.x, bz = z + B.z, W = B.w, D = B.d, H = 2.85, T = 0.16;
+    world.navBuildings?.push({id:'zarya:'+B.id,x:bx,z:bz,W,D,ry:0,gap:[-.825,.825]});
     world.addProp(bx, bz, (b) => {
       const box = (xx, yy, zz, w, h, d, mat = KIND.WOOD, ry = 0) => boxAt(b, bx + xx, y + yy, bz + zz, w, h, d, mat, ry);
       box(0, 0.09, 0, W + 0.3, 0.18, D + 0.3, GK.BLOCK);
@@ -181,7 +182,7 @@ export function buildZarya(world, L) {
     // Furnishings have colliders too, but leave the aisle and the door clear.
     if (B.dorm) {
       for (const s of [-1, 1]) for (const zz of [-3.6, -0.7, 2.2]) world.col.add(bx + s * (W / 2 - 0.75), bz + zz - 0.45, bx + s * (W / 2 - 0.75), bz + zz + 0.45, 0.58, 0.7, WOOD);
-      for (let i = 0; i < 3; i++) world.addCabinet(`zarya:${B.id}:${i}`, 'locker', bx - 1.05 + i * 1.05, y + 0.18, bz - D / 2 + 0.4, 0, false, { locked: i === 1, minLoot: 2, loot: i === 1 ? ['shard', 'flare', 'battery'] : null });
+      for (let i = 0; i < 3; i++) world.addCabinet(`zarya:${B.id}:${i}`, 'locker', bx - 1.05 + i * 1.05, y + 0.18, bz - D / 2 + 0.4, 0, i===0, { locked: i === 1, minLoot: 2, loot: i === 1 ? ['shard', 'flare', 'battery'] : null });
     } else {
       for (const xx of [-5.2, 0, 5.2]) world.col.add(bx + xx - 0.68, bz + 0.7, bx + xx + 0.68, bz + 0.7, 0.7, 0.85, WOOD);
       world.col.add(bx + 2.2, bz - 2.65, bx + 6.8, bz - 2.65, 0.57, 0.9, METAL);

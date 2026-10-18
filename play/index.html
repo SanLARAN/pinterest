@@ -7,8 +7,8 @@
     <meta name="description" content="ТИШЕ — low-poly эхолокационный хоррор. Ты слеп в огромном лесу: твой микрофон — эхолокатор. Запусти пять генераторов и не закричи." />
     <title>ТИШЕ — эхолокационный хоррор</title>
     <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
-  <script type="module" crossorigin src="./assets/index-9FaMGmva.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-CB7wJ_Tn.css">
+  <script type="module" crossorigin src="./assets/index-C0dSNUYi.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-UAqi2lHu.css">
 </head>
   <body>
     <canvas id="gl" tabindex="-1"></canvas>
@@ -118,7 +118,6 @@
             <button class="link" id="btnScores"><span data-i18n="scores"></span></button>
             <i>·</i>
             <button class="link" id="btnSettings"><span data-i18n="settings"></span></button>
-            <button class="link" id="btnAccount" type="button">Профиль</button>
           </nav>
           <div id="micPanel">
             <div class="mic-row">
@@ -132,6 +131,11 @@
           <!-- your survivor: click it for the wardrobe -->
 
         </div>
+        <section id="socialDock" aria-label="Friends">
+          <div class="social-selfrow"><button id="btnAccount" class="social-portrait" data-portrait="true" type="button" aria-label="Личное дело"><canvas width="128" height="128"></canvas></button><div class="social-details"><strong class="social-name"></strong><span class="social-tag"></span><i class="social-sync"></i></div></div>
+          <button type="button" class="social-add" data-social="add" data-action="social-add"></button>
+          <h2 class="social-heading"></h2><div class="social-list"></div>
+        </section>
         <div class="menu-foot">
           <div class="hp"><svg viewBox="0 0 24 24"><path d="M4 15v-3a8 8 0 0 1 16 0v3"/><rect x="3" y="14" width="4" height="7" rx="1.5"/><rect x="17" y="14" width="4" height="7" rx="1.5"/></svg><span data-i18n="headphones"></span></div>
           <aside id="news" class="news" aria-label="news"></aside>
@@ -218,6 +222,7 @@
         <h2 data-i18n="coopTitle">С ДРУЗЬЯМИ</h2>
         <div id="coopHome" class="coop-view">
           <label class="callsign"><span data-i18n="callsign"></span><input id="coopName" maxlength="14" autocomplete="off" spellcheck="false" placeholder="???" /></label>
+          <p id="coopNameHint" class="callsign-locked" hidden></p>
           <button class="btn primary" id="btnCreate"><span data-i18n="coopCreate">СОЗДАТЬ КОМНАТУ</span></button>
           <div class="coop-or"><span data-i18n="coopOr">или войди по коду друга</span></div>
           <form class="coop-join" id="coopJoinForm" autocomplete="off">

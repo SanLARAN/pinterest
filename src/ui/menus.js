@@ -2,6 +2,7 @@
 import { t, setLang, getLang } from '../core/i18n.js';
 import { settings, saveSettings, getScores } from '../core/storage.js';
 import { fmtTime, fmtScore } from './hud.js';
+import {currentIdentity} from '../core/identity.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -88,6 +89,7 @@ export class Menus {
     const name = $('nameInput');
     name.value = settings.name || '';
     name.addEventListener('input', () => {
+      const identity=currentIdentity();if(identity?.locked){name.value=identity.name;return;}
       settings.name = name.value.trim().slice(0, 14);
       saveSettings();
     });

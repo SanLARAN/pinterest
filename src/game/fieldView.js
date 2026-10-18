@@ -8,9 +8,9 @@ import { fmtTime } from '../ui/hud.js';
 const VERT=`varying vec3 vN; varying vec3 vP; varying vec2 vUv;
 void main(){vN=normalize(normalMatrix*normal);vP=position;vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`;
 function material(color,light=1) {
-  return new THREE.ShaderMaterial({uniforms:{color:{value:new THREE.Color(color)},light:{value:light}},vertexShader:VERT,
+  return new THREE.ShaderMaterial({uniforms:{color:{value:new THREE.Color().setHex(color,THREE.LinearSRGBColorSpace)},light:{value:light}},vertexShader:VERT,
     fragmentShader:`uniform vec3 color; uniform float light; varying vec3 vN; varying vec3 vP;
-    void main(){float sh=.4+.6*max(0.,dot(normalize(vN),normalize(vec3(-.4,.7,1.))));
+    void main(){float sh=.55+.45*max(0.,dot(normalize(vN),normalize(vec3(-.4,.7,1.))));
     float weave=.965+.035*sin(vP.y*900.)*sin(vP.x*800.);gl_FragColor=vec4(color*light*sh*weave,0.);}`});
 }
 function cube(parent,geo,mat,x,y,z,w,h,d) {
@@ -26,7 +26,7 @@ function wrap(ctx,text,width) {
 export class FieldView {
   constructor(game) {
     this.g=game; this.watch=0; this.box=new THREE.BoxGeometry(1,1,1);
-    this.mat={cloth:material(0x354239,.8),skin:material(0xa38471,.75),glove:material(0x252e29,.9),resin:material(0x171c1c,1),steel:material(0x6c7773,.9),canvas:material(0x4a4931,.75),leather:material(0x332d22,.9)};
+    this.mat={cloth:material(0x354239,.8),skin:material(0xa38471,.75),glove:material(0x686655,.85),resin:material(0x171c1c,1),steel:material(0x6c7773,.9),canvas:material(0x4a4931,.75),leather:material(0x332d22,.9)};
     this.root=new THREE.Group();this.root.visible=false;game.scene.add(this.root);
     this.left=this.arm(-1);this.right=this.arm(1);this.root.add(this.left,this.right);
     this.watchCase=this.buildWatch(); this.watchCase.scale.setScalar(.73); this.left.add(this.watchCase);
@@ -87,7 +87,7 @@ export class FieldView {
   update(dt) {
     const g=this.g;
     const held=g.input.peekHeld || performance.now()<g.input.peekTouchUntil;
-    const can=g.player.alive && !g.inventory.active && !g.inputMuted && !g.cabinets.busy && !g.player.carrying && !g.escape.held && !g.expedition.onTower && g.escape.mySeat<0 && ['play','morning','dawn'].includes(g.state);
+    const can=g.player.alive && !g.partMap?.active && !g.inventory.active && !g.inputMuted && !g.cabinets.busy && !g.player.carrying && !g.escape.held && !g.expedition.onTower && g.escape.mySeat<0 && ['play','morning','dawn'].includes(g.state);
     this.watch=damp(this.watch,can&&held?1:0,can&&held?9:12,dt);
     if(this.watch<.001) this.watch=0;
     document.body.classList.toggle('watch-up',this.watch>.45);
@@ -151,7 +151,8 @@ export class FieldView {
       m.rotation.set(kind==='flare'?0:-.35,kind==='flare'?-Math.PI/2:0,kind==='battery'?-.25:0);
       m.scale.setScalar(kind==='stones'?.7:1);
     }
+    if(g.partMap?.amount>.01){const d=g.partMap.distance(camera),k=g.partMap.amount;this.left.visible=this.right.visible=true;this.watchCase.visible=false;this.bag.visible=this.prop.visible=false;this.left.position.set(-.25,-.42-(1-k)*.3,-d+.025);this.right.position.set(.25,-.42-(1-k)*.3,-d+.025);this.left.rotation.set(.1,0,.08);this.right.rotation.set(.1,0,-.08);}
     const dyes=g.selfBody.rig?.dyes;
-    if(dyes?.[0]?.isColor) this.mat.cloth.uniforms.color.value.copy(dyes[0]);
+    if(dyes?.[2]?.isColor){this.mat.cloth.uniforms.color.value.copy(dyes[2]);const fur=g.selfBody.rig.fit?.body==='fluffy';this.mat.glove.uniforms.color.value.copy(fur?dyes[2]:this.mat.steel.uniforms.color.value).multiplyScalar(fur?.9:.8);}
   }
 }

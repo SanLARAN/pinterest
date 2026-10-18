@@ -713,31 +713,9 @@ export class Monster {
   _steer(dt, tx, tz, speed, turnRate = this.state === 'hunt' ? 7 : 2.6) {
     const g = this.game;
     const cfg = this.cfg;
-    // detour if stuck
-    if (this.detourT > 0) {
-      this.detourT -= dt;
-      tx = this.dtx;
-      tz = this.dtz;
-    } else if (g.doors) {
-      // into (or out of) a cabin: by the door. a shut one gets leaned on — or broken down
-      const rt = g.doors.route(this.x, this.z, tx, tz);
-      if (rt) {
-        tx = rt.x;
-        tz = rt.z;
-        if (rt.shut) {
-          speed = Math.min(speed, 0.6);
-          g.doors.push(rt.door, this, dt);
-          this.stuckT = 0;
-        }
-      } else if (g.escape) {
-        // into (or out of) the forestry yard: through the gateway, once the gate is open
-        const yr = g.escape.route(this.x, this.z, tx, tz);
-        if (yr) {
-          tx = yr.x;
-          tz = yr.z;
-        }
-      }
-    }
+    if(g.doors){const rt=g.doors.route(this.x,this.z,tx,tz);if(rt){tx=rt.x;tz=rt.z;if(rt.shut){speed=0;tx=this.x;tz=this.z;g.doors.push(rt.door,this,dt);}}else if(g.escape){const yr=g.escape.route(this.x,this.z,tx,tz);if(yr){tx=yr.x;tz=yr.z;}}}
+    const navigation=g.world.navigation;
+    if(navigation){navigation.beginFrame(g.time);const next=navigation.next(this,{x:tx,z:tz},dt,cfg.radius);tx=next.x;tz=next.z;if(Math.hypot(tx-this.x,tz-this.z)<.04)speed=0;}
 
     // ---- steering ----
     const dx = tx - this.x, dz = tz - this.z;
@@ -747,34 +725,24 @@ export class Monster {
       const da = angleDiff(this.yaw, want);
       this.yaw += clamp(da, -turnRate * dt, turnRate * dt);
       // slow down for sharp turns
-      speed *= 1 - Math.min(0.7, Math.abs(da) / Math.PI);
+      speed *= Math.abs(da)>Math.PI*.55?.08:1-Math.min(.7,Math.abs(da)/Math.PI);
     }
     this.speedCur = lerp(this.speedCur, speed, 1 - Math.exp(-6 * dt));
     const ox = this.x, oz = this.z;
     this.x += Math.sin(this.yaw) * this.speedCur * dt;
     this.z += Math.cos(this.yaw) * this.speedCur * dt;
     const pos = { x: this.x, z: this.z };
-    g.world.col.resolve(pos, g.doors ? g.doors.squeeze(this.x, this.z, cfg.radius) : cfg.radius);
+    g.world.col.resolve(pos,navigation?navigation.radiusAt(pos.x,pos.z,cfg.radius):g.doors?g.doors.squeeze(this.x,this.z,cfg.radius):cfg.radius);
     if (g.world.lake) {
       const L = g.world.lake;
       const lx = pos.x - L.x, lz = pos.z - L.z, ld = Math.hypot(lx, lz);
-      if (ld < L.r + 0.5) { pos.x = L.x + (lx / ld) * (L.r + 0.5); pos.z = L.z + (lz / ld) * (L.r + 0.5); }
+      if (ld < L.r + 0.5) { const safe=Math.max(ld,.001),nx=ld>.001?lx/safe:1,nz=ld>.001?lz/safe:0;pos.x=L.x+nx*(L.r+.5);pos.z=L.z+nz*(L.r+.5); }
     }
     const w = CFG.WORLD_WALL;
     this.x = clamp(pos.x, -w, w);
     this.z = clamp(pos.z, -w, w);
     const moved = Math.hypot(this.x - ox, this.z - oz);
-    if (this.speedCur > 0.5 && moved < this.speedCur * dt * 0.3) {
-      this.stuckT += dt;
-      if (this.stuckT > 0.6) {
-        const side = Math.random() < 0.5 ? -1 : 1;
-        const a = this.yaw + side * (Math.PI / 2 + Math.random() * 0.6);
-        this.dtx = this.x + Math.sin(a) * 4;
-        this.dtz = this.z + Math.cos(a) * 4;
-        this.detourT = 0.9;
-        this.stuckT = 0;
-      }
-    } else this.stuckT = Math.max(0, this.stuckT - dt);
+    if(this.speedCur>.5&&moved<this.speedCur*dt*.25){this.stuckT+=dt;if(this.stuckT>.45&&this.nav)this.nav.ttl=0;}else this.stuckT=Math.max(0,this.stuckT-dt);
     this.y = lerp(this.y, g.world.terrain.height(this.x, this.z), 1 - Math.exp(-12 * dt));
   }
 
@@ -887,6 +855,8 @@ export class Monster {
           }
           if (victim && g.doors && g.doors.blocks(this.x, this.z, victim.x, victim.z)) victim = null; // not through a wall or a shut door
           if (victim && g.escape && g.escape.blocks(this.x, this.z, victim.x, victim.z)) victim = null; // ...or the yard's fence
+          if(victim&&Math.abs(victim.y-this.y)>2.3)victim=null;
+          if(victim&&g.world.losBlocked(this.x,this.y+1.1,this.z,victim.x,victim.y+1.1,victim.z,.15))victim=null; // camp walls/furniture count too
           if (victim) {
             g.kill(this, victim);
             return;
@@ -1163,6 +1133,8 @@ export class Watcher extends Monster {
       }
       if (victim && g.doors && g.doors.blocks(this.x, this.z, victim.x, victim.z)) victim = null;
       if (victim && g.escape && g.escape.blocks(this.x, this.z, victim.x, victim.z)) victim = null;
+      if(victim&&Math.abs(victim.y-this.y)>2.3)victim=null;
+          if(victim&&g.world.losBlocked(this.x,this.y+1.1,this.z,victim.x,victim.y+1.1,victim.z,.15))victim=null;
       if (victim) {
         g.kill(this, victim);
         return;

@@ -8,6 +8,7 @@ import { settings, saveSettings } from '../core/storage.js';
 import { t } from '../core/i18n.js';
 import { myFit, cleanFit } from '../game/outfit.js';
 import { cleanLobbyRules } from './lobbyRules.js';
+import {currentIdentity} from '../core/identity.js';
 
 const LOBBY_TYPES = new Set(['hi', 'roster', 'full', 'start', 'bye', 'nm', 'lobby']);
 
@@ -16,6 +17,7 @@ export function cleanName(s) {
 }
 
 export function myName() {
+  const identity=currentIdentity();if(identity?.locked)return cleanName(identity.name);
   if (!settings.name) {
     settings.name = `${t('defaultName')}-${10 + Math.floor(Math.random() * 90)}`;
     saveSettings();

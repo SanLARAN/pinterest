@@ -549,6 +549,7 @@ export class Objectives {
       if (game.torch) game.torch.consider(consider);
       if (game.tools) game.tools.consider(consider);
       game.inventory?.consider(consider);
+      game.partMap?.consider(consider);
       for (const body of this.bodies) if (body.searched && body.gun?.visible) consider(body, body.x, body.z, USE_R_BODY, 'bodyGun');
       if (game.expedition) game.expedition.consider(consider);
     }
@@ -593,6 +594,7 @@ export class Objectives {
       game.tools.interact(best, pressed, T);
       return;
     }
+    if(best.kind==='partMap'){this.searchT=0;game.partMap.interact(pressed,T);return;}
     if (best.kind === 'lookout' || best.kind === 'campSpeaker' || best.kind === 'campGenerator') {
       this.searchT = 0;
       game.expedition.interact(best, dt, held, pressed, T);

@@ -7,6 +7,7 @@ import { Terrain } from './terrain.js';
 import { Collision } from './collision.js';
 import { ForestTrails } from './trails.js';
 import { Meadow } from './meadow.js';
+import { ForestNavigation } from './navigation.js';
 import { buildYard, buildOutside, inYard } from './yard.js';
 import { FIRETOWER, ZARYA, buildFiretower, buildZarya, buildWaymarks } from './expedition.js';
 
@@ -40,6 +41,9 @@ export const LANDMARKS = [
   { id: 'yard', x: CFG.YARD.x, z: CFG.YARD.z, r: 21 },
   { id: 'firetower', x: FIRETOWER.x, z: FIRETOWER.z, r: FIRETOWER.r },
   { id: 'zarya', x: ZARYA.x, z: ZARYA.z, r: ZARYA.r },
+  { id: 'cabin3', x: -88, z: -226, r: 13, ry: -.5 },
+  { id: 'cabin4', x: 154, z: 70, r: 13, ry: 1.6 },
+  { id: 'cabin5', x: -220, z: -20, r: 13, ry: .3 },
 ];
 
 // the tracks that lead to and from the yard: no trees grow on them
@@ -113,6 +117,7 @@ export class World {
     this.lake = null;
     this.spawn = { x: 0, z: 0, yaw: 0 };
     this.effigies = [];
+    this.navBuildings=[]; // open-door camp buildings, for indoor/outdoor navigation
     this.doors = []; // cabin doors (the game hangs and swings them)
     this.cabinets = []; // cupboards in the buildings (the game fills them — and one of them may not be a cupboard)
     this.medhut = null; // the first-aid hut: where its cot and lantern are (see lm_medhut)
@@ -145,6 +150,7 @@ export class World {
     this.trails.build();
     this.genTrees(rng);
     this.genScatter(rng);
+    this.navigation=new ForestNavigation(this);
     this.buildChunks();
     this.grass=new Meadow(this).generate();
     // past the edge: the cut through the hills, the lowland, the highway (meshes of their own)
@@ -469,6 +475,8 @@ export class World {
       this.addCabinet(`${L.id}:wardrobe`, 'wardrobe', L.x + wx, y + 0.2, L.z + wz, ry, true);
       const [cx, cz] = rot(-W / 2 + T / 2 + CABINET_DIMS.cupboard.d / 2 + 0.02, 1.2, ry);
       this.addCabinet(`${L.id}:cupboard`, 'cupboard', L.x + cx, y + 0.2, L.z + cz, ry + Math.PI / 2);
+      const [ax,az]=rot(-1.2,D/2-T/2-CABINET_DIMS.wardrobe.d/2-.02,ry);
+      this.addCabinet(`${L.id}:wardrobe2`,'wardrobe',L.x+ax,y+.2,L.z+az,ry+Math.PI,true);
     }
   }
 

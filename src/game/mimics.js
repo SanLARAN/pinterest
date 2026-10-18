@@ -1,0 +1,2 @@
+// Shared seed, bounded ambush density. Locked guaranteed-loot cabinets never become mimics.
+export function chooseMimics(candidates,rng,force=false){const pool=candidates.filter(c=>!c.spec?.locked).slice();for(let i=pool.length-1;i>0;i--){const j=Math.floor(rng.next()*(i+1));[pool[i],pool[j]]=[pool[j],pool[i]];}const n=Math.min(pool.length,pool.length>=5?2+(rng.next()<.35?1:0):1);const picked=new Set(pool.slice(0,n));if(force&&candidates[0]&&!candidates[0].spec?.locked){if(picked.size>=n)picked.delete([...picked][0]);picked.add(candidates[0]);}return picked;}

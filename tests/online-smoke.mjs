@@ -80,6 +80,8 @@ try {
     const s=window.__hush.garage.studio;return!s.mirror&&!s.mirrorTarget&&!s.reflection&&!s.reflect;
   }));
   check('patch notes are anchored in the footer',await A.page.$eval('#news',e=>e.parentElement.classList.contains('menu-foot')));
+  check('social portrait replaces the Profile text link',await A.page.evaluate(()=>!!document.querySelector('#socialDock #btnAccount canvas')&&!document.querySelector('.menu-links #btnAccount')));
+  check('major forest has five huts, 26 cabinets and one parts-map source',await A.page.evaluate(()=>{const H=window.__hush;return H.world.doors.length===6&&H.world.cabinets.length===26&&H.world.trails.routes.length===20&&H.game.partMap.locations.length===4}));
   check('grass fills independent field chunks, not only path borders',await A.page.evaluate(()=>window.__hush.world.grass.tufts>100000&&window.__hush.world.grass.meshes.length===225));
   check('Zarya has its local engine, seven fixtures and a wall-mounted medicine cabinet',await A.page.evaluate(()=>{const w=window.__hush.world;return w.sites.length===5&&w.zarya.generator.id==='zarya-local'&&w.zarya.lights.length===7&&w.cabinets.find(c=>c.id==='zarya:aid').wallMounted}));
   await A.page.evaluate(async () => { const h = window.__hush; h.audio.init(); await h.mic.start(h.audio); });
@@ -261,7 +263,8 @@ try {
   check('the night falls for both', !!night);
   const runRules=await B.page.evaluate(()=>window.__hush.game.roomRules.hideNames);
   check('hideNames is copied into the run, not just the roster',runRules);
-  for(const P of[A,B])await P.page.evaluate(()=>{window.__hush.game.voiceMimic.wait=1e9});
+  // This is a transport fixture, not a random-director survival run. Manually spawned monsters below keep their actual AI.
+  for(const P of[A,B])await P.page.evaluate(()=>{const g=window.__hush.game;g.voiceMimic.wait=1e9;g.awake=true;g.dirT=g.nextScare=1e9;});
 
   // a cabin door: B swings it open from outside (it opens away from B: inward); the host sees the same
   const bDoor = await B.page.evaluate(() => {

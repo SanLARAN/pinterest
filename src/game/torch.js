@@ -19,13 +19,13 @@ import { haloMaterial } from './glowsticks.js';
 import { t } from '../core/i18n.js';
 
 export const TORCH = {
-  battery: 60, // s of light on a full battery
-  light: 1.65, // intensity in the hand
-  radius: 14, // m
-  cone: 0.88, // cos of the beam's edge (~28°)
+  battery: 135, // s of light on a full battery
+  light: 2.1, // intensity in the hand
+  radius: 21, // m
+  cone: 0.86, // cos of the beam's edge (~31°)
   color: [1.0, 0.93, 0.8],
-  found: 0.5, // charge it's found with
-  spare: 0.3, // a spare battery from a cupboard
+  found: 0.6, // charge it's found with
+  spare: 0.45, // a spare battery from a cupboard
   low: 0.25, // below this it stutters, and goes out for moments
   dipI: 0.015, // ...this bright, in one of those moments
   see: 13, // a thing in the beam this close (and in the clear) notices it...

@@ -286,25 +286,25 @@ const TEXT = {
         "latin": "Lumen breve",
         "text": [
           "Лежит ещё включённый у развалин, вышек или могил. В одиночной ночи один, в кооперативе два. Подними (E): в руке он даст узкий конус настоящего тёплого света.",
-          "Это не способ перестать быть слепым. Найдёшь с половиной заряда: тридцать секунд. Свет — маяк; тому, кто видит тебя, даже не обязательно попасть в луч."
+          "Свет всё ещё опасен, но теперь полезнее: найденный заряд 60 %, около 81 секунды. Свет — маяк; тому, кто видит тебя, даже не обязательно попасть в луч."
         ],
         "tips": [
           "Возьми в руки из рюкзака; ЛКМ — включить или выключить. Лучше быстро глянуть и погасить.",
-          "Запасные батарейки редки, бывают в шкафчиках: +18 секунд света.",
+          "Запасная батарейка из шкафчика добавляет 45 % — около 61 секунды света.",
           "На последней четверти фонарь гаснет на мгновения. Наблюдатель в эти провалы делает рывок."
         ],
         "facts": [
           [
             "луч",
-            "14 м · полуугол ~28°"
+            "21 м · полуугол ~31°"
           ],
           [
             "полный заряд",
-            "60 с"
+            "135 с"
           ],
           [
             "найденный заряд",
-            "50 % · 30 с"
+            "60 % · 81 с"
           ],
           [
             "маяк",
@@ -842,25 +842,25 @@ const TEXT = {
         "latin": "Lumen breve",
         "text": [
           "Still switched on by a wreck, a tower or the graves. One per solo night, two in co-op. Pick it up (E): a narrow cone of real warm light.",
-          "Not an escape from blindness. Found half charged: thirty seconds. Its light is a beacon, even to things outside the beam."
+          "Still dangerous, but more useful: found at 60% charge, about 81 seconds. Its light is a beacon, even to things outside the beam."
         ],
         "tips": [
           "Equip from the backpack; LMB — on or off. Take a quick look, then kill the light.",
-          "Rare spare batteries in cupboards give 18 more seconds.",
+          "Spare cupboard batteries restore 45%, about 61 more seconds.",
           "In the last quarter it goes dark for moments. The Watcher lunges in those moments."
         ],
         "facts": [
           [
             "beam",
-            "14 m · ~28° half angle"
+            "21 m · ~31° half angle"
           ],
           [
             "full battery",
-            "60 s"
+            "135 s"
           ],
           [
             "found charge",
-            "50% · 30 s"
+            "60% · 81 s"
           ],
           [
             "beacon",
@@ -868,7 +868,7 @@ const TEXT = {
           ],
           [
             "spare battery",
-            "+30%"
+            "+45%"
           ]
         ],
         "quote": "It makes the forest visible. You too."

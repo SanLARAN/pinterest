@@ -32,6 +32,7 @@ ${EDGE_GLSL}
 uniform vec3 uDye[4];  // headwear main / accent, outfit main / accent
 uniform vec3 uRim;     // their colour in the team
 uniform float uShow;   // fades them in and out
+uniform float uSelfLit;
 uniform float uEcho;   // 1 = your own body: found by the echo like the trees are
 varying vec3 vWorld;
 varying vec3 vLocal;
@@ -93,6 +94,7 @@ void main() {
     col += echo * uEcho * (1.0 - nat);
   }
 
+  if(uSelfLit>0.){col+=base*uSelfLit*(.6+.4*abs(dot(N,V)));nat=max(nat,.65);}
   // the dark eats distance; daylight has its haze
   col *= mix(exp(-camD * 0.015), 1.0, uDawn);
   vec3 fogC = mix(vec3(0.62, 0.52, 0.5), vec3(0.72, 0.76, 0.78), uMorning);
@@ -113,6 +115,7 @@ export function createPersonMaterial(dyes, rimHex) {
       uRim: { value: new THREE.Color(rimHex) },
       uShow: { value: 1 },
       uEcho: { value: 0 },
+      uSelfLit:{value:0},
     },
     vertexShader: VERT,
     fragmentShader: FRAG,

@@ -24,14 +24,14 @@ test('paths stay outside the lake and are deterministic, not tied to pickup RNG'
 });
 test('the real forest connects all main destinations; no new trunk or log blocks the corridor',()=>{
  const w=new World(new THREE.Scene(),new THREE.MeshBasicMaterial()).generate(),t=w.trails;
- for(const id of['camp','cabin','tower','stones','wreck','firetower','zarya','yard','medhut'])assert.ok(t.nodes.has(id),id);
- assert.equal(t.routes.length,17);assert.ok(t.length>1000&&t.length<1800);assert.ok(t.vertices>30000&&t.vertices<90000);
+ for(const id of['camp','cabin','tower','stones','wreck','firetower','zarya','yard','medhut','cabin3','cabin4','cabin5'])assert.ok(t.nodes.has(id),id);
+ assert.equal(t.routes.length,20);assert.ok(t.length>1000&&t.length<2300);assert.ok(t.vertices>30000&&t.vertices<90000);
  for(const r of t.routes)for(const p of r.points) {
   assert.ok(w.col.free(p.x,p.z,.28),`${r.from} -> ${r.to} blocked at ${p.x},${p.z}`);
   assert.ok(t.near(p.x,p.z,.5));
  }
  const reached=new Set(['camp']);for(let i=0;i<20;i++)for(const r of t.routes){if(reached.has(r.from))reached.add(r.to);if(reached.has(r.to))reached.add(r.from);}
- for(const id of['cabin','tower','stones','wreck','firetower','zarya','yard','medhut'])assert.ok(reached.has(id),`${id} must be reachable from camp`);
+ for(const id of['cabin','tower','stones','wreck','firetower','zarya','yard','medhut','cabin3','cabin4','cabin5'])assert.ok(reached.has(id),`${id} must be reachable from camp`);
  for(const m of w.meshes)m.geometry.dispose();w.material.dispose();
 });
 test('baked paths contain earth, ruts and encroaching grass, never emissive eye/shard geometry',()=>{

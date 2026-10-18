@@ -44,6 +44,7 @@ export class SelfBody {
     const mat = createPersonMaterial(rig.dyes, rimHex);
     mat.uniforms.uEcho.value = 1;
     const meshes = dressPerson(rig, mat);
+    this.armMat=createPersonMaterial(rig.dyes,rimHex);this.armMat.uniforms.uEcho.value=1;this.armMat.uniforms.uSelfLit.value=.28;
     const n = rig.nodes;
     const under = (o, top) => {
       for (let q = o; q; q = q.parent) if (q === top) return true;
@@ -61,6 +62,7 @@ export class SelfBody {
         for (let j = 0; j < a.length; j += 3) if (a[j + 1] > 0.3 && Math.abs(a[j]) < 0.2) front = Math.max(front, a[j + 2]);
       }
     });
+    for(const side of['L','R'])for(const m of this.arms[side])m.material=this.armMat;
     this.front = front;
     this.rig = rig;
     this.mat = mat;
@@ -73,6 +75,7 @@ export class SelfBody {
     if (this.rig.root.parent) this.rig.root.parent.remove(this.rig.root);
     undressPerson(this.meshes);
     this.mat.dispose();
+    this.armMat?.dispose();this.armMat=null;
     this.rig = null;
     this.mat = null;
     this.meshes = [];

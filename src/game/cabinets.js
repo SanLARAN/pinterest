@@ -2,18 +2,19 @@
 // wall of the scouts' hut, a tool locker in the forestry yard. E opens one; inside there may be nothing — or up
 // to three things worth having: a glow stick, a handful of nuts to throw, an amber shard, a flare cartridge.
 //
-// And very rarely one of the big ones isn't a cupboard. The шкафандр is a machine that waits: whoever opens it
+// Two or three of the eligible big ones are not cupboards. The шкафандр is a machine that waits: whoever opens it
 // is caught by the rollers and dragged in. Fifteen seconds. One or two friends can grab a hand (E) and pull —
 // on the beat: a key comes down the track, press it as it hits the line. Two of you, one hand each: you have to
 // pull on the same beat, or you're only tearing at each other. Alone in the forest, you can only fight it
 // yourself — and that rarely works. Whatever happens, it never works again.
 //
-// Co-op: anyone opens / takes ('co' / 'ct'); whoever opens the шкафандр says so ('zs'). The host judges: who
+// Co-op: anyone opens / takes ('co' / 'ct'); opening a шкафандр requests a host grant ('zq' → 'zsh'). The host judges: who
 // holds which hand ('zg' → 'zh'), every beat (each player times their own presses against their own clock and
 // reports the beat they hit: 'zp' → 'zb' — "the same beat" survives network lag), and the end ('zr' / 'zd').
 import * as THREE from 'three';
 import { CFG } from '../core/config.js';
 import { t } from '../core/i18n.js';
+import {chooseMimics} from './mimics.js';
 import { RNG, clamp, lerp, smoothstep, damp } from '../core/rng.js';
 import { MeshBuilder, KIND } from '../world/builder.js';
 import { CABINET_DIMS } from '../world/world.js';
@@ -33,7 +34,6 @@ export const KEY_LABEL = { U: 'W', L: 'A', D: 'S', R: 'D' };
 const OPEN_R = 1.7;
 export const PRY_TIME = 2.8;
 const GRAB_R = 2.4;
-const MIMIC_CHANCE = 0.3;
 const ITEMS = ['glow', 'nuts', 'shard', 'flare', 'battery'];
 const ITEM_W = [0.29, 0.29, 0.23, 0.12, 0.07]; // (batteries: rare — the flashlight is for a quick look)
 const RES = { NONE: 0, PULL: 1, SYNC: 2, OFF: 3, STRUGGLE: 4, PERFECT: 5 };
@@ -411,15 +411,13 @@ export class Cabinets {
     this.nightSeed = (rng.next() * 4294967296) >>> 0; // (the keys of its beat: the same for everyone)
     this.hintedHelp = false;
     this.pry = null;
-    let mimic = null;
-    const roll = rng.next(), pick = rng.next();
-    if (cands.length && (roll < MIMIC_CHANCE || this.force)) mimic = this.force ? cands[0] : cands[Math.floor(pick * cands.length)];
+    const mimics=chooseMimics(cands,rng,this.force);this.springPending=null;
     for (const c of this.list) {
       c.opened = false;
       c.locked = !!c.spec.locked;
       if (c.padlock) c.padlock.visible = c.locked;
       c.spent = false;
-      c.mimic = c === mimic;
+      c.mimic = mimics.has(c);
       c.tellT = 5 + rng.next() * 8;
       for (const d of c.doors) {
         d.ang = d.target = c.mimic ? 0.035 : 0; // (it never quite shuts)
@@ -571,8 +569,8 @@ export class Cabinets {
     if (c.locked) { g.hud.popup(t('pryNeed'), 'dim'); return; }
     if (c.mimic && g.state === 'play') {
       // it was never a cupboard
-      this.spring(c.i, me.id, true);
-      if (g.sync) g.sync.ev('zs', c.i);
+      if(this.trap&&!this.trap.free){g.hud.popup(t('trapBusy'),'dim');return;}
+      if(g.auth)this.hostSpring(c.i,me.id);else{this.springPending={ci:c.i,ttl:2,retry:.5};g.coop.toHost('zq',c.i);}
       return;
     }
     this.openFx(c, true);
@@ -670,12 +668,18 @@ export class Cabinets {
   }
 
   // ---------------- the шкафандр ----------------
+  hostSpring(i,pid){
+    const g=this.g,p=g.playerById(pid),c=this.list[i];
+    if(!g.auth||!Number.isInteger(i)||g.state!=='play'||!c?.mimic||c.spent||c.locked||!p?.alive||p.carrying||g.escape.load(pid)||g.escape.seatOf(pid)>=0||this.trap&&!this.trap.free||Math.hypot(p.x-c.front.x,p.z-c.front.z)>2.7||Math.abs(p.y-c.spec.y)>2||g.world?.losBlocked?.(p.x,p.y+(p.eyeCur||1.6),p.z,c.front.x,c.spec.y+.6,c.front.z,.22))return false;
+    this.spring(i,pid,pid===g.player.id);if(g.sync)g.sync.ev('zsh',i,pid);return true;
+  }
   // (every machine) it has someone. mine: it's me
   spring(i, victimId, mine = false) {
     const g = this.g;
     const c = this.list[i | 0];
     if (!c || !c.mimic || c.spent) return;
     if (this.trap && !this.trap.free) return; // (one at a time: the first word wins, the host's snapshot settles it)
+    if(this.trap?.free)this._endTrap(true);this.springPending=null;
     const seed = (Math.imul(i + 1, 2246822519) ^ this.nightSeed) >>> 0;
     c.opened = true;
     this.trap = {
@@ -727,7 +731,7 @@ export class Cabinets {
   }
 
   netSpring(pid, i) {
-    this.spring(i | 0, pid, false);
+    this.spring(i | 0, pid, pid===this.g.player.id);
   }
 
   // E by someone caught: a free hand (the host says which)
@@ -1047,6 +1051,7 @@ export class Cabinets {
   update(dt) {
     const g = this.g;
     if (this.askT > 0) this.askT -= dt;
+    const pending=this.springPending;if(pending){pending.ttl-=dt;pending.retry-=dt;if(this.trap||pending.ttl<=0||!g.player.alive)this.springPending=null;else if(pending.retry<=0){pending.retry=.5;g.coop.toHost('zq',pending.ci);}}
     for (const c of this.list) {
       // the doors: a spring toward where they should be (a chomp while it feeds)
       for (const d of c.doors) {
@@ -1267,8 +1272,10 @@ export class Cabinets {
     }
     if (!this.armMat) {
       this.armMat = createPersonMaterial(dyeColors(myFit()), 0xffffff);
+      this.armMat.uniforms.uSelfLit.value=.45;
       for (const a of this.arms) a.fore.material = a.hand.material = this.armMat;
     }
+    const dyes=this.g.selfBody?.rig?.dyes;if(dyes)for(let i=0;i<4;i++)this.armMat.uniforms.uDye.value[i].copy(dyes[i]);
     const c = this.list[tr.ci];
     const tt = tr.t;
     for (const a of this.arms) {

@@ -43,10 +43,10 @@ const CUT_LEN = 15.6;
 const WIN_PART = 750; // score for each part you fit
 // where each part might have ended up (one landmark each, a different one every night)
 const HIDE = {
-  wheel: ['cabin2', 'stones2', 'graves2'],
-  battery: ['stones2', 'cabin2', 'lake'],
-  carb: ['cabin2', 'graves2', 'stones'],
-  can: ['lake', 'stones2', 'graves2'],
+  wheel: ['cabin2', 'stones2', 'graves2','cabin4'],
+  battery: ['stones2', 'cabin2', 'lake','cabin3'],
+  carb: ['cabin2', 'graves2', 'stones','cabin5'],
+  can: ['lake', 'stones2', 'graves2','cabin4','cabin3'],
 };
 const UP = new THREE.Vector3(0, 1, 0);
 const AX = [new THREE.Vector3(1, 0, 0), new THREE.Vector3(-1, 0, 0), new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, -1, 0), new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, 0, -1)];

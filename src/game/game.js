@@ -32,6 +32,7 @@ import { Dread } from './dread.js';
 import { CAP } from '../world/world.js';
 import { shared } from '../render/sonar.js';
 import { Pulses } from '../render/pulses.js';
+import {PartMap} from './partMap.js';
 
 const RED = [1.0, 0.13, 0.08];
 const CUT_FADE = 13.9; // s into the fly-by when the screen starts going dark
@@ -90,6 +91,7 @@ export class Game {
     this.scareRigs = {};
     this._ears = { x: 0, y: 0, z: 0 };
     this.roomRules = { hideNames: false };
+    this.partMap=new PartMap(this);
     this.inventory = new Backpack(this);
     this.fieldView = new FieldView(this);
     this.voiceMimic = new VoiceMimic(this);
@@ -196,6 +198,7 @@ export class Game {
     this.glows.dropFor(r.id, r.x, r.z);
     this.escape.dropFor(r.id, r.x, r.z);
     this.tools.dropFor(r.id, r.x, r.z);
+    this.partMap?.dropFor(r.id);
     this.voiceMimic.forget(id);
     this.inventory.remoteSlots.delete(id);
     this.remotes.delete(id);
@@ -251,6 +254,7 @@ export class Game {
     this.tools.reset();
     this.expedition.reset();
     this.setFlares(0, false);
+    this.partMap.reset();
     this.inventory.reset();
     this.fieldView.reset();
     this.voiceMimic.reset();
@@ -1628,6 +1632,7 @@ export class Game {
     if (this.inputMuted) raw = { look: NO_LOOK, events: [] };
     this.inventory.update(dt);
     this.fieldView.update(dt);
+    this.partMap.update(dt);
     this.voiceMimic.update(dt);
     if (this.inventory.active) raw = { look: NO_LOOK, events: [] };
     let look = raw.look;
@@ -2140,13 +2145,14 @@ export class Game {
     this.expedition.applyView(camera);
     this.world.grass?.update(camera);
     const hands = !cutCam && !sp && !this.expedition.onTower && this.player.alive && (this.state === 'play' || this.state === 'dawn');
-    const gear = hands && !this.cabinets.busy && !this.inventory.active && this.inventory.equipT <= 0 && this.fieldView.watch < 0.1 && !this.escape.held && !this.player.carrying;
+    const gear = hands && !this.partMap.active && !this.cabinets.busy && !this.inventory.active && this.inventory.equipT <= 0 && this.fieldView.watch < 0.1 && !this.escape.held && !this.player.carrying;
     const active = this.inventory.equipped;
     this.glows.placeView(camera, gear && active === 'glow');
     this.escape.placeView(camera, hands);
     this.cabinets.placeView(camera, hands);
     this.torch.placeView(camera, gear && active === 'torch');
     this.tools.placeView(camera, gear && (active === 'tape' || active === 'crowbar'));
+    this.partMap.place(camera,hands&&!this.cabinets.busy&&!this.inventory.active);
     this.fieldView.place(camera, !cutCam && !sp && this.player.alive && !this.cabinets.busy && !this.expedition.onTower && ['play','morning','dawn'].includes(this.state));
     // your own body, under your eyes
     const st = this.state;
