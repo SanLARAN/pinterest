@@ -1,3 +1,5 @@
+import {getScope} from '../core/persistence.js';
+import {cloudError} from '../cloud/words.js';
 // The wardrobe. Your survivor stands beside the main menu — click it and you're in the room where you
 // dress it: headwear and an outfit, the standard kit or one of three themed pieces for each, two dyes
 // per piece. What you pick is saved here and sent to your friends: it's how they'll see you out there.
@@ -293,7 +295,8 @@ export class Wardrobe {
     this._touch();
   }
 
-  buy(pid) {
+  async buy(pid) {
+    if(this.buying)return;
     const p = product(pid);
     if (!p) return;
     const T = wt().shop;
@@ -304,7 +307,10 @@ export class Wardrobe {
       this._afterBuy(p, false);
       return;
     }
-    if (!buyProduct(pid, p.price)) {
+    const owner=getScope();let bought=false;this.buying=true;this._renderInfo();
+    try{bought=await buyProduct(pid,p.price);}catch(error){const toast=$('wrToast');if(toast){toast.textContent=cloudError(error);toast.classList.add('show');}return;}finally{this.buying=false;if(this.shown)this._renderInfo();}
+    if(owner!==getScope())return;
+    if (!bought) {
       this._sound('tap');
       const b = this.el.querySelector('.wr-buy');
       if (b) {
@@ -528,6 +534,7 @@ export class Wardrobe {
         + `<p>${esc(S.sets[p.id].desc)}</p><p class="wr-pieces">${pieces}${first.slot === 'car' ? ` · ${esc(S.carNote)}` : ''}</p>`
         + `<div class="wr-shoprow">${btn}${!own && short > 0 ? `<span class="wr-short">${esc(S.short.replace('{n}', short))} ${GEM}</span>` : ''}</div>`
         + `<p class="wr-earn">${esc(S.sub)}</p>`;
+      this.el.querySelector('[data-buy]')?.toggleAttribute('disabled',!!this.buying||worn);
       return;
     }
     const it = item(wardrobe[this.slot]);

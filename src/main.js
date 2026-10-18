@@ -9,6 +9,7 @@ import '@fontsource/jetbrains-mono/latin-700.css';
 import './style.css';
 import './garage-home.css';
 import './screen-editor.css';
+import './cloud.css';
 
 import * as THREE from 'three';
 import { CFG } from './core/config.js';
@@ -31,7 +32,12 @@ import { Menus } from './ui/menus.js';
 import { Game } from './game/game.js';
 import { buildListener } from './game/monsters.js';
 import { PLAYER_COLORS } from './game/remote.js';
-import { EARN, wallet } from './game/wallet.js';
+import { EARN, wallet, onWallet, pendingRewards } from './game/wallet.js';
+import {myFit} from './game/outfit.js';
+import {beginRewards,endRewards} from './cloud/rewards.js';
+import {CloudController} from './cloud/controller.js';
+import {cloudWords} from './cloud/words.js';
+import {AccountUI} from './ui/account.js';
 import { News } from './ui/news.js';
 import { MicCal } from './ui/miccal.js';
 import { Coop, myName } from './net/coop.js';
@@ -106,6 +112,7 @@ const wardrobe = new Wardrobe({
   onClose: () => {
     const back = lobby.isOpen() ? document.querySelector('#coopList button.fit') : $('btnWardrobe');
     if (back) back.focus({ preventScroll: true });
+    cloud.safePoint();
   },
   onChange: () => {
     if (coop.active) coop.announce();
@@ -233,6 +240,7 @@ const menus = new Menus({
       atlas.applyI18n();
       wardrobe.applyI18n();
       news.render();
+      account.render();
       updateMicUI();
       lobby.render();
       $('lockHint').textContent = input.lockFailed ? t('dragToLook') : t('clickToLook');
@@ -279,7 +287,22 @@ const lobby = new Lobby({
   },
 });
 const home=new GarageHome({ensureGarage,atlas,onWardrobe:()=>wardrobe.open()});
-coop.on('change', () => lobby.render());
+// No account gate on play, and no cloud request in the frame loop.
+const canApplyAccount=()=>state==='menu'&&!coop.active&&!lobby.starting&&!wardrobe.isOpen()&&!atlas.isOpen()&&!micCal.isOpen()&&!['settingsPanel','howPanel','scoresPanel'].some(id=>menus.isOpen(id));
+const cloud=new CloudController({
+ canApply:canApplyAccount,
+ onApplied:()=>{setLang(settings.lang);menus.applyI18n();menus.loadSettingsForm();$('nameInput').value=settings.name;if(!coop.active)$('coopName').value=settings.name;atlas.applyI18n();atlas.refreshBadge();wardrobe.applyI18n();news.render();audio.setVolume(settings.volume);mic.setEcho(settings.voiceEcho);updateMicUI();lobby.menuLabel();if(garage?.view==='menu'){const f=myFit();garage.setCar(f.car,f.cc);garage.studio.setFit(f);}account?.render();},
+ getPresence:()=>{const room=coop.active&&!coop.inRun&&coop.phase==='lobby'?coop.code:null;return{state:['playing','paused'].includes(state)?'playing':room?'lobby':'online',room,strategy:coop.signalling?.only||'default'};},
+ onNotice:()=>{if(state==='playing')hud.popup(cloudWords().inboxNotice,'dim');}
+});
+const account=new AccountUI({cloud,canOpen:()=>state==='menu'&&!wardrobe.isOpen()&&!atlas.isOpen()&&!micCal.isOpen()&&!lobby.rulesOpen&&!lobby.starting,canChange:canApplyAccount,getRoom:()=>coop.active&&!coop.inRun?coop.code:null,onJoin:async room=>{
+ if(state!=='menu'||lobby.starting)throw new Error('leave_room');account.close();lobby.open();if(coop.active&&coop.code===room.room_code)return;await coop.join(room.room_code,{strategy:room.strategy});lobby.render();
+}});
+let overReward=null;
+function renderOverWallet(){const el=$('overWallet');if(!el||!overReward)return;const{earned,escBonus}=overReward;el.textContent=earned>0?t('walletNight').replace('{n}',earned).replace('{escape}',escBonus?t('walletEscape').replace('{n}',escBonus):'').replace('{total}',wallet.shards):'';if(pendingRewards()>0)el.textContent+=' · '+cloudWords().pending;}
+onWallet(()=>{if(state==='over')renderOverWallet();});cloud.on(()=>{if(state==='over')renderOverWallet();});
+
+coop.on('change', () => {lobby.render();cloud.presenceChanged();cloud.safePoint();});
 coop.on('start', (d) => beginCoopRun(d));
 coop.on('hostLost', () => {
   if (runOnline && game && (state === 'playing' || state === 'paused')) game.hostLost();
@@ -293,6 +316,7 @@ coop.on('hostLost', () => {
 // the host pressed START in the garage: the car starts first (everyone sees it), then the night.
 // A restart from the results screen (no cut) goes straight in, as before.
 function beginCoopRun(d) {
+  account.close();
   if (d.cut && state === 'menu' && ensureGarage()) {
     if (atlas.isOpen()) atlas.close();
     if (wardrobe.isOpen()) wardrobe.close();
@@ -487,6 +511,7 @@ function setBodyState() {
 // opts.coop = the host's start message ({ seed, players }) for a co-op night
 function startRun(opts = {}) {
   if (!game) return;
+  account.close();overReward=null;
   const online = !!opts.coop;
   if (!online && state === 'over' && performance.now() - overAt < 450) return;
   if (!online && coop.active) coop.leave(); // a solo night: you leave the room
@@ -523,7 +548,9 @@ function startRun(opts = {}) {
       game.tut.done = true;
     }
   }
+  beginRewards();
   state = 'playing';
+  cloud.presenceChanged();
   setBodyState();
   post.u.uFade.value = 1;
   if (!input.touch) input.requestLock();
@@ -586,6 +613,7 @@ function resume() {
 
 // keepRoom: co-op "to the lobby" — stay in the room with your friends
 function toMenu(keepRoom = false) {
+  account.close();endRewards({reason:'menu',time:game?.time,score:game?.score,gens:game?.objectives.count});overReward=null;
   const wasOnline = runOnline;
   // walking away from a night still leaves it in the atlas (what you met, what you started)
   if (game && (state === 'playing' || state === 'paused') && (game.state === 'play' || game.state === 'dying')) {
@@ -646,6 +674,7 @@ function toMenu(keepRoom = false) {
   if (keepRoom && coop.active) lobby.open();
   else home.enter();
   lobby.menuLabel();
+  cloud.presenceChanged();cloud.safePoint();
 }
 
 function teamSummary() {
@@ -674,6 +703,7 @@ function onEnd(res) {
   }
   stats.earned = game.stats.earned | 0;
   stats.escBonus = escBonus;
+  endRewards({reason:'end',won:res.won,time:stats.time,score:stats.score,gens:stats.gens});
   try {
     const started = game.objectives.gens.filter((g) => g.running).map((g) => ({ k: g.k, site: g.site && g.site.id }));
     recordNight(stats, res, started);
@@ -689,10 +719,7 @@ function onEnd(res) {
   game.expedition.silence();
   game.flares.clear(); // (a burning flare would hiss on behind the end screen)
   menus.showOver(res, stats, rank, list, team);
-  const ow = $('overWallet');
-  if (ow) {
-    ow.textContent = stats.earned > 0 ? t('walletNight').replace('{n}', stats.earned).replace('{escape}', escBonus ? t('walletEscape').replace('{n}', escBonus) : '').replace('{total}', wallet.shards) : '';
-  }
+  overReward={earned:stats.earned,escBonus};renderOverWallet();
   menus.renderScores();
   if (online) {
     coop.endRun();
@@ -708,6 +735,7 @@ function onEnd(res) {
   document.body.classList.remove('spectating');
   mates.clear();
   state = 'over';
+  cloud.presenceChanged();
   overAt = performance.now();
   setBodyState();
   input.exitLock();
@@ -724,7 +752,8 @@ function handleEvents(events) {
         break;
       case 'pause':
         if (state === 'playing' && game?.inventory.opened) { game.inventory.close(); break; }
-        if (atlas.isOpen()) atlas.close();
+        if(account.isOpen())account.close();
+        else if (atlas.isOpen()) atlas.close();
         else if (wardrobe.isOpen()) wardrobe.close();
         else if (lobby.rulesOpen) lobby.closeRules();
         else if (lobby.isOpen()) {
@@ -747,7 +776,7 @@ function handleEvents(events) {
         if (state === 'over' || (state === 'paused' && !runOnline)) restartRun();
         break;
       case 'confirm':
-        if (atlas.isOpen() || wardrobe.isOpen() || menus.isOpen('settingsPanel') || menus.isOpen('howPanel') || menus.isOpen('scoresPanel') || lobby.isOpen()) break;
+        if (account.isOpen() || atlas.isOpen() || wardrobe.isOpen() || menus.isOpen('settingsPanel') || menus.isOpen('howPanel') || menus.isOpen('scoresPanel') || lobby.isOpen()) break;
         if (state === 'over') restartRun();
         else if (state === 'menu') startRun();
         else if (state === 'paused') resume();
@@ -794,7 +823,7 @@ function step(now, render) {
   handleEvents(events);
 
   const garageOn = state === 'menu' && !atlasOpen && !wardrobeOpen && !!garage;
-  home.setActive(state==='menu'&&!atlasOpen&&!wardrobeOpen&&!lobby.isOpen()&&!['settingsPanel','howPanel','scoresPanel'].some(id=>menus.isOpen(id))&&!micCal.isOpen());
+  home.setActive(state==='menu'&&!atlasOpen&&!wardrobeOpen&&!lobby.isOpen()&&!['settingsPanel','howPanel','scoresPanel'].some(id=>menus.isOpen(id))&&!micCal.isOpen()&&!account.isOpen());
   if (state === 'menu') {
     if (garageOn) {if(!lobby.isOpen())home.enter();updateGarage(rawDt);}
     else if(atlasOpen||wardrobeOpen) {
@@ -858,6 +887,7 @@ function step(now, render) {
     return;
   }
   if (garageOn) {
+    if(account.isOpen())return;
     garage.frame(rawDt);
     if(lobby.isOpen())lobby.place(garage.anchors());else home.place();
     return;
@@ -898,7 +928,7 @@ function boot() {
       perf.fpsEl.style.cssText = 'position:fixed;right:8px;top:64px;z-index:99;font:11px JetBrains Mono,monospace;color:#8ef0ff;opacity:.8;pointer-events:none';
       document.body.appendChild(perf.fpsEl);
     }
-    window.__hush = { world, game, shared, pulses, ghosts, eyes, renderer, perf, mic, audio, input, hud, post, shadows, coop, lobby, atlas, wardrobe, micCal, news, home, debug: DEBUG, startRun, pause, resume, toMenu, ensureGarage, get garage() { return garage; }, get state() { return state; } };
+    window.__hush = { world, game, shared, pulses, ghosts, eyes, renderer, perf, mic, audio, input, hud, post, shadows, coop, lobby, atlas, wardrobe, micCal, news, home, debug: DEBUG, startRun, pause, resume, toMenu, ensureGarage, cloud, account, get garage() { return garage; }, get state() { return state; } };
     state = 'menu';
     menuTime = 0;
     post.u.uFade.value = 0;
@@ -908,6 +938,7 @@ function boot() {
     if (DEBUG.autostart) startRun();
     if (params.has('sfx')) import('./ui/sfxtest.js').then((m) => m.mountSfxPanel(audio));
     lobby.menuLabel();
+    cloud.start();
     setTimeout(() => {
       if (state === 'menu' && ensureGarage()) {
         try { renderer.compile(garage.scene, garage.camera); } catch { /* it'll compile on first draw */ }

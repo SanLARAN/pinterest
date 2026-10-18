@@ -7,6 +7,23 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v:'1.15',date:'2026-10-18',
+    ru:{title:'Личное дело',items:[
+      '«Профиль» в меню: регистрация, вход по почте и паролю, подтверждение адреса, восстановление пароля. Гостевая игра и комнаты по коду по-прежнему доступны без аккаунта',
+      'Облачный гардероб, покупки, цвета и рисунок головы-экрана, личные рекорды, атлас и статистика. При первом входе — явный одноразовый перенос гостевого прогресса; исходная гостевая копия сохраняется',
+      'Друзья по уникальному тегу, входящие и отправленные заявки, принятие, удаление, блокировка, статусы в сети/в лобби/в игре и приглашения в комнату. Приглашения не переключают комнату автоматически',
+      'Кэш разделён по аккаунтам. Сбои сети не останавливают игру; изменения и награды ждут синхронизации. Конфликт с другим устройством требует выбора, а не молча перезаписывает данные',
+      'Покупки проверяет сервер, повторные награды и импорт не дублируют осколки. Голос и движение остаются в WebRTC, аудиозаписи в облако не выгружаются. Для писем подтверждения и восстановления нужна настроенная почтовая служба проекта',
+    ]},
+    en:{title:'Personnel file',items:[
+      'Profile in the menu: email/password registration, sign-in, confirmation and password recovery. Guest play and room codes remain available without an account',
+      'Cloud wardrobe, purchases, dyes and CRT artwork, personal records, atlas and statistics. First sign-in offers an explicit one-time guest import; the original guest copy is kept',
+      'Friends by unique tag, incoming/outgoing requests, accept/remove/block, online/lobby/run status and room invitations. Invitations never switch rooms automatically',
+      'Account-separated local caches. Network failures do not stop gameplay; edits and rewards queue for sync. Conflicts with another device require a choice, never silent overwrites',
+      'Server-priced purchases, idempotent rewards and imports. Voice and movement stay on WebRTC; no voice recordings are uploaded. Confirmation/recovery emails require the project mail service to be configured',
+    ]},
+  },
+  {
     v:'1.14',date:'2026-10-18',
     ru:{title:'Зорька включает свет',items:[
       'Трава теперь растёт пятнами по полянам и лесу, а не только по краям троп. Разная густота, мягкое покачивание и затухание вдали; та же настоящая подсветка, без свечения',

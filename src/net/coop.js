@@ -77,14 +77,14 @@ export class Coop {
     return code;
   }
 
-  async join(raw) {
+  async join(raw, options = {}) {
     const code = cleanCode(raw);
     if (code.length < 4) throw new Error('bad code');
-    await this._enter(code, false);
+    await this._enter(code, false, options);
     return code;
   }
 
-  async _enter(code, host) {
+  async _enter(code, host, options = {}) {
     await this.leave();
     this.code = code;
     this.isHost = host;
@@ -100,7 +100,8 @@ export class Coop {
     this.emit('change');
     const params = new URLSearchParams(location.search);
     const relays = params.get('relays') ? params.get('relays').split(',').filter(Boolean) : null;
-    const only = ['nostr', 'torrent'].includes(params.get('net')) ? params.get('net') : null;
+    const only = options.strategy==='default'?null:['nostr','torrent'].includes(options.strategy)?options.strategy:['nostr','torrent'].includes(params.get('net'))?params.get('net'):null;
+    this.signalling={only};
     try {
       await this.net.join(code, { relays, test: !!relays, only });
     } catch (e) {
@@ -142,7 +143,8 @@ export class Coop {
     u.hash = '';
     u.searchParams.set('room', this.code);
     const q = new URLSearchParams(location.search);
-    for (const k of ['relays', 'net']) if (q.get(k)) u.searchParams.set(k, q.get(k)); // test / diagnostic setups keep their signalling
+    if(q.get('relays'))u.searchParams.set('relays',q.get('relays')); // diagnostics stay local to the caller, never in cloud invites
+    if(this.signalling?.only)u.searchParams.set('net',this.signalling.only);
     return u.toString();
   }
 

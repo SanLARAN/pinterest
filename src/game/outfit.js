@@ -1,3 +1,4 @@
+import {readJSON,writeJSON} from '../core/persistence.js';
 // The wardrobe: what your survivor wears. Two slots (headwear, outfit), the standard kit plus themed pieces
 // for each (Taiga, the Zone, Halloween, Anime, Furry — and three sets from the shop), and two dyes per piece.
 // A third slot is the car in the co-op garage (the host's is the one everybody sees). Clothes never change the
@@ -129,12 +130,7 @@ export function fitKey(fit) {
 const KEY = 'hush.outfit.v1';
 
 function load() {
-  let raw = null;
-  try {
-    raw = JSON.parse(localStorage.getItem(KEY) || 'null');
-  } catch {
-    raw = null;
-  }
+  const raw=readJSON(KEY);
   const w = { head: ITEMS.head[0].id, body: ITEMS.body[0].id, car: ITEMS.car[0].id, colors: {}, screen:{...DEFAULT_SCREEN} };
   if (raw && typeof raw === 'object') {
     for (const slot of SLOTS) {
@@ -152,13 +148,8 @@ function load() {
 
 export const wardrobe = load();
 
-export function saveWardrobe() {
-  try {
-    localStorage.setItem(KEY, JSON.stringify(wardrobe));
-  } catch {
-    /* private mode */
-  }
-}
+export function saveWardrobe(){writeJSON(KEY,wardrobe,'outfit');}
+export function reloadWardrobe(){for(const k of Object.keys(wardrobe))delete wardrobe[k];Object.assign(wardrobe,load());}
 
 export function colorsOf(id) {
   const c = wardrobe.colors[id];

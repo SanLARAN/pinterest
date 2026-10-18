@@ -1,3 +1,4 @@
+import {readJSON,writeJSON,readDevice,saveDevice} from './persistence.js';
 // Settings + local high-score table (localStorage, fails gracefully).
 const SETTINGS_KEY = 'hush.settings.v1';
 const SCORES_KEY = 'hush.scores.v1';
@@ -21,26 +22,13 @@ const DEFAULTS = {
   micCal: null, // the 15-second setup: { floor, talk, shout } dBFS (see ui/miccal.js)
 };
 
-function read(key, fallback) {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : fallback;
-  } catch {
-    return fallback;
-  }
-}
-function write(key, value) {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    /* private mode etc. */
-  }
-}
-
-export const settings = { ...DEFAULTS, ...read(SETTINGS_KEY, {}) };
-export function saveSettings() {
-  write(SETTINGS_KEY, settings);
-}
+function read(key,fallback){return readJSON(key,fallback);}
+function write(key,value){const section=key===SETTINGS_KEY?'settings':key===SCORES_KEY?'scores':'atlas';writeJSON(key,value,section);}
+function loadSettings(){const next={...DEFAULTS,...read(SETTINGS_KEY,{})};const device=readDevice();for(const k of['quality','micEnabled','micSens','micCal','voiceVol'])if(k in device)next[k]=device[k];return next;}
+export const settings=loadSettings();
+export function saveSettings(){saveDevice(settings);write(SETTINGS_KEY,settings);}
+export function reloadStorageState(){for(const k of Object.keys(settings))delete settings[k];Object.assign(settings,loadSettings());for(const k of Object.keys(atlasLog))delete atlasLog[k];Object.assign(atlasLog,loadAtlas());}
+export function defaultSettings(){return{...DEFAULTS,voiceVol:{},micCal:null};}
 
 export function getScores() {
   const list = read(SCORES_KEY, []);
@@ -74,7 +62,7 @@ export function bestScore() {
 
 // ---------------- the atlas: what you have lived through, night after night ----------------
 const ATLAS_KEY = 'hush.atlas.v1';
-function freshAtlas() {
+export function freshAtlas() {
   return {
     nights: 0, wins: 0, best: 0, // best = longest night survived (s)
     seen: {}, // creature -> nights it showed itself to you

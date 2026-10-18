@@ -1,0 +1,3 @@
+# Preserve minified dependencies byte-for-byte, including whitespace inside template strings.
+# Source files still use normal git whitespace checks.
+play/assets/*.js -whitespace
