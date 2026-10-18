@@ -6,7 +6,7 @@ import { ForestTrails } from '../src/world/trails.js';
 import { Collision } from '../src/world/collision.js';
 import { MeshBuilder, KIND } from '../src/world/builder.js';
 import { World, LANDMARKS } from '../src/world/world.js';
-import { buildAtlasDesk, buildDressingFurniture } from '../src/ui/garageStudio.js';
+import { buildAtlasDesk } from '../src/ui/garageStudio.js';
 import { Wardrobe } from '../src/ui/wardrobe.js';
 import { Input } from '../src/input/input.js';
 import { item, owns } from '../src/game/outfit.js';
@@ -46,8 +46,8 @@ test('a baked mesh append keeps material/hidden-edge bytes and honours its place
  b.place(2,3,4);b.append(data);const out=b.toArrays();assert.equal(out.count,3);assert.deepEqual([...out.dat],[...data.dat]);
  assert.deepEqual([...out.pos],[2,3,4,3,3,4,2,4,4]);
 });
-test('the atlas is actual finite book-desk furniture, and the wardrobe has a dressing corner',()=>{
- for(const a of[buildAtlasDesk(),buildDressingFurniture()]){assert.ok(a.count>200&&a.count<5000);assert.ok(a.pos.every(Number.isFinite));}
+test('the atlas keeps its finite book-desk furniture without adding a dressing cabinet',()=>{
+ for(const a of[buildAtlasDesk()]){assert.ok(a.count>200&&a.count<5000);assert.ok(a.pos.every(Number.isFinite));}
  assert.ok(owns('boykisser'),'the free existing outfit stays free');assert.equal(item('trueno').slot,'car');
 });
 test('Enter/Space on native menu controls never also emits global confirm/start/skip',()=>{

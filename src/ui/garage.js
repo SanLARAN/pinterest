@@ -1071,7 +1071,6 @@ export class Garage {
     this.sparks.update(dt, this._pix());
     this.dustMat.uniforms.uPix.value = this._pix();
     this._anchors();
-    this.studio?.reflect();
     this._render();
   }
 
@@ -1257,6 +1256,7 @@ export class Garage {
       } else f.appear = Math.min(1, f.appear + dt / 1.1);
       f.mat.uniforms.uAppear.value = f.appear >= 1 ? 1 : f.appear;
       f.mat.uniforms.uHover.value = damp(f.mat.uniforms.uHover.value, s === this.hoverSlot && f.self ? 1 : 0, 10, dt);
+      if(this.studio&&(this.view==='menu'||this.view==='dressing')){f.rig.root.visible=false;continue;}
       f.st.t += dt;
       this._lookAround(f, dt);
       const n = f.rig.nodes;

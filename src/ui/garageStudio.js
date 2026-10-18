@@ -1,37 +1,16 @@
 // The same garage is the title screen, lobby and dressing room. One live renderer, no floating avatar.
 import * as THREE from 'three';
-import { MeshBuilder, KIND } from '../world/builder.js';
-import { clamp, damp, lerp, RNG } from '../core/rng.js';
+import { MeshBuilder } from '../world/builder.js';
+import { clamp, damp, RNG } from '../core/rng.js';
 import { t } from '../core/i18n.js';
 import { myFit, cleanFit, fitKey } from '../game/outfit.js';
 import { poseSurvivor, poseFur } from '../game/survivor.js';
+import { GET_UP_SECONDS, teaSeatMotion } from './teaSeat.js';
 import { Mannequin } from './mannequin.js'; // only lazily used for the small, cached catalogue stills
 
-const AT = new THREE.Vector3(2.15,.1,2.18);
-const MIRROR_Z=1.49;
 const FOCUS={body:{y:1.02,h:2.5,w:1.35},head:{y:1.72,h:1.05,w:1.05},car:{y:.8,h:2.3,w:4.9}};
 const v3=new THREE.Vector3();
 const box=(b,x,y,z,w,h,d,kind=4,rz=0)=>{b.place(x,y,z,0,0,rz);b.box(w,h,d,kind);};
-
-export function buildDressingFurniture() {
-  const b=new MeshBuilder(1500);
-  // A battered cabinet and open rail behind your own, full-sized survivor.
-  box(b,3.39,1.06,1.61,.73,2.1,.45,21);
-  box(b,3.39,1.09,1.85,.64,1.91,.035,4);
-  for(const y of[.2,.92,1.64])box(b,3.39,y,1.88,.59,.025,.04,5);
-  box(b,3.13,1.13,1.9,.025,.16,.025,5);
-  box(b,2.14,.055,2.17,1.43,.09,1.25,4);
-  // The mirror has a deep timber frame, screws and a slightly crooked top.
-  for(const x of[1.49,2.81])box(b,x,1.12,MIRROR_Z,.085,2.17,.075,4);
-  for(const y of[.045,2.195])box(b,2.15,y,MIRROR_Z,1.4,.085,.075,4);
-  for(const x of[1.5,2.8])for(const y of[.08,2.15])box(b,x,y,MIRROR_Z+.043,.015,.015,.012,5);
-  // Cloth, hooks and a plain work lamp. A useful, neutral dressing light, not a neon showroom.
-  box(b,3.52,2.38,1.58,.07,.07,.58,5);
-  box(b,3.52,2.38,1.91,.4,.07,.16,23);
-  box(b,3.52,2.335,1.91,.31,.015,.12,48);
-  for(let i=0;i<3;i++) {const x=3.2+i*.17;box(b,x,1.81,1.96,.018,.07,.035,5);box(b,x,1.71,1.96,.04,.14,.025,4);}
-  return b.toArrays();
-}
 
 export function buildAtlasDesk() {
   const b=new MeshBuilder(700);
@@ -52,17 +31,19 @@ export function buildAtlasDesk() {
 export class GarageStudio {
   constructor(garage) {
     this.g=garage;this.fitKey='';this.adapter=null;this.hover='';this.look=new THREE.Vector3(.2,.95,.8);
-    garage._mesh(buildDressingFurniture());garage._mesh(buildAtlasDesk());
-    this.resident={rig:null,key:'',mat:garage._mat({uNeutral:{value:.18},uFill:{value:new THREE.Vector4(.2,.55,.8,.34)}})};
+    garage._mesh(buildAtlasDesk());
+    this.resident={rig:null,key:'',id:'menu-survivor',slot:1,t:0,look:{yaw:0,pitch:0,wy:0,wp:0,next:1,tgt:null,at:null},st:{phase:'sip',t:0},mat:garage._mat({uNeutral:{value:.18},uFill:{value:new THREE.Vector4(.2,.55,.8,.34)}})};
+    // Reuse the lobby's proven tea/hand IK, without changing the real engine-start cutscene.
+    this.chairView=Object.create(garage);this.chairView.cut=null;
+    this.standAge=0;this.seatMotion=teaSeatMotion(0);this.ownsCup=false;
     this.carPreviewMat=garage._mat({uNeutral:{value:.65}});
-    this.setFit(myFit());this._book();this._mirror();this._outside();
-    this.bookAmount=0;this.bookWant=0;this.lastReflection=-100;this.lastLang='';
+    this.setFit(myFit());this._book();this._outside();
+    this.bookAmount=0;this.bookWant=0;this.lastLang='';
   }
   setFit(fit) {
     const f=cleanFit(fit),key=fitKey(f);if(key===this.fitKey)return;
     this.fitKey=key;this.g._dress(this.resident,f);
-    const root=this.resident.rig.root;if(!root.parent)this.g.scene.add(root);root.position.copy(AT);
-    this.lastReflection=-100;
+    const root=this.resident.rig.root;if(!root.parent)this.g.scene.add(root);root.position.fromArray(this.seatMotion.root);
   }
   _book() {
     const g=this.g;this.book=new THREE.Group();this.book.position.set(.26,.827,2.32);this.book.rotation.y=-.2;g.scene.add(this.book);
@@ -97,16 +78,6 @@ export class GarageStudio {
       box(b,x,h*.4,z,.18,h*.8,.18,1);for(let k=0;k<3;k++){b.place(x,h*.35+k*h*.21,z);b.cone(5,.9-k*.2,h*.55,2);}}
     this.g._mesh(b.toArrays());
   }
-  _mirror() {
-    this.mirrorScene=new THREE.Scene();this.mirrorScene.background=new THREE.Color('#17201e');
-    this.mirrorCamera=new THREE.PerspectiveCamera();this.mirrorMatrix=new THREE.Matrix4();
-    const mat=new THREE.ShaderMaterial({uniforms:{image:{value:null},matrix:{value:this.mirrorMatrix}},
-      vertexShader:'uniform mat4 matrix;varying vec4 v;varying vec2 uv0;void main(){uv0=uv;v=matrix*vec4(position,1.);gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
-      fragmentShader:`uniform sampler2D image;varying vec4 v;varying vec2 uv0;void main(){vec3 c=texture2DProj(image,v).rgb;float smudge=.03+sin(uv0.x*143.+uv0.y*78.)*sin(uv0.y*229.)*.008;float crack=1.-smoothstep(.001,.004,abs(uv0.x-(.68+.13*sin(uv0.y*8.))));float edge=smoothstep(0.,.08,min(min(uv0.x,1.-uv0.x),min(uv0.y,1.-uv0.y)));gl_FragColor=vec4(mix(vec3(.025,.035,.031),c*.67+vec3(smudge)+crack*.055,edge),0.);}`});
-    this.mirror=new THREE.Mesh(new THREE.PlaneGeometry(1.22,2.04),mat);this.mirror.position.set(2.15,1.12,MIRROR_Z+.005);this.g.scene.add(this.mirror);
-    this.reflection={rig:null,key:'',mat:this.g._mat({uNeutral:{value:.7},uCam:{value:new THREE.Vector3()}})};
-    this.mirror.visible=false;
-  }
   openBook(callback) { if(this.bookCallback)return;this.bookWant=1;this.bookCallback=callback;this.bookStarted=performance.now(); }
   cancelBook() { this.bookCallback=null;this.bookWant=0; }
   bookRect() {
@@ -115,32 +86,49 @@ export class GarageStudio {
     const xs=a.map(p=>(p.x*.5+.5)*this.g.w),ys=a.map(p=>(.5-p.y*.5)*this.g.h);
     return{x:Math.min(...xs),y:Math.min(...ys),w:Math.max(...xs)-Math.min(...xs),h:Math.max(...ys)-Math.min(...ys)};
   }
+  beginDressing() {
+    if(this.g.view!=='menu') {
+      this.standAge=0;
+      this.resident.st={phase:'idle',t:0,next:3};
+    }
+  }
   frame(dt) {
-    const g=this.g,dressing=g.view==='dressing',home=g.view==='menu',f=this.resident;
-    f.rig.root.visible=(home||dressing)&&!this.adapter?.carOn;
-    for(const peer of g.figs)if(peer)peer.rig.root.visible=!dressing;
+    const g=this.g,dressing=g.view==='dressing',home=g.view==='menu',active=home||dressing,f=this.resident;
+    if(active) this.standAge=clamp(this.standAge+(dressing?dt:-dt),0,GET_UP_SECONDS);
+    this.seatMotion=teaSeatMotion(this.standAge,this.adapter?.orbit.yaw??.42);
+    f.rig.root.visible=active&&(!this.adapter?.carOn||this.standAge<GET_UP_SECONDS);
+    for(const peer of g.figs)if(peer)peer.rig.root.visible=!active;
     g.carRoot.rotation.y=dressing&&this.adapter?.carOn?this.adapter.orbit.yaw-.3:0;
     for(const mesh of g.carParts)if(mesh.material===g.matSet||mesh.material===this.carPreviewMat)mesh.material=dressing&&this.adapter?.carOn?this.carPreviewMat:g.matSet;
     g.carRoot.updateMatrixWorld(true);
     g.u.uHeadD.value.set(-1,-.04,0).normalize().applyAxisAngle(new THREE.Vector3(0,1,0),g.carRoot.rotation.y);
     g._carPoint(g.CP.head[0],g.u.uHeadP0.value);g._carPoint(g.CP.head[1],g.u.uHeadP1.value);
-    this.mirror.visible=(home||dressing)&&!this.adapter?.carOn;
     if(home)this.setFit(myFit());
     f.mat.uniforms.uNeutral.value=dressing ? .78 : .18;
     f.mat.uniforms.uHover.value=damp(f.mat.uniforms.uHover.value,(this.hover==='survivor'||g.studioHover)? .45:0,8,dt);
     g.u.uDesk.value.set(.05,1.29,2.13,.8);
-    const n=f.rig.nodes;poseSurvivor(f.rig,g.t*.8,0,false,false);
-    n.chest.rotation.x=Math.sin(g.t*1.3)*.014;n.head.rotation.y=Math.sin(g.t*.31)*.12;
-    n.head.rotation.x=Math.sin(g.t*.23)*.035;
-    f.rig.root.position.copy(AT);f.rig.root.rotation.y=dressing?(this.adapter?.orbit.yaw??.3):.24;
-    if(!dressing) { const a=(g.t%20),k=a>9&&a<13?Math.sin((a-9)/4*Math.PI):0;n.shL.rotation.x=-.58*k;n.elL.rotation.x=-.25-1.4*k;n.head.rotation.x+=.3*k; }
-    const gesture=this.adapter?.gesture;
-    if(gesture) {
-      gesture.t+=dt;const k=Math.sin(clamp(gesture.t/1.2,0,1)*Math.PI);
-      n.shR.rotation.x-=k*(gesture.type==='hat'?1.5:.55);n.elR.rotation.x-=k*.8;
-      if(gesture.t>1.2)this.adapter.gesture=null;
+    if(active) {
+      const motion=this.seatMotion,n=f.rig.nodes;
+      poseSurvivor(f.rig,g.t*.8,0,false,false);n.hips.rotation.set(0,0,0);
+      f.rig.root.position.fromArray(motion.root);f.rig.root.rotation.set(0,motion.yaw,0);
+      f.st.t+=dt;f.t+=dt;
+      f.look.yaw=damp(f.look.yaw,home?Math.sin(g.t*.25)*.22+.2:0,4,dt);
+      f.look.pitch=damp(f.look.pitch,Math.sin(g.t*.2)*.04,4,dt);
+      this.chairView.cut=this.standAge>0?{t:1.3+motion.rc}:null;
+      g._chair.call(this.chairView,f,dt);
+      this.ownsCup=true;
+      const gesture=this.adapter?.gesture;
+      if(gesture) {
+        gesture.t+=dt;
+        if(motion.up>=.999) {const k=Math.sin(clamp(gesture.t/1.2,0,1)*Math.PI);n.shR.rotation.x-=k*(gesture.type==='hat'?1.5:.55);n.elR.rotation.x-=k*.8;}
+        if(gesture.t>1.2)this.adapter.gesture=null;
+      }
+      poseFur(f.rig,dt);g._glow(f);
+    } else if(this.ownsCup) {
+      // The visible lobby chair owns the real mug again; never overwrite a friend's sip.
+      if(!g.figs[1]||g.figs[1].leaving){g.cup.position.copy(g.cupHome);g.cup.rotation.set(0,0,0);}
+      this.ownsCup=false;
     }
-    poseFur(f.rig,dt);g._glow(f);
     if(this.adapter&&dressing)this.adapter.tick(dt);
     this.bookAmount=damp(this.bookAmount,this.bookWant,9,dt);this.bookLid.rotation.z=this.bookAmount*2.1;
     this.bookMat.uniforms.hover.value=damp(this.bookMat.uniforms.hover.value,this.hover==='book'?1:0,8,dt);
@@ -154,13 +142,13 @@ export class GarageStudio {
       if(!r||r.width<1||r.height<1)return;
       cam.fov=32;cam.setViewOffset(g.w,g.h,g.w/2-r.x-r.width/2,g.h/2-r.y-r.height/2,g.w,g.h);
       const d=Math.max(f.h*g.h/(Math.max(100,r.height)*.83*2*Math.tan(Math.PI*cam.fov/360)),f.w*g.h/(Math.max(100,r.width)*.83*2*Math.tan(Math.PI*cam.fov/360)))*a.orbit.zoom;
-      target=a.carOn?new THREE.Vector3(.35,f.y,-.6):AT.clone().add(v3.set(0,f.y,0));
+      target=a.carOn?new THREE.Vector3(.35,f.y,-.6):new THREE.Vector3(...this.seatMotion.anchor).add(v3.set(0,f.y-.39*(1-this.seatMotion.up),0));
       const yaw=a.carOn ? -.4 : 0,pitch=a.orbit.pitch;
       pos=target.clone().add(v3.set(Math.sin(yaw)*d,Math.sin(pitch)*d,Math.cos(yaw)*Math.cos(pitch)*d));
     } else {
-      cam.clearViewOffset();cam.fov=portrait?40:38;
-      target=portrait?new THREE.Vector3(1.2,1.0,2):new THREE.Vector3(.2,.95,.8);
-      pos=portrait?new THREE.Vector3(1.2,4.4,11):new THREE.Vector3(.55,2.65,7.8);
+      cam.clearViewOffset();cam.fov=portrait?44:38;
+      target=portrait?new THREE.Vector3(1.5,.9,1.6):new THREE.Vector3(.4,.9,.8);
+      pos=portrait?new THREE.Vector3(1.5,3.8,10.6):new THREE.Vector3(.7,2.65,7.8);
       if(g.w/g.h>2)pos.z+=1.2;
       pos.x+=(g.ptr.on?g.ptr.x:0)*.06;pos.y+=(g.ptr.on?g.ptr.y:0)*.025;
     }
@@ -169,21 +157,7 @@ export class GarageStudio {
     cam.lookAt(this.look);cam.near=.06;cam.far=60;cam.updateProjectionMatrix();cam.updateMatrixWorld(true);
     g.ceiling.visible=cam.position.y<2.94;
   }
-  reflect() {
-    const g=this.g;if(!this.mirror.visible||!this.resident.rig.root.visible||g.t-this.lastReflection<.2)return;
-    this.lastReflection=g.t;
-    if(!this.mirrorTarget) {this.mirrorTarget=new THREE.WebGLRenderTarget(256,512);this.mirror.material.uniforms.image.value=this.mirrorTarget.texture;}
-    const f=this.reflection;g._dress(f,this.resident.fit);if(!f.rig.root.parent)this.mirrorScene.add(f.rig.root);
-    f.rig.root.position.copy(this.resident.rig.root.position);f.rig.root.rotation.copy(this.resident.rig.root.rotation);
-    for(const [id,n]of Object.entries(f.rig.nodes)) {const original=this.resident.rig.nodes[id];if(original){n.position.copy(original.position);n.quaternion.copy(original.quaternion);}}
-    const cam=g.camera,rc=this.mirrorCamera;rc.copy(cam,false);rc.clearViewOffset();
-    rc.position.copy(cam.position);rc.position.z=2*MIRROR_Z-cam.position.z;
-    const at=cam.getWorldDirection(new THREE.Vector3()).add(cam.position);at.z=2*MIRROR_Z-at.z;rc.lookAt(at);rc.updateMatrixWorld(true);rc.updateProjectionMatrix();
-    f.mat.uniforms.uCam.value.copy(rc.position);
-    this.mirror.updateMatrixWorld(true);
-    this.mirrorMatrix.set(.5,0,0,.5,0,.5,0,.5,0,0,.5,.5,0,0,0,1).multiply(rc.projectionMatrix).multiply(rc.matrixWorldInverse).multiply(this.mirror.matrixWorld);
-    const old=g.renderer.getRenderTarget();g.renderer.setRenderTarget(this.mirrorTarget);g.renderer.render(this.mirrorScene,rc);g.renderer.setRenderTarget(old);
-  }
+
 }
 
 // Preserves the wardrobe's UI/preview API while moving its actual survivor into the shared 3D garage.
@@ -195,7 +169,7 @@ export class GarageMannequin {
   get rig(){return this.studio.resident.rig;}
   attach(host,mode) {
     this.host=host;this.mode=mode;
-    if(mode==='stage'){this.studio.adapter=this;this.g.open('dressing');this._bind(host);this.orbit.zoom=1;this.orbit.pitch=.08;}
+    if(mode==='stage'){this.studio.beginDressing();this.studio.adapter=this;this.g.open('dressing');this._bind(host);this.orbit.zoom=1;this.orbit.pitch=.08;}
     else {this.carOn=false;this.ptrs.clear();this.orbit.vyaw=0;this.gesture=null;this.studio.adapter=null;this.onReturn();}
   }
   setFit(fit,gesture=null){this.studio.setFit(fit);if(gesture)this.play(gesture);}

@@ -731,6 +731,7 @@ function handleEvents(events) {
         } else if (menus.isOpen('settingsPanel')) menus.closeSettings();
         else if (menus.isOpen('howPanel')) menus.show('howPanel', false);
         else if (menus.isOpen('scoresPanel')) menus.show('scoresPanel', false);
+        else if (state === 'menu' && !news.st.folded) news.setFolded(true);
         else if (state === 'playing') pause();
         else if (state === 'paused') resume();
         break;

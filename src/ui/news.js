@@ -1,4 +1,4 @@
-// What's new: the patch notes, on the main menu's left. The newest night first, older ones folded away.
+// What's new: footer patch notes that open upward. The newest night first, older ones folded away.
 // A dot on the tab while there's a version you haven't seen; folding the panel is remembered.
 import { getLang } from '../core/i18n.js';
 
@@ -6,6 +6,19 @@ const KEY = 'hush.news.v1';
 
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
+  {
+    v:'1.13',date:'2026-10-18',
+    ru:{title:'Чай перед сменой',items:[
+      'Зеркало вместе с рамой, дополнительный шкаф и помост убраны из гаража: игрок на стуле больше не перекрыт, а бочка свободна',
+      'В главном меню твой выживший сидит на существующем стуле и пьёт чай. Открывая гардероб, ставит кружку на бочку и встаёт; при возвращении в меню садится обратно',
+      '«Что нового» переехало в нижнюю строку. Панель раскрывается вверх без старого смещения за край экрана; кнопка сворачивания остаётся видимой при прокрутке, Esc закрывает панель',
+    ]},
+    en:{title:'Tea before the shift',items:[
+      'The mirror and its frame, extra cabinet and platform are removed: the seated lobby player is no longer obscured, and the drum is clear',
+      'Your survivor sits on the existing chair and drinks tea on the title screen. Opening the wardrobe puts the mug on the drum and stands them up; returning to the menu sits them down again',
+      'What’s new moves to the footer. The panel opens upward within the viewport, with a sticky fold control and Escape support',
+    ]},
+  },
   {
     v:'1.12',date:'2026-10-18',
     ru:{title:'Перед ночной сменой',items:[
@@ -203,6 +216,7 @@ export class News {
     if (!on) this.st.seen = NEWS[0].v;
     this._save();
     this.render();
+    this.el.querySelector(on?'.news-tab':'.news-fold')?.focus({preventScroll:true});
   }
 
   _save() {

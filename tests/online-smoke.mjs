@@ -66,6 +66,15 @@ try {
     'hush.wallet.v1': JSON.stringify({ shards: 0, total: 86, owned: ['trueno'] }),
     'hush.outfit.v1': JSON.stringify({ head: 'boykisser', body: 'fluffy', car: 'trueno', colors: {} }),
   });
+  const teaReady=await until(()=>A.page.evaluate(()=>{
+    const g=window.__hush.garage,s=g?.studio;
+    return g?.view==='menu'&&s?.resident.rig.root.visible&&s.seatMotion.up===0&&s.resident.rig.nodes.hips.position.y===.55;
+  }),15000);
+  check('the title survivor sits in the original tea chair',!!teaReady);
+  check('no mirror or reflection pass obscures the tea chair',await A.page.evaluate(()=>{
+    const s=window.__hush.garage.studio;return!s.mirror&&!s.mirrorTarget&&!s.reflection&&!s.reflect;
+  }));
+  check('patch notes are anchored in the footer',await A.page.$eval('#news',e=>e.parentElement.classList.contains('menu-foot')));
   await A.page.evaluate(async () => { const h = window.__hush; h.audio.init(); await h.mic.start(h.audio); });
   // public trackers / relays sometimes just don't pass an offer along: one more try with a fresh room
   // before calling it broken (a real break fails both)
@@ -185,6 +194,11 @@ try {
     const h=window.__hush;return!h.coop.rules.hideNames&&h.garage.view==='dressing'&&h.wardrobe.mq.renderer===h.renderer;
   }),15000);
   check('room rules/roster updates preserve the shared wardrobe view',!!dressingHeld);
+  const stoodUp=await until(()=>B.page.evaluate(()=>{
+    const g=window.__hush.garage,s=g.studio;
+    return s.seatMotion.up===1&&s.resident.rig.nodes.hips.position.y===.94&&g.cup.position.distanceTo(g.cupHome)<.001&&!g.cut;
+  }),15000);
+  check('wardrobe stands up and leaves the mug on the drum, without starting the car',!!stoodUp);
   await A.page.evaluate(()=>window.__hush.coop.setHideNames(true));
   await until(()=>B.page.evaluate(()=>window.__hush.coop.rules.hideNames),15000);
   const fitB=await B.page.evaluate(()=>{window.__hush.wardrobe.close();return JSON.stringify(window.__hush.coop.me().fit)});
