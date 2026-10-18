@@ -361,6 +361,18 @@ void main() {
   }
   vec3 base = k < 12 ? KC[min(k, 11)] : xNight(k);
   vec3 dayC = k < 12 ? DC[min(k, 11)] : xDay(k);
+  // Worn earth and encroaching grass use real lamps/torch/flare lighting, never an emissive route.
+  if(k>=54 && k<=56) {
+    base=vec3(.27,.3,.3);
+    dayC=k==54?vec3(.27,.19,.115):k==55?vec3(.19,.27,.105):vec3(.13,.095,.06);
+  }
+  if(k==54) {
+    float side=abs(vBary.x*2.-1.);
+    float moss=sin(vWorld.x*7.3+sin(vWorld.z*5.1)*2.)*sin(vWorld.z*8.2+vWorld.x*3.7);
+    if(side>.93+moss*.055)discard;
+    float worn=(1.-smoothstep(.28,.93,side+moss*.16))*(.84+.16*sin(vWorld.z*3.7+vWorld.x*2.3));
+    dayC=mix(DC[0]*vec3(.87,.9,.9),dayC,worn);
+  }
 
   float ring;
   vec3 L = sonarLight(vWorld, Nrm, ring);
@@ -379,6 +391,7 @@ void main() {
   // scanned, not drawn: lines break into grainy dashes
   float dash = hash13(floor(vWorld * 9.0));
   edge *= 0.4 + 0.6 * smoothstep(0.12, 0.62, dash);
+  if (k == 54 || k == 56) edge = 0.0;
   if (k == 0) edge *= 0.6; // the ground grid stays a whisper
 
   // point-cloud faces: mostly black with sparse specks (averaged out in the distance)

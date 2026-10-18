@@ -172,12 +172,26 @@ try {
     return h.coop.rules.hideNames && h.coop.setHideNames(false)===false && !h.lobby.rulesButton.hidden;
   }), 15000);
   check('host lobby rule reaches the guest; guest cannot overwrite it', !!rulesOk);
-  // the wardrobe: B dresses up in the lobby (through the real panel); the host must see it on the roster...
-  const fitB = await B.page.evaluate(() => {
-    const w = window.__hush.wardrobe;
-    w.open(); w.wear('pumpkin'); w.setSlot('body'); w.paint('#2f4f8f'); w.close();
-    return JSON.stringify(window.__hush.coop.me().fit);
+  // The atlas is the physical book on A's workbench, not a navigation link.
+  await A.page.click('#btnAtlas');
+  check('workbench book opens the atlas without starting a run',!!await until(()=>A.page.evaluate(()=>window.__hush.atlas.isOpen()&&window.__hush.state==='menu'),15000));
+  await A.page.evaluate(()=>window.__hush.atlas.close());
+  // The wardrobe uses that same garage renderer. Incoming room traffic must not steal its camera.
+  await B.page.evaluate(() => {
+    const w=window.__hush.wardrobe;w.open();w.wear('pumpkin');w.setSlot('body');w.paint('#2f4f8f');
   });
+  await A.page.evaluate(()=>window.__hush.coop.setHideNames(false));
+  const dressingHeld=await until(()=>B.page.evaluate(()=>{
+    const h=window.__hush;return!h.coop.rules.hideNames&&h.garage.view==='dressing'&&h.wardrobe.mq.renderer===h.renderer;
+  }),15000);
+  check('room rules/roster updates preserve the shared wardrobe view',!!dressingHeld);
+  await A.page.evaluate(()=>window.__hush.coop.setHideNames(true));
+  await until(()=>B.page.evaluate(()=>window.__hush.coop.rules.hideNames),15000);
+  const fitB=await B.page.evaluate(()=>{window.__hush.wardrobe.close();return JSON.stringify(window.__hush.coop.me().fit)});
+  const trailA=await A.page.evaluate(()=>window.__hush.world.trails.routes.map(r=>r.length.toFixed(3)).join('|'));
+  const trailB=await B.page.evaluate(()=>window.__hush.world.trails.routes.map(r=>r.length.toFixed(3)).join('|'));
+  check('all trail corridors are identical across the room',trailA===trailB);
+
   const seenFit = await until(() => A.page.evaluate(() => {
     const p = window.__hush.coop.players().find((q) => !q.self);
     return p && p.fit && p.fit.head === 'pumpkin' && p.fit.bc[0] === '#2f4f8f' ? JSON.stringify(p.fit) : null;

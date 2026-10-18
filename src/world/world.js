@@ -5,6 +5,7 @@ import { RNG, smoothstep } from '../core/rng.js';
 import { MeshBuilder, KIND } from './builder.js';
 import { Terrain } from './terrain.js';
 import { Collision } from './collision.js';
+import { ForestTrails } from './trails.js';
 import { buildYard, buildOutside, inYard } from './yard.js';
 import { FIRETOWER, ZARYA, buildFiretower, buildZarya, buildWaymarks } from './expedition.js';
 
@@ -139,6 +140,8 @@ export class World {
     this.genSites(); // own RNG: the forest stays exactly the same
     buildWaymarks(this);
 
+    this.trails = new ForestTrails(this).generate(LANDMARKS);
+    this.trails.build();
     this.genTrees(rng);
     this.genScatter(rng);
     this.buildChunks();
@@ -181,7 +184,7 @@ export class World {
       for (let gx = -half; gx < half; gx += step) {
         const x = gx + rng.float(-2.1, 2.1);
         const z = gz + rng.float(-2.1, 2.1);
-        if (this.inLandmark(x, z, 1) || onTrack(x, z)) continue;
+        if (this.inLandmark(x, z, 1) || onTrack(x, z) || this.trails?.near(x,z,1.3)) continue;
         const dens = noise.noise(x / 70 + 40, z / 70 - 20) * 0.7 + noise.noise(x / 23, z / 23) * 0.3;
         const p = 0.12 + 0.82 * smoothstep(-0.45, 0.3, dens);
         if (!rng.chance(p)) continue;
@@ -275,7 +278,7 @@ export class World {
     // boulders
     for (let i = 0; i < 900; i++) {
       const x = rng.float(-half, half), z = rng.float(-half, half);
-      if (this.inLandmark(x, z, 2) || onTrack(x, z) || !this.col.free(x, z, 1.5)) continue;
+      if (this.inLandmark(x, z, 2) || onTrack(x, z) || this.trails?.near(x,z,3.1) || !this.col.free(x, z, 1.5)) continue;
       const r = rng.chance(0.15) ? rng.float(1.4, 2.6) : rng.float(0.4, 1.0);
       const y = this.terrain.height(x, z);
       const seed = (rng.next() * 1e9) | 0;
@@ -293,6 +296,7 @@ export class World {
       if (this.inLandmark(x, z, 3) || onTrack(x, z)) continue;
       const a = rng.float(0, 6.28), len = rng.float(3, 7);
       const x2 = x + Math.cos(a) * len, z2 = z + Math.sin(a) * len;
+      if(this.trails?.crosses(x,z,x2,z2,1.8)) continue;
       if (!this.col.free(x, z, 1.0) || !this.col.free(x2, z2, 1.0) || !this.col.free((x + x2) / 2, (z + z2) / 2, 1.0)) continue;
       const y1 = this.terrain.height(x, z) + 0.25, y2 = this.terrain.height(x2, z2) + 0.25;
       const r = rng.float(0.25, 0.4);
@@ -310,7 +314,7 @@ export class World {
       effSpots.push([Math.cos(ang) * dist, Math.sin(ang) * dist]);
     }
     for (const [ex, ez] of effSpots) {
-      if (this.inLandmark(ex, ez, 0.5) || !this.col.free(ex, ez, 0.8)) continue;
+      if (this.trails?.near(ex,ez,1.4) || this.inLandmark(ex, ez, 0.5) || !this.col.free(ex, ez, 0.8)) continue;
       this.effigy(ex, ez, rng);
     }
   }

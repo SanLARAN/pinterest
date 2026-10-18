@@ -7,6 +7,25 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v:'1.12',date:'2026-10-18',
+    ru:{title:'Перед ночной сменой',items:[
+      'Главное меню теперь в живом гараже лесхоза: твой персонаж в выбранной одежде, машина, рабочая лампа, дождь по крыше и тёмный лес за воротами. Без долгой заставки',
+      'Атлас больше не ссылка в меню: настоящая книга лежит на переднем верстаке. Нажми на неё — обложка приоткроется, и появится полевой журнал. Книга доступна с клавиатуры и на таче',
+      'Гардероб — угол этого же гаража: шкафчик, зеркало с отражением и нейтральная рабочая лампа. Голова приближается при выборе головного убора; поворот, приближение и примерка работают мышью и пальцами',
+      'Вещи оформлены как бирки с состояниями «надето», «надеть» и «примерить». Ненадетые платные комплекты можно посмотреть без покупки; при выходе примерка отменяется. Вся прежняя одежда, покраска и купленные вещи сохранены',
+      'Около 1,2 км старых заросших троп: к генераторам, мед-хижине, «Зорьке», пожарной вышке и лесхозу. Земля, колеи, корни и трава видны при настоящем свете; эхо показывает лишь ближние фрагменты',
+      'Тропы обходят озеро и препятствия. Деревья и крупный валежник не перекрывают узкий проход. Никаких светящихся линий, стрелок на экране или новой миникарты',
+    ]},
+    en:{title:'Before the night shift',items:[
+      'The title screen is now the living forestry garage: your dressed survivor, your car, a work lamp, rain on the roof and dark trees outside. No long intro',
+      'The atlas is no longer a menu link. A real book rests on the front workbench: click it to lift its cover and open the field journal. Keyboard and touch accessible',
+      'The wardrobe is a corner of the same garage, with a locker, a reflecting mirror and neutral work light. Headwear gets a closer view; drag, wheel and pinch to inspect your survivor',
+      'Clothes have equipment tags: equipped, equip or try on. Preview unowned paid sets without buying; leaving removes the preview. All existing outfits, colours and purchases are preserved',
+      'About 1.2 km of old, overgrown paths lead to generators, the first-aid hut, Zarya, the fire lookout and the yard. Soil, ruts, roots and grass appear in actual light; echoes reveal only nearby fragments',
+      'Paths skirt the lake and solid obstacles. Trees and large fallen logs leave the narrow corridor clear. No glowing route, screen arrows or new minimap',
+    ]},
+  },
+  {
     v: '1.11', date: '2026-10-18',
     ru: {
       title: 'Не верь знакомому голосу',
@@ -164,7 +183,7 @@ export class News {
   constructor(el) {
     this.el = el;
     this.st = load();
-    if (this.st.folded === undefined && typeof innerWidth === 'number' && innerWidth < 1020) this.st.folded = true; // (small screens: just the tab)
+    if (this.st.folded === undefined) this.st.folded = true; // (small screens: just the tab)
     this.open = new Set([NEWS[0].v]); // which versions are unfolded
     this.el.addEventListener('click', (e) => {
       const b = e.target.closest('button');

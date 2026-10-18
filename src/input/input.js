@@ -44,7 +44,9 @@ export class Input {
 
   _bind() {
     window.addEventListener('keydown', (e) => {
-      if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT')) {
+      // Native button activation owns Enter/Space in menus; never also start/skip a run.
+      if((!this.gameActive||this.uiMode)&&['Enter','NumpadEnter','Space'].includes(e.code)&&e.target?.closest?.('button,a,[role=button]'))return;
+      if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA')) {
         if (e.code === 'Enter' || e.code === 'Escape') e.target.blur();
         return;
       }

@@ -17,6 +17,7 @@ export const KIND = {
   EYE: 9,
   WATER: 10,
   SHARD: 11,
+  TRAIL: 54, TRAIL_GRASS: 55, TRAIL_RUT: 56,
 };
 
 const _q = new THREE.Quaternion();
@@ -247,6 +248,13 @@ export class MeshBuilder {
     this.cylinder(segs, r0, r1, len, kind, { capTop: true, capBottom: true, phase: Math.PI / segs });
     this.m.copy(saved);
     this.flip = savedFlip;
+  }
+
+  // Append baked world props without retaining one closure per blade of grass.
+  append(arr) {
+    this._ensure(arr.count);
+    for(let i=0;i<arr.count;i++) { const p=i*3,d=i*4;this._v(arr.pos[p],arr.pos[p+1],arr.pos[p+2],arr.dat[d],arr.dat[d+1],arr.dat[d+2],arr.dat[d+3]); }
+    return this;
   }
 
   toGeometry() {

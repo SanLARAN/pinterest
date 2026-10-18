@@ -55,6 +55,8 @@ uniform vec4 uTail;
 uniform vec4 uDash;
 uniform vec4 uEmber;
 uniform vec4 uFlame;
+uniform float uNeutral;
+uniform vec4 uDesk;
 uniform float uAmb;
 uniform vec4 uFill;     // a soft cool fill from the camera's side: xyz direction, strength
 uniform float uFade;
@@ -145,6 +147,7 @@ void main() {
     vec3 l = L * inversesqrt(d2);
     light += vec3(1.0, 0.82, 0.6) * uLamp.w * smoothstep(0.55, 0.85, l.y) * (0.2 + 0.8 * max(dot(N, l), 0.0)) / (1.0 + d2 * 1.6);
   }
+  light += near(uDesk.xyz,uDesk.w,.8,vec3(1.0,.82,.58),N);
   light += near(uLantern.xyz, uLantern.w, 0.7, vec3(1.0, 0.6, 0.28), N);
   // moonlight: the gap of the wicket door, the window
   {
@@ -201,6 +204,7 @@ void main() {
   } else if (k == 20 || k == 21) {
     occ *= 0.6 + 0.4 * smoothstep(0.0, 0.6, vWorld.y);
   }
+  light=mix(light,vec3(.78,.8,.79)*(.4+.6*max(dot(N,normalize(vec3(.2,.6,.7))),0.)),uNeutral);
   light *= occ;
   spec *= occ;
 
@@ -504,6 +508,7 @@ export class Garage {
     this.safe = { top: 70, bottom: 190 };
     this.fade = 0;
     this.visible = false;
+    this.ambReady=false;
     this.view = 'home';
     this.voice = null; // id -> 0..1, set by the lobby
     const V4 = (x = 0, y = 0, z = 0, w = 0) => new THREE.Vector4(x, y, z, w);
@@ -527,6 +532,8 @@ export class Garage {
       uDash: { value: V4() },
       uEmber: { value: V4() },
       uFlame: { value: V4() },
+      uDesk: { value: V4() },
+      uNeutral: { value: 0 },
       uAmb: { value: 0.13 },
       uFill: { value: V4(0.35, 0.55, 0.76, 0.16) },
       uFade: { value: 0 },
@@ -895,6 +902,7 @@ export class Garage {
   close() {
     if (!this.visible) return;
     this.visible = false;
+    this.ambReady=false;
     if (this.audio) this.audio.garageAmb(false);
     if (this.cut && !this.cut.done) this.cut = null;
     this._stopEngine(0.4);
@@ -1043,6 +1051,7 @@ export class Garage {
   // ---------------- every frame ----------------
   frame(dt) {
     if (!this.visible) return;
+    if(this.audio?.ready&&!this.ambReady){this.ambReady=true;this.audio.garageAmb(true);}
     dt *= this.timeScale; // (tests freeze it for stills)
     this.t += dt;
     const u = this.u;
@@ -1054,6 +1063,7 @@ export class Garage {
     this._ambient(dt);
     this._car(dt);
     this._figures(dt);
+    this.studio?.frame(dt);
     this._camera(dt);
     this._blobs();
     this._butt(dt);
@@ -1061,6 +1071,7 @@ export class Garage {
     this.sparks.update(dt, this._pix());
     this.dustMat.uniforms.uPix.value = this._pix();
     this._anchors();
+    this.studio?.reflect();
     this._render();
   }
 
@@ -1078,7 +1089,7 @@ export class Garage {
     p.uGrain.value = 0.055;
     p.uShockAmp.value = 0;
     p.uFade.value = this.fade * this.fade;
-    p.uWarm.value = 0.42;
+    p.uWarm.value = this.view==='dressing'?0:0.42;
     p.uFlicker.value = this.flicker || 0;
     p.uAsh.value = 0.28;
     this.u.uCam.value.copy(this.camera.position);
@@ -1904,6 +1915,7 @@ export class Garage {
       cam.updateMatrixWorld(true);
       return;
     }
+    if(this.studio && (this.view==='menu'||this.view==='dressing')) {this.studio.camera(dt);return;}
     let { target } = this.base;
     const { dir, d } = this.base;
     const P = this.ptr;

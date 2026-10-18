@@ -7,6 +7,7 @@ import '@fontsource/jetbrains-mono/latin-400.css';
 import '@fontsource/jetbrains-mono/cyrillic-700.css';
 import '@fontsource/jetbrains-mono/latin-700.css';
 import './style.css';
+import './garage-home.css';
 
 import * as THREE from 'three';
 import { CFG } from './core/config.js';
@@ -36,6 +37,8 @@ import { Coop, myName } from './net/coop.js';
 import { cleanCode } from './net/net.js';
 import { Lobby } from './ui/lobby.js';
 import { Garage } from './ui/garage.js';
+import { GarageStudio, GarageMannequin } from './ui/garageStudio.js';
+import { GarageHome } from './ui/garageHome.js';
 import { Mates } from './ui/mates.js';
 import { VoiceMix, VoiceList } from './ui/voicemix.js';
 import { Atlas } from './ui/atlas.js';
@@ -93,11 +96,12 @@ const mates = new Mates($('mates'));
 const voiceMix = new VoiceMix(audio); // your volume for each friend's voice
 const pauseVoices = new VoiceList($('pauseVoiceRows'), voiceMix, audio);
 // the atlas (main menu): a field journal with live 3D plates. its own little canvas; the forest isn't drawn while it's open
-const atlas = new Atlas({ audio, world, onClose: () => $('btnAtlas').focus({ preventScroll: true }) });
+const atlas = new Atlas({ audio, world, onClose: () => home.atlasClosed() });
 // the wardrobe (main menu): your survivor stands by the buttons; click it to dress it. friends in your room
 // hear about it as soon as you walk out
 const wardrobe = new Wardrobe({
   audio, coop, name: () => myName(),
+  stageFactory: () => {const g=ensureGarage();return g?new GarageMannequin(g.studio,()=>{if(lobby.isOpen())lobby.render();else home.enter();}):null;},
   onClose: () => {
     const back = lobby.isOpen() ? document.querySelector('#coopList button.fit') : $('btnWardrobe');
     if (back) back.focus({ preventScroll: true });
@@ -203,7 +207,7 @@ const menus = new Menus({
   onMenu: () => toMenu(),
   onCoop: () => lobby.open(),
   onAtlas: () => {
-    if (state === 'menu') atlas.open();
+    if (state === 'menu') home.openAtlas();
   },
   onShop: () => {
     if (state === 'menu') wardrobe.open('shop');
@@ -248,6 +252,7 @@ function ensureGarage() {
   if (garage || garageFailed) return garage;
   try {
     garage = new Garage({ renderer, post, audio });
+    garage.studio = new GarageStudio(garage);
     garage.resize(innerWidth, innerHeight);
     garage.voice = (id) => lobby.level(id);
     lobby.garage = garage;
@@ -260,7 +265,8 @@ function ensureGarage() {
 }
 const lobby = new Lobby({
   coop, mic, audio, mix: voiceMix,
-  beforeOpen: () => ensureGarage(),
+  beforeOpen: () => { home.setActive(false); return ensureGarage(); },
+  afterClose: () => home.enter(),
   onMicToggle: () => toggleMic(),
   onWardrobe: () => {
     if (state === 'menu') wardrobe.open(); // (over the lobby: you stay in the room)
@@ -271,6 +277,7 @@ const lobby = new Lobby({
     else audio.uiClick();
   },
 });
+const home=new GarageHome({ensureGarage,atlas,onWardrobe:()=>wardrobe.open()});
 coop.on('change', () => lobby.render());
 coop.on('start', (d) => beginCoopRun(d));
 coop.on('hostLost', () => {
@@ -452,6 +459,9 @@ function updateGarage(dt) {
   if (mic.state === 'on') {
     const ev = mic.update(dt, audio.outputDb());
     if (ev.pulse > 0 && me) garage.voicePing(me.slot, Math.max(0.35, ev.pulse));
+    else if(ev.pulse>0&&garage.studio){const p=garage.studio.resident.rig.nodes.head.getWorldPosition(new THREE.Vector3());garage.ping(p.x,p.y,p.z,4,.14);}
+    const ratio=mic.screamDb>mic.floor?(mic.trig-mic.floor)/(mic.screamDb-mic.floor):.3;
+    menus.micTest(mic.meter,Math.min(.9,Math.max(.05,ratio)));
   }
   const now = performance.now();
   for (const p of coop.players()) {
@@ -489,6 +499,7 @@ function startRun(opts = {}) {
   menus.show('howPanel', false);
   menus.show('scoresPanel', false);
   lobby.close();
+  home.leave();garage?.close();
   hud.show(true);
   hud.cache = {};
   input.reset();
@@ -632,6 +643,7 @@ function toMenu(keepRoom = false) {
   updateMicUI();
   post.u.uFade.value = 0;
   if (keepRoom && coop.active) lobby.open();
+  else home.enter();
   lobby.menuLabel();
 }
 
@@ -779,10 +791,13 @@ function step(now, render) {
   if (state === 'boot') return;
   handleEvents(events);
 
-  const garageOn = state === 'menu' && !atlasOpen && !wardrobeOpen && !!garage && lobby.isOpen();
+  const garageOn = state === 'menu' && !atlasOpen && !wardrobeOpen && !!garage;
+  home.setActive(state==='menu'&&!atlasOpen&&!wardrobeOpen&&!lobby.isOpen()&&!['settingsPanel','howPanel','scoresPanel'].some(id=>menus.isOpen(id))&&!micCal.isOpen());
   if (state === 'menu') {
-    if (garageOn) updateGarage(rawDt);
-    else updateAttract(rawDt);
+    if (garageOn) {if(!lobby.isOpen())home.enter();updateGarage(rawDt);}
+    else if(atlasOpen||wardrobeOpen) {
+      if(mic.state==='on'){const ev=mic.update(rawDt,audio.outputDb());if(ev.pulse>0&&!micCal.isOpen()){if(atlasOpen)atlas.ping();else wardrobe.ping();}}
+    } else updateAttract(rawDt);
   } else if (state === 'playing' || (state === 'paused' && runOnline && game && game.state !== 'over')) {
     const dt = Math.min(rawDt, 0.05) * (runOnline ? 1 : game.fx.timeScale) * DEBUG.speed;
     game.update(dt, state === 'paused' ? { look: { dx: 0, dy: 0 }, events: [] } : { look, events });
@@ -842,10 +857,11 @@ function step(now, render) {
   }
   if (garageOn) {
     garage.frame(rawDt);
-    lobby.place(garage.anchors());
+    if(lobby.isOpen())lobby.place(garage.anchors());else home.place();
     return;
   }
 
+  if(state==='menu')home.place(); // includes the book's 2D-cover fallback if the garage could not initialise
   sky.position.copy(camera.position);
   motes.material.uniforms.uPix.value = 9 * (post.h / 900);
   post.u.uTime.value = now / 1000;
@@ -872,7 +888,7 @@ function boot() {
     game = new Game({ scene, camera, world, pulses, ghosts, eyes, particles, audio, mic, input, hud, radar, post, shadows });
     game.onEnd = onEnd;
     setupAttract();
-    wardrobe.init(); // your survivor by the menu buttons (its own small canvas)
+    wardrobe.init(); // the live survivor now belongs to the shared garage scene
     // warm up shaders so the first ping doesn't hitch
     renderer.compile(scene, camera);
     if (DEBUG.fps) {
@@ -880,11 +896,12 @@ function boot() {
       perf.fpsEl.style.cssText = 'position:fixed;right:8px;top:64px;z-index:99;font:11px JetBrains Mono,monospace;color:#8ef0ff;opacity:.8;pointer-events:none';
       document.body.appendChild(perf.fpsEl);
     }
-    window.__hush = { world, game, shared, pulses, ghosts, eyes, renderer, perf, mic, audio, input, hud, post, shadows, coop, lobby, atlas, wardrobe, micCal, news, debug: DEBUG, startRun, pause, resume, toMenu, ensureGarage, get garage() { return garage; }, get state() { return state; } };
+    window.__hush = { world, game, shared, pulses, ghosts, eyes, renderer, perf, mic, audio, input, hud, post, shadows, coop, lobby, atlas, wardrobe, micCal, news, home, debug: DEBUG, startRun, pause, resume, toMenu, ensureGarage, get garage() { return garage; }, get state() { return state; } };
     state = 'menu';
     menuTime = 0;
     post.u.uFade.value = 0;
     menus.only('menu');
+    home.enter();
     updateMicUI();
     if (DEBUG.autostart) startRun();
     if (params.has('sfx')) import('./ui/sfxtest.js').then((m) => m.mountSfxPanel(audio));

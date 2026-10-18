@@ -19,8 +19,9 @@ const SPEAKER = (muted) =>
   }</svg>`;
 
 export class Lobby {
-  constructor({ coop, mic, audio, mix, onMicToggle, uiSound, onWardrobe = null, beforeOpen = null }) {
+  constructor({ coop, mic, audio, mix, onMicToggle, uiSound, onWardrobe = null, beforeOpen = null, afterClose = null }) {
     this.coop = coop;
+    this.afterClose=afterClose;
     this.beforeOpen = beforeOpen; // (main builds the garage the first time)
     this.onWardrobe = onWardrobe; // your own tag (or figure) opens the wardrobe
     this.mic = mic;
@@ -82,8 +83,8 @@ export class Lobby {
     document.body.classList.remove('in-lobby');
     clearInterval(this.timer);
     if (this.garage) {
-      this.garage.close();
-      this.garage.restorePost();
+      if(this.afterClose)this.afterClose();
+      else {this.garage.close();this.garage.restorePost();}
     }
   }
 
@@ -292,7 +293,7 @@ export class Lobby {
     this.el.classList.toggle('home', !inRoom);
     $('btnCreate').disabled = this.busy;
     $('btnJoin').disabled = this.busy;
-    if (this.garage && this.isOpen()) {
+    if (this.garage && this.isOpen() && !document.body.classList.contains('wardrobe-open')) {
       this.garage.open(inRoom ? 'room' : 'home');
       this.garage.setPlayers(inRoom ? c.players().map((p) => ({ slot: p.slot, id: p.id, name: p.name, self: p.self, host: p.host, fit: p.self ? myFit() : p.fit })) : []);
     }
