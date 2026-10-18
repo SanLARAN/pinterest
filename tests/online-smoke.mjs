@@ -17,7 +17,12 @@ let ok = true;
 const facts = []; // a one-line summary, also posted as a GitHub annotation
 const check = (name, cond, extra = '') => {
   log(cond ? 'PASS' : 'FAIL', name, extra);
-  if (!cond) ok = false;
+  if (!cond) {
+    ok = false;
+    // Make the actual failed assertion available through the Checks API, not only zipped logs.
+    const esc=s=>String(s).replace(/%/g,'%25').replace(/\r/g,'%0D').replace(/\n/g,'%0A');
+    if (process.env.GITHUB_ACTIONS) console.log(`::error title=${esc(name).replace(/:/g,'%3A').replace(/,/g,'%2C')}::${esc(extra || name)}`);
+  }
 };
 
 const ARGS = [
@@ -263,11 +268,14 @@ try {
     g.cabinets.open(c);
     return {i:c.i,k:c.items.findIndex(q=>!q.taken&&q.kind!=='nuts')};
   });
-  await until(() => A.page.evaluate(i=>{
+  // This test teleports B. Wait for the host's interpolated body to arrive INSIDE the cabin,
+  // not merely within 2m on the other side of its wall: hostClaim correctly rejects that sightline.
+  const cabinetReady=await until(() => A.page.evaluate(i=>{
     const g=window.__hush.game,c=g.cabinets.list[i],r=[...g.remotes.values()][0];
-    return c.opened&&r&&Math.hypot(r.x-c.front.x,r.z-c.front.z)<2;
+    return c.opened&&r&&Math.hypot(r.x-c.front.x,r.z-c.front.z)<.2&&Math.abs(r.y-c.spec.y)<.5;
   },cab.i),20000);
-  if(cab.k>=0) await B.page.evaluate(({i,k})=>window.__hush.game.cabinets.take(window.__hush.game.cabinets.list[i],k),cab);
+  check('the host sees B arrive at the cupboard before the claim',!!cabinetReady,JSON.stringify(cab));
+  if(cabinetReady&&cab.k>=0) await B.page.evaluate(({i,k})=>window.__hush.game.cabinets.take(window.__hush.game.cabinets.list[i],k),cab);
   const cabinetOk=await until(()=>A.page.evaluate(({i,k})=>{
     const c=window.__hush.game.cabinets.list[i];return c.opened&&(k<0||c.items[k].taken);
   },cab),20000);
