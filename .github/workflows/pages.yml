@@ -11,6 +11,10 @@ name: Pages (HUSH)
 on:
   push:
     branches: [main, arena/a5474240-pinterest, arena/2a2936ce-pinterest]
+    # A tag pushes the same build to the live site from a session branch: the
+    # github-pages environment only allows main, the old session branch and
+    # tags named arena/*, so this is the one deploy path that needs no settings.
+    tags: ['arena/*']
   workflow_dispatch:
 
 permissions:
