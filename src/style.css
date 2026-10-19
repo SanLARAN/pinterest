@@ -404,6 +404,10 @@ body.touch #skip { display: none; }
 
 #intro { position: absolute; left: 50%; top: 64%; transform: translate(-50%, -50%); text-align: center; opacity: 0; transition: opacity 0.8s; width: 92vw; }
 #intro.show { opacity: 1; }
+/* a soft dark breath behind the words: on a bright meadow the letters would otherwise wash out */
+#intro::before { content: ''; position: absolute; inset: -34% -12%; z-index: -1; pointer-events: none; background: radial-gradient(ellipse at 50% 50%, #05080699 0%, #05080655 45%, transparent 72%); opacity: 0; transition: opacity .8s; }
+#intro.show::before { opacity: 1; }
+body.morning #intro::before { background: radial-gradient(ellipse at 50% 50%, #fff7e099 0%, #fff7e055 45%, transparent 72%); }
 #intro .big { font-size: clamp(20px, 3.6vw, 36px); letter-spacing: 0.42em; text-indent: 0.42em; color: rgba(214, 205, 192, 0.85); }
 #intro.show .big { animation: introBreath 3.2s ease-in-out infinite; }
 #intro .small { margin-top: 18px; font-size: 12px; letter-spacing: 0.12em; color: rgba(167, 180, 182, 0.55); }
