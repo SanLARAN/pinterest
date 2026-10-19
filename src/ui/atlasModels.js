@@ -460,6 +460,22 @@ function flashlight(mat) {
   root.add(mesh);
   return still(root, 0.35, { yaw: 1.1, pitch: 0.5 }, { lamp: { x: -0.04, y: 0.035, z: -0.14, r: 0.55, c: [1,0.93,0.8], core: 0xfff1cf, halo: 0xe6cc8e, s: 0.04 } });
 }
+function syringe(mat) { // the adrenaline dose: glass barrel, chrome plunger, needle, a red core
+  const root = new THREE.Group();
+  const b = new MeshBuilder();
+  b.place(0, 0.05, 0, Math.PI / 2, 0, 0);
+  b.cylinder(6, 0.016, 0.016, 0.14, KIND.SHARD);
+  b.place(0, 0.05, 0.1, Math.PI / 2, 0, 0);
+  b.cylinder(4, 0.003, 0.003, 0.04, KIND.METAL);
+  b.place(0, 0.052, -0.08);
+  b.box(0.03, 0.026, 0.03, KIND.METAL);
+  b.place(0, 0.055, -0.048, Math.PI / 2, 0, 0);
+  b.cylinder(4, 0.018, 0.018, 0.012, KIND.EFFIGY);
+  const mesh = new THREE.Mesh(geometryOf(b.toArrays()), mat);
+  mesh.position.y = 0.02;
+  root.add(mesh);
+  return still(root, 0.3, { yaw: 1.2, pitch: 0.45 }, { lamp: { x: 0, y: 0.05, z: -0.04, r: 0.4, c: [1, 0.25, 0.2], core: 0xff6a55, halo: 0xb3271c, s: 0.03 } });
+}
 function fieldTool(build, view) {
   return (mat) => {
     const root = new THREE.Group(); root.add(meshOf(build(), mat));
@@ -655,6 +671,7 @@ const MODELS = {
   listener, crawler, watcher, howler, shkaf, shade,
   generator: (mat) => generator(mat, true),
   corpse, fuel, plug, fuses, belt, battery, shard, stone, flare, glowstick, flashlight,
+  syringe,
   tape: fieldTool(buildTape, { yaw: 0.6, pitch: 0.35 }),
   crowbar: fieldTool(buildCrowbar, { yaw: 0.65, pitch: 0.65 }),
   binoculars: fieldTool(buildBinoculars, { yaw: 0.65, pitch: 0.4 }),

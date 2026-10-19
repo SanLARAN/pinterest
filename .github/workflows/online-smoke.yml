@@ -7,7 +7,13 @@ name: Online smoke test
 on:
   workflow_dispatch:
   push:
-    branches: [arena/2a2936ce-pinterest]
+    branches: [arena/428824a1-pinterest, main]
+    paths:
+      - tests/online-smoke.mjs
+      - .github/workflows/online-smoke.yml
+      - src/net/**
+  pull_request:
+    branches: [main]
     paths:
       - tests/online-smoke.mjs
       - .github/workflows/online-smoke.yml

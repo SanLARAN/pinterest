@@ -7,6 +7,37 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v:'2.1',date:'2026-10-19',
+    ru:{title:'Смена затянулась',items:[
+      'Смена стала четыре дня: ночь — 8 минут, утро — 1 минута 45 секунд. Лимита «45 минут» больше нет: рассветы первых трёх ночей — передышка, рассвет четвёртой — победа. Через четыре минуты после начала четвёртой ночи лес просыпается окончательно',
+      'Рассвет поднимает павших: кто лежал или истёк к утру — встаёт на ногах там, где его застал свет. Шкафандр оставляет себе то, что взял. Каждое падение укорачивает следующее кровотечение',
+      'Опасность растёт и ночью, и с каждым пережитым днём: множитель шагает каждые четыре минуты ночи и прибавляет половину за каждый рассвет. Генераторы не гаснут наутро: починенный лагерный генератор держит свет до конца смены',
+      'Рюкзак открывается по-настоящему: объёмный ранец с четырьмя карманами — вращай перетаскиванием, предметы поднимаются из карманов. Плоская сетка остаётся на сенсорных экранах',
+      'Руки работают: за спиной дотягиваются до лямок и снимают рюкзак, у генератора тело приседает и налегает на машину, а ключ ходит по гайкам в такт ударам',
+      'Шприц с адреналином: подними павшего друга прямо на месте (1,5 секунды, 2,2 метра), без носилки и койки. Пять минут «резиновых ног»: ходьба ×0.8, бег ×0.72, выносливость горит ×1.65. За смену в лесу их два, и только в совместной игре',
+      'Ворота в гараже открываются: щеколда, створки, мотор, все садятся — и машина выезжает на полигон. Стоянка со всеми девятью предметами, мишени и четыре эндуро-мотоцикла с подвеской, наклоном, прыжками и настоящими столкновениями — по одному на каждого. Кнопка «ПОЛИГОН» в меню играет тот же фильм в одиночку',
+      'Ракетница возвращается каждую ночь к новому телу; повторная находка — один патрон, а не два. Часы показывают день смены и считают время до рассвета. Протокол 14 — обновите страницу у всей комнаты',
+      'Починка полигона: там теперь можно ходить, брать всё со стеллажа и кататься. Раньше выезд за ворота оставался стоячей картинкой. На мотоцикле E только сажает и слезет, обзор сидит на седле и кренится вместе с ним, стеллаж и мотоциклы больше не спорят за одну клавишу',
+      'Рюкзак в руках стал читаемым: у него своя подсветка сверху слева, швы, стяжки и стальное кольцо, лямка руки уходит из кадра, а лес за ним мягко затемняется — ночь больше не съедает тёмную ткань',
+      'Телефон держится с первого кадра: тач-режим включается сразу (без «нажмите, чтобы захватить курсор»), в портрете обзор шире — не 72°, а до 104°, — и подписи с разрядкой больше не уезжают за край',
+      'Сборка 2.1: исправлены пропущенные куски тренировочного обновления и возвращены проверки, которые их ловят',
+    ]},
+    en:{title:'The long shift',items:[
+      'The shift is four days: a night is 8 minutes, a morning 1:45. The 45-minute limit is gone: the first three dawns are a breather, the fourth is the win. Four minutes into the last night the forest wakes up for good',
+      'Dawn clears the fallen: anyone down — or bled out — gets back on their feet where the light found them. The шкафандр keeps what it took. Every fall shortens the next bleed',
+      'Danger climbs through the night and with every dawn survived: the multiplier steps every four minutes of a night and adds half a step per day. Generators stay lit come morning: a repaired camp generator holds its light for the rest of the shift',
+      'The pack opens in the round: a real rucksack with four pockets — drag to turn, items lift out of their pockets. The flat grid remains the touch fallback',
+      'Hands that work: they reach back for the straps and swing the pack down; at a generator the body kneels and leans in while the wrench works the bolts in time with the clanks',
+      'The adrenaline syringe: raise a downed friend in place (1.5 s, 2.2 m) — no cot, no carrying. Five minutes of rubber legs: walk ×0.8, sprint ×0.72, stamina burns ×1.65. Two exist per shift, co-op only',
+      'The lobby gates open: the latch, the leaves, the engine, everybody in — and the car rolls out to the training ground. A rack of all nine field items, targets, and four enduro bikes with suspension, lean, jumps and real collisions, one per player. The ПОЛИГОН button on the home menu plays the same film for solo players',
+      'The flare gun returns to a new body every night; finding it again is one cartridge, not two. The wristwatch shows the day of the shift and counts down to dawn. Protocol 14: everybody must refresh',
+      'The range repaired: you can walk it, take the whole rack and ride. The drive through the gates used to leave you in a frozen picture. On a bike E only mounts and steps off, the eye line sits on the seat and leans with the machine, and the rack and the bikes no longer fight over one key',
+      'The pack in your hands reads as gear now: its own key light from the upper left, seams, compression straps and a steel D-ring; the swinging arm leaves the frame, and the forest dims softly behind it — the night no longer swallows dark canvas',
+      'Phones are live from the first frame: touch mode starts immediately (no "click to capture the cursor"), portrait opens the view up (72° to as much as 104°), and letter-spaced captions stay inside the screen',
+      'Build fix: the missing half of the training update is in, with the checks that catch it next time',
+    ]},
+  },
+  {
     v:'2.0',date:'2026-10-18',
     ru:{title:'Большая починка смены',items:[
       'Социальный уголок вместо ссылки «Профиль»: квадрат с твоим настоящим персонажем, «Добавить друга» и список друзей ниже. На очень низком экране уголок сворачивается до портрета, чтобы не перекрывать управление',

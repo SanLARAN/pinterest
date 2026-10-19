@@ -1797,6 +1797,52 @@ export class AudioEngine {
 
   // ---------- generators ----------
   // a persistent engine at (x,y,z): returns { spin(level 0..1), sputter(), stop() }
+  // the enduro bike under you: a two-stroke buzz whose pitch follows the throttle, non-spatial
+  // (it's your own engine — the forest hears it through playerNoise, your ears through this)
+  motoOn() {
+    if (!this.ready) return null;
+    if (this.moto) { this.moto.on(); return this.moto; }
+    const t = this.now;
+    const out = this._gain(0.0001);
+    out.connect(this.amb);
+    const o1 = this._osc('sawtooth', 68), o2 = this._osc('square', 137);
+    const lp = this._filter('lowpass', 900, 1.1);
+    o1.connect(lp); o2.connect(lp); lp.connect(out);
+    o1.start(t); o2.start(t);
+    const self = this;
+    const m = {
+      on() { out.gain.setTargetAtTime(0.05, self.now, 0.2); },
+      rev(k) {
+        const now = self.now;
+        o1.frequency.setTargetAtTime(58 + 150 * k, now, 0.09);
+        o2.frequency.setTargetAtTime(117 + 300 * k, now, 0.09);
+        lp.frequency.setTargetAtTime(700 + 1800 * k, now, 0.12);
+        out.gain.setTargetAtTime(0.045 + 0.075 * k, now, 0.15);
+      },
+      off() {
+        out.gain.setTargetAtTime(0.0001, self.now, 0.3);
+      },
+      kill() {
+        m.off();
+        setTimeout(() => { try { o1.stop(); o2.stop(); } catch { /* */ } }, 1400);
+        self.moto = null;
+      },
+    };
+    this.moto = m;
+    m.on();
+    return m;
+  }
+
+  motoLoop(k, riding) {
+    if (!this.ready || !this.moto) return;
+    if (riding) this.moto.rev(k);
+    else this.moto.kill();
+  }
+
+  motoOff() {
+    if (this.moto) this.moto.kill();
+  }
+
   genHum(x, y, z, spinning = false) {
     if (!this.ready) return null;
     const t = this.now;

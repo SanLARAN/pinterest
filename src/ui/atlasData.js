@@ -7,7 +7,7 @@
 
 export const CHAPTERS = [
   { id: 'beasts', num: 'I', entries: ['listener', 'crawler', 'watcher', 'howler', 'shkaf', 'shade'] },
-  { id: 'tasks', num: 'II', entries: ['generator', 'corpse', 'fuel', 'plug', 'fuses', 'belt', 'battery', 'shard', 'stone', 'flare', 'glowstick', 'flashlight', 'tape', 'crowbar', 'binoculars'] },
+  { id: 'tasks', num: 'II', entries: ['generator', 'corpse', 'fuel', 'plug', 'fuses', 'belt', 'battery', 'shard', 'stone', 'flare', 'glowstick', 'flashlight', 'tape', 'crowbar', 'binoculars', 'syringe'] },
   { id: 'places', num: 'III', entries: ['camp', 'medhut', 'cabin', 'tower', 'stones', 'wreck', 'firetower', 'zarya'] },
   { id: 'way', num: 'IV', entries: ['yard', 'uaz', 'wheel', 'carbattery', 'carb', 'jerrycan'] },
 ];
@@ -34,6 +34,7 @@ export const ENTRIES = {
   tape: { model: 'tape', sound: 'tape', kind: 'thing', log: [['found', 'tapes']] },
   crowbar: { model: 'crowbar', sound: 'crowbar', kind: 'thing', log: [['found', 'crowbars'], ['pried', 'pried']] },
   binoculars: { model: 'binoculars', kind: 'thing', log: [['surveyed', 'surveys']] },
+  syringe: { model: 'syringe', kind: 'thing', log: [['jabbed', 'syringes']] },
   firetower: { model: 'firetower', kind: 'place', log: [['visited', 'lookouts']] },
   zarya: { model: 'zarya', sound: 'speaker', kind: 'place', log: [['visited', 'camps']] },
   camp: { model: 'camp', kind: 'place', log: [['startedHere', 'site:camp']] },
@@ -487,6 +488,16 @@ const TEXT = {
         ],
         tips: ['Утром она не нужна — прибереги до темноты.', 'Наблюдатель в её свет не шагнёт: брось её между собой и им.', 'Под конец она тускнеет и мигает — значит, осталось секунд пятнадцать.', 'Если упадёшь, палочка выпадет из руки и будет светить там, где ты лежишь, — друзьям проще тебя найти.'],
         facts: [['с собой', '1 на ночь'], ['горит', '~2,5 мин'], ['свет', 'на ~6 м'], ['щелчок', 'слышно в паре шагов']],
+      },
+      syringe: {
+        name: 'Шприц адреналина', latin: 'две на смену · только вместе',
+        text: [
+          'Тяжёлый пакет из аптечки на стене «Зорьки». Адреналин — для сердца, остановившегося от страха, а не от ран: укол возвращает павшего на ноги там, где он лежит. Без носилок, без койки, без шести секунд у постели.',
+          'Возьми в руки (I) и нажми ЛКМ рядом с лежащим другом — полторы секунды, и он стоит. Кровотечение за это время не останавливается: не медли и не промахивайся.',
+          'Пять минут после укола его ноги как резина: ходьба медленнее на пятую часть, бег — на четверть, дыхание сбивается вдвое быстрее. Это цена скорости.',
+        ],
+        tips: ['Одна доза всегда в аптечке у «Зорьки», вторая — в каком-то запертом шкафу.', 'Укол не действует на того, кто уже истёк: успей до последней капли.', 'Койка в мед-хижине по-прежнему лечит без последствий — если дотащишь.', 'В одиночной смене шприцов нет: спасать некого.'],
+        facts: [['укол', '1,5 с'], ['дистанция', '2,2 м'], ['после', '5 мин «резиновых ног»'], ['за смену', '2 · только кооп']],
       },
       camp: {
         name: 'Лагерь', latin: 'старая просека · генератор №1',
@@ -1043,6 +1054,16 @@ const TEXT = {
         ],
         tips: ["You won't need it in the morning — save it for the dark.", "The Watcher won't step into its light: throw it between you and it.", 'Near the end it dims and flickers — fifteen seconds or so left.', "If you go down it falls from your hand and keeps glowing where you lie — easier for your friends to find you."],
         facts: [['carry', '1 a night'], ['burns', '~2.5 min'], ['light', '~6 m'], ['the snap', 'heard a couple of steps away']],
+      },
+      syringe: {
+        name: 'Adrenaline syringe', latin: 'two a shift · co-op only',
+        text: [
+          'A heavy packet from the medicine cabinet at Zarya. Adrenaline is for a heart stopped by fear, not wounds: one jab puts a friend who is down back on their feet where they lie. No stretcher, no cot, no six seconds at the bedside.',
+          'Equip it (I) and press LMB beside a friend who is down — a second and a half, and they are standing. The bleeding does not stop while you fumble: hurry, and do not miss.',
+          'For five minutes after the jab their legs are rubber: walking a fifth slower, running a quarter slower, breath giving out half again as fast. That is the price of speed.',
+        ],
+        tips: ['One dose always waits in the medicine cabinet at Zarya; the second, in some locked cupboard.', 'The jab cannot help someone who has already bled out — get there before the last drop.', "The cot in the scouts' hut still heals without after-effects — if you can carry them that far.", 'Solo shifts hold no syringes: there is no one to raise.'],
+        facts: [['the jab', '1.5 s'], ['reach', '2.2 m'], ['after', '5 min of rubber legs'], ['a shift', '2 · co-op only']],
       },
       camp: {
         name: 'The camp', latin: 'an old clearing · generator #1',

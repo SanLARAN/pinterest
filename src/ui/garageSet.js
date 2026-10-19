@@ -115,7 +115,9 @@ export function tyre(b, r, w, kind, segs = 12, treads = true) {
 const _m = new THREE.Matrix4(), _p = new THREE.Vector3(), _q = new THREE.Quaternion(), _s = new THREE.Vector3(1, 1, 1), _e = new THREE.Euler();
 
 // ---------------- the room ----------------
-export function buildRoom() {
+// gateLeaves=false: the two swinging leaves are left out (they ride their own meshes, so the
+// departure film can open them); the posts, the wall and the wicket hole stay
+export function buildRoom(gateLeaves = true) {
   const b = new MeshBuilder(8192);
   const r = new RNG(77);
   const { X0, X1, Z0, Z1, H, T } = ROOM;
@@ -244,15 +246,17 @@ export function buildRoom() {
       boxAt(b, fx, gh * 0.31, (za + zb) / 2, 0.05, 0.06, L, GK.GATE, 0, Math.atan2(gh * 0.4, zb - za - 0.1));
     }
   };
-  sheet(gz0 + 0.08, gm - 0.01);
-  sheet(gm + 0.01, gz1 - 0.08, [[GATE.wz0, GATE.wz1, GATE.wy0, GATE.wy1]]);
-  // the wicket's own frame in the leaf
-  const wzc = (GATE.wz0 + GATE.wz1) / 2;
-  boxAt(b, gx - 0.01, GATE.wy1 + 0.03, wzc, 0.06, 0.06, GATE.wz1 - GATE.wz0 + 0.12, GK.GATE);
-  boxAt(b, gx - 0.01, (GATE.wy0 + GATE.wy1) / 2, GATE.wz0 - 0.03, 0.06, GATE.wy1 - GATE.wy0, 0.06, GK.GATE);
-  // a vertical latch bar between the leaves, the big hinges, a padlock hanging open
-  boxAt(b, gx + 0.03, 1.2, gm, 0.05, 1.9, 0.06, GK.METAL);
-  boxAt(b, gx + 0.09, 1.05, gm - 0.06, 0.06, 0.09, 0.06, GK.RUST);
+  if (gateLeaves) {
+    sheet(gz0 + 0.08, gm - 0.01);
+    sheet(gm + 0.01, gz1 - 0.08, [[GATE.wz0, GATE.wz1, GATE.wy0, GATE.wy1]]);
+    // the wicket's own frame in the leaf
+    const wzc = (GATE.wz0 + GATE.wz1) / 2;
+    boxAt(b, gx - 0.01, GATE.wy1 + 0.03, wzc, 0.06, 0.06, GATE.wz1 - GATE.wz0 + 0.12, GK.GATE);
+    boxAt(b, gx - 0.01, (GATE.wy0 + GATE.wy1) / 2, GATE.wz0 - 0.03, 0.06, GATE.wy1 - GATE.wy0, 0.06, GK.GATE);
+    // a vertical latch bar between the leaves, a padlock hanging open
+    boxAt(b, gx + 0.03, 1.2, gm, 0.05, 1.9, 0.06, GK.METAL);
+    boxAt(b, gx + 0.09, 1.05, gm - 0.06, 0.06, 0.09, 0.06, GK.RUST);
+  }
   for (const z of [gz0 + 0.1, gz1 - 0.1]) for (const y of [0.45, 2.05]) boxAt(b, gx + 0.03, y, z, 0.06, 0.18, 0.1, GK.RUST);
   // outside: moonlit ground, pines against the night sky (big: you look out through the gap at a slant)
   quad(b, [gx - 0.06, 0.0, -30], [gx - 4.2, 0.0, -30], [gx - 4.2, 0.0, 6], [gx - 0.06, 0.0, 6], GK.MOONLIT);
@@ -997,6 +1001,63 @@ export function buildPasser() {
     b.identity();
     b.limb([s * 0.17, 1.95, 0], [s * 0.34, 1.3, 0], 0.03, 0.025, GK.SILHOUETTE, 4);
     b.limb([s * 0.34, 1.3, 0], [s * 0.4, 0.7, 0], 0.025, 0.015, GK.SILHOUETTE, 4);
+  }
+  return b.toArrays();
+}
+
+// ---------------- one gate leaf (its own mesh: the departure film swings it open) ----------------
+// side -1: the far leaf, hinged at GATE.z0, reaching toward the middle along +z.
+// side +1: the near leaf (with the wicket hole), hinged at GATE.z1, reaching along -z.
+// Leaf-local frame: the hinge post on the y axis at x = 0 (the room's X0), the leaf along ±z.
+export function buildGateLeaf(side) {
+  const b = new MeshBuilder(512);
+  const gx = 0; // (the mesh is placed at the room's X0; everything here is leaf-local)
+  const gh = GATE.h, gm = 0; // the middle of the gate is at local z = ±(GATE.z1 - GATE.z0)/2
+  const len = (GATE.z1 - GATE.z0) / 2 - 0.09;
+  const za = side < 0 ? 0.08 : -len - 0.01; // the leaf's span along z (local)
+  const zb = side < 0 ? len + 0.01 : -0.08;
+  const sheetLocal = (za2, zb2, holes = []) => {
+    const sx = gx - 0.05;
+    const segs = [[za2, zb2, 0.06, gh - 0.08]];
+    for (const h of holes) {
+      segs.length = 0;
+      segs.push([za2, zb2, 0.06, h[2]], [za2, zb2, h[3], gh - 0.08], [za2, h[0], h[2], h[3]], [h[1], zb2, h[2], h[3]]);
+    }
+    for (const sg of segs) {
+      if (sg[1] - sg[0] < 0.01 || sg[3] - sg[2] < 0.01) continue;
+      quad(b, [sx, sg[2], sg[0]], [sx, sg[2], sg[1]], [sx, sg[3], sg[1]], [sx, sg[3], sg[0]], GK.GATE);
+    }
+    for (let z = za2 + 0.09; z < zb2 - 0.05; z += 0.16) {
+      const inHole = holes.some((h) => z > h[0] - 0.02 && z < h[1] + 0.02);
+      if (inHole) {
+        for (const h of holes) {
+          boxAt(b, sx + 0.012, (0.08 + h[2]) / 2, z, 0.024, h[2] - 0.08, 0.035, GK.GATE);
+          boxAt(b, sx + 0.012, (h[3] + gh - 0.1) / 2, z, 0.024, gh - 0.1 - h[3], 0.035, GK.GATE);
+        }
+      } else boxAt(b, sx + 0.012, gh / 2 - 0.02, z, 0.024, gh - 0.16, 0.035, GK.GATE);
+    }
+    const fx = gx - 0.01;
+    boxAt(b, fx, 0.1, (za2 + zb2) / 2, 0.06, 0.07, Math.abs(zb2 - za2), GK.GATE);
+    boxAt(b, fx, gh - 0.13, (za2 + zb2) / 2, 0.06, 0.07, Math.abs(zb2 - za2), GK.GATE);
+    boxAt(b, fx, gh / 2, za2 + 0.035 * Math.sign(zb2 - za2), 0.06, gh - 0.2, 0.07, GK.GATE);
+    boxAt(b, fx, gh / 2, zb2 - 0.035 * Math.sign(zb2 - za2), 0.06, gh - 0.2, 0.07, GK.GATE);
+    if (!holes.length) {
+      boxAt(b, fx, gh * 0.52, (za2 + zb2) / 2, 0.05, 0.06, Math.abs(zb2 - za2) - 0.06, GK.GATE);
+      const L = Math.hypot(Math.abs(zb2 - za2) - 0.1, gh * 0.4);
+      boxAt(b, fx, gh * 0.31, (za2 + zb2) / 2, 0.05, 0.06, L, GK.GATE, 0, Math.atan2(gh * 0.4, Math.abs(zb2 - za2) - 0.1));
+    }
+  };
+  // the wicket hole is only in the near leaf, in its local z
+  const wz0 = GATE.wz0 - GATE.z1, wz1 = GATE.wz1 - GATE.z1;
+  if (side < 0) sheetLocal(za, zb);
+  else {
+    sheetLocal(za, zb, [[wz0, wz1, GATE.wy0, GATE.wy1]]);
+    const wzc = (wz0 + wz1) / 2;
+    boxAt(b, gx - 0.01, GATE.wy1 + 0.03, wzc, 0.06, 0.06, wz1 - wz0 + 0.12, GK.GATE);
+    boxAt(b, gx - 0.01, (GATE.wy0 + GATE.wy1) / 2, wz0 - 0.03, 0.06, GATE.wy1 - GATE.wy0, 0.06, GK.GATE);
+    // the latch bar and its padlock ride the near leaf (they lift away with it)
+    boxAt(b, gx + 0.03, 1.2, gm - (GATE.z1 - GATE.z0) / 2 + (GATE.z1 - GATE.mid), 0.05, 1.9, 0.06, GK.METAL);
+    boxAt(b, gx + 0.09, 1.05, gm - (GATE.z1 - GATE.z0) / 2 + (GATE.z1 - GATE.mid) - 0.06, 0.06, 0.09, 0.06, GK.RUST);
   }
   return b.toArrays();
 }

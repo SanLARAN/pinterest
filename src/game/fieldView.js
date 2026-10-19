@@ -2,6 +2,7 @@
 // Both the backpack reach and the watch raise temporarily replace the matching SelfBody arms.
 import * as THREE from 'three';
 import { clamp, damp, lerp, smoothstep } from '../core/rng.js';
+import { CFG } from '../core/config.js';
 import { t } from '../core/i18n.js';
 import { fmtTime } from '../ui/hud.js';
 
@@ -31,6 +32,7 @@ export class FieldView {
     this.left=this.arm(-1);this.right=this.arm(1);this.root.add(this.left,this.right);
     this.watchCase=this.buildWatch(); this.watchCase.scale.setScalar(.73); this.left.add(this.watchCase);
     this.bag=this.buildBag();this.root.add(this.bag);
+    this.wrench=this.buildWrench();this.right.add(this.wrench);this.wrench.visible=false;
     this.prop=new THREE.Group();this.root.add(this.prop);
     this.props={};
     for(const kind of ['stones','battery','flare','flareAmmo']) {
@@ -40,7 +42,16 @@ export class FieldView {
     this.a11y=document.createElement('output');this.a11y.id='watchData';this.a11y.className='sr-only';
     this.a11y.setAttribute('aria-label',t('watchInfo'));document.getElementById('hud').append(this.a11y);
   }
-  reset() { this.watch=0;this.root.visible=false;this.lcdKey='';this.lastLCD=0;document.body.classList.remove('watch-up'); }
+  reset() { this.watch=0;this.work=0;this.root.visible=false;this.lcdKey='';this.lastLCD=0;document.body.classList.remove('watch-up'); }
+  // the wrench at a generator: a shaft, a head and an open jaw, hung off the working hand
+  buildWrench() {
+    const w=new THREE.Group();w.position.set(0,.19,.01);w.rotation.z=.12;
+    cube(w,this.box,this.mat.steel,0,.1,0,.026,.2,.026);
+    cube(w,this.box,this.mat.steel,0,.215,0,.06,.045,.028);
+    cube(w,this.box,this.mat.steel,-.024,.25,.0,.022,.06,.024).rotation.z=.5;
+    cube(w,this.box,this.mat.steel,.024,.25,.0,.022,.06,.024).rotation.z=-.5;
+    return w;
+  }
   arm(side) {
     const a=new THREE.Group();
     const sleeve=cube(a,this.box,this.mat.cloth,side*.055,-.255,.035,.102,.29,.11);sleeve.rotation.z=side*.24;sleeve.rotation.x=-.25;
@@ -87,18 +98,24 @@ export class FieldView {
   update(dt) {
     const g=this.g;
     const held=g.input.peekHeld || performance.now()<g.input.peekTouchUntil;
-    const can=g.player.alive && !g.partMap?.active && !g.inventory.active && !g.inputMuted && !g.cabinets.busy && !g.player.carrying && !g.escape.held && !g.expedition.onTower && g.escape.mySeat<0 && ['play','morning','dawn'].includes(g.state);
+    const can=g.player.alive && !g.partMap?.active && !g.inventory.active && !g.inputMuted && !g.cabinets.busy && !g.player.carrying && !g.escape.held && !g.expedition.onTower && g.escape.mySeat<0 && ['play','morning','dawn','training'].includes(g.state);
     this.watch=damp(this.watch,can&&held?1:0,can&&held?9:12,dt);
     if(this.watch<.001) this.watch=0;
     document.body.classList.toggle('watch-up',this.watch>.45);
     if(this.watch>.01) { this.lastLCD-=dt;if(this.lastLCD<=0) { this.lastLCD=.2;this.drawLCD(); } }
+    // at a generator the arms come up and the wrench goes to work (the body kneels under them)
+    const working=!!(can && g.objectives?.working && ['play','morning'].includes(g.state) && this.watch<.2);
+    this.work=damp(this.work||0,working?1:0,working?6:5,dt);
+    if(this.work<.001) this.work=0;
   }
   drawLCD() {
     const g=this.g,p=g.player;
     if(!this.lcd) return;
     const task=g.objectives.taskText()||t('watchFind');
-    const calm=Math.ceil(g.calmLeft?.()||0),state=g.state;
-    const info={time:fmtTime(g.time||0),gens:g.objectives.count||0,parts:g.escape.count||0,score:Math.floor(g.score||0),mult:(g.mult||1).toFixed(1),team:g.online?`${g.livePlayers().length}/${g.remotes.size+1}`:'1/1',calm,task,torch:g.torch.has?Math.ceil(g.torch.charge*100):null};
+    const calm=Math.ceil(g.calmLeft?.()||0),state=g.state,S=CFG.SHIFT;
+    // the shift has four days: the big number counts DOWN — to dusk in the morning, to dawn at night
+    const rem=state==='play'?Math.max(0,S.NIGHT-(g.time||0)):state==='morning'?Math.max(0,S.MORNING-(g.morningT||0)):(g.time||0);
+    const info={time:fmtTime(rem),day:`${g.day||1}/${S.DAYS}`,gens:g.objectives.count||0,parts:g.escape.count||0,score:Math.floor(g.score||0),mult:(g.mult||1).toFixed(1),team:g.online?`${g.livePlayers().length}/${g.remotes.size+1}`:'1/1',calm,task,torch:g.torch.has?Math.ceil(g.torch.charge*100):null};
     const key=JSON.stringify(info)+t('watchTime')+state;if(key===this.lcdKey) return;this.lcdKey=key;this.data=info;
     const c=this.lcd;c.fillStyle='#151c1d';c.fillRect(0,0,512,672);
     c.fillStyle='#ccd5cd';c.font='bold 40px monospace';c.fillText('HUSH',34,64);
@@ -106,7 +123,7 @@ export class FieldView {
     c.fillStyle='#95443d';c.fillRect(32,86,448,3);c.fillStyle='#8aaba8';c.font='bold 20px monospace';c.textAlign='center';c.fillText('ILLUMINATOR',256,119);c.textAlign='left';
     c.fillStyle='#3b453c';c.fillRect(30,140,452,422);
     const bg=c.createLinearGradient(0,145,0,558);bg.addColorStop(0,'#9da78b');bg.addColorStop(.5,'#c0ceb0');bg.addColorStop(1,'#8caa98');c.fillStyle=bg;c.fillRect(36,146,440,410);
-    c.fillStyle='#1e322a';c.font='bold 20px monospace';c.fillText(`${t('watchTime')} / ${t(state==='morning'?'watchDay':'watchNight')}`,51,177);
+    c.fillStyle='#1e322a';c.font='bold 20px monospace';c.fillText(`${t('watchDayN').replace('{n}',g.day||1).replace('{d}',S.DAYS)} · ${t(state==='morning'?'watchDay':'watchNight')}`,51,177);
     c.font='bold 76px monospace';c.fillText(info.time,46,254);
     c.font='bold 23px monospace';c.fillText(`${t('watchGens')} ${info.gens}/5`,51,291);
     for(let i=0;i<5;i++){c.globalAlpha=i<info.gens?1:.18;c.fillRect(301+i*29,270,20,21);}c.globalAlpha=1;
@@ -121,21 +138,32 @@ export class FieldView {
     rows.slice(start,start+4).forEach((s,i)=>c.fillText(s,51,434+i*28));
     c.fillStyle='#7b9390';c.font='bold 20px monospace';c.textAlign='center';c.fillText('ALARM · CHRONOGRAPH',256,604);c.font='16px monospace';c.fillText('LIGHT                 DATA',256,645);c.textAlign='left';
     this.lcdTex.needsUpdate=true;
-    if(this.a11y) this.a11y.textContent=`${info.time}. ${t('generators')} ${info.gens}/5. ${t('watchCar')} ${info.parts}/4. ${t('score')} ${info.score} x${info.mult}. ${t('watchAlive')} ${info.team}. ${calm?`${t('watchCalm')} ${calm}. `:''}${task}`;
+    if(this.a11y) this.a11y.textContent=`${t('watchDayN').replace('{n}',g.day||1).replace('{d}',S.DAYS)}. ${info.time}. ${t('generators')} ${info.gens}/5. ${t('watchCar')} ${info.parts}/4. ${t('score')} ${info.score} x${info.mult}. ${t('watchAlive')} ${info.team}. ${calm?`${t('watchCalm')} ${calm}. `:''}${task}`;
   }
   place(camera,show) {
     const g=this.g,bag=g.inventory,reach=bag.progress,k=ease(clamp(this.watch,0,1));
     this.root.visible=!!show;if(!show) return;
     this.root.position.copy(camera.position);this.root.quaternion.copy(camera.quaternion);
-    this.left.visible=k>.005||reach>.005;this.right.visible=reach>.005 || (!!bag.equipped && bag.equipT<=0 && !bag.active && !g.player.carrying && !g.escape.held && k<.1);
+    const wk=this.work||0;
+    this.left.visible=k>.005||reach>.005||wk>.05;this.right.visible=reach>.005||wk>.05 || (!!bag.equipped && bag.equipT<=0 && !bag.active && !g.player.carrying && !g.escape.held && k<.1);
+    this.wrench.visible=wk>.3&&reach<.01&&k<.1;
     this.watchCase.visible=k>.005;
-    this.bag.visible=reach>.22;
-    this.prop.visible=this.right.visible && reach<.01 && k<.1;
+    this.bag.visible=reach>.22 && !g.bag3d?.active; // the round pack draws its own
+    // once the pack is out in front of you, the arm that swung it there leaves the frame (it would sit
+    // across the pouch you are reaching for)
+    if (g.bag3d?.active && g.bag3d.state.k > 0.45) { this.right.visible = false; this.left.visible = k > .005; }
+    this.prop.visible=this.right.visible && reach<.01 && k<.1 && wk<.3;
     const reachBack=Math.sin(clamp(reach/.48,0,1)*Math.PI);
     const wide=smoothstep(.8,1.3,camera.aspect); // keep the full wrist inside a portrait phone too
     this.left.position.set(lerp(-.46,lerp(-.012,-.09,wide),k),lerp(-.62,lerp(-.04,-.025,wide),k),lerp(-.25,lerp(-.3,-.26,wide),k));
     this.left.rotation.set(lerp(-.8,-.035,k),lerp(.6,-.04,k),lerp(-1.2,.035,k));
     this.right.position.set(.215,-.27,-.4);this.right.rotation.set(-1.05,-.1,-.1);
+    if(wk>.01&&reach<.01&&k<.1) {
+      // the repair: the left hand steadies the housing, the right leans on the wrench
+      const sw=Math.sin(performance.now()/1000*7);
+      this.left.position.set(-.24,-.3,-.43);this.left.rotation.set(-1.05,.4,.18);
+      this.right.position.set(.18,-.33+sw*.02*wk,-.45);this.right.rotation.set(-1.2+sw*.16*wk,-.18,-.12);
+    }
     if(reach>.001) {
       const pull=smoothstep(.24,.88,reach);
       this.right.position.set(lerp(-.22,.25,pull),lerp(.10,-.22,pull),lerp(.04,-.48,pull));

@@ -151,7 +151,7 @@ export class GlowSticks {
   use() {
     const g = this.g, p = g.player;
     if (!p.alive) return;
-    if (g.state !== 'play') {
+    if (g.state !== 'play' && g.state !== 'training') {
       g.hud.popup(t('aGlowDay'), 'dim');
       return;
     }

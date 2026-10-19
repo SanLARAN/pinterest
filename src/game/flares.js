@@ -285,7 +285,7 @@ export class Flares {
   // every monster near enough comes to the light (not the Watcher: light is the one thing it hates)
   _lure(f) {
     const g = this.g;
-    if (!g.auth || g.state !== 'play') return;
+    if (!g.auth || (g.state !== 'play' && g.state !== 'training')) return;
     for (const m of g.monsters) {
       if (m.type === 'watcher' || !m.alive || m.scripted) continue;
       if (m.state === 'hunt' || m.state === 'feed' || m.state === 'flee' || m.state === 'inhale' || m.state === 'howl') continue;

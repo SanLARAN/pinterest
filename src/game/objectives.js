@@ -304,6 +304,7 @@ export class Objectives {
     });
     this.morningOn = false;
     this.target = null;
+    this.working = null; // nobody's hands are on an engine at dawn
     this.searchT = 0;
     this.closeNote();
     this.lastTask = '';
@@ -325,9 +326,11 @@ export class Objectives {
     g.lamp = on ? 1 : g.lamp;
   }
 
-  // dusk: it coughs, sputters and dies, the lamp flickering out with it
+  // dusk: it coughs, sputters and dies, the lamp flickering out with it — unless you already repaired
+  // it: a running camp generator holds its light through every dusk of the shift (you earned it)
   campFail() {
     const g = this.gens[0];
+    if (g.running) return;
     this.morningOn = false;
     g.flick = 1.4;
     g.dying = true;
@@ -339,13 +342,21 @@ export class Objectives {
     }
   }
 
-  startNight() {
+  // each night of the shift: the camp body is out again, and if the flare gun was taken a fresh one
+  // lies by another body (never the camp's). The body is picked from the run's seed and the day, so
+  // every machine — host or guest — lays it by the same corpse without a word over the wire
+  startNight(day = 1, seed = 0) {
     const g = this.gens[0];
     g.dying = false;
-    g.lamp = 0;
-    if (g.hum) { g.hum.stop(); g.hum = null; }
+    if (!g.running) g.lamp = 0;
+    if (g.hum && !g.running) { g.hum.stop(); g.hum = null; }
     this.bodies[0].mesh.visible = true;
     this.bodies[0].item.visible = true;
+    const cur = this.bodies[this.flareBody];
+    if (day > 1 && cur?.gun && !cur.gun.visible) {
+      this.flareBody = 1 + (((seed ^ (day * 0x9e3779b1)) >>> 0) % 4);
+      this.bodies.forEach((body, i) => { if (body.gun) body.gun.visible = i === this.flareBody; });
+    }
   }
 
   // back to the menu: every hum, fly and lamp off
@@ -518,6 +529,7 @@ export class Objectives {
     const game = this.g;
     const p = game.player;
     const input = game.input;
+    this.working = null; // set again below while your hands are actually on an engine
     if (game.inventory?.active) { this.target = null; this.searchT = 0; game.hud.setUse(null); return; }
     if (game.expedition?.onTower) {
       this.target = null;
@@ -529,6 +541,7 @@ export class Objectives {
     const f = p.forward();
     const es = game.escape;
     const seated = !!es && es.mySeat >= 0;
+    const riding = !!game.motos && game.motos.rider >= 0; // in the saddle, E is only "step off"
     const hands = !doorsOnly && !p.carrying && !(es && es.held) && !seated; // (with someone on your shoulder — or a part in your arms — you can still shove a door)
     // what's in front of you
     let best = null, bd = 1e9;
@@ -541,7 +554,9 @@ export class Objectives {
       const score = d * (1.6 - facing);
       if (score < bd) { bd = score; best = { obj, kind, d }; }
     };
-    if (hands) {
+    if (hands && riding) {
+      game.motos.consider(consider); // the machine under you: E steps off
+    } else if (hands) {
       for (const body of this.bodies) if (!body.searched && body.mesh.visible) consider(body, body.x, body.z, USE_R_BODY, 'body');
       for (const g of this.gens) if (!g.running) consider(g, g.x, g.z, USE_R_GEN, 'gen');
       if (game.rescue) game.rescue.consider(consider);
@@ -550,13 +565,14 @@ export class Objectives {
       if (game.tools) game.tools.consider(consider);
       game.inventory?.consider(consider);
       game.partMap?.consider(consider);
+      if (game.training) { game.train?.consider(consider); game.motos?.consider(consider); }
       for (const body of this.bodies) if (body.searched && body.gun?.visible) consider(body, body.x, body.z, USE_R_BODY, 'bodyGun');
       if (game.expedition) game.expedition.consider(consider);
     }
-    if (es && !doorsOnly) es.consider(consider);
-    if (game.doors && !seated) game.doors.consider(consider);
+    if (es && !doorsOnly && !riding) es.consider(consider);
+    if (game.doors && !seated && !riding) game.doors.consider(consider);
     // cupboards (in the morning too: the first-aid hut is right by the camp) — and someone caught in one
-    if (game.cabinets && !seated) game.cabinets.consider(consider, !p.carrying && !(es && es.held));
+    if (game.cabinets && !seated && !riding) game.cabinets.consider(consider, !p.carrying && !(es && es.held));
     if (best && this.target && best.obj !== this.target.obj) this.searchT = 0;
     this.target = best;
     if (!best || best.kind !== 'lookout') game.expedition?.idle();
@@ -582,6 +598,8 @@ export class Objectives {
     }
     const o = best.obj;
     if (best.kind === 'bagDrop') { this.searchT = 0; game.inventory.interact(o, pressed, T); return; }
+    if (best.kind === 'rack') { this.searchT = 0; game.train.interact(best, dt, held, still, T); return; }
+    if (best.kind === 'moto') { this.searchT = 0; game.motos.interact(best, dt, held, still, T); return; }
     if (best.kind === 'bodyGun') {
       this.searchT = 0;
       const ok = game.inventory.canReceive('flare',false,true);
@@ -655,11 +673,12 @@ export class Objectives {
       if (g.pullQueued && g.pullCD <= 0) {
         g.pullQueued = false;
         this._pull(g);
+        this.working = g; // the starter cord is wrung with both hands too
       }
       return;
     }
     hud.setUse(T('useHold').replace('{action}', t('actions')[spec.part]), g.progress, true);
-    if (held && still) this._work(g, dt);
+    if (held && still) { this._work(g, dt); this.working = g; }
   }
 
   _search(body) {

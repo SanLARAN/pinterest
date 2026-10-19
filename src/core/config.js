@@ -5,10 +5,17 @@ export const CFG = {
   WORLD_WALL: 286, // player / monsters can't go past this
   CHUNK: 40,
   TERRAIN_CELL: 2.5,
-  RUN_SECONDS: 45 * 60, // after this the forest wakes up: everything starts closing in on you
+  // the shift: four days instead of a single endless night. Each day is a short morning around the
+  // camp and an eight-minute night; the fourth night ends the shift in a win — but four minutes into
+  // it the forest wakes up for good, and everything comes looking. Escaping in the УАЗ ends it earlier.
+  SHIFT: {
+    DAYS: 4,
+    NIGHT: 8 * 60, // one night
+    MORNING: 105, // 1:45 of daylight between the nights
+    LAST_WAKE: 240, // on the last night: the minute the forest stops pretending
+  },
   GRACE_SECONDS: 12, // at the start of the night monsters can't hunt you
   SPAWN_DELAY: 45, // ...and for the first 45 s the forest sleeps: no monsters at all, look around in peace
-  MORNING_SECONDS: 32, // the calm before: daylight, birds, a humming generator
   DUSK_SECONDS: 3.6, // ...and then the light dies
   CAMP_LEASH: 26, // in the morning you stay around the camp
 
@@ -109,7 +116,8 @@ export const CFG = {
   DOOR: { loud: 0.12, shutLoud: 0.2, bashes: 3, bashEvery: 0.55, calmPush: 1.1 },
 
   // co-op: a friend who is caught goes down, not out. Check their pulse (it tells you how long they have
-  // left), carry them to the scouts' first-aid hut and lay them on the cot — only there can they be brought back
+  // left), carry them to the scouts' first-aid hut and lay them on the cot — only there can they be brought
+  // back — or spend an adrenaline syringe to raise them where they fell (see SYRINGE below)
   REVIVE: {
     bleed: [240, 170, 120], // s they last on the ground: the first time, the second, the third and after
     pulse: 1.3, // s holding E to find a pulse
@@ -121,6 +129,18 @@ export const CFG = {
     cot: 1.9, // ...and to lay them on the cot
     gasp: 0.22, // the first breath of someone brought back
     work: 0.05, // each push on the chest
+  },
+  // the adrenaline syringe: a field item (co-op only — solo has no one to raise). One jab, a second and a
+  // half: your friend is on their feet where they fell, no cot, no carrying — but their legs are rubber for
+  // five minutes and the bleed clock did not stop while you fumbled with the cap
+  SYRINGE: {
+    jab: 1.5, // s holding the use
+    reach: 2.2, // m — close enough to press the needle in
+    debuff: 300, // s of rubber legs: walk x0.8, sprint x0.72, stamina burns x1.65
+    walk: 0.8,
+    sprint: 0.72,
+    drain: 1.65,
+    perShift: 2, // how many exist in the forest over the whole shift (the medhut's wall cabinet keeps one)
   },
   // glow sticks: one each. Crack it (G) and it glows for a while — in your hand, or wherever you throw it (G again)
   GLOW: {
@@ -141,27 +161,31 @@ export const CFG = {
     escape: 500,
     corpse: 400,
     generator: 2000,
-    revive: 1500, // you brought someone back
-    win: 25000, // + speedBonus for every second left before RUN_SECONDS
-    speedBonus: 10,
+    revive: 1500, // you brought someone back on the cot
+    adrenaline: 750, // you raised them with the syringe: fast, but they'll limp
+    night: 3000, // each dawn the whole team lived to see
+    win: 25000, // the shift survived (the fourth night's dawn)
+    speedBonus: 10, // per second still left in the shift, if you drive out early
   },
 
   SHARDS: 46,
 };
 
-// difficulty multiplier steps every 5 minutes
-export function dangerMultiplier(t) {
-  return 1 + Math.floor(t / 300) * 0.5;
+// difficulty steps every four minutes of a night, and again with each dawn survived
+export function dangerMultiplier(t, day = 1) {
+  return 1 + (day - 1) * 0.5 + Math.floor(t / 240) * 0.5;
 }
 
-// how many of each monster should exist at time t (seconds)
-export function monsterTargets(t) {
+// how many of each monster should exist at t seconds into the night of the given day
+export function monsterTargets(t, day = 1) {
   const m = t / 60;
   let listeners = 2, crawlers = 0;
   if (m >= 2) listeners = 3;
+  if (day >= 2) listeners = 3;
   if (m >= 4) crawlers = 1;
-  if (m >= 10) crawlers = 2;
-  if (m >= 20) crawlers = 3;
+  if (day >= 2 && m >= 4) crawlers = 2;
+  if (day >= 3) crawlers = 2;
+  if (day >= 4 && m >= 2) crawlers = 3;
   return { listeners: Math.min(listeners, CFG.MAX_LISTENERS), crawlers };
 }
 

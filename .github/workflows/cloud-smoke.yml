@@ -1,7 +1,7 @@
 name: Cloud API smoke
 on:
   push:
-    branches: [arena/2a2936ce-pinterest]
+    branches: [arena/428824a1-pinterest, main]
     paths:
       - 'src/cloud/**'
       - 'src/core/persistence.js'

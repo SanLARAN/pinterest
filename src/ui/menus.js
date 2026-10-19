@@ -72,6 +72,8 @@ export class Menus {
     click('btnSettingsP', () => this.openSettings('pause'));
     click('btnSettingsBack', () => this.closeSettings());
     click('btnResume', () => this.h.onResume());
+    click('btnEndTraining', () => this.h.onEndTraining && this.h.onEndTraining());
+    click('btnRange', () => this.h.onRange && this.h.onRange());
     click('btnRestartP', () => this.h.onRestart());
     click('btnMenuP', () => this.h.onMenu());
     click('btnRestart', () => this.h.onRestart());

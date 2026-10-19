@@ -30,6 +30,7 @@ export class Player {
     this.y = this.world.terrain.height(this.x, this.z);
     this.eyeCur = CFG.PLAYER.eye;
     this.stamina = CFG.PLAYER.stamina;
+    this.adrenaline = 0; // >0: the syringe's rubber legs, counting down (see CFG.SYRINGE)
     this.exhausted = false;
     this.staminaDelay = 0;
     this.stepAcc = 0;
@@ -67,7 +68,12 @@ export class Player {
     this.sprinting = wantSprint;
     const R = CFG.REVIVE;
     const carryV = load && !this.carrying ? load.walk : R.carry;
-    const target = heavy ? (this.crouching ? Math.min(R.carryCrouch, carryV * 0.55) : carryV) : this.crouching ? P.crouch : wantSprint ? P.sprint : P.walk;
+    let target = heavy ? (this.crouching ? Math.min(R.carryCrouch, carryV * 0.55) : carryV) : this.crouching ? P.crouch : wantSprint ? P.sprint : P.walk;
+    // the syringe's after-effect: rubber legs — walking ×0.8, running ×0.72, for as long as it lasts
+    if (this.adrenaline > 0) {
+      this.adrenaline = Math.max(0, this.adrenaline - dt);
+      target *= this.sprinting && !heavy ? CFG.SYRINGE.sprint : CFG.SYRINGE.walk;
+    }
 
     const sy = Math.sin(this.yaw), cy = Math.cos(this.yaw);
     // forward = (-sin, -cos), right = (cos, -sin)
@@ -108,7 +114,7 @@ export class Player {
 
     // stamina
     if (this.sprinting && this.speed > 1) {
-      this.stamina -= P.sprintDrain * dt;
+      this.stamina -= P.sprintDrain * (this.adrenaline > 0 ? CFG.SYRINGE.drain : 1) * dt;
       this.staminaDelay = 0.8;
       if (this.stamina <= 0) {
         this.stamina = 0;

@@ -112,6 +112,10 @@ export class SelfBody {
     poseFur(rig, Math.min(0.1, (now - (this._t || now)) / 1000), p.speed); // (a tail behind you, as it should be)
     this._t = now;
     const carrying = !!p.carrying, part = !!es.held;
+    // at a generator the body folds into the repair kneel — unless something fills the arms
+    // (the wrench itself is drawn up close, by the FieldView arms, which these step aside for)
+    const wk = clamp(g.workK || 0, 0, 1) * (carrying || part ? 0 : 1);
+    if (wk > 0.001) poseWork(rig, wk, (g.time || 0) + (p.bobPhase || 0) * 0.1);
     if (carrying) poseCarrier(rig);
     root.position.set(p.x, p.y + (p.bobY || 0), p.z);
     root.rotation.set(0, p.yaw + PI, 0); // (the rig faces +z; you look down -z)
@@ -149,4 +153,25 @@ function poseSelf(rig, phase, amp, k) {
   n.shR.rotation.set(s * 0.45 * amp - 0.5 * k, 0, 0.07 + 0.12 * k);
   n.elL.rotation.x = -0.25 - amp * 0.2 - 0.55 * k;
   n.elR.rotation.x = -0.25 - amp * 0.2 - 0.55 * k;
+}
+
+// the repair kneel at a generator: the right knee finds the ground, the left foot stays planted, the
+// chest leans into the machine and the eyes go to the bolts. Writes toward the pose by wk (0..1) on
+// top of whatever the walk left there, so it eases in and out instead of snapping
+export function poseWork(rig, wk, phase) {
+  const n = rig.nodes;
+  const swing = Math.sin(phase * 7);
+  const L = (node, axis, v) => { node.rotation[axis] = lerp(node.rotation[axis], v, wk); };
+  n.hips.position.y = lerp(n.hips.position.y, 0.5, wk);
+  n.hips.position.x = lerp(n.hips.position.x, 0.05, wk); // shifted onto the planted foot
+  L(n.chest, 'x', 0.55); // leaning in over the engine
+  L(n.head, 'x', -0.4); // ...and watching your own hands
+  L(n.thL, 'x', -1.5); L(n.thL, 'z', -0.06); // the left foot planted flat by the machine
+  n.knL.rotation.x = lerp(n.knL.rotation.x, 1.75, wk);
+  L(n.thR, 'x', -0.25); L(n.thR, 'z', 0.1); // the right knee folded to the ground behind
+  n.knR.rotation.x = lerp(n.knR.rotation.x, 2.45, wk);
+  L(n.shL, 'x', -1.55 + swing * 0.06); L(n.shL, 'y', 0.35); L(n.shL, 'z', -0.18); // the left hand steadies the housing
+  L(n.shR, 'x', -1.75 - swing * 0.22); L(n.shR, 'y', -0.2); L(n.shR, 'z', 0.24); // the wrench arm works
+  n.elL.rotation.x = lerp(n.elL.rotation.x, -0.85, wk);
+  n.elR.rotation.x = lerp(n.elR.rotation.x, -0.45 + swing * 0.3, wk);
 }

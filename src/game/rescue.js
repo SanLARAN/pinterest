@@ -32,6 +32,7 @@ export class Rescue {
   }
 
   reset() {
+    this.jab = null; // no needle is in anyone's arm at dawn
     this.pulseT = 0;
     this.pulseFor = null;
     this.pulseDone = false;
@@ -141,6 +142,23 @@ export class Rescue {
     if (!p || p.alive || p.gone) return;
     p.gone = true;
     this._gone(p);
+  }
+
+  // dawn clears the fallen: anyone still down — or already bled out — gets up where they are, whole.
+  // The шкафандр keeps what it took. Their next bleed is shorter: the body remembers (see REVIVE.bleed).
+  dawnSweep() {
+    const g = this.g;
+    if (!g.online) return;
+    for (const p of this.downed()) {
+      if (p.consumed) continue;
+      if (p.carriedBy) {
+        const c = g.playerById(p.carriedBy);
+        if (c && c.carrying === p.id) c.carrying = null;
+      }
+      this.revive(p, p.x, p.z, p.yaw, null);
+      if (p === g.player) g.hud.popup(t('dawnRaise'), 'dawn');
+      else g.hud.popup(t('mateDawnRaise').replace('{name}', g.nameOf(p.id)), 'dawn');
+    }
   }
 
   _gone(p) {
@@ -425,8 +443,84 @@ export class Rescue {
     this.revive(b, x, z, yaw, reviverId);
   }
 
-  // (every machine) b breathes again, on their feet beside the cot
-  revive(b, x, z, yaw, reviverId) {
+  // ---------------- the adrenaline syringe ----------------
+  // click with it equipped near a friend who's down: a second and a half of steady hands and they're
+  // on their feet where they fell — no cot, no carrying. Their legs are rubber for five minutes, and
+  // the bleed clock never stopped for the jab either. Co-op only: solo has no one to raise
+  jabTarget() {
+    const g = this.g;
+    if (!g.online) return null;
+    const me = g.player;
+    const f = me.forward();
+    let best = null, bd = 1e9;
+    for (const b of this.downed()) {
+      if (b === me || b.carriedBy || b.onCot || b.consumed || b.gone) continue; // gone is past saving
+      const dx = b.x - me.x, dz = b.z - me.z;
+      const d = Math.hypot(dx, dz);
+      if (d > CFG.SYRINGE.reach) continue;
+      const facing = d < 1.1 ? 1 : (dx * f.x + dz * f.z) / d;
+      if (facing < 0.2) continue;
+      const score = d * (1.6 - facing);
+      if (score < bd) { bd = score; best = b; }
+    }
+    return best;
+  }
+
+  startJab() {
+    const g = this.g;
+    if (this.jab) return;
+    if (g.inventory.syringes <= 0) return;
+    const b = this.jabTarget();
+    if (!b) { g.hud.popup(t('syrNoOne'), 'dim'); return; }
+    this.jab = { id: b.id, t: 0 };
+  }
+
+  _jabTick(dt) {
+    const g = this.g, j = this.jab;
+    if (!j) return;
+    const me = g.player, b = g.playerById(j.id);
+    const gone = !b || b.alive || b.gone || b.carriedBy || b.onCot || b.consumed || !me.alive || me.carrying || g.escape.held || g.escape.mySeat >= 0 || g.state !== 'play';
+    if (gone || !b || Math.hypot(b.x - me.x, b.z - me.z) > CFG.SYRINGE.reach + 0.4) {
+      this.jab = null;
+      g.hud.setUse(null);
+      if (gone && me.alive) g.hud.popup(t('syrOff'), 'dim'); // they were carried off / got up elsewhere
+      return;
+    }
+    j.t += dt;
+    g.hud.setUse(t('useSyringe'), j.t / CFG.SYRINGE.jab, true);
+    if (j.t < CFG.SYRINGE.jab) return;
+    this.jab = null;
+    g.hud.setUse(null);
+    if (g.inventory.syringes <= 0) { g.hud.popup(t('syrEmpty'), 'dim'); return; }
+    g.inventory.syringes--;
+    g.inventory.reconcile();
+    if (g.auth) this.hostAdrenaline(j.id, g.player.id);
+    else if (g.coop?.toHost) g.coop.toHost('ad', j.id);
+  }
+
+  // the host: someone's jab landed. State, distance, and only a body still bleeding
+  hostAdrenaline(bodyId, byId) {
+    const g = this.g;
+    if (!g.auth || !g.online) return;
+    const b = g.playerById(bodyId), by = g.playerById(byId);
+    if (!b || b.alive || b.consumed || b.gone || b.carriedBy || b.onCot) return;
+    if (!by || !by.alive) return;
+    if (Math.hypot(b.x - by.x, b.z - by.z) > CFG.SYRINGE.reach + 1.2) return;
+    const x = +b.x.toFixed(2), z = +b.z.toFixed(2), yaw = +((b.yaw || 0).toFixed(3));
+    this.netAdrenaline(bodyId, x, z, yaw, byId);
+    g.sync.ev('arv', bodyId, x, z, yaw, byId);
+  }
+
+  // (every machine) the needle went in: up on their feet, rubber-legged for five minutes
+  netAdrenaline(bodyId, x, z, yaw, byId) {
+    const g = this.g;
+    const b = g.playerById(bodyId);
+    if (!b || ![x, z, yaw].every(Number.isFinite)) return;
+    this.revive(b, x, z, yaw, byId, 'syringe');
+  }
+
+  // (every machine) b breathes again, on their feet beside the cot — or, via the syringe, where they fell
+  revive(b, x, z, yaw, reviverId, via = 'cot') {
     const g = this.g;
     if (b.alive) return;
     if (this.cotId === b.id) this.cotId = null;
@@ -442,13 +536,19 @@ export class Rescue {
     if (b === g.player) g.reviveLocal(x, z, yaw);
     else {
       b.revive(x, z, yaw);
-      g.hud.popup(t('mateRevived').replace('{name}', g.nameOf(b.id)), 'cyan');
+      g.hud.popup(t(via === 'syringe' ? 'mateSyringed' : 'mateRevived').replace('{name}', g.nameOf(b.id)), 'cyan');
+    }
+    if (via === 'syringe') { // five minutes of rubber legs: walk x0.8, sprint x0.72, stamina burns x1.65
+      b.adrenaline = CFG.SYRINGE.debuff;
+      if (b === g.player) g.hud.popup(t('syrRubber'), 'warn');
     }
     if (reviverId === g.player.id && b !== g.player) {
-      const pts = Math.round(CFG.SCORE.revive * g.mult);
+      const syr = via === 'syringe';
+      const pts = Math.round((syr ? CFG.SCORE.adrenaline : CFG.SCORE.revive) * g.mult);
       g.score += pts;
-      g.stats.revives = (g.stats.revives | 0) + 1;
-      g.hud.popup(`+${pts} ${t('popRevive')}`, 'amber');
+      if (syr) g.stats.syringes = (g.stats.syringes | 0) + 1;
+      else g.stats.revives = (g.stats.revives | 0) + 1;
+      g.hud.popup(`+${pts} ${t(syr ? 'popSyringe' : 'popRevive')}`, 'amber');
     }
     this.reviveT = 0;
     this.waitRv = 0;
@@ -459,6 +559,7 @@ export class Rescue {
   update(dt) {
     const g = this.g;
     if (!g.online) return;
+    this._jabTick(dt);
     this.askT -= dt;
     if (this.waitRv > 0) this.waitRv -= dt;
     this.hostTick();

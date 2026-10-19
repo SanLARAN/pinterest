@@ -183,6 +183,12 @@ export class Lobby {
     this.el.addEventListener('click', (e) => {
       if (!this.garage || !this._inRoom() || this.starting || !bare(e)) return;
       if(this.garage.hitRules(e.clientX,e.clientY)) { this.openRules(); return; }
+      if (this.garage.hitGate(e.clientX, e.clientY)) {
+        if (this.uiSound) this.uiSound('click');
+        if (this.coop.isHost && this.coop.active) this.coop.startRun({ cut: 2 }); // the gates: out to the training ground
+        else this.garage.gateWobble(); // the latch answers; the host's hand opens them
+        return;
+      }
       const s = this.garage.hit(e.clientX, e.clientY);
       const me = this.coop.me();
       if (s < 0) {

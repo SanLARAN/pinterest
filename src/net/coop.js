@@ -321,7 +321,9 @@ export class Coop {
     const list = this.players();
     for (const p of list) p.inRun = true;
     this.phase = 'game';
-    const msg = { seed: (Math.random() * 2 ** 31) >>> 0, players: list.map((p) => ({ id: p.id, name: p.name, slot: p.slot, fit: p.self ? myFit() : p.fit })), cut: cut ? 1 : 0, rules: cleanLobbyRules(this.rules) };
+    // cut: 1 the engine-start film, 2 the departure film — the gates open and the car takes the
+    // team to the training ground (tr) instead of the night
+    const msg = { seed: (Math.random() * 2 ** 31) >>> 0, players: list.map((p) => ({ id: p.id, name: p.name, slot: p.slot, fit: p.self ? myFit() : p.fit })), cut: cut === 2 ? 2 : cut ? 1 : 0, tr: cut === 2 ? 1 : 0, rules: cleanLobbyRules(this.rules) };
     this.net.send('start', msg);
     this._broadcastRoster();
     this._onStart(msg);

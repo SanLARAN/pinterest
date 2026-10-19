@@ -52,7 +52,7 @@ export class ForestTools {
   get hasCrowbar() { return this.items.some((it) => it.kind === 'crowbar' && it.state === 'held' && it.owner === this.g.player.id); }
   get handsFree() {
     const g = this.g;
-    return g.player.alive && g.state === 'play' && !g.inputMuted && !g.player.carrying && !g.escape.held && g.escape.mySeat < 0 && !g.cabinets.busy && !g.expedition?.onTower;
+    return g.player.alive && (g.state === 'play' || g.state === 'training') && !g.inputMuted && !g.player.carrying && !g.escape.held && g.escape.mySeat < 0 && !g.cabinets.busy && !g.expedition?.onTower;
   }
   get clock() { return this.g.auth ? this.g.time : this.g.netT; }
   groundHeight(x, z) {
@@ -123,7 +123,7 @@ export class ForestTools {
   // Only the host calls this. Validate ownership, reach and free hands on the host's last player state.
   grant(action, i, pid, clip = null) {
     const g = this.g, p = g.playerById(pid);
-    if (!Number.isInteger(i) || i < 0 || !g.auth || g.state !== 'play' || !p || !p.alive || p.carrying || g.escape.load(pid) || g.cabinets.locked(pid) || g.escape.seatOf(pid) >= 0) return false;
+    if (!Number.isInteger(i) || i < 0 || !g.auth || g.state !== 'play' && g.state !== 'training' || !p || !p.alive || p.carrying || g.escape.load(pid) || g.cabinets.locked(pid) || g.escape.seatOf(pid) >= 0) return false;
     if (action === 'pry') {
       const c = g.cabinets.list[i | 0];
       if (!c || !c.locked || Math.hypot(c.front.x - p.x, c.front.z - p.z) > 2.5 || Math.abs(c.spec.y - p.y) > 2) return false;
@@ -250,7 +250,7 @@ export class ForestTools {
       if (!p || !p.alive) this.dropFor(it.owner, p?.x ?? it.x, p?.z ?? it.z);
     }
     for (const it of this.items) {
-      const playing = it.state === 'playing' && now >= it.start && now < it.end && g.state === 'play';
+      const playing = it.state === 'playing' && now >= it.start && now < it.end && (g.state === 'play' || g.state === 'training');
       if (!playing) this._stop(it);
       if (playing) {
         if (g.audio.ready && g.distToEars(it.x, it.z) < 85 && !it.sound) {

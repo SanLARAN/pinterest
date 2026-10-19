@@ -164,6 +164,9 @@ export class NetSync {
       case 'rc': // a guest wants to lift someone who's down
         if (this.host && typeof d === 'string') g.rescue.grant(d, pid);
         break;
+      case 'ad': // a guest's adrenaline syringe went in
+        if (this.host && typeof d === 'string') g.rescue.hostAdrenaline(d, pid);
+        break;
       case 'rr': // a guest finished working on someone on the cot
         if (this.host && typeof d === 'string') g.rescue.hostRevive(d, pid);
         break;
@@ -222,6 +225,9 @@ export class NetSync {
       case 'gd': if (r && typeof a === 'string') { const s = g.glows.find(a); if (s?.owner === pid && s.state === 'held') g.glows.dropFor(pid, +b, +c); } break;
       case 'pu':
         if (r) g.remotePulse(r, +a, +b, +c, +e, !!f);
+        break;
+      case 'mb': // a friend got on/off their bike at the training ground
+        if (Number.isInteger(a) && g.motos) g.motos.netMount(pid, a, !!b);
         break;
       case 'st':
         if (r) g.stones.throw(+a, +b, +c, +e, +f, +d[6], pid);
@@ -301,6 +307,7 @@ export class NetSync {
           case 'iu': g.cabinets.netUnlock(a); break;
           case 'spe': g.expedition.netMerge(a); break;
           case 'du': if (g.state === 'morning') g.startDusk(); break;
+          case 'dn': if (g.state === 'play') { if (Number.isInteger(a)) g.day = Math.max(1, a); g.startDawn(); } break;
           case 'hu': if (m) g.fxHunt(m, b); break;
           case 'in': if (m) g.fxInvestigate(m, +c || 0, b); break;
           case 'lo': if (m) g.fxLost(m, b); break;
@@ -313,9 +320,9 @@ export class NetSync {
           case 'ki': g.netKill(a, b, c, +e, +f, +d[6]); break;
           case 'cu': g.rescue.netLift(a, b); break;
           case 'rv': g.rescue.netRevive(a, +b, +c, +e, f); break;
+          case 'arv': g.rescue.netAdrenaline(a, +b, +c, +e, f); break;
           case 'bo': g.rescue.netGone(a); break;
           case 'dk': g.doors.netKnock(a, b); break;
-          case 'dn': if (g.state === 'play') g.startDawn(); break;
           case 'xg': g.escape.netGrant(a, b, +c); break;
           case 'xa': g.escape.netSeats(a); break;
           case 'xl': g.escape.netLoaded(a, b); break;

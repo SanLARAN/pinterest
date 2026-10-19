@@ -105,7 +105,7 @@ const radar = new Radar($('radar'));
 const input = new Input(canvas);
 input.bindTouchUI($('touch'));
 // Phones and tablets live in touch mode from the first frame: no pointer-lock prompt on a device with no
-// mouse, and the on-screen look stick, hands, echo and SKIP button are already where they belong.
+// mouse, and the look stick, hands, echo and SKIP button are already where they belong.
 // (A touchscreen laptop keeps its mouse: the primary pointer is fine there, so this does not fire.)
 if (matchMedia('(pointer: coarse)').matches && !matchMedia('(any-pointer: fine)').matches) input.setTouch(true);
 const coop = new Coop({ audio, mic });
@@ -225,6 +225,8 @@ const menus = new Menus({
   onPlay: () => startRun(),
   onResume: () => resume(),
   onRestart: () => restartRun(),
+  onEndTraining: () => endTraining(),
+  onRange: () => startTrainingSolo(),
   onMenu: () => toMenu(),
   onCoop: () => lobby.open(),
   onAtlas: () => {
@@ -342,7 +344,16 @@ function beginCoopRun(d) {
     for (const id of ['settingsPanel', 'howPanel', 'scoresPanel']) menus.show(id, false);
     if (!lobby.isOpen()) lobby.open();
     lobby.setStarting(true);
-    const ok = garage.startCar(() => {
+    const depart = d.cut === 2; // the gates open and the car takes the team to the training ground
+    const ok = depart ? garage.startDepart(() => {
+      lobby.setStarting(false);
+      if (!coop.active || !coop.inRun || coop.status === 'hostLost' || state !== 'menu') {
+        garage.abortStart();
+        lobby.render();
+        return;
+      }
+      startRun({ coop: d });
+    }) : garage.startCar(() => {
       lobby.setStarting(false);
       if (!coop.active || !coop.inRun || coop.status === 'hostLost' || state !== 'menu') {
         garage.abortStart();
@@ -532,6 +543,7 @@ function startRun(opts = {}) {
   if (!game) return;
   account.close();overReward=null;
   const online = !!opts.coop;
+  const training = !!(opts.training || opts.coop?.tr); // the departure film's destination
   if (!online && state === 'over' && performance.now() - overAt < 450) return;
   if (!online && coop.active) coop.leave(); // a solo night: you leave the room
   if (runOnline && game.online) game.teardownOnline();
@@ -555,11 +567,11 @@ function startRun(opts = {}) {
   if (online) {
     const me = opts.coop.players.find((p) => p.id === coop.selfId);
     game.setupSolo();
-    game.reset({ seed: opts.coop.seed, slot: me ? me.slot : 0, online: true });
+    game.reset({ seed: opts.coop.seed, slot: me ? me.slot : 0, online: true, training });
     game.setupOnline(coop, opts.coop.players);
   } else {
     game.setupSolo();
-    game.reset();
+    game.reset({ training });
     if (DEBUG.night || DEBUG.t > 0) game.startNight();
     if (DEBUG.t > 0) {
       game.time = DEBUG.t;
@@ -584,6 +596,72 @@ function startRun(opts = {}) {
   lastFrame = performance.now();
 }
 
+// ---------------- the training ground ----------------
+// the menu's «ПОЛИГОН»: the same departure film, played alone — gates, engine, everyone in (that's you)
+function startTrainingSolo() {
+  if (state !== 'menu') return;
+  if (!garage && !ensureGarage()) return;
+  audio.init();
+  audio.setVolume(settings.volume);
+  menus.only(null);
+  home.leave();
+  lobby.close();
+  document.body.classList.add('cutscene');
+  const done = () => {
+    document.body.classList.remove('cutscene');
+    garage.close();
+    startRun({ training: true });
+  };
+  ensureSoloFig();
+  garage.open('room');
+  if (!garage.startDepart(done)) done();
+}
+
+// your figure at the wheel, for the solo film (the lobby keeps its own figures)
+function ensureSoloFig() {
+  if (!garage) return;
+  if (!garage.figs[0]) garage.setPlayers([{ id: 'me', name: settings.name || '???', slot: 0, self: true, fit: myFit() }]);
+}
+
+// pack up the training: no scores, no records — the garage/lobby is where you were
+function endTraining() {
+  if (!game || state !== 'playing' || !game.training) return;
+  const online = runOnline;
+  game.inventory.close(false);
+  game.fieldView.reset();
+  game.tools.silence(true);
+  game.expedition.silence();
+  game.flares.clear();
+  game.motos.dismount(true);
+  game.motos.dispose();
+  game.train?.end();
+  game.train = null;
+  game.training = false;
+  game.state = 'idle';
+  game.inputMuted = false;
+  runOnline = false;
+  document.body.classList.remove('spectating', 'cutscene', 'coop');
+  mates.clear();
+  hud.show(false);
+  input.exitLock();
+  audio.setPaused(false);
+  if (online) {
+    if (coop.isHost) coop.endRun(); else coop.leaveRun();
+    game.teardownOnline();
+    state = 'menu';
+    setBodyState();
+    lobby.open();
+    lobby.render();
+  } else {
+    state = 'menu';
+    setBodyState();
+    menus.only('menu');
+    home.enter();
+  }
+  cloud.presenceChanged();
+  lastFrame = performance.now();
+}
+
 // "again": solo restarts at once; in co-op only the host can call a new night (for everyone)
 function restartRun() {
   if (runOnline || coop.active) {
@@ -595,7 +673,7 @@ function restartRun() {
 
 function pause() {
   game?.inventory.close(false);
-  if (state !== 'playing' || !game || !['play', 'morning', 'dusk'].includes(game.state)) return;
+  if (state !== 'playing' || !game || !['play', 'morning', 'dusk', 'training'].includes(game.state)) return;
   state = 'paused';
   setBodyState();
   game.tools.cancelRecord();
@@ -605,9 +683,14 @@ function pause() {
   if (!game.online) audio.setPaused(true);
   input.exitLock();
   const night = game.state === 'play';
-  $('pauseStats').innerHTML = night
+  const training = game.state === 'training';
+  $('pauseStats').innerHTML = training
+    ? t('trainingSmall')
+    : night
     ? `${fmtTime(game.time)} · ${t('generators')} ${game.objectives.count}/5<br>${t('score')} ${fmtScore(game.score)} ×${game.mult.toFixed(1)}`
     : `${t('morningBig')}`;
+  $('btnEndTraining').hidden = !training;
+  $('btnRestartP').hidden = training;
   renderPauseVoices();
   menus.only('pause');
 }
@@ -875,7 +958,7 @@ function step(now, render) {
       }
       // pointer-lock hint (or drag-to-look hint when the browser/iframe refuses pointer lock)
       let lockMsg = '';
-      if (!input.touch && (game.state === 'play' || game.state === 'morning') && !input.locked) {
+      if (!input.touch && (game.state === 'play' || game.state === 'morning' || game.state === 'training') && !input.locked) {
         if (!input.lockFailed) lockMsg = t('clickToLook');
         else {
           if (!perf.dragHintAt) perf.dragHintAt = now;

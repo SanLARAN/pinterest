@@ -9,7 +9,7 @@ import { buildFlareGun } from './objectives.js';
 import { BAG_SIZE, BAG_KINDS, BAG_LIMIT, LOOT_KIND, fitsPocket, cleanPockets, cleanParcel, iconSvg } from './backpackData.js';
 
 const round = (v) => Math.round(v * 100) / 100;
-const KEYS = { stones: 'bagStones', glow: 'bagGlow', torch: 'torchName', flare: 'flareGun', battery: 'bagBattery', tape: 'tapeName', crowbar: 'crowbarName',map:'partMapName' };
+const KEYS = { stones: 'bagStones', glow: 'bagGlow', torch: 'torchName', flare: 'flareGun', battery: 'bagBattery', tape: 'tapeName', crowbar: 'crowbarName', map: 'partMapName', syringe: 'bagSyringe' };
 export const bagName = (kind) => t(KEYS[kind] || 'bagEmpty');
 
 function parcelGeometry(kind) {
@@ -33,7 +33,7 @@ function parcelGeometry(kind) {
 export class Backpack {
   constructor(game) {
     this.g = game;
-    this.geo = Object.fromEntries(['stones','glow','flare','flareAmmo','battery','map'].map(k => [k, parcelGeometry(k)]));
+    this.geo = Object.fromEntries(['stones','glow','flare','flareAmmo','battery','map','syringe'].map(k => [k, parcelGeometry(k)]));
     this.geo.torch = game.torch.geo;
     this.heldViews = {};
     this.el = document.createElement('section');
@@ -73,7 +73,7 @@ export class Backpack {
 
   reset() {
     this.close(false); this.progress = 0; this.equipped = null; this.equipT = 0;
-    this.slots = ['stones','glow',null,null]; this.cells = 0;
+    this.slots = ['stones','glow',null,null]; this.cells = 0; this.syringes = 0;
     this.world = new Map(); this.claims = new Map(); this.applied = new Set(); this.parcelApplied = new Set(); this.droppedApplied = new Set();
     this.remoteSlots = new Map(); this.pending = new Map(); this.seq = 0; this.epoch = Date.now().toString(36);
     this.claimPending = null; this.beat = 0; this.summaryKey = ''; this.wasAlive = true;
@@ -85,17 +85,17 @@ export class Backpack {
   get blocked() { return this.active || this.pending.size > 0; }
   owns(k) {
     const g=this.g;
-    return k==='stones' ? g.player.stones>0 : k==='glow' ? g.glows.count>0 || !!g.glows.held : k==='torch' ? g.torch.has : k==='flare' ? !!g.player.hasFlare || g.player.flares>0 : k==='battery' ? this.cells>0 : k==='tape' ? !!g.tools.tapeHeld : k==='crowbar' ? g.tools.hasCrowbar : k==='map'?!!g.partMap?.has:false;
+    return k==='stones' ? g.player.stones>0 : k==='glow' ? g.glows.count>0 || !!g.glows.held : k==='torch' ? g.torch.has : k==='flare' ? !!g.player.hasFlare || g.player.flares>0 : k==='battery' ? this.cells>0 : k==='tape' ? !!g.tools.tapeHeld : k==='crowbar' ? g.tools.hasCrowbar : k==='map'?!!g.partMap?.has:k==='syringe'?this.syringes>0:false;
   }
   count(k) {
     const g=this.g;
-    return k==='stones'?g.player.stones:k==='glow'?g.glows.count+(g.glows.held?1:0):k==='battery'?this.cells:k==='flare'?g.player.flares|0:1;
+    return k==='stones'?g.player.stones:k==='glow'?g.glows.count+(g.glows.held?1:0):k==='battery'?this.cells:k==='flare'?g.player.flares|0:k==='syringe'?this.syringes:1;
   }
   canReceive(k, announce=false, upgrade=false) {
     let ok = fitsPocket(this.slots,k);
     if(ok && upgrade && k==='flare' && !this.g.player.hasFlare) return true;
     if(ok && this.owns(k)) {
-      if(['stones','glow','battery','flare'].includes(k)) ok = this.count(k) < BAG_LIMIT[k];
+      if(['stones','glow','battery','flare','syringe'].includes(k)) ok = this.count(k) < BAG_LIMIT[k];
       else if(k==='torch') ok = this.g.torch.charge < .99;
       else ok=false;
     }
@@ -131,9 +131,11 @@ export class Backpack {
   }
 
   toggle() { if(this.opened) this.close(); else this.open(); }
+  // on a desktop the pack opens in the round (see ui/bag3d.js); the flat grid is the touch fallback
+  get round() { return !!this.g.bag3d && (!this.g.input.touch || innerWidth >= 720); } // a narrow phone keeps the flat grid; landscape and tablets get the real pack
   open() {
     const g=this.g;
-    if(!g.player.alive || !['play','morning','dawn'].includes(g.state) || g.inputMuted) return false;
+    if(!g.player.alive || !['play','morning','dawn','training'].includes(g.state) || g.inputMuted) return false;
     if(g.player.carrying || g.escape.held || g.escape.mySeat>=0 || g.cabinets.busy || g.expedition.onTower) { g.handsFull(); return false; }
     this.opened=true; this.uiReady=false; this.shadePressed=false; this.el.hidden=false; this.el.classList.remove('ready');
     this.menu.hidden=true; this.reconcile(); this.renderKey=''; this.render();
@@ -141,14 +143,17 @@ export class Backpack {
     g.tools.cancelRecord();g.partMap?.fold(true);
     if(g.torch.on) g.torch.toggle();
     g.objectives.closeNote(); g.hud.setHint(null); g.hud.setUse(null);
-    document.body.classList.add('bag-open'); g.input.exitLock();
+    if(this.round) { document.body.classList.add('bag-open','bag-3d'); g.bag3d.open(); }
+    else document.body.classList.add('bag-open');
+    g.input.exitLock();
     if(g.audio.ready) g.audio.paper();
     return true;
   }
   close(lock=true) {
     const had=this.opened;
     this.opened=false; this.uiReady=false; this.menu.hidden=true; this.el.classList.remove('ready');
-    document.body.classList.remove('bag-open');
+    document.body.classList.remove('bag-open','bag-3d');
+    if(this.g.bag3d) this.g.bag3d.close();
     this.g.input.uiMode=false;
     if(had) {
       this.g.input.reset();
@@ -157,17 +162,24 @@ export class Backpack {
     this.el.hidden=true;
     if (this.el.contains(document.activeElement)) document.activeElement.blur();
   }
-  context(i) {
+  context(i, at = null) {
     const kind=this.slots[i];
     if(!kind || !this.opened || !this.uiReady || this.pending.size) return;
     this.menuSlot=i; this.menu.hidden=false;
     this.menu.querySelector('span').textContent=bagName(kind);
     this.menu.querySelector('[data-action="equip"]').textContent=t(this.equipped===kind?'bagStow':'bagEquip');
     this.menu.querySelector('[data-action="drop"]').textContent=t('bagDrop');
-    const r=this.pockets[i].getBoundingClientRect();
+    // the flat grid pins the menu to its pocket button; the round pack, to the click that opened it
+    const r = at ? { x: at.x - 110, y: at.y - 30, width: 220, height: 60 } : this.pockets[i].getBoundingClientRect();
     this.menu.style.left=`${Math.max(12,Math.min(innerWidth-232,r.x+r.width*.4))}px`;
     this.menu.style.top=`${Math.max(12,Math.min(innerHeight-150,r.y+r.height*.5))}px`;
     this.menu.querySelector('button').focus();
+  }
+  // the round pack's pointer chose a pouch (Bag3D): lift the item out and pin the menu to the click
+  pickPocket(i, x, y) {
+    if(!this.opened || !this.uiReady || this.pending.size || !this.slots[i]) return false;
+    this.context(i, { x, y });
+    return true;
   }
   equip(i) {
     const kind=this.slots[i]; if(!kind || this.pending.size) return;
@@ -178,7 +190,7 @@ export class Backpack {
   }
   primary() {
     const g=this.g;
-    if(this.lowerWatch() || this.blocked || this.equipT>0 || !g.player.alive || g.inputMuted || !['play','dawn'].includes(g.state)) return;
+    if(this.lowerWatch() || this.blocked || this.equipT>0 || !g.player.alive || g.inputMuted || !['play','dawn','training'].includes(g.state)) return;
     if(g.escape.held) { g.escape.throwHeld(); return; }
     if(g.player.carrying || g.cabinets.busy || g.expedition.onTower || g.escape.mySeat>=0) return;
     const k=this.equipped;
@@ -192,7 +204,8 @@ export class Backpack {
       if(!g.torch.has) { g.hud.popup(t('bagBatteryNoTorch'),'dim'); return; }
       if(g.torch.charge>=.99) { g.hud.popup(t('bagBatteryFull'),'dim'); return; }
       if(this.cells>0) { this.cells--; g.torch.addBattery(); }
-    } else if(k==='crowbar') g.hud.popup(t('bagPryHint'),'dim');
+    } else if(k==='syringe') g.rescue.startJab();
+    else if(k==='crowbar') g.hud.popup(t('bagPryHint'),'dim');
     this.reconcile();
   }
   lowerWatch() { const g=this.g; if(g.fieldView?.watch>.12) { g.input.peekHeld=false; g.input.peekTouchUntil=0; return true; } return false; }
@@ -211,6 +224,7 @@ export class Backpack {
     if(kind==='torch') { g.torch.on=false; g.torch.has=false; g.torch.charge=0; }
     if(kind==='flare') g.setFlares(0,false);
     if(kind==='battery') this.cells=0;
+    if(kind==='syringe') this.syringes=0;
     if(kind==='map'&&g.partMap){g.partMap.has=false;g.partMap.fold(true);}
     if(this.equipped===kind) this.equipped=null;
   }
@@ -220,6 +234,7 @@ export class Backpack {
     if(k==='glow') g.glows.count=Math.min(BAG_LIMIT.glow,g.glows.count+d.n);
     if(k==='map')g.partMap.has=true;
     if(k==='battery') this.cells=Math.min(BAG_LIMIT.battery,this.cells+d.n);
+    if(k==='syringe') this.syringes=Math.min(BAG_LIMIT.syringe,this.syringes+d.n);
     if(k==='torch') { g.torch.has=true; g.torch.charge=Math.min(1,g.torch.charge+d.charge); g.stats.torch=1; }
     if(k==='flare') g.setFlares(Math.min(BAG_LIMIT.flare,(g.player.flares|0)+d.n),!!g.player.hasFlare||d.gun);
     this.reconcile();
@@ -360,7 +375,7 @@ export class Backpack {
       for(let i=0;i<BAG_SIZE;i++) this.drop(i,true);
     }
     this.wasAlive=alive;
-    if(this.opened && (!alive || g.inputMuted || !['play','morning','dawn'].includes(g.state))) this.close(false);
+    if(this.opened && (!alive || g.inputMuted || !['play','morning','dawn','training'].includes(g.state))) this.close(false);
     this.progress=Math.max(0,Math.min(1,this.progress+(this.opened?1:-1)*dt/(this.opened?.7:.32)));
     this.equipT=Math.max(0,this.equipT-dt);
     if(this.opened && this.progress>.94 && !this.uiReady && !g.input.locked && !document.pointerLockElement) { this.uiReady=true; this.el.classList.add('ready'); this.pockets.find(b=>!b.disabled)?.focus({preventScroll:true}); }
@@ -380,7 +395,7 @@ export class Backpack {
     if(key===this.renderKey) return; this.renderKey=key;
     this.el.setAttribute('aria-label',t('bagTitle'));
     this.el.querySelector('h2').textContent=t('bagTitle');
-    this.el.querySelector('.bag-tip').textContent=t(g.input.touch?'bagTipT':'bagTip');
+    this.el.querySelector('.bag-tip').textContent=t(g.input.touch?'bagTipT':this.round?'bagTip3d':'bagTip');
     this.el.querySelector('.bag-world').textContent=t('bagWorld');
     this.el.querySelector('.bag-capacity').textContent=`${this.slots.filter(Boolean).length} / ${BAG_SIZE} · ${t('bagSlots')}`;
     this.el.querySelector('.bag-close').textContent=`${t('bagClose')}  [ I / ESC ]`;
@@ -390,7 +405,7 @@ export class Backpack {
       b.querySelector('.bag-item').innerHTML=kind?iconSvg(kind):'<i>+</i>';
       const name=kind==='flare'&&!g.player.hasFlare?t('bagCartridges'):bagName(kind);
       b.querySelector('.bag-item-name').textContent=kind?name:t('bagEmpty');
-      let sub=kind?`${this.count(kind)}${['stones','glow','battery','flare'].includes(kind)?` / ${BAG_LIMIT[kind]}`:''}`:'';
+      let sub=kind?`${this.count(kind)}${['stones','glow','battery','flare','syringe'].includes(kind)?` / ${BAG_LIMIT[kind]}`:''}`:'';
       if(kind==='torch') sub=`${Math.ceil(g.torch.charge*100)}%`;
       if(kind==='tape') sub=`${g.tools.tapeHeld?.charges||0} / 2`;
       if(kind==='glow' && g.glows.held) sub+=` · ${t('bagLit')}`;

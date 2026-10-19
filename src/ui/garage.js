@@ -9,14 +9,14 @@
 import * as THREE from 'three';
 import { EDGE_GLSL } from '../render/sonar.js';
 import { Particles } from '../render/particles.js';
-import { clamp, lerp, damp } from '../core/rng.js';
+import { clamp, lerp, damp, smoothstep } from '../core/rng.js';
 import { t } from '../core/i18n.js';
 import { buildSurvivor, dyeColors, poseFur } from '../game/survivor.js';
 import { cleanFit, shapeKey, item } from '../game/outfit.js';
 import {
   ROOM, GATE, WIN, CAR, BULB, BULB_LOCAL, BULB2, BULB2_LOCAL, CARP, SPOTS, LANTERN_AT, DRUM_AT, ITEM_SPOTS, PACK,
   buildRoom, buildCeiling, buildWicket, buildProps, buildBulb, buildBulb2, buildSteering, CAR_MODELS, GPAL_GLSL,
-  buildItems, buildPack, buildPackFlap, buildCigarette, buildCup, buildLighter, buildFlame, buildPasser,
+  buildItems, buildPack, buildPackFlap, buildCigarette, buildCup, buildLighter, buildFlame, buildPasser, buildGateLeaf,
 } from './garageSet.js';
 
 const PI = Math.PI;
@@ -627,7 +627,7 @@ export class Garage {
 
   _build() {
     const S = this.scene;
-    this._mesh(buildRoom());
+    this.roomMesh = this._mesh(buildRoom());
     this.ceiling = this._mesh(buildCeiling());
     this._mesh(buildProps());
     this._buildRulesPoster();
@@ -905,6 +905,7 @@ export class Garage {
     this.ambReady=false;
     if (this.audio) this.audio.garageAmb(false);
     if (this.cut && !this.cut.done) this.cut = null;
+    if (this.depart) this._endDepart();
     this._stopEngine(0.4);
   }
 
@@ -975,6 +976,164 @@ export class Garage {
     for (const f of this.figs) if (f) f.st = { phase: 'idle', t: 0, next: rnd(1, 3), nextTap: 5 };
     this._resetPacker();
     this.cup.position.copy(this.cupHome);
+  }
+
+  // ---------------- the departure film ----------------
+  // the gates open and the car takes the team out: the training ground. Runs on every machine that
+  // can see the garage (the host's word arrives as start.cut === 2; the menu button plays it solo)
+  startDepart(onDone) {
+    if ((this.cut && !this.cut.done) || this.depart) return false;
+    this.cut = null;
+    this._stopEngine(0.2);
+    this.depart = { t: 0, onDone, fired: false, clanked: false, keyed: false, gate: 0, drive: 0, walk: 0 };
+    // the static gate leaves give way to their own swinging meshes
+    this.roomMesh.geometry.dispose();
+    this.roomMesh.geometry = geometryFrom(buildRoom(false));
+    this.gateLeaves = [-1, 1].map((side) => {
+      const m = this._mesh(buildGateLeaf(side));
+      m.position.set(ROOM.X0, 0, side < 0 ? GATE.z0 : GATE.z1);
+      return m;
+    });
+    // the wicket rides the near leaf from now on
+    const near = this.gateLeaves[1];
+    this.wicket.position.set(-0.05, GATE.wy0 + 0.01, GATE.wz1 - GATE.z1);
+    near.add(this.wicket);
+    this.open(this.view === 'home' ? 'room' : this.view);
+    return true;
+  }
+
+  // the gates are shut and the room is whole again (the film ended, or was cancelled)
+  _endDepart() {
+    if (!this.depart && !this.gateLeaves) return;
+    this.depart = null;
+    if (this.gateLeaves) {
+      for (const m of this.gateLeaves) {
+        if (m.parent) m.parent.remove(m);
+        m.geometry.dispose();
+      }
+      this.gateLeaves = null;
+    }
+    if (this.wicket) {
+      this.scene.add(this.wicket);
+      this.wicket.position.set(ROOM.X0 - 0.05, GATE.wy0 + 0.01, GATE.wz1 - 0.01);
+      this.wicket.rotation.set(0, 0, 0);
+    }
+    if (this.roomMesh) {
+      this.roomMesh.geometry.dispose();
+      this.roomMesh.geometry = geometryFrom(buildRoom(true));
+    }
+    this.u.uGap.value.set(ROOM.X0 - 0.25, 1.0, (GATE.wz0 + GATE.wz1) / 2, 0.9);
+    this.u.uHeadI.value = 0;
+    this.u.uTail.value.w = 0;
+    this.u.uDash.value.w = 0;
+    this.carRoot.position.set(CAR.x, 0, CAR.z);
+    for (const f of this.figs) if (f) { f.st = { phase: 'idle', t: 0, next: rnd(1, 3), nextTap: 5, i: -1 }; }
+  }
+
+  // a click on the gates: are they on screen where the pointer is? (the lobby asks)
+  hitGate(x, y) {
+    if (this.depart) return false;
+    const pts = [[ROOM.X0 - 0.1, 0.12, GATE.z0], [ROOM.X0 - 0.1, 0.12, GATE.z1], [ROOM.X0 - 0.1, GATE.h - 0.15, GATE.z1], [ROOM.X0 - 0.1, GATE.h - 0.15, GATE.z0]];
+    let minX = 1e9, maxX = -1e9, minY = 1e9, maxY = -1e9, front = true;
+    for (const [px, py, pz] of pts) {
+      const v = _w.set(px, py, pz).project(this.camera);
+      if (v.z > 1) front = false;
+      const sx = (v.x * 0.5 + 0.5) * this.w, sy = (-v.y * 0.5 + 0.5) * this.h;
+      minX = Math.min(minX, sx); maxX = Math.max(maxX, sx);
+      minY = Math.min(minY, sy); maxY = Math.max(maxY, sy);
+    }
+    return front && x >= minX - 14 && x <= maxX + 14 && y >= minY - 10 && y <= maxY + 10;
+  }
+
+  // a guest's click on the gates: the latch answers, but only the host's hand opens them
+  gateWobble() {
+    this.gateWob = 0.6;
+    if (this.audio?.ready) this.audio.clank(ROOM.X0, 1.2, GATE.mid, 0.4);
+  }
+
+  _departure(dt) {
+    const c = this.depart;
+    if (!c) {
+      if (this.gateWob > 0) { // the latch settles
+        this.gateWob = Math.max(0, this.gateWob - dt);
+        this.u.uGap.value.w = 0.9 + Math.sin(this.t * 42) * 0.12 * this.gateWob;
+        if (this.gateWob <= 0) this.u.uGap.value.w = 0.9;
+      }
+      return;
+    }
+    c.t += dt;
+    const t = c.t;
+    const A = this.audio;
+    // the latch: a heavy slide, then the leaves
+    if (!c.clanked && t >= 0.9) {
+      c.clanked = true;
+      if (A?.ready) A.clank(ROOM.X0, 1.2, GATE.mid, 1);
+      this.shake.vroll += 0.1;
+    }
+    if (t >= 1.05) c.gate = smoothstep(1.05, 2.6, t);
+    const g = c.gate;
+    if (this.gateLeaves) {
+      this.gateLeaves[0].rotation.y = -1.85 * g; // the far leaf swings out
+      this.gateLeaves[1].rotation.y = 1.85 * g; // ...and the near one, the wicket riding it
+    }
+    this.u.uGap.value.set(ROOM.X0 - 0.3 - 0.5 * g, 1.0, (GATE.wz0 + GATE.wz1) / 2, 0.9 + 1.7 * g);
+    // the engine: keyed, catches, headlights through the open gates
+    if (!c.keyed && t >= 2.0) {
+      c.keyed = true;
+      if (A) this.engine = A.carStart();
+      this.u.uDash.value.w = 0.5;
+    }
+    if (t >= 2.9) this.idle = 1;
+    this.u.uHeadI.value = t >= 2.9 ? Math.min(1, (t - 2.9) * 3) : 0;
+    this.u.uTail.value.w = t >= 2.9 ? 0.7 : 0;
+    // the team walks to the car (the driver is already there)
+    if (t >= 2.6 && t < 5.2) {
+      c.walk = Math.min(1, (t - 2.6) / 1.9);
+      this._walkToCar(c.walk);
+    } else if (t >= 5.2) this._walkToCar(1);
+    // and the car rolls out through the gates
+    if (t >= 3.4) {
+      c.drive = Math.min(1, (t - 3.4) / 2.4);
+      const v = 0.4 + 2.6 * c.drive * c.drive;
+      this.carRoot.position.x -= v * dt;
+      const ex = this._carPoint(this.CP.exhaust, _w);
+      if (Math.random() < dt * 18) this.smoke.emit(ex.x + 0.05, ex.y, ex.z, rnd(0.6, 1.4), rnd(0, 0.4), rnd(-0.3, 0.3), { life: 2.4, s0: 0.1, s1: 0.8, a: 0.3, rise: 0.22, drag: 1.6, col: [0.42, 0.42, 0.44], jitter: 0.5 });
+      this.shake.vy += dt * 0.4 * c.drive;
+    }
+    // into the night
+    if (t > 5.9) this.fade = Math.max(0, 1 - (t - 5.9) / 0.7);
+    if (!c.fired && t >= 6.7) {
+      c.fired = true;
+      const fn = c.onDone;
+      this._endDepart();
+      this._stopEngine(0.6);
+      this.fade = 0.3;
+      if (fn) fn();
+    }
+  }
+
+  // the passengers leave their spots and file into the car (k: 0 at their places, 1 at the doors)
+  _walkToCar(k) {
+    const ease = k * k * (3 - 2 * k);
+    for (let s = 1; s < 4; s++) {
+      const f = this.figs[s];
+      if (!f || f.leaving) continue;
+      const spot = SPOTS[s];
+      const door = _w.set(s === 1 ? 0.1 : s === 2 ? -0.4 : 0.1, 0, s === 3 ? 1.1 : 0.85); // car-local
+      this.carMesh.localToWorld(door);
+      f.rig.root.position.x = lerp(spot.pos[0], door.x, ease);
+      f.rig.root.position.z = lerp(spot.pos[2], door.z, ease);
+      f.rig.root.rotation.y = Math.atan2(door.x - f.rig.root.position.x, door.z - f.rig.root.position.z) + Math.PI;
+      const n = f.rig.nodes;
+      const ph = f.t * 7 + s;
+      n.thL.rotation.x = Math.sin(ph) * 0.55 * (ease > 0.02 ? 1 : 0);
+      n.thR.rotation.x = -Math.sin(ph) * 0.55 * (ease > 0.02 ? 1 : 0);
+      n.knL.rotation.x = Math.max(0, -Math.sin(ph)) * 0.7;
+      n.knR.rotation.x = Math.max(0, Math.sin(ph)) * 0.7;
+      n.shL.rotation.x = -Math.sin(ph) * 0.3;
+      n.shR.rotation.x = Math.sin(ph) * 0.3;
+      if (ease >= 1 && !f.leaving) { f.leaving = true; f.leaveT = 0; }
+    }
   }
 
   _stopEngine(fade) {
@@ -1060,6 +1219,7 @@ export class Garage {
     u.uTime.value = this.t;
     this.homeK = damp(this.homeK ?? 1, this.view === 'home' ? 1 : 0, 2.2, dt);
     this._cutscene(dt);
+    this._departure(dt);
     this._ambient(dt);
     this._car(dt);
     this._figures(dt);

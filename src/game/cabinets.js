@@ -178,6 +178,15 @@ function itemOf(kind) {
   } else if (kind === 'shard') {
     b.place(0, 0.05, 0, 0.2, 0.3, 0.15);
     b.octa(0.03, 0.05, KIND.SHARD);
+  } else if (kind === 'syringe') { // the adrenaline dose: a barrel, a plunger, a needle, a red cap
+    b.place(0, 0.05, 0, Math.PI / 2, 0, 0);
+    b.cylinder(6, 0.016, 0.016, 0.14, KIND.SHARD); // the glass barrel
+    b.place(0, 0.05, 0.1, Math.PI / 2, 0, 0);
+    b.cylinder(4, 0.003, 0.003, 0.04, GK.CHROME); // the needle
+    b.place(0, 0.052, -0.08);
+    b.box(0.03, 0.026, 0.03, GK.CHROME); // the plunger
+    b.place(0, 0.055, -0.048, Math.PI / 2, 0, 0);
+    b.cylinder(4, 0.018, 0.018, 0.012, GK.REDPAINT); // the red dose inside
   } else if (kind === 'battery') {
     for (const [x, z] of [[0, 0], [0.032, 0.01]]) { // two of them, standing
       b.place(x, 0, z);
@@ -331,7 +340,7 @@ export class Cabinets {
     this.mat = world.material;
     const shared = new Map();
     const geo = (key, make) => shared.get(key) || (shared.set(key, geometryOf(make())), shared.get(key));
-    this.itemGeo = Object.fromEntries(ITEMS.map((k) => [k, itemOf(k)]));
+    this.itemGeo = { ...Object.fromEntries(ITEMS.map((k) => [k, itemOf(k)])), syringe: itemOf('syringe') };
     this.list = (world.cabinets || []).map((spec, i) => {
       const D = CABINET_DIMS[spec.kind];
       const group = new THREE.Group();
@@ -445,6 +454,7 @@ export class Cabinets {
           x -= ITEM_W[j];
         }
         if (c.kind === 'firstaid' && k === 0) kind = 'glow';
+        if (g.online && c.id === 'zarya:aid' && k === 0) kind = 'syringe'; // co-op: the medicine cabinet keeps a dose
         if (c.spec.loot?.[k]) kind = c.spec.loot[k];
         const mesh = new THREE.Mesh(this.itemGeo[kind], this.mat);
         const y = SHELF_Y[c.kind][k] + (c.kind === 'firstaid' ? 0 : 0);
@@ -455,6 +465,22 @@ export class Cabinets {
       }
       this._placeDoors(c);
     }
+    if (g.online) this._seedAdrenaline(rng); // the second dose, in a locked cabinet (co-op only)
+  }
+
+  // the second adrenaline dose hides in a locked cabinet somewhere out there: one a shift. The
+  // pick comes from the night's seed stream, so every machine hides it in the same cupboard
+  _seedAdrenaline(rng) {
+    const locked = this.list.filter((c) => c.locked && !c.mimic && !c.items.some((i) => i.kind === 'syringe') && c.items.length < 3);
+    if (!locked.length) return false;
+    const c = locked[Math.floor(rng.next() * locked.length) % locked.length];
+    const slot = c.items.length;
+    const mesh = new THREE.Mesh(this.itemGeo.syringe, this.mat);
+    mesh.position.set(SLOT_X[c.kind][slot] ?? 0, SHELF_Y[c.kind][slot] ?? 0.08, -0.02 + (slot % 2) * 0.05);
+    mesh.rotation.y = rng.next() * PI;
+    c.group.add(mesh);
+    c.items.push({ kind: 'syringe', mesh, taken: false });
+    return true;
   }
 
   silence() {
@@ -657,6 +683,10 @@ export class Cabinets {
     } else if (kind === 'battery') {
       g.inventory.cells = Math.min(3, g.inventory.cells + 1);
       g.hud.popup(`+ ${t('bagBattery')}`, 'amber');
+      if (a.ready && a.cabinetItem) a.cabinetItem('nuts');
+    } else if (kind === 'syringe') {
+      g.inventory.syringes = Math.min(CFG.BAG_LIMIT?.syringe ?? 2, (g.inventory.syringes | 0) + 1);
+      g.hud.popup(`+ ${name}`, 'amber');
       if (a.ready && a.cabinetItem) a.cabinetItem('nuts');
     } else {
       g.setFlares((p.flares | 0) + 1, !!p.hasFlare);
