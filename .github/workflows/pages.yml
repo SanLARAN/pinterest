@@ -10,8 +10,7 @@ name: Pages (HUSH)
 
 on:
   push:
-    # the session branch that carries the game, plus main for whenever the work lands there
-    branches: [main, arena/2a2936ce-pinterest, arena/20478628-pinterest]
+    branches: [arena/2a2936ce-pinterest]
   workflow_dispatch:
 
 permissions:

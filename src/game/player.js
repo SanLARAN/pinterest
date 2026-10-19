@@ -44,7 +44,6 @@ export class Player {
     this.moved = 0;
     this.distFromSpawn = 0;
     this.carrying = null; // co-op: the id of a friend on your shoulder (see Rescue)
-    this.adrenaline = 0; // s of the come-down after a syringe (see Rescue.adrenaline)
   }
 
   forward() {
@@ -68,11 +67,7 @@ export class Player {
     this.sprinting = wantSprint;
     const R = CFG.REVIVE;
     const carryV = load && !this.carrying ? load.walk : R.carry;
-    // adrenaline: five minutes of rubber legs after a syringe brings you back
-    if (this.adrenaline > 0) this.adrenaline = Math.max(0, this.adrenaline - dt);
-    const adr = this.adrenaline > 0 ? CFG.ADRENALINE : null;
-    const target = (heavy ? (this.crouching ? Math.min(R.carryCrouch, carryV * 0.55) : carryV) : this.crouching ? P.crouch : wantSprint ? P.sprint : P.walk)
-      * (adr ? (wantSprint ? adr.sprint : adr.walk) : 1);
+    const target = heavy ? (this.crouching ? Math.min(R.carryCrouch, carryV * 0.55) : carryV) : this.crouching ? P.crouch : wantSprint ? P.sprint : P.walk;
 
     const sy = Math.sin(this.yaw), cy = Math.cos(this.yaw);
     // forward = (-sin, -cos), right = (cos, -sin)
@@ -113,7 +108,7 @@ export class Player {
 
     // stamina
     if (this.sprinting && this.speed > 1) {
-      this.stamina -= P.sprintDrain * dt * (adr ? adr.staminaDrain : 1);
+      this.stamina -= P.sprintDrain * dt;
       this.staminaDelay = 0.8;
       if (this.stamina <= 0) {
         this.stamina = 0;
