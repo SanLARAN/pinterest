@@ -22,6 +22,10 @@ export const CFG = {
 
   CAMERA_FAR: 150,
   FOV: 72,
+  // a phone held upright must not look at the forest through a keyhole: below 16:9 the vertical view
+  // opens up so the horizontal one keeps at least ~60°, and never past 104° (no fisheye at the edges)
+  FOV_PORTRAIT_MIN_H: 60,
+  FOV_MAX: 104,
 
   PLAYER: {
     radius: 0.35,
@@ -167,3 +171,11 @@ export const PALETTE = {
   amber: [1.0, 0.68, 0.22],
   stone: [0.86, 0.95, 1.0],
 };
+
+// the vertical field of view for a viewport's aspect ratio (width / height)
+export function fovFor(aspect) {
+  if (!(aspect > 0) || aspect >= 16 / 9) return CFG.FOV;
+  const h = (CFG.FOV_PORTRAIT_MIN_H * Math.PI) / 360;
+  const v = (2 * Math.atan(Math.tan(h) / aspect) * 180) / Math.PI;
+  return Math.min(CFG.FOV_MAX, Math.max(CFG.FOV, v));
+}

@@ -13,7 +13,7 @@ import './cloud.css';
 import './social.css';
 
 import * as THREE from 'three';
-import { CFG } from './core/config.js';
+import { CFG, fovFor } from './core/config.js';
 import { settings, saveSettings, submitScore, recordNight } from './core/storage.js';
 import { setLang, t } from './core/i18n.js';
 import { World } from './world/world.js';
@@ -104,6 +104,10 @@ const hud = new HUD();
 const radar = new Radar($('radar'));
 const input = new Input(canvas);
 input.bindTouchUI($('touch'));
+// Phones and tablets live in touch mode from the first frame: no pointer-lock prompt on a device with no
+// mouse, and the on-screen look stick, hands, echo and SKIP button are already where they belong.
+// (A touchscreen laptop keeps its mouse: the primary pointer is fine there, so this does not fire.)
+if (matchMedia('(pointer: coarse)').matches && !matchMedia('(any-pointer: fine)').matches) input.setTouch(true);
 const coop = new Coop({ audio, mic });
 const mates = new Mates($('mates'));
 const voiceMix = new VoiceMix(audio); // your volume for each friend's voice
@@ -174,6 +178,7 @@ function resize() {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
   renderer.setSize(w, h, false);
   camera.aspect = w / h;
+  camera.fov = fovFor(camera.aspect);
   camera.updateProjectionMatrix();
   post.setSize(w, h, perf.scale);
   radar.resize();
@@ -201,7 +206,9 @@ function perfTick(dt) {
     if (avg > 1 / 50 && perf.scale > lo + 0.001) {
       perf.ceiling = perf.scale - 0.05;
       perf.ceilT = 30;
-      perf.scale = Math.max(lo, perf.scale - 0.12);
+      // a device that is far from 60 takes a bigger first step, so the first seconds on a weak phone
+      // stop stuttering instead of walking down one notch per second
+      perf.scale = Math.max(lo, perf.scale - (avg > 1 / 35 ? 0.2 : 0.12));
       perf.cool = 4;
       resize();
     } else if (avg < 1 / 57 && perf.scale < Math.min(hi, perf.ceiling) - 0.001 && perf.cool <= 0) {

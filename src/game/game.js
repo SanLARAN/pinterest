@@ -1,6 +1,6 @@
 // One run of the game: rules, scoring, director, scares, juice.
 import * as THREE from 'three';
-import { CFG, dangerMultiplier, monsterTargets } from '../core/config.js';
+import { CFG, dangerMultiplier, monsterTargets, fovFor } from '../core/config.js';
 import { RNG, Simplex2, clamp, lerp, smoothstep, damp } from '../core/rng.js';
 import { t } from '../core/i18n.js';
 import { settings, saveSettings } from '../core/storage.js';
@@ -2133,7 +2133,8 @@ export class Game {
       camera.rotation.set(pitch, yaw, roll, 'YXZ');
       const cy = Math.cos(p.yaw), sy = Math.sin(p.yaw);
       camera.position.set(p.x + cy * sh * 0.08 * px, p.y + p.eyeCur + (p.bobY || 0) + sh * 0.06 * py, p.z - sy * sh * 0.08 * px);
-      const fov = this.expedition.viewing ? 22 : CFG.FOV + fx.fovKick + (p.sprinting ? 5 : 0);
+      const base = fovFor(camera.aspect);
+      const fov = this.expedition.viewing ? 22 : base + fx.fovKick + (p.sprinting ? 5 : 0);
       if (Math.abs(camera.fov - fov) > 0.01) {
         camera.fov = damp(camera.fov, fov, 10, 1 / 60);
         camera.updateProjectionMatrix();
