@@ -1,0 +1,27 @@
+name: Cloud API smoke
+on:
+  push:
+    branches: [arena/428824a1-pinterest, main]
+    paths:
+      - 'src/cloud/**'
+      - 'src/core/persistence.js'
+      - 'supabase/**'
+      - 'tests/cloud*'
+      - '.github/workflows/cloud-smoke.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  cloud:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - name: Live public API and anonymous-denial checks
+        run: node tests/cloud-live.mjs

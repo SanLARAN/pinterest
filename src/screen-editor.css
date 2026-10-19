@@ -1,0 +1,24 @@
+/* A small phosphor workbench, not another shop screen. The game keeps one shared 3D canvas. */
+#screenEditor[hidden] { display:none !important; }
+#screenEditor { position:fixed;inset:0;z-index:130;display:grid;place-items:center;padding:16px;background:#020605df;color:#d3d5bc;font:11px 'JetBrains Mono',monospace; }
+.screen-editor-card { width:min(560px,100%);max-height:calc(100dvh - 32px);overflow:auto;overscroll-behavior:contain;padding:0 20px 12px;border:1px solid #7383658c;background:repeating-linear-gradient(0deg,#bac49b04 0 1px,transparent 1px 4px),#172218;box-shadow:0 20px 80px #000d;scrollbar-width:thin;scrollbar-color:#637451 #142017; }
+.screen-editor-card header { display:flex;justify-content:space-between;align-items:center;gap:12px;position:sticky;top:0;z-index:2;padding:16px 0 10px;background:#172218; }
+.screen-editor-card h2 { font:700 17px 'JetBrains Mono',monospace;letter-spacing:.13em;margin:0; }
+.screen-editor-card header p { color:#82977d;font-size:9px;letter-spacing:.15em;margin:7px 0 0; }
+.screen-editor-card button { cursor:pointer;color:#bcc9ac;background:#223420;border:1px solid #6c7d5266;padding:8px 10px;font:9px 'JetBrains Mono',monospace;min-height:32px; }
+.screen-editor-card button:hover,.screen-editor-card button:focus-visible { color:#eff4db;border-color:#b4c49d;outline:1px solid #b4c49d;outline-offset:2px; }
+.screen-editor-card button[aria-pressed="true"],.screen-editor-card button.primary { color:#e2efd5;background:#4a634139;border-color:#a4ba8099; }
+.screen-editor-card header button { font-size:18px;min-width:34px; }
+.screen-editor-card canvas { display:block;image-rendering:pixelated;width:min(100%,320px,44dvh);height:auto;aspect-ratio:4/3;margin:8px auto 14px;background:#060c0a;border:1px solid #739b68;box-shadow:0 0 25px #6dcc6920;cursor:crosshair;touch-action:none; }
+.screen-editor-card canvas:focus-visible { outline:1px solid #d4d8ae;outline-offset:3px; }
+.screen-tools,.screen-presets { display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px; }
+.screen-presets button { font-size:8px;padding:7px 9px; }
+.screen-editor-card label { display:grid;gap:7px;color:#9aac8a;font-size:10px; }
+.screen-editor-card textarea { box-sizing:border-box;resize:none;width:100%;padding:9px;background:#0a150c;border:1px solid #6c7d5266;border-radius:0;color:#cfedb9;font:13px 'JetBrains Mono',monospace;line-height:1.6; }
+.screen-editor-hint { font-size:9px;color:#94a38a;line-height:1.7;margin:10px 0 14px; }
+.screen-editor-card footer { position:sticky;bottom:-12px;z-index:2;display:flex;gap:10px;justify-content:flex-end;background:#172218;padding:10px 0 12px;border-top:1px solid #6c7d5244; }
+.screen-editor-card footer button { min-height:38px;min-width:100px; }
+@media(max-width:430px) {
+ #screenEditor { padding:10px; }.screen-editor-card { max-height:calc(100dvh - 20px);padding:0 12px 10px; }
+ .screen-editor-card h2 { font-size:15px; }.screen-tools { gap:4px; }.screen-tools button { flex:1 0 auto;font-size:8px;padding:7px; }
+}
