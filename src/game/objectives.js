@@ -659,10 +659,7 @@ export class Objectives {
       return;
     }
     hud.setUse(T('useHold').replace('{action}', t('actions')[spec.part]), g.progress, true);
-    if (held && still) {
-      this._work(g, dt);
-      game.fieldView?.repairing(spec.mode); // the hands do the work, not just the progress bar
-    }
+    if (held && still) this._work(g, dt);
   }
 
   _search(body) {

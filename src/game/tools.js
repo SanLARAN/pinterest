@@ -52,7 +52,7 @@ export class ForestTools {
   get hasCrowbar() { return this.items.some((it) => it.kind === 'crowbar' && it.state === 'held' && it.owner === this.g.player.id); }
   get handsFree() {
     const g = this.g;
-    return g.player.alive && (g.state === 'play' || g.training) && !g.inputMuted && !g.player.carrying && !g.escape.held && g.escape.mySeat < 0 && !g.cabinets.busy && !g.expedition?.onTower;
+    return g.player.alive && g.state === 'play' && !g.inputMuted && !g.player.carrying && !g.escape.held && g.escape.mySeat < 0 && !g.cabinets.busy && !g.expedition?.onTower;
   }
   get clock() { return this.g.auth ? this.g.time : this.g.netT; }
   groundHeight(x, z) {

@@ -21,12 +21,11 @@ const SPEAKER = (muted) =>
   }</svg>`;
 
 export class Lobby {
-  constructor({ coop, mic, audio, mix, onMicToggle, uiSound, onWardrobe = null, onDepart = null, beforeOpen = null, afterClose = null }) {
+  constructor({ coop, mic, audio, mix, onMicToggle, uiSound, onWardrobe = null, beforeOpen = null, afterClose = null }) {
     this.coop = coop;
     this.afterClose=afterClose;
     this.beforeOpen = beforeOpen; // (main builds the garage the first time)
     this.onWardrobe = onWardrobe; // your own tag (or figure) opens the wardrobe
-    this.onDepart = onDepart; // the gates: out to the training ground
     this.mic = mic;
     this.audio = audio;
     this.mix = mix; // per-friend voice volume
@@ -59,11 +58,6 @@ export class Lobby {
       }
     });
     this.rulesButton.addEventListener('click',()=>this.openRules());
-    // the gates: an invisible target where the 3D leaves are; clicking them plays the departure
-    this.gateButton=document.createElement('button');
-    this.gateButton.id='btnGarageGate';this.gateButton.type='button';this.gateButton.hidden=true;
-    this.gateButton.innerHTML='<span></span>';this.el.append(this.gateButton);
-    this.gateButton.addEventListener('click',()=>{ if(this.onDepart&&this.garage&&!this.garage.departing&&!this.starting) this.onDepart(); });
     this.rulesPanel.querySelector('.rules-close').addEventListener('click',()=>this.closeRules());
     this.rulesPanel.querySelector('.lobby-rules-backdrop').addEventListener('click',()=>this.closeRules());
     for(const button of this.rulesPanel.querySelectorAll('[data-hide]')) button.addEventListener('click',()=>{this.coop.setHideNames(button.dataset.hide==='yes');this.renderRules();});
@@ -227,19 +221,6 @@ export class Lobby {
     this.rulesPanel.querySelector('.rules-close').textContent=`${t('bagClose')} [ ESC ]`;
     for(const b of this.rulesPanel.querySelectorAll('[data-hide]')) { const yes=b.dataset.hide==='yes';b.textContent=t(yes?'ruleYes':'ruleNo');b.disabled=!host;b.setAttribute('aria-pressed',String(r.hideNames===yes)); }
   }
-  placeGate() {
-    if (!this.gateButton) return;
-    const on = this._inRoom() && !this.starting && !this.rulesOpen;
-    const r = on ? this.gateRectVisible() : null;
-    this.gateButton.hidden = !r;
-    if (!r) return;
-    const b = this.gateButton.style;
-    b.left = `${r.x}px`; b.top = `${r.y}px`;
-    b.width = `${Math.max(30, r.w)}px`; b.height = `${Math.max(30, r.h)}px`;
-    const span = this.gateButton.firstChild;
-    if (span) span.textContent = `${t('gateLeave')} · ${t('trainingTitle')}`;
-  }
-
   placeRules() {
     if(!this._inRoom() || !this.garage || this.starting) return;
     const r=this.garage.rulesRect();const visible=r && r.x>4 && r.y>30 && r.x+r.w<innerWidth-4 && r.y+r.h<innerHeight-40 && r.w>60;
@@ -251,14 +232,6 @@ export class Lobby {
 
   _inRoom() {
     return this.coop.active && !!this.coop.code;
-  }
-
-  gateRectVisible() {
-    if (!this.garage || this.garage.departing) return null;
-    const r = this.garage.gateRect();
-    if (!r || r.w < 20 || r.h < 20) return null;
-    if (r.x < -20 || r.x + r.w > innerWidth + 20 || r.y < -20 || r.y + r.h > innerHeight + 20) return null;
-    return r;
   }
 
   _toggleVol(id) {
@@ -480,7 +453,6 @@ export class Lobby {
   // every frame while the garage is drawn: hang each tag over its place (CSS px from garage.anchors())
   place(anchors) {
     this.placeRules();
-    this.placeGate();
     if (!this._inRoom() || !anchors || !anchors.length) return;
     const W = innerWidth, H = innerHeight;
     const top = this.garage ? this.garage.safe.top - 26 : 60;
