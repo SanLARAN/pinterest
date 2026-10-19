@@ -161,7 +161,6 @@ export class NetSync {
       case 'sk':
         if (this.host && g.state === 'morning') g.startDusk();
         break;
-      case 'adr': if (this.host && typeof a === 'string') g.rescue.hostAdrenaline(a, pid); break;
       case 'rc': // a guest wants to lift someone who's down
         if (this.host && typeof d === 'string') g.rescue.grant(d, pid);
         break;
@@ -302,7 +301,6 @@ export class NetSync {
           case 'iu': g.cabinets.netUnlock(a); break;
           case 'spe': g.expedition.netMerge(a); break;
           case 'du': if (g.state === 'morning') g.startDusk(); break;
-          case 'dm': if (g.state === 'play') g.startMorning(false, a | 0); break;
           case 'hu': if (m) g.fxHunt(m, b); break;
           case 'in': if (m) g.fxInvestigate(m, +c || 0, b); break;
           case 'lo': if (m) g.fxLost(m, b); break;
@@ -315,7 +313,6 @@ export class NetSync {
           case 'ki': g.netKill(a, b, c, +e, +f, +d[6]); break;
           case 'cu': g.rescue.netLift(a, b); break;
           case 'rv': g.rescue.netRevive(a, +b, +c, +e, f); break;
-          case 'arv': g.rescue.netAdrenaline(a, +b, +c, +e, f); break;
           case 'bo': g.rescue.netGone(a); break;
           case 'dk': g.doors.netKnock(a, b); break;
           case 'dn': if (g.state === 'play') g.startDawn(); break;

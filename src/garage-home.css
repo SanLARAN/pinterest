@@ -248,6 +248,3 @@ body.wardrobe-open #coopPanel { opacity:0 !important;visibility:hidden;pointer-e
   #menu .menu-foot > .news:not(.folded) { bottom:50px;max-height:calc(100dvh - 74px); }
   #homeRoomCaption { bottom:45px; }
 }
-
-/* the gate film: the menu gets out of the way while the car leaves */
-body.departing #menu { opacity: 0 !important; pointer-events: none !important; transition: opacity .45s; }

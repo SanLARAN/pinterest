@@ -50,7 +50,6 @@ export class Rescue {
     p.bleedEnd = 0;
     p.gone = false;
     p.consumed = false; // (the шкафандр leaves nothing to carry)
-    p.adrenaline = 0;
     p.carriedBy = null;
     p.carrying = null;
     p.onCot = false;
@@ -447,80 +446,6 @@ export class Rescue {
     }
     if (reviverId === g.player.id && b !== g.player) {
       const pts = Math.round(CFG.SCORE.revive * g.mult);
-      g.score += pts;
-      g.stats.revives = (g.stats.revives | 0) + 1;
-      g.hud.popup(`+${pts} ${t('popRevive')}`, 'amber');
-    }
-    this.reviveT = 0;
-    this.waitRv = 0;
-    if (g.auth) g.teamOverAt = 0;
-  }
-
-  // ---------------- adrenaline ----------------
-  // A syringe instead of the cot: the heart restarts on the spot, but the legs pay for it.
-  adrenaline() {
-    const g = this.g, me = g.player;
-    if (!me.alive) return false;
-    if (!g.online) { g.hud.popup(t('adrSelf'), 'dim'); return false; }
-    if ((g.inventory?.syringes | 0) <= 0) { g.hud.popup(t('adrEmpty'), 'dim'); return false; }
-    const f = me.forward();
-    let best = null, bd = CFG.ADRENALINE.reach;
-    for (const b of this.downed()) {
-      if (b === me || b.gone || b.consumed) continue;
-      const dx = b.x - me.x, dz = b.z - me.z, d = Math.hypot(dx, dz);
-      if (d > CFG.ADRENALINE.reach) continue;
-      const facing = d < 0.9 ? 1 : (dx * f.x + dz * f.z) / d;
-      if (facing < 0.1) continue;
-      if (d < bd) { bd = d; best = b; }
-    }
-    if (!best) { g.hud.popup(t('adrUse'), 'dim'); return false; }
-    g.inventory.syringes = Math.max(0, (g.inventory.syringes | 0) - 1);
-    g.inventory.reconcile();
-    g.audio.cabinetItem('nuts');
-    if (g.auth) this.hostAdrenaline(best.id, me.id);
-    else g.coop.toHost('adr', best.id);
-    return true;
-  }
-
-  hostAdrenaline(bodyId, reviverId) {
-    const g = this.g, b = g.playerById(bodyId), rv = g.playerById(reviverId);
-    if (!b || b.alive || b.gone || !rv || !rv.alive) return false;
-    if (Math.hypot(b.x - rv.x, b.z - rv.z) > CFG.ADRENALINE.reach + 0.9) return false;
-    const yaw = b.yaw || 0;
-    this.adrenalineRevive(b, b.x, b.z, yaw, reviverId);
-    if (g.sync) g.sync.ev('arv', b.id, +b.x.toFixed(2), +b.z.toFixed(2), +yaw.toFixed(3), reviverId);
-    return true;
-  }
-
-  netAdrenaline(bodyId, x, z, yaw, reviverId) {
-    const b = this.g.playerById(bodyId);
-    if (!b || ![x, z, yaw].every(Number.isFinite)) return;
-    this.adrenalineRevive(b, x, z, yaw, reviverId);
-  }
-
-  adrenalineRevive(b, x, z, yaw, reviverId) {
-    const g = this.g;
-    if (b.alive) return;
-    if (this.cotId === b.id) this.cotId = null;
-    if (b.carriedBy) {
-      const c = g.playerById(b.carriedBy);
-      if (c && c.carrying === b.id) c.carrying = null;
-    }
-    b.carriedBy = null;
-    b.onCot = false;
-    b.gone = false;
-    b.adrenaline = CFG.ADRENALINE.duration; // five minutes of rubber legs
-    const y = g.world.terrain.height(x, z) + 0.3;
-    g.audio.reviveGasp(x, y, z, b === g.player);
-    if (b === g.player) {
-      g.reviveLocal(x, z, yaw);
-      g.hud.popup(`${t('debuff')} · 5:00`, 'amber');
-    } else {
-      b.revive(x, z, yaw);
-      g.hud.popup(t('adrBack').replace('{name}', g.nameOf(b)), 'cyan');
-    }
-    if (reviverId === g.player.id && b !== g.player) {
-      const pts = Math.round(CFG.SCORE.revive * g.mult * 0.7);
       g.score += pts;
       g.stats.revives = (g.stats.revives | 0) + 1;
       g.hud.popup(`+${pts} ${t('popRevive')}`, 'amber');
