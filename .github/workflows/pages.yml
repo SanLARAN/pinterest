@@ -69,7 +69,15 @@ jobs:
 
   deploy:
     needs: build
-    if: needs.build.outputs.build_type == 'workflow'
+    # Only refs the github-pages environment allows: the two long-lived branches and arena/* tags.
+    # A session branch still builds, tests and checks that ./play/ is fresh — it just doesn't deploy,
+    # so a green check means "this commit is publishable", not "protection rules blocked me".
+    if: >-
+      needs.build.outputs.build_type == 'workflow' && (
+        startsWith(github.ref, 'refs/tags/arena/') ||
+        github.ref == 'refs/heads/main' ||
+        github.ref == 'refs/heads/arena/428824a1-pinterest'
+      )
     runs-on: ubuntu-latest
     environment:
       name: github-pages
