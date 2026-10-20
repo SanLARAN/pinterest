@@ -460,21 +460,26 @@ function flashlight(mat) {
   root.add(mesh);
   return still(root, 0.35, { yaw: 1.1, pitch: 0.5 }, { lamp: { x: -0.04, y: 0.035, z: -0.14, r: 0.55, c: [1,0.93,0.8], core: 0xfff1cf, halo: 0xe6cc8e, s: 0.04 } });
 }
-function syringe(mat) { // the adrenaline dose: glass barrel, chrome plunger, needle, a red core
+function syringe(mat) { // the adrenaline dose: a glass barrel with red in it, chrome flange and plunger, a needle
   const root = new THREE.Group();
-  const b = new MeshBuilder();
-  b.place(0, 0.05, 0, Math.PI / 2, 0, 0);
-  b.cylinder(6, 0.016, 0.016, 0.14, KIND.SHARD);
-  b.place(0, 0.05, 0.1, Math.PI / 2, 0, 0);
-  b.cylinder(4, 0.003, 0.003, 0.04, KIND.METAL);
-  b.place(0, 0.052, -0.08);
-  b.box(0.03, 0.026, 0.03, KIND.METAL);
-  b.place(0, 0.055, -0.048, Math.PI / 2, 0, 0);
-  b.cylinder(4, 0.018, 0.018, 0.012, KIND.EFFIGY);
-  const mesh = new THREE.Mesh(geometryOf(b.toArrays()), mat);
-  mesh.position.y = 0.02;
+  const b = new MeshBuilder(256);
+  // built standing on its needle (along +Y), then laid down on its side as it lies in the pack
+  const R = 0.017, L = 0.13;
+  b.place(0, 0.02, 0); b.cylinder(10, R, R, L, KIND.SHARD, { y0: 0 }); // the glass barrel
+  b.place(0, 0.022, 0); b.cylinder(10, R * 0.86, R * 0.86, L * 0.42, KIND.EFFIGY, { y0: 0 }); // the dose in it
+  b.place(0, 0.02 + L * 0.5, 0); b.box(0.062, 0.008, 0.03, KIND.SHARD); // the finger flange
+  b.place(0, 0.02 + L * 0.62, 0); b.cylinder(6, 0.005, 0.005, 0.055, KIND.METAL, { y0: 0 }); // the plunger rod
+  b.place(0, 0.02 + L * 0.62 + 0.055, 0); b.box(0.05, 0.008, 0.024, KIND.METAL); // its thumb pad
+  b.place(0, 0.02, 0, Math.PI, 0, 0); b.cylinder(8, 0.009, 0.006, 0.022, KIND.METAL, { y0: 0 }); // the needle hub
+  b.place(0, -0.004, 0, Math.PI, 0, 0); b.cylinder(4, 0.0018, 0.0018, 0.05, KIND.METAL, { y0: 0 }); // the needle
+  for (let i = 0; i < 4; i++) { // graduations down the barrel
+    b.place(0.0172, 0.035 + i * 0.024, 0); b.box(0.004, 0.006, 0.014, KIND.BONE);
+  }
+  const mesh = new THREE.Mesh(geometryFrom(b.toArrays()), mat);
+  mesh.rotation.x = Math.PI / 2; // lying along z, needle toward -z
+  mesh.position.y = 0.03;
   root.add(mesh);
-  return still(root, 0.3, { yaw: 1.2, pitch: 0.45 }, { lamp: { x: 0, y: 0.05, z: -0.04, r: 0.4, c: [1, 0.25, 0.2], core: 0xff6a55, halo: 0xb3271c, s: 0.03 } });
+  return still(root, 0.14, { yaw: 0.9, pitch: 0.5 }, { lamp: { x: 0, y: 0.05, z: -0.09, r: 0.4, c: [1, 0.25, 0.2], core: 0xff6a55, halo: 0xb3271c, s: 0.03 } });
 }
 function fieldTool(build, view) {
   return (mat) => {

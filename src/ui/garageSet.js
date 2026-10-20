@@ -670,20 +670,23 @@ export function buildSteering(R = CARP.wheelRad) {
   return b.toArrays();
 }
 
-export function buildCarWheels(opts = {}) {
+// `only` (0..3) builds just that one wheel, centred on the origin with its axle along z — the garage
+// hangs four of those at the axles so the departure film can spin them (the set is kept for the
+// mannequin and anything that wants the old single mesh)
+export function buildCarWheels(opts = {}, only = -1) {
   const b = new MeshBuilder(4096);
   const { wheelX: x, wheelZ: z, wheelR: r, wheelW: w } = CARP;
   const P = opts.paint ?? GK.CARPAINT;
-  for (const sx of [-1, 1]) {
-    for (const sz of [-1, 1]) {
-      b.place(sx * x, r, sz * z, PI / 2, 0, 0);
-      tyre(b, r, w, GK.RUBBER, 12, true);
-      b.place(sx * x, r, sz * (z + w * 0.38), PI / 2, 0, 0);
-      b.cylinder(10, r * 0.55, r * 0.55, 0.03, P, { y0: -0.015, capBottom: true });
-      b.place(sx * x, r, sz * (z + w * 0.45), PI / 2, 0, 0);
-      b.cylinder(6, 0.07, 0.07, 0.03, GK.CHROME, { y0: -0.015 });
-    }
-  }
+  [[-1, -1], [-1, 1], [1, -1], [1, 1]].forEach(([sx, sz], i) => {
+    if (only >= 0 && i !== only) return;
+    const cx = only >= 0 ? 0 : sx * x, cz = only >= 0 ? 0 : sz * z, cy = only >= 0 ? 0 : r;
+    b.place(cx, cy, cz, PI / 2, 0, 0);
+    tyre(b, r, w, GK.RUBBER, 12, true);
+    b.place(cx, cy, cz + sz * w * 0.38, PI / 2, 0, 0);
+    b.cylinder(10, r * 0.55, r * 0.55, 0.03, P, { y0: -0.015, capBottom: true });
+    b.place(cx, cy, cz + sz * w * 0.45, PI / 2, 0, 0);
+    b.cylinder(6, 0.07, 0.07, 0.03, GK.CHROME, { y0: -0.015 });
+  });
   return b.toArrays();
 }
 
@@ -832,21 +835,21 @@ export function buildTruenoPod() {
   return b.toArrays();
 }
 
-export function buildTruenoWheels() {
+export function buildTruenoWheels(only = -1) {
   const b = new MeshBuilder(4096);
   const { wheelX: x, wheelZ: z, wheelR: r, wheelW: w } = TRUENO_P;
-  for (const sx of [-1, 1]) {
-    for (const sz of [-1, 1]) {
-      b.place(sx * x, r, sz * z, PI / 2, 0, 0);
-      tyre(b, r, w, GK.RUBBER, 12, true);
-      b.place(sx * x, r, sz * (z + w * 0.38), PI / 2, 0, 0);
-      b.cylinder(10, r * 0.62, r * 0.62, 0.025, GK.CHROME, { y0: -0.012, capBottom: true });
-      for (let k = 0; k < 4; k++) { // four spokes of black
-        b.place(sx * x, r, sz * (z + w * 0.46), PI / 2, (k / 4) * PI * 2 + 0.4, 0);
-        b.box(0.035, 0.02, r * 1.05, GK.DARK);
-      }
+  [[-1, -1], [-1, 1], [1, -1], [1, 1]].forEach(([sx, sz], i) => {
+    if (only >= 0 && i !== only) return;
+    const cx = only >= 0 ? 0 : sx * x, cz = only >= 0 ? 0 : sz * z, cy = only >= 0 ? 0 : r;
+    b.place(cx, cy, cz, PI / 2, 0, 0);
+    tyre(b, r, w, GK.RUBBER, 12, true);
+    b.place(cx, cy, cz + sz * w * 0.38, PI / 2, 0, 0);
+    b.cylinder(10, r * 0.62, r * 0.62, 0.025, GK.CHROME, { y0: -0.012, capBottom: true });
+    for (let k = 0; k < 4; k++) { // four spokes of black
+      b.place(cx, cy, cz + sz * w * 0.46, PI / 2, (k / 4) * PI * 2 + 0.4, 0);
+      b.box(0.035, 0.02, r * 1.05, GK.DARK);
     }
-  }
+  });
   return b.toArrays();
 }
 
@@ -863,13 +866,13 @@ export function buildTruenoGlass() {
 export const CAR_MODELS = {
   uaz: {
     P: CARP, len: 4.0, wid: 1.78,
-    body: () => buildCarBody({ paint: CK.A, canvas: CK.B }), wheels: () => buildCarWheels({ paint: CK.A }), glass: () => buildCarGlass(),
+    body: () => buildCarBody({ paint: CK.A, canvas: CK.B }), wheels: (only = -1) => buildCarWheels({ paint: CK.A }, only), glass: () => buildCarGlass(),
     driver: { pos: [0.1, 0, 0.42], hips: 1.02, recline: -0.1, thigh: -1.5, knee: 0.88 },
     engine: [-1.3, 1.1, 0], mirror: [-0.62, 1.62, 0.02], tailAt: [2.02, 0.95, 0],
   },
   trueno: {
     P: TRUENO_P, len: 4.24, wid: 1.64,
-    body: buildTruenoBody, wheels: buildTruenoWheels, glass: buildTruenoGlass, pod: buildTruenoPod,
+    body: buildTruenoBody, wheels: (only = -1) => buildTruenoWheels(only), glass: buildTruenoGlass, pod: buildTruenoPod,
     driver: { pos: [-0.02, 0, 0.36], hips: 0.5, recline: -0.28, thigh: -1.22, knee: 0.55 },
     engine: [-1.3, 0.9, 0], mirror: [-0.36, 1.26, 0.02], tailAt: [2.05, 0.76, 0],
   },

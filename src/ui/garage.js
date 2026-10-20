@@ -657,6 +657,8 @@ export class Garage {
     this.steering = new THREE.Group();
     this.carMesh.add(this.steering);
     this.carParts = []; // this model's meshes (swapped with the model)
+    this.wheelMeshes = []; // the four wheels, each on its own, so the film can roll them
+    this.wheelSpin = 0;
     this.pods = []; // a Trueno's pop-up headlights
     this.podA = 0;
     this.shake = { roll: 0, vroll: 0, pitch: 0, vpitch: 0, y: 0, vy: 0 };
@@ -933,7 +935,15 @@ export class Garage {
     this.model = M;
     this.CP = M.P;
     const keep = (m) => (this.carParts.push(m), m);
-    keep(this._mesh(M.wheels(), this.matSet, this.carRoot));
+    // four wheels, one mesh each, hung at their axles: the car may stand still all evening, but when
+    // it rolls out through the gates the wheels turn with the road
+    this.wheelMeshes = [];
+    this.wheelSpin = 0;
+    [[-1, -1], [-1, 1], [1, -1], [1, 1]].forEach(([sx, sz], i) => {
+      const m = keep(this._mesh(M.wheels(i), this.matSet, this.carRoot));
+      m.position.set(sx * this.CP.wheelX, this.CP.wheelR, sz * this.CP.wheelZ);
+      this.wheelMeshes.push(m);
+    });
     keep(this._mesh(M.body(), this.matSet, this.carMesh));
     const glass = keep(this._mesh(M.glass(), this.matGlass, this.carMesh));
     glass.renderOrder = 5;
@@ -986,6 +996,9 @@ export class Garage {
     this.cut = null;
     this._stopEngine(0.2);
     this.depart = { t: 0, onDone, fired: false, clanked: false, keyed: false, gate: 0, drive: 0, walk: 0 };
+    this.wheelSpin = 0;
+    for (const w of this.wheelMeshes) w.rotation.z = 0;
+    this.carRoot.position.set(CAR.x, 0, CAR.z);
     // the static gate leaves give way to their own swinging meshes
     this.roomMesh.geometry.dispose();
     this.roomMesh.geometry = geometryFrom(buildRoom(false));
@@ -1027,6 +1040,8 @@ export class Garage {
     this.u.uTail.value.w = 0;
     this.u.uDash.value.w = 0;
     this.carRoot.position.set(CAR.x, 0, CAR.z);
+    this.wheelSpin = 0;
+    for (const w of this.wheelMeshes) w.rotation.z = 0;
     for (const f of this.figs) if (f) { f.st = { phase: 'idle', t: 0, next: rnd(1, 3), nextTap: 5, i: -1 }; }
   }
 
@@ -1096,6 +1111,8 @@ export class Garage {
       c.drive = Math.min(1, (t - 3.4) / 2.4);
       const v = 0.4 + 2.6 * c.drive * c.drive;
       this.carRoot.position.x -= v * dt;
+      this.wheelSpin += (v / this.CP.wheelR) * dt; // the tyres roll with the road, not the body
+      for (const w of this.wheelMeshes) w.rotation.z = this.wheelSpin;
       const ex = this._carPoint(this.CP.exhaust, _w);
       if (Math.random() < dt * 18) this.smoke.emit(ex.x + 0.05, ex.y, ex.z, rnd(0.6, 1.4), rnd(0, 0.4), rnd(-0.3, 0.3), { life: 2.4, s0: 0.1, s1: 0.8, a: 0.3, rise: 0.22, drag: 1.6, col: [0.42, 0.42, 0.44], jitter: 0.5 });
       this.shake.vy += dt * 0.4 * c.drive;

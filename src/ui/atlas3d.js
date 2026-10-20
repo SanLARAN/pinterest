@@ -231,10 +231,16 @@ export class Specimen {
 
   _get(key) {
     let m = this.models.get(key);
-    if (!m) {
-      m = buildModel(key, this.mat, this.ctx);
-      if (!m) return null;
-      this._prepare(m);
+    if (m === undefined) {
+      // a model that throws (a bad key, a builder bug) must not lock the book: the page still reads,
+      // its plate just stays dark (`.nogl`) instead of leaving a half-turned leaf stuck over it
+      try {
+        m = buildModel(key, this.mat, this.ctx) || null;
+        if (m) this._prepare(m);
+      } catch (e) {
+        console.warn('[atlas] the plate for', key, 'would not build', e);
+        m = null;
+      }
       this.models.set(key, m);
     }
     return m;

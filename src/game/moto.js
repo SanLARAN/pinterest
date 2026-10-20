@@ -340,6 +340,7 @@ export class MotoPark {
     if (!silent) g.hud.popup(t('motoOff'), 'dim');
     g.audio?.motoOff?.();
     if (g.sync) g.sync.ev('mb', i, 0);
+    this.place(); // it was hidden while under you (the cockpit stood in for it)
   }
 
   // a friend got on/off their bike ('mb': every machine marks it, and draws it under them)
@@ -352,9 +353,15 @@ export class MotoPark {
   update(dt, input) {
     const g = this.g;
     this.mountT = Math.max(0, this.mountT - dt);
-    if (this.rider < 0) return;
+    if (this.rider < 0) {
+      // on foot: a parked machine is a solid thing, not a picture — and your own must be back in
+      // sight the moment you step off (place() is what makes it visible again)
+      this.separate();
+      this.place();
+      return;
+    }
     const b = this.bikes[this.rider];
-    const muted = g.inputMuted || g.inventory.active || g.state !== 'training';
+    const muted = g.inputMuted || g.inventory?.active || g.state !== 'training';
     const ev = stepBike(b, muted ? { move: { x: 0, y: 0 } } : { move: input.move }, g.world, dt);
     g.player.x = b.x;
     g.player.z = b.z;
@@ -373,14 +380,60 @@ export class MotoPark {
       g.hud.popup(t('motoThrown'), 'warn');
       g.audio?.bump?.();
     }
+    this._apart(b);
     g.audio?.motoLoop?.(Math.abs(b.speed) / MOTO.max, this.rider >= 0);
     this.place();
+  }
+
+  // the closest point on a bike's spine (a capsule along its heading), and how far you are from it
+  _near(b, x, z, res) {
+    const fx = -Math.sin(b.yaw), fz = -Math.cos(b.yaw);
+    const t = clamp((x - b.x) * fx + (z - b.z) * fz, -0.74, 0.74);
+    const cx = b.x + fx * t, cz = b.z + fz * t;
+    const dx = x - cx, dz = z - cz;
+    res.d = Math.hypot(dx, dz);
+    res.nx = res.d > 1e-5 ? dx / res.d : 1;
+    res.nz = res.d > 1e-5 ? dz / res.d : 0;
+    return res;
+  }
+
+  // a walker against the parked machines: push out of the spine, kill the step into it
+  separate() {
+    const g = this.g, p = g.player;
+    if (!p) return;
+    const q = { d: 0, nx: 0, nz: 0 };
+    for (const b of this.bikes) {
+      if (this.riders.get(b.i)) continue; // a friend is sitting on it: their body does the colliding
+      this._near(b, p.x, p.z, q);
+      const rr = 0.36 + 0.3; // half the machine's width, plus the walker
+      if (q.d >= rr) continue;
+      p.x += q.nx * (rr - q.d);
+      p.z += q.nz * (rr - q.d);
+      const vn = p.vx * q.nx + p.vz * q.nz;
+      if (vn < 0) { p.vx -= vn * q.nx; p.vz -= vn * q.nz; }
+    }
+  }
+
+  // a ridden machine against the parked ones: it stops and slides, it does not pass through
+  _apart(b) {
+    const q = { d: 0, nx: 0, nz: 0 };
+    for (const o of this.bikes) {
+      if (o === b) continue;
+      this._near(o, b.x, b.z, q);
+      const rr = 0.72;
+      if (q.d >= rr) continue;
+      b.x += q.nx * (rr - q.d);
+      b.z += q.nz * (rr - q.d);
+      const vn = b.vx * q.nx + b.vz * q.nz;
+      if (vn < 0) { b.vx -= vn * q.nx; b.vz -= vn * q.nz; }
+    }
   }
 
   // the meshes: yours exactly where it is; a friend's under their remote body
   place() {
     const g = this.g;
     for (const b of this.bikes) {
+      if (!b.mesh) continue; // a bare bike state (the physics tests build those)
       const riderId = this.riders.get(b.i);
       let x = b.x, z = b.z, yaw = b.yaw, y = b.y, roll = b.roll, pitch = b.pitch, spin = b.spin;
       if (b.i !== this.rider && riderId) {

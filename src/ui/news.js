@@ -7,6 +7,23 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v:'2.1.2',date:'2026-10-20',
+    ru:{title:'Ствол, стеллаж и атлас',items:[
+      'Слез с мотоцикла — он на месте: машина пряталась под всадником и после «слезть» оставалась невидимой. Теперь она возвращается в кадр в тот же кадр',
+      'Мотоцикл, стеллаж с предметами, ящик и мишени стали твёрдыми: сквозь них больше не пройти. Столкновение с соседней машиной тоже честное — на ходу она упирается, а не проезжает насквозь',
+      'Атлас больше не запинается: страница шприца адреналина падала на сборке своей 3D-модели, перелистывание застревало на середине и книга переставала отвечать. Модель починена и перерисована, а сбой одной страницы теперь просто оставляет её без витрины, но листать не мешает',
+      'Фильм выезда: у машины крутятся колёса — каждое на своей оси, с шагом по скорости',
+      'Стеллаж на полигоне: камни, химсвет, ракета, батарея, карта и пенал со шприцем стоят каждый на своей полке, сверху — «СТАРТ»',
+    ]},
+    en:{title:'The bike, the rack and the atlas',items:[
+      'Step off the bike and it is still there: the machine hid under its rider and stayed invisible after stepping down. It is back in the frame the moment you dismount',
+      'The bikes, the rack of kit, its crate and the targets are solid now — you walk around them, not through them. A moving bike stops against its neighbour instead of passing through',
+      'The atlas no longer jams: the adrenaline syringe page crashed while building its 3D plate, the page turn stopped halfway and the book stopped answering. The model is fixed and redrawn, and a page that fails now just opens without its plate',
+      'The departure film rolls its wheels: four of them, one per axle, turning in step with the road',
+      'The range rack: stones, a glow stick, a flare, the battery, the map and the syringe case each stand on their own shelf under a painted СТАРТ',
+    ]},
+  },
+  {
     v:'2.1',date:'2026-10-19',
     ru:{title:'Смена затянулась',items:[
       'Смена стала четыре дня: ночь — 8 минут, утро — 1 минута 45 секунд. Лимита «45 минут» больше нет: рассветы первых трёх ночей — передышка, рассвет четвёртой — победа. Через четыре минуты после начала четвёртой ночи лес просыпается окончательно',

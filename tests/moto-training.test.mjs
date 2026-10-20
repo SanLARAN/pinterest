@@ -122,6 +122,33 @@ test('mounting claims the nearest free bike and dismounting steps you off beside
   assert.ok(Math.abs(p.g.player.x - ex) < 0.01 && Math.abs(p.g.player.z - ez) < 0.01, 'stepped off to the side');
 });
 
+test('stepping off puts your machine back in sight, and a parked bike is solid', () => {
+  const p = park();
+  p.bikes.forEach((b) => { b.mesh = { visible: true, position: { set() {} }, rotation: { set() {}, x: 0 } }; b.wheels = []; });
+  p.g.player = { x: 0.4, z: 0.1, yaw: 0.2, vx: 0, vz: 0, roll: 0 };
+  p.g.audio = {};
+  p.g.hud = { popup() {} };
+  p.g.remotes = new Map();
+  p.g.state = 'training';
+  p.g.world.col = { resolve: (q) => ({ hit: false, nx: 0, nz: 0, depth: 0, kind: -1 }) };
+  p.mountT = 0;
+  p.mount(0);
+  p.update(1 / 60, { move: { x: 0, y: 0 } });
+  assert.equal(p.bikes[0].mesh.visible, false, 'your own bike hides under you (the cockpit stands in)');
+  p.mountT = 0;
+  p.dismount();
+  assert.equal(p.bikes[0].mesh.visible, true, 'and comes back the moment you step off');
+  // walk straight into a parked machine: you are stopped at its spine, not let through it
+  const b = p.bikes[1];
+  p.g.player.x = b.x + 0.05; p.g.player.z = b.z + 0.05;
+  p.g.player.vx = -1; p.g.player.vz = 0; // walking into it
+  p.update(1 / 60, { move: { x: 0, y: 0 } });
+  const d = Math.hypot(p.g.player.x - b.x, p.g.player.z - b.z);
+  assert.ok(d > 0.6, `pushed out of the machine (d ${d.toFixed(2)})`);
+  const nx = (p.g.player.x - b.x) / d;
+  assert.ok(p.g.player.vx * nx >= -0.001, 'and the step into it is killed');
+});
+
 // ---------------- the rack and the targets ----------------
 function range() {
   const g = {
@@ -304,4 +331,14 @@ test('the bike row is parked clear of the rack apron, so E at the shelves takes 
   const ox = 0, oz = -1;
   const rackX = gen.x + ox * 4.6, rackZ = gen.z + oz * 4.6;
   assert.ok(Math.hypot(rackX - 0, rackZ - 0) > 2.1 + 1.9, 'a bike cannot be picked from the rack face');
+});
+
+test('the stand is solid while the range is up, and the ground is clear again after it', async () => {
+  const { Collision } = await import('../src/world/collision.js');
+  const col = new Collision(300, 8);
+  assert.equal(col.free(0, 0, 0.3), true, 'clear to begin with');
+  const idx = col.circle(0, 0, 0.4, 1.7, 2);
+  assert.equal(col.free(0, 0, 0.3), false, 'the shelf stops a walker');
+  col.remove(idx);
+  assert.equal(col.free(0, 0, 0.3), true, 'packed up, the way is clear again');
 });

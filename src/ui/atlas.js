@@ -200,6 +200,15 @@ export class Atlas {
     const back = leaf.querySelector('.leaf-back');
     const right = $('atlasRight');
     this.busy = 1;
+    const done = () => {
+      leaf.className = 'leaf';
+      front.innerHTML = '';
+      back.innerHTML = '';
+      if (dir > 0) this._renderLeft();
+      else this._renderRight();
+      this.busy = 0;
+    };
+    try {
     if (dir > 0) {
       // front: the page you were reading. under it: the next right page. back: the next plate, still dark
       front.innerHTML = right.innerHTML;
@@ -222,14 +231,12 @@ export class Atlas {
     front.className = 'leaf-face leaf-front ' + (dir > 0 ? 'as-r' : 'as-l');
     back.className = 'leaf-face leaf-back ' + (dir > 0 ? 'as-l' : 'as-r');
     leaf.className = 'leaf ' + (dir > 0 ? 'fwd' : 'back');
-    const done = () => {
-      leaf.className = 'leaf';
-      front.innerHTML = '';
-      back.innerHTML = '';
-      if (dir > 0) this._renderLeft();
-      else this._renderRight();
-      this.busy = 0;
-    };
+    } catch (e) {
+      // a page whose plate or text failed still has to turn: land it now, keep the book usable
+      console.warn('[atlas] the page would not render', e);
+      done();
+      return;
+    }
     this._later(done, 640);
   }
 

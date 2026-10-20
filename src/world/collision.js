@@ -35,6 +35,17 @@ export class Collision {
     return this.add(x, z, x, z, r, h, kind);
   }
 
+  // take a collider away again (a stand the training ground added, then packed up): it is parked far
+  // outside the world and given a negative radius, so no query can ever find it again
+  remove(idx) {
+    const c = this.caps[idx];
+    if (!c) return;
+    c.ax = c.bx = 1e7;
+    c.az = c.bz = 1e7;
+    c.r = -1;
+    c.h = -1;
+  }
+
   // a capsule that moves (a door on its hinge): filed into every cell it can ever reach — anywhere
   // within `reach` of (x, z) — so queries find it wherever it is. Move it with setSeg().
   addDynamic(x, z, reach, r, h = 6, kind = 0) {

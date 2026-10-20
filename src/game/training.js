@@ -171,6 +171,17 @@ export class Training {
       it.rev = (it.rev | 0) + 1; // the host tells everyone where they went
       g.tools._place(it);
     }
+    // The stand is solid. Two colliders: a capsule along its width (the shelves and the back board,
+    // stopping you at the front lip) and a small circle on the crate by its left foot.
+    this.colIdx = [];
+    if (g.world?.col?.add) {
+      const [ax, az] = world(-1.16, 0);
+      const [bx, bz] = world(1.16, 0);
+      this.colIdx.push(g.world.col.add(ax, az, bx, bz, 0.34, 1.7, 2));
+      const [cx, cz] = world(-1.55, 0.5);
+      this.colIdx.push(g.world.col.circle(cx, cz, 0.3, 0.5, 2));
+    }
+
     // the targets: three boards down the meadow, a painted ring on each
     this.targets = TARGETS.map((T, i) => {
       const x = gen.x + ox * T.d + Math.cos(yaw) * T.off;
@@ -187,6 +198,8 @@ export class Training {
       m.rotation.y = Math.atan2(ox, oz) + Math.PI; // facing back at the rack
       m.frustumCulled = false;
       this.group.add(m);
+      // the board's post is solid too: you can walk round a target, not through it
+      if (g.world?.col?.circle) this.colIdx.push(g.world.col.circle(x, z, 0.16, 1.5, 2));
       return { mesh: m, x, y, z, k: 0, up: 1, resetT: 0, i };
     });
 
@@ -252,12 +265,16 @@ export class Training {
     }
   }
 
-  // leaving: the meshes go, the bikes stay gone with them
+  // leaving: the meshes go, the bikes stay gone with them, and the stand is no longer in the way
   end() {
     const g = this.g;
     if (this.group) {
       g.scene.remove(this.group);
       this.group = null;
+    }
+    if (this.colIdx) {
+      for (const i of this.colIdx) g.world?.col?.remove?.(i);
+      this.colIdx = [];
     }
     this.targets = [];
   }
