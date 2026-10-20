@@ -202,6 +202,12 @@ export class Post {
     this.rtScene.dispose();
   }
 
+  // A driver that runs out of memory for a multisampled target does not throw: it hands back black. If the
+  // canvas ever loses its context, the samples are the first thing to give up (2.1k).
+  dropSamples() {
+    if (this.rtScene.samples > 0) this.setSamples(0);
+  }
+
   setSize(cssW, cssH, scale) {
     const w = Math.max(2, Math.round(cssW * scale));
     const h = Math.max(2, Math.round(cssH * scale));

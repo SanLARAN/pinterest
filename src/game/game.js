@@ -46,6 +46,8 @@ const STONE = [0.85, 0.95, 1.0];
 const HOWL = [1.0, 0.36, 0.1];
 const LAMPC = [1.0, 0.74, 0.42];
 const MORNING_LIGHT = 0.95;
+const FADE_IN = 1.4; // s: up out of the film's black into the first night
+const DAWN_SECONDS = 11; // the last night lets go of the sky slowly
 const NO_LOOK = { dx: 0, dy: 0 };
 const SRC_SELF = new Set(['voice', 'ping', 'step', 'bump', 'breath', 'repair', 'door', 'flare', 'glow', 'part', 'engine', 'torch', 'crowbar', 'ladder']);
 const _v = new THREE.Vector3();
@@ -286,7 +288,6 @@ export class Game {
     this.morningT = 0;
     this.duskT = 0;
     this.duskHit = false;
-    this.leashT = 0;
     this.morningAudio = false;
     this.events = [];
     this._resetNight();
@@ -374,26 +375,14 @@ export class Game {
       this.audio.bump();
       this.addTrauma(0.12);
     }
-    // stay around the camp — there's nothing out there you need yet
-    const cx = 0, cz = 3, R = CFG.CAMP_LEASH;
-    const dx = p.x - cx, dz = p.z - cz, d = Math.hypot(dx, dz);
-    if (d > R) {
-      p.x = cx + (dx / d) * R;
-      p.z = cz + (dz / d) * R;
-      p.vx *= 0.2;
-      p.vz *= 0.2;
-      this.leashT = 2.8;
-    }
+    // (2.1k: there used to be a 26 m leash round the camp here — an invisible wall that pushed you back
+    // with a hint. The morning is short and the forest is the point: walk out if you want to.)
     const hud = this.hud;
     if (this.morningT > 0.8 && this.morningT < 7.5) hud.setIntro(this.day > 1 ? t('morningBigN').replace('{n}', this.day).replace('{d}', CFG.SHIFT.DAYS) : t('morningBig'), t('morningSmall'));
     else hud.setIntro(null);
     let hint = null;
     if (this.morningT > 8 && this.morningT < 17) hint = this.input.touch ? t('morningHintTouch') : t('morningHint');
     else if (this.morningT > 19 && this.morningT < 26) hint = t('morningGen');
-    if (this.leashT > 0) {
-      this.leashT -= dt;
-      hint = t('campLeash');
-    }
     hud.setHint(hint);
     this.objectives.update(dt, false);
     this.doors.update(dt);
@@ -468,7 +457,6 @@ export class Game {
 
     // HUD: the intro speaks once; then only what your hands are near
     if (this.time > 9 && this.time - dt <= 9) this.hud.setIntro(null);
-    if (this.leashT > 0) this.leashT = Math.max(0, this.leashT - dt);
 
     this.fx.danger = 0;
     this._commonFx(dt);
@@ -481,7 +469,6 @@ export class Game {
     this.state = 'morning';
     this.time = 0; // everyone still down was raised at dawn: the night's clocks start clean
     this.morningT = 0;
-    this.leashT = 0;
     this.duskT = 0;
     this.duskHit = false;
     this.morningAudio = false; // the birds come back with the next frame
@@ -540,7 +527,9 @@ export class Game {
 
   startNight() {
     // (the opening film is over by now, or a debug jump / a skip is putting it away)
-    if (this.opening && this.opening.state === 'run') this.opening.cancel();
+    // (finish() marks itself 'done' before calling this, so the film's own hand-over is fadeIn > 0)
+    const fromFilm = (this.opening && this.opening.state === 'run') || this.fadeIn > 0;
+    if (fromFilm) this.opening.cancel();
     this.state = 'play';
     this.time = 0;
     shared.uDawn.value = 0;
@@ -557,6 +546,16 @@ export class Game {
     this.hud.setSkip(false);
     this.hud.setIntro(null);
     this.hud.setHint(null);
+    // the film leaves you where you stood watching the fire — so look at it: the night opens on the camp,
+    // the dying coals and the tent, not on the black away from it (2.1k: you used to wake facing the forest,
+    // in the dark, with nothing to go by)
+    if (fromFilm) {
+      const f = this.fire;
+      const p = this.player;
+      const a = Math.atan2(-(f.x - p.x), -(f.z - p.z));
+      p.yaw = a + 0.18;
+      p.pitch = -0.12;
+    }
     this.hud.flashAlert(t('nightTag').replace('{n}', this.day).replace('{d}', CFG.SHIFT.DAYS), 'dim', 2.4);
     // nothing is out there yet: the forest sleeps for SPAWN_DELAY seconds (see updateDirector → wake)
     for (const m of this.monsters) m.dispose();
@@ -1629,6 +1628,8 @@ export class Game {
   startDawn() {
     this.state = 'dawn';
     this.dawnT = 0;
+    shared.uDawn.value = 0;
+    shared.uMorning.value = 0;
     this.hud.setIntro(null);
     this.hud.intro.classList.remove('red');
     this.hud.setUse(null);
@@ -1654,7 +1655,11 @@ export class Game {
 
   updateDawn(dt) {
     this.dawnT += dt;
-    shared.uDawn.value = smoothstep(0, 5, this.dawnT) * 0.85 + 0.15;
+    // 2.1k: the day used to jump to 0.15 on the first frame and be full by second five; now the sky opens
+    // over the whole dawn, and the warm palette comes in behind the light, so nothing pops
+    const k = smoothstep(0, DAWN_SECONDS - 1.2, this.dawnT);
+    shared.uDawn.value = MORNING_LIGHT * k;
+    shared.uMorning.value = smoothstep(0.35, 1, k);
     for (let i = this.monsters.length - 1; i >= 0; i--) {
       const m = this.monsters[i];
       if (this.dawnT > 1.5) {
@@ -1662,7 +1667,7 @@ export class Game {
         this.monsters.splice(i, 1);
       } else m.update(dt, this.time);
     }
-    if (this.dawnT > 7 && this.state === 'dawn') {
+    if (this.dawnT > DAWN_SECONDS && this.state === 'dawn') {
       if (this.day >= CFG.SHIFT.DAYS) {
         this.state = 'won';
         if (this.onEnd) this.onEnd({ won: true, coop: this.online, alive: this.player.alive });
@@ -2291,6 +2296,13 @@ export class Game {
     fx.fovKick = damp(fx.fovKick, 0, 5, dt);
     if (fx.slowT > 0) fx.slowT -= dt / Math.max(fx.timeScale, 0.3);
     fx.timeScale = damp(fx.timeScale, fx.slowT > 0 ? 0.45 : 1, 8, dt);
+    // out of the opening film's black (2.1j left fadeIn assigned and never spent: the first night
+    // started with fx.fade = 0 and stayed black — nothing could be seen or done)
+    if (this.fadeIn > 0) {
+      this.fadeIn = Math.max(0, this.fadeIn - dt);
+      const k = 1 - this.fadeIn / FADE_IN;
+      fx.fade = Math.max(fx.fade, smoothstep(0, 1, k));
+    }
   }
 
   // camera + listener + post uniforms
@@ -2345,6 +2357,7 @@ export class Game {
     this.partMap.place(camera,hands&&!this.cabinets.busy&&!this.inventory.active);
     this.fieldView.place(camera, !cutCam && !sp && this.player.alive && !riding && !this.cabinets.busy && !this.expedition.onTower && ['play','morning','dawn','training'].includes(this.state));
     this.bag3d.place(camera);
+    this.fire.placeCamera(camera);
     this.motos.placeCockpit(camera, riding); // the rider's own bars (the arms above are off while riding)
     // your own body, under your eyes
     const st = this.state;

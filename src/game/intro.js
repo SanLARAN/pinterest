@@ -275,6 +275,15 @@ function pBlanket(rig, tt, k = 1) {
   n.elR.rotation.x = lerp(-1.55, -0.7, k);
 }
 
+// the shortest way round from one yaw to another, at a rate (rad/s)
+function turnTo(cur, want, dt, rate = 5.5) {
+  let d = (want - cur) % (Math.PI * 2);
+  if (d > Math.PI) d -= Math.PI * 2;
+  if (d < -Math.PI) d += Math.PI * 2;
+  const step = Math.max(-rate * dt, Math.min(rate * dt, d));
+  return cur + step;
+}
+
 export class IntroCutscene {
   constructor(game) {
     this.g = game;
@@ -368,7 +377,8 @@ export class IntroCutscene {
     this.done = true;
     this._teardown();
     this.g.fx.fade = 0;
-    this.g.fadeIn = 0.9; // ...and comes back up as the first night
+    this.g.fadeIn = 1.4; // ...and comes back up as the first night (spent in Game._commonFx)
+    try { this.g.input.requestLock(); } catch { /* the browser may refuse: the hint says so */ }
   }
 
   // ---------------- the cast ----------------
@@ -412,8 +422,8 @@ export class IntroCutscene {
       this.g.scene.add(rig.root);
       const sx = Math.cos(a) * R_SEAT;
       const sz = Math.sin(a) * R_SEAT;
-      const fx = Math.cos(a) * 1.18; // where they stand to work on the fire (in from their seat)
-      const fz = Math.sin(a) * 1.18;
+      const fx = Math.cos(a) * 1.7; // where they stand to work on the fire (in from their seat)
+      const fz = Math.sin(a) * 1.7;
       const actor = {
         slot: p.slot,
         solo: !!p.solo,
@@ -429,6 +439,10 @@ export class IntroCutscene {
         z: sz,
         y: ground(sx, sz),
         yaw: Math.atan2(-(FIRE.x - sx), -(FIRE.z - sz)),
+        yawCur: Math.atan2(-(FIRE.x - sx), -(FIRE.z - sz)),
+        px: sx,
+        pz: sz,
+        spd: 0,
         k: 1, // sitting
         u: 0,
         lit: 1,
@@ -643,12 +657,15 @@ export class IntroCutscene {
         a.z = lerp(sz, a.work.z, u1);
         const toFire = Math.atan2(-(FIRE.x - a.x), -(FIRE.z - a.z));
         if (tt < p.tAct) {
-          a.phase += dt * 7.5;
-          a.yaw = u1 < 0.98 ? Math.atan2(-(a.work.x - a.x), -(a.work.z - a.z)) : toFire;
-          poseSurvivor(a.rig, a.phase, 1.15, false, false);
-          poseFur(a.rig, dt, 1.15);
+          // the stride follows the ground: a step per 0.62 m, so the feet do not skate
+          a.phase += a.spd * dt / 0.62 * Math.PI;
+          a.yaw = Math.atan2(-(a.work.x - a.x), -(a.work.z - a.z));
+          poseSurvivor(a.rig, a.phase, clamp(a.spd, 0.5, 2.4), false, false);
+          poseFur(a.rig, dt, clamp(a.spd, 0.5, 2.4));
         } else {
-          poseSurvivor(a.rig, 0, 0, false, false);
+          // (the last step: settle out of the stride instead of snapping the legs straight)
+          const k = clamp((tt - p.tAct) / 0.3, 0, 1);
+          poseMix(a.rig, bufs, (r, t) => { poseSurvivor(r, a.phase, 1.15, false, false); poseFur(r, 0, 1.15); }, pStand, smoothstep(0, 1, k), tt);
           a.yaw = toFire;
           const u = clamp((tt - p.tAct) / p.dur, 0, 1);
           const poser = { pour: pPour, stomp: pStomp, tarp: pTarp, bucket: pBucket, stick: pStick }[a.seat.act] || pPour;
@@ -668,9 +685,9 @@ export class IntroCutscene {
         const fy = a.yaw;
         const want = Math.atan2(-(a.seat.bed.x - from.x), -(a.seat.bed.z - from.z));
         a.yaw = want;
-        a.phase += dt * 8.2;
-        poseSurvivor(a.rig, a.phase, 1.5, false, false);
-        poseFur(a.rig, dt, 1.5);
+        a.phase += a.spd * dt / 0.62 * Math.PI;
+        poseSurvivor(a.rig, a.phase, clamp(a.spd, 0.5, 2.2), false, false);
+        poseFur(a.rig, dt, clamp(a.spd, 0.5, 2.2));
         this._propVis(a, false);
         void fy;
       } else {
@@ -716,8 +733,13 @@ export class IntroCutscene {
       }
       if (tt >= p.tWalk) poseFur(a.rig, 0, 0); // (a furry survivor's tail keeps its own time)
       a.rig.root.visible = visible;
+      // how fast did they actually move this beat (a stander is not walking, and must not look like it)
+      a.spd = dt > 1e-5 ? Math.hypot(a.x - a.px, a.z - a.pz) / dt : 0;
+      a.px = a.x;
+      a.pz = a.z;
+      a.yawCur = silent ? a.yaw : turnTo(a.yawCur, a.yaw, dt, 5.5);
       a.rig.root.position.set(a.x, ground(a.x, a.z) + (a.seat.sleep && a.rig.root.rotation.x < -0.2 ? 0.18 : 0), a.z);
-      a.rig.root.rotation.y = a.yaw;
+      a.rig.root.rotation.y = a.yawCur;
       void n;
     });
   }
@@ -742,6 +764,11 @@ export class IntroCutscene {
     if (tip > 0) prop.node.rotation.set(0.2 + tip * 2.1, 0, 0);
     else if (act === 'stick') prop.node.rotation.set(0.9 + Math.sin(u * Math.PI * 4.4) * 0.12, 0, 0.2);
     else prop.node.rotation.set(0.2, 0, 0);
+    // the water out of the pot / the bucket: from the lip of the thing in their hands into the coals
+    if (tip > 0 && (act === 'pour' || act === 'bucket')) {
+      const p = prop.mesh.getWorldPosition(this._lip || (this._lip = new THREE.Vector3()));
+      this.g.fire.stream(p, tip);
+    }
   }
 
   // sounds and steam at the exact beat of each action

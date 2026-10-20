@@ -7,6 +7,23 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v:'2.1k',date:'2026-10-20',
+    ru:{title:'Ночь после фильма видно, рюкзак не врёт, чёрных квадратов нет',items:[
+      'После вступительного фильма ты просыпаешься лицом к погасшему костру: картинка поднимается из темноты, а угли ещё светят — у лагеря видно, куда идти',
+      'Из рюкзака убраны сердечки и клетки-призраки: он показывает только то, что ты несёшь, а справа стоит объёмный портрет твоего выжившего',
+      'Retina больше не рисует чёрные квадраты: мультисэмплинг ограничен памятью под размер кадра и снимается при сбое контекста',
+      'Утро больше не запирает у лагеря невидимой стеной, а рассвет идёт плавно все одиннадцать секунд',
+      'В фильме у костра сглажены повороты и шаг, из котелка и ведра льётся вода, огонь стал ниже, а все отступили от ямы',
+    ]},
+    en:{title:'You can see the night after the film, the pack tells the truth, no black tiles',items:[
+      'After the opening film you wake facing the dead fire: the picture comes up out of the dark and the coals still glow, so the camp shows you the way',
+      'The hearts and the ghost tiles are gone from the pack: it lists only what you carry, with a real 3D portrait of your survivor on the right',
+      'Retina no longer paints black tiles: multisampling is capped by the memory the frame needs and dropped when the context goes',
+      'The morning no longer walls you in around the camp, and the dawn comes up smoothly over eleven seconds',
+      'The campfire film has smoothed turns and strides, water pours from the pot and the bucket, the fire is knee-high, and everyone stands back from the pit',
+    ]},
+  },
+  {
     v:'2.1j',date:'2026-10-20',
     ru:{title:'Смена начинается фильмом: ночь наступает на глазах',items:[
       'Камера спускается с неба на лагерь у костра, пока последний день уходит из света: небо гаснет вместе с огнём, проступают звёзды',

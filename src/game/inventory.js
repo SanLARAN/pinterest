@@ -7,6 +7,7 @@ import { MeshBuilder, KIND } from '../world/builder.js';
 import { geometryOf } from './uaz.js';
 import { buildFlareGun } from './objectives.js';
 import { BAG_SIZE, BAG_KINDS, BAG_LIMIT, BAG_TABS, LOOT_KIND, fitsPocket, cleanPockets, cleanParcel, iconSvg } from './backpackData.js';
+import { myFit } from './outfit.js';
 
 const round = (v) => Math.round(v * 100) / 100;
 const esc = (v) => String(v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -48,7 +49,7 @@ export class Backpack {
         <header class="bp-head">
           <div class="bp-kicker">HUSH · FIELD KIT</div>
           <h2 class="bp-title"></h2>
-          <div class="bp-head-r"><span class="bp-tab-name"></span><i class="bp-heart" aria-hidden="true"></i><i class="bp-heart" aria-hidden="true"></i><i class="bp-heart gap" aria-hidden="true"></i></div>
+          <div class="bp-head-r"><span class="bp-tab-name"></span></div>
         </header>
         <nav class="bp-tabs" role="tablist"></nav>
         <div class="bp-main">
@@ -57,6 +58,7 @@ export class Backpack {
             <div class="bp-cap"><span class="bp-cap-k"></span><b class="bp-cap-v"></b></div>
             <figure class="bp-fig" aria-hidden="true">
               <span class="bp-fig-glow"></span>
+              <canvas class="bp-portrait" width="420" height="520" aria-hidden="true"></canvas>
               <svg class="bp-body" viewBox="0 0 220 340">
                 <g fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
                   <path d="M64 112q-6 2-6 18v92q0 10 9 10h86q9 0 9-10v-92q0-16-6-18" fill="#1b2118"/>
@@ -107,6 +109,9 @@ export class Backpack {
     this.descEl = this.el.querySelector('.bp-desc');
     this.chipsEl = this.el.querySelector('.bp-chips');
     this.heldEl = this.el.querySelector('.bp-held');
+    this.figEl = this.el.querySelector('.bp-fig');
+    this.portraitEl = this.el.querySelector('.bp-portrait');
+    this.portraitKey = '';
     this.capEl = this.el.querySelector('.bp-cap-v');
     this.equipBtn = this.el.querySelector('[data-bp="equip"]');
     this.dropBtn = this.el.querySelector('[data-bp="drop"]');
@@ -196,9 +201,23 @@ export class Backpack {
     const g=this.g;
     return k==='stones' ? g.player.stones>0 : k==='glow' ? g.glows.count>0 || !!g.glows.held : k==='torch' ? g.torch.has : k==='flare' ? !!g.player.hasFlare || g.player.flares>0 : k==='battery' ? this.cells>0 : k==='tape' ? !!g.tools.tapeHeld : k==='crowbar' ? g.tools.hasCrowbar : k==='map'?!!g.partMap?.has:k==='syringe'?this.syringes>0:false;
   }
+  // How many you have. (2.1k: everything that was not a stack fell through to `1` here — so the pack
+  // showed a recorder, a crowbar, a map and a syringe you had never picked up. Non-stackables are 1 only
+  // when you actually hold them.)
   count(k) {
     const g=this.g;
-    return k==='stones'?g.player.stones:k==='glow'?g.glows.count+(g.glows.held?1:0):k==='battery'?this.cells:k==='flare'?g.player.flares|0:k==='syringe'?this.syringes:1;
+    switch (k) {
+      case 'stones': return g.player.stones | 0;
+      case 'glow': return g.glows.count + (g.glows.held ? 1 : 0);
+      case 'battery': return this.cells | 0;
+      case 'flare': return g.player.flares | 0;
+      case 'syringe': return this.syringes | 0;
+      case 'torch': return g.torch.has ? 1 : 0;
+      case 'tape': return g.tools.tapeHeld ? 1 : 0;
+      case 'crowbar': return g.tools.hasCrowbar ? 1 : 0;
+      case 'map': return g.partMap?.has ? 1 : 0;
+      default: return 0;
+    }
   }
   canReceive(k, announce=false, upgrade=false) {
     let ok = fitsPocket(this.slots,k);
@@ -480,7 +499,37 @@ export class Backpack {
   }
   // ---------------- the page ----------------
   // The pack opens as a page of its own: tabs, a field of slots, and the item you point at described
-  // on the right beside the survivor who has to carry it. No 3D rucksack, no four-pocket diagram.
+  // on the right beside the survivor who has to carry it — a real 3D still of your own fit (the same
+  // renderer the wardrobe's cards use), painted into the canvas once per outfit, with the flat SVG only
+  // as the fallback for a browser that cannot give us a second WebGL context.
+  portrait() {
+    const cv = this.portraitEl;
+    if (!cv) return;
+    let key = '';
+    try {
+      const f = myFit();
+      key = JSON.stringify(f);
+      if (key === this.portraitKey && cv.classList.contains('on')) return;
+      if (!this.mq && !this.mqDead) {
+        // (lazy: the bag may never be opened in a shift, and a context is not free)
+        import('../ui/mannequin.js').then(({ Mannequin }) => {
+          try {
+            this.mq = new Mannequin();
+            this.portraitKey = '';
+            if (this.opened) this.render();
+          } catch { this.mqDead = true; }
+        }).catch(() => { this.mqDead = true; });
+        return;
+      }
+      if (!this.mq) return;
+      this.mq.still(f, 'body', cv);
+      this.portraitKey = key;
+      cv.classList.add('on');
+      this.figEl.classList.add('has-portrait');
+    } catch {
+      this.mqDead = true; // keep the drawn figure
+    }
+  }
   render() {
     const g=this.g;
     const lang=getLang();
@@ -507,20 +556,21 @@ export class Backpack {
       b.setAttribute('aria-selected',on?'true':'false');
       b.tabIndex=on?0:-1;
     });
-    // the field of slots: every kind of the chosen shelf, then its empty places
-    const tiles=kinds.map((kind)=>{
+    // (2.1k: the shelf used to list every kind there is with the ones you do not carry greyed out — a bag
+    // that showed you a recorder, a crowbar and a map you had never found. Now it holds what you actually
+    // carry; the rest is just empty canvas.)
+    const tiles=kinds.filter(owns).map((kind)=>{
       const n=this.count(kind), on=this.equipped===kind;
       const sel=kind===this.sel;
       const name=kind==='flare'&&!g.player.hasFlare?t('bagCartridges'):bagName(kind);
-      const live=owns(kind);
-      return `<button type="button" class="bp-slot${live?' owned':' void'}${sel?' sel':''}${on?' on':''}" data-kind="${kind}" ${live?'':'disabled'} aria-label="${esc(name)}${live?`, ${n}`:''}"${sel?' aria-current="true"':''}>
+      return `<button type="button" class="bp-slot owned${sel?' sel':''}${on?' on':''}" data-kind="${kind}" aria-label="${esc(name)}, ${n}"${sel?' aria-current="true"':''}>
         <span class="bp-ico">${iconSvg(kind)}</span>
         <span class="bp-lbl">${esc(name)}</span>
-        <span class="bp-n">${live?'×'+n:''}</span>
+        <span class="bp-n">×${n}</span>
         ${on?`<i class="bp-mark">${esc(t('bagInHands'))}</i>`:''}
       </button>`;
     });
-    while(tiles.length%5||tiles.length<25) tiles.push('<span class="bp-slot void filler" aria-hidden="true"></span>');
+    while(tiles.length%5||tiles.length<10) tiles.push('<span class="bp-slot empty filler" aria-hidden="true"></span>');
     this.grid.innerHTML=tiles.join('');
     // the right-hand page: what it is, and what it costs you to carry
     const nm=k?(k==='flare'&&!g.player.hasFlare?t('bagCartridges'):bagName(k)):t('bagEmpty');
@@ -550,6 +600,7 @@ export class Backpack {
     this.dropZone.querySelector('b').textContent=t('bagDrop');
     this.dropZone.querySelector('span').textContent=t('bagDropHint');
     this.dropZone.hidden=!document.body.classList.contains('bag-dragging');
+    this.portrait();
   }
 
   // ---------------- throwing things out ----------------

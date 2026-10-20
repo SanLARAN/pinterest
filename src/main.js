@@ -166,24 +166,40 @@ let menuTime = 0;
 const perf = { acc: 0, n: 0, scale: 1, cool: 3, ceiling: 9, ceilT: 0, fpsEl: null, fps: 60 };
 
 // ---------------- resolution ----------------
-// Retina (2.1j): the scene is rendered at up to two device pixels per CSS pixel — on a retina screen the
-// edges and the film grain are finally as sharp as the display. A pixel budget keeps a big monitor from
-// asking for more than any GPU can push, and the auto/high guard below still trades pixels for frames.
+// Retina (2.1j): the scene is rendered at up to two device pixels per CSS pixel. A pixel budget keeps a big
+// monitor from asking for more than any GPU can push, the auto/high guard trades pixels for frames, and
+// 2.1k ties the budget to the multisample count (see sampleCount) so nothing ever asks for a target no
+// driver will hold — that is what the black tiles were.
 const PIX_BUDGET = { high: 4.4e6, auto: 2.9e6, low: 1.2e6 };
 function dprCap() {
   return Math.min(window.devicePixelRatio || 1, 2);
 }
 function scaleBounds() {
   const dpr = dprCap();
-  const budget = Math.sqrt((PIX_BUDGET[settings.quality] || PIX_BUDGET.auto) / Math.max(1, innerWidth * innerHeight));
+  // (2.1k: a 4×-multisampled target at 4.4 MP is 141 MB of half-float — too much for many GPUs, and the
+  // drivers that choke on it are the ones that draw the black tiles. Multisampling buys less than resolution.)
+  const n = sampleCount();
+  const msaa = n >= 4 ? 0.55 : n === 2 ? 0.8 : 1;
+  const budget = Math.sqrt(((PIX_BUDGET[settings.quality] || PIX_BUDGET.auto) * msaa) / Math.max(1, innerWidth * innerHeight));
   const hi = Math.max(0.55, Math.min(dpr, budget));
   if (settings.quality === 'high') return [Math.min(0.85, hi), hi];
   if (settings.quality === 'low') return [0.55, 0.55];
   return [0.5, Math.min(hi, 1.5)];
 }
-// edges: the scene pass is multisampled. High gets 4 (smooth silhouettes on a desktop), auto 2, low none
+// Edges: the scene pass is multisampled. 2.1k: how many samples the scene target gets. This is decided by the preset and the size of the window
+// only — never by the live resolution scale — so the multisampled buffers are NOT re-created every time the
+// auto-guard nudges the scale (that reallocation storm is what drew black tiles on retina hardware).
+// It is also capped by memory: a 4× MSAA half-float target is ~8 bytes a sample, and a big desktop at 2×
+// device pixels would ask for more than the driver can hold.
+function sampleCount() {
+  if (settings.quality === 'low') return 0;
+  const dpr = dprCap();
+  const px = innerWidth * innerHeight * dpr * dpr; // the most the scene could ever be at this window size
+  if (settings.quality === 'high') return px <= 2.4e6 ? 4 : px <= 5.0e6 ? 2 : 0;
+  return px <= 3.6e6 ? 2 : 0;
+}
 function applySamples() {
-  post.setSamples(settings.quality === 'high' ? 4 : settings.quality === 'low' ? 0 : 2);
+  post.setSamples(sampleCount());
 }
 function applyQuality() {
   const [lo, hi] = scaleBounds();
@@ -203,10 +219,21 @@ function resize() {
   camera.fov = fovFor(camera.aspect);
   camera.updateProjectionMatrix();
   post.setSize(w, h, perf.scale);
+  applySamples(); // (the safe sample count follows the scale, not just the preset)
   radar.resize();
   if (garage) garage.resize(w, h);
 }
 window.addEventListener('resize', resize);
+// a lost GL context (the usual way a driver says "that target was too big"): give up the multisampling
+// first, then let the browser restore the context; the scene is re-uploaded on the next frame
+canvas.addEventListener('webglcontextlost', (e) => {
+  e.preventDefault();
+  post.dropSamples();
+  perf.scale = Math.max(0.55, Math.min(perf.scale, 1));
+});
+canvas.addEventListener('webglcontextrestored', () => {
+  resize();
+});
 
 function pixScale() {
   return post.h / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2));
@@ -1005,6 +1032,7 @@ function step(now, render) {
   if(state==='menu')home.place(); // includes the book's 2D-cover fallback if the garage could not initialise
   sky.position.copy(camera.position);
   motes.material.uniforms.uPix.value = 9 * (post.h / 900);
+  game._bufferH = post.h; // (the fire's water beads size themselves in world metres)
   post.u.uTime.value = now / 1000;
   renderer.info.reset();
   shadows.update(camera);

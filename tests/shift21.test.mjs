@@ -9,6 +9,7 @@ import { Rescue } from '../src/game/rescue.js';
 import { NetSync } from '../src/game/netsync.js';
 import { Objectives } from '../src/game/objectives.js';
 import { PROTOCOL } from '../src/net/net.js';
+import { shared } from '../src/render/sonar.js';
 
 const S = CFG.SHIFT;
 
@@ -93,7 +94,11 @@ test('a night ends in a dawn; dawns one to three roll into the next morning, the
   g.startDawn();
   assert.equal(g.state, 'dawn');
   assert.equal(g.day, 1); // the day advances only when the next morning begins
-  g.dawnT = 7.01;
+  // the day comes up over eleven seconds, not in a flash (2.1k): half way in, the sky is still dim
+  g.dawnT = 3;
+  Game.prototype.updateDawn.call(g, 0.02);
+  assert.ok(shared.uDawn.value < 0.5, 'the dawn is a ramp, not a switch');
+  g.dawnT = 11.01;
   Game.prototype.updateDawn.call(g, 0.02);
   assert.equal(g.state, 'morning');
   assert.equal(g.day, 2);
@@ -110,7 +115,7 @@ test('a night ends in a dawn; dawns one to three roll into the next morning, the
   g.startDawn();
   let ended = null;
   g.onEnd = (r) => (ended = r);
-  g.dawnT = 7.01;
+  g.dawnT = 11.01;
   Game.prototype.updateDawn.call(g, 0.02);
   assert.equal(g.state, 'won');
   assert.deepEqual(ended, { won: true, coop: false, alive: true });

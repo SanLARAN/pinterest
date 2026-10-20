@@ -10,7 +10,7 @@
 // world, the people around it and their faces the same way a glow stick does.
 import * as THREE from 'three';
 import { shared } from '../render/sonar.js';
-import { clamp } from '../core/rng.js';
+import { clamp, lerp, smoothstep } from '../core/rng.js';
 
 const FIRE_C = [1.0, 0.52, 0.2]; // ember orange
 const FIRE_R = 13; // m of reach
@@ -165,7 +165,7 @@ export class Campfire {
       depthWrite: false, blending: THREE.AdditiveBlending, fog: false,
     });
     this.glow = new THREE.Sprite(gm);
-    this.glow.position.y = 0.62;
+    this.glow.position.y = 0.44;
     this.glow.scale.set(2.4, 2.4, 1);
     this.glow.renderOrder = 4;
     this.group.add(this.glow);
@@ -209,7 +209,7 @@ export class Campfire {
     this.puffK = 0;
     this.steam = [];
     for (let i = 0; i < 7; i++) {
-      const m = new THREE.SpriteMaterial({ map: tex, color: 0xd8d4cc, transparent: true, opacity: 0, depthWrite: false });
+      const m = new THREE.SpriteMaterial({ map: tex, color: 0xbdb8ae, transparent: true, opacity: 0, depthWrite: false });
       const s = new THREE.Sprite(m);
       s.userData.seed = Math.random();
       s.userData.a = Math.random() * Math.PI * 2;
@@ -218,6 +218,88 @@ export class Campfire {
       this.group.add(s);
       this.steam.push(s);
     }
+    // the pouring water: a dozen points of beaded spray, each on its own place in the arc
+    this.streamK = 0;
+    this.streamFrom = new THREE.Vector3();
+    this._dropN = 14;
+    const dg = new THREE.BufferGeometry();
+    dg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(this._dropN * 3), 3));
+    dg.setAttribute('aU', new THREE.BufferAttribute(new Float32Array(this._dropN), 1));
+    this._dropPos = dg.attributes.position;
+    const dm = new THREE.ShaderMaterial({
+      uniforms: { uK: { value: 0 }, uPix: { value: 9 } },
+      vertexShader: /* glsl */ `
+        attribute float aU;
+        uniform float uK;
+        uniform float uPix;
+        varying float vA;
+        void main() {
+          vec4 mv = modelViewMatrix * vec4(position, 1.0);
+          gl_Position = projectionMatrix * mv;
+          gl_PointSize = clamp((0.075 + 0.03 * sin(aU * 3.14159)) * uPix / max(-mv.z, 0.35), 1.5, 22.0);
+          vA = uK * smoothstep(0.0, 0.1, aU) * (1.0 - smoothstep(0.8, 1.0, aU));
+        }`,
+      fragmentShader: /* glsl */ `
+        varying float vA;
+        void main() {
+          float r = 1.0 - smoothstep(0.08, 0.5, length(gl_PointCoord - 0.5));
+          float a = vA * r * 0.75;
+          if (a < 0.01) discard;
+          gl_FragColor = vec4(vec3(0.74, 0.86, 0.94) * a, 1.0);
+        }`,
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    });
+    this._drops = new THREE.Points(dg, dm);
+    this._drops.frustumCulled = false;
+    this._drops.renderOrder = 7;
+    this._drops.visible = false;
+    this.group.add(this._drops);
+    this._dropU = new Float32Array(this._dropN);
+    for (let i = 0; i < this._dropN; i++) this._dropU[i] = i / this._dropN;
+  }
+
+  // one parabola from the lip of the pot down into the coals (called every frame the pour is happening)
+  _stream(dt) {
+    const k = this.streamK;
+    const pts = this._drops;
+    const g = this.group, from = this.streamFrom;
+    pts.visible = k > 0.01;
+    pts.material.uniforms.uK.value = k;
+    if (!pts.visible) { this.streamK = 0; return; }
+    const arr = this._dropPos.array, au = pts.geometry.attributes.aU.array;
+    for (let i = 0; i < this._dropN; i++) {
+      let u = (this._dropU[i] + dt * 1.5) % 1;
+      this._dropU[i] = u;
+      au[i] = u;
+      // from the lip of the pot to the coals: a parabola that lifts a little and then drops in, all of
+      // it in the fire's own space, so it follows the group wherever it sits
+      const x = lerp(from.x, this.x, u);
+      const z = lerp(from.z, this.z, u);
+      const y0 = from.y - this.y;
+      const y = lerp(y0, 0.06, u) + Math.sin(u * Math.PI) * 0.2;
+      arr[i * 3] = x - g.position.x; arr[i * 3 + 1] = y; arr[i * 3 + 2] = z - g.position.z;
+    }
+    this._dropPos.needsUpdate = true;
+    pts.geometry.attributes.aU.needsUpdate = true;
+    this.streamK = Math.max(0, k - dt * 4); // goes out the moment the pot comes up
+  }
+
+  // the pixels per world metre at one metre (the droplets are ordered points: their size is in metres)
+  placeCamera(camera) {
+    if (!this._drops) return;
+    const proj = camera.projectionMatrix.elements[5] || 1; // 1/tan(fov/2)
+    const h = (this.g && this.g._bufferH) || (typeof innerHeight === 'number' ? innerHeight : 720);
+    this._drops.material.uniforms.uPix.value = proj * h * 0.5;
+  }
+
+  // the water: a handful of droplets on one parabola from the pot's lip into the coals. `from` is the
+  // world point the pot is pouring from, `k` 0..1 how hard (0 puts the stream away)
+  stream(from, k = 1) {
+    if (!this._drops) return;
+    this.streamK = clamp(k, 0, 1);
+    if (from) this.streamFrom.copy(from);
   }
 
   // water hits the coals: a hiss you can see
@@ -253,18 +335,20 @@ export class Campfire {
   update(dt) {
     this.t += dt;
     const t = this.t;
-    this.ember = Math.max(0, this.ember - dt * 0.01);
+    this.ember = Math.max(0, this.ember - dt * 0.009);
     // a fire does not burn evenly: three sines that never line up again
     const flick = 0.8 + 0.13 * Math.sin(t * 9.7) + 0.07 * Math.sin(t * 21.3 + 1.7) + 0.05 * Math.sin(t * 41.7 + 0.3);
-    this.I = this.lit * Math.max(0.25, flick) * 1.35 + this.ember * 0.11 * (0.72 + 0.28 * Math.sin(t * 1.7));
+    // (2.1k: the embers used to give 0.11 — so the first night began with the player standing in a
+    // light that no shader could see. The coals now keep a small warm pool for the first minute, then go.)
+    this.I = this.lit * Math.max(0.25, flick) * 1.35 + this.ember * (0.55 + 0.12 * Math.sin(t * 1.7));
     const on = this.lit > 0.01;
     this.flames.visible = on;
     this.embers.visible = on || this.ember > 0.05;
     this.flames.material.uniforms.uLit.value = this.lit;
     this.embers.material.uniforms.uLit.value = Math.max(this.lit, this.ember * 0.5);
-    this.flames.scale.setScalar(1.02 + 0.06 * Math.sin(t * 3.1) + 0.22 * this.lit);
+    this.flames.scale.setScalar((0.62 + 0.04 * Math.sin(t * 3.1) + 0.13 * this.lit));
     this.glow.material.opacity = (0.34 * this.lit + 0.3 * this.ember) * (0.86 + 0.14 * Math.sin(t * 7.3));
-    this.glow.scale.setScalar(1.9 + 0.5 * this.lit + 0.08 * Math.sin(t * 5.1));
+    this.glow.scale.setScalar(1.5 + 0.45 * this.lit + 0.07 * Math.sin(t * 5.1));
     this.glow.material.color.setRGB(1, 0.5 + 0.12 * this.lit, 0.18 + 0.06 * this.lit);
     // smoke: a slow column that leans with the same wind the trees move in
     const day = shared.uDawn.value;
@@ -278,6 +362,7 @@ export class Campfire {
       const fade = Math.sin(Math.min(1, u) * Math.PI) * (1 - u * 0.35);
       s.material.opacity = fade * 0.13 * this.lit * (0.55 + 0.45 * day);
     }
+    this._stream(dt);
     // and the steam of the dousing
     this.puffT = Math.max(0, this.puffT - dt);
     const pk = this.puffT > 0 ? 1 - this.puffT / 1.7 : 0;
@@ -286,9 +371,9 @@ export class Campfire {
       const u = clamp(pk + s.userData.seed * 0.4, 0, 1);
       const rise = u * 2.2;
       s.position.set(Math.cos(s.userData.a) * s.userData.r * (1 + u * 2.4), 0.35 + rise, Math.sin(s.userData.a) * s.userData.r * (1 + u * 2.4));
-      const grow = 0.35 + u * 1.9;
+      const grow = 0.3 + u * 1.35;
       s.scale.set(grow, grow, 1);
-      s.material.opacity = Math.sin(Math.min(1, u) * Math.PI) * 0.34 * this.puffK;
+      s.material.opacity = Math.sin(Math.min(1, u) * Math.PI) * 0.2 * this.puffK;
     }
   }
 

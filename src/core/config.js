@@ -17,7 +17,6 @@ export const CFG = {
   GRACE_SECONDS: 12, // at the start of the night monsters can't hunt you
   SPAWN_DELAY: 45, // ...and for the first 45 s the forest sleeps: no monsters at all, look around in peace
   DUSK_SECONDS: 3.6, // ...and then the light dies
-  CAMP_LEASH: 26, // in the morning you stay around the camp
 
   // the way out: a fenced forestry yard by the north edge — a broken УАЗ behind sliding gates that run on the
   // generators' power — and past it a cut through the hills down to the highway
