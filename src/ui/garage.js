@@ -222,7 +222,7 @@ void main() {
   col += vec3(0.78, 0.85, 0.9) * ring * edge * 0.45;
   col += vec3(0.6, 0.8, 0.9) * uHover * edge * 0.25;
   // the gates, when the pointer is on them: their edges pick up a cold light, so it reads as a way out
-  if (k == 30) col += vec3(0.42, 0.72, 0.86) * uGate * (0.12 + 0.5 * edge) * (0.75 + 0.25 * sin(uTime * 3.4));
+  if (k == 30) col += vec3(0.42, 0.72, 0.86) * uGate * (0.18 + 0.75 * edge) * (0.75 + 0.25 * sin(uTime * 3.4));
 
   if (k == 17 || k == 18) {
     float fl = 0.86 + 0.14 * sin(uTime * 9.0 + vWorld.y * 40.0) * sin(uTime * 5.3);
@@ -1070,9 +1070,9 @@ export class Garage {
       // under the pointer the gates light up and come off the latch a hand's width — the way out invites
       const want = this.overGate ? 1 : 0;
       this.gateHover = damp(this.gateHover || 0, want, 7, dt);
-      this.u.uGate.value = this.gateHover * 0.5;
+      this.u.uGate.value = this.gateHover;
       if (this.gateLeaves) {
-        const crack = 0.17 * this.gateHover;
+        const crack = 0.22 * this.gateHover;
         this.gateLeaves[0].rotation.y = -crack;
         this.gateLeaves[1].rotation.y = crack;
       }
@@ -1239,6 +1239,12 @@ export class Garage {
     this.homeK = damp(this.homeK ?? 1, this.view === 'home' ? 1 : 0, 2.2, dt);
     this._cutscene(dt);
     this._departure(dt);
+    // the camera eases into the room; a pointer resting still on the gates must not lose them
+    this.hoverT = (this.hoverT || 0) + dt;
+    if (this.hoverT > 0.15 && this.ptr.on && this.ptr.cx != null) {
+      this.hoverT = 0;
+      this._gateOver(!this.depart && !this.cut && this.hitGate(this.ptr.cx, this.ptr.cy));
+    }
     this._ambient(dt);
     this._car(dt);
     this._figures(dt);
@@ -2147,12 +2153,17 @@ export class Garage {
     this.ptr.on = on;
     // the gates: the pointer resting on them lights them and eases them off the latch, with a soft latch
     // click the first moment it lands there
+    this.ptr.cx = clientX; this.ptr.cy = clientY;
     const over = on && !this.depart && !this.cut && this.hitGate(clientX, clientY);
+    this._gateOver(over);
+    this.hoverSlot = on ? this.hit(clientX, clientY) : -1;
+    return this.hoverSlot;
+  }
+
+  _gateOver(over) {
     if (over && !this.gateWasOver && this.audio?.ready) this.audio.clank(ROOM.X0, 1.2, GATE.mid, 0.28);
     this.gateWasOver = over;
     this.overGate = over;
-    this.hoverSlot = on ? this.hit(clientX, clientY) : -1;
-    return this.hoverSlot;
   }
 
   // which figure is under a screen point (CSS px) — a capsule from the hips to the head

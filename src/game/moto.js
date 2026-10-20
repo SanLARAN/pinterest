@@ -13,6 +13,7 @@ import { geometryOf } from './uaz.js';
 import { GroundShade } from './groundShade.js';
 
 const PI = Math.PI;
+const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 export const MOTO = {
   max: 17, // m/s flat out (~60 km/h through the trees)
   accel: 7.5,
@@ -28,6 +29,7 @@ export const MOTO = {
   seat: 1.24, // the rider's eye line on the seat
   throwAt: 5.5, // a head-on hit faster than this dumps the rider
   radius: 0.55,
+  wheelbase: 0.62, // half the distance between the axles: where the two wheels read the hill
 };
 
 // the bike itself: a plain state object the park moves around (pure math, tested without a scene)
@@ -94,7 +96,11 @@ export function stepBike(b, input, world, dt) {
   // simply lets go and the machine is in the air — which is what a jump over a bank is. Where the hill
   // falls away faster than gravity can take the bike down, it flies there too; on anything smooth the
   // suspension keeps it planted, and a landing compresses it (b.sus, drawn by place()).
-  const gh = world.terrain.height(b.x, b.z);
+  // The hill is read under each wheel, not under the middle of the bike: over a crest the rear axle
+  // still has ground while the front has none, and that difference is both the pitch and the jump.
+  const ghF = world.terrain.height(b.x + fx * MOTO.wheelbase, b.z + fz * MOTO.wheelbase);
+  const ghB = world.terrain.height(b.x - fx * MOTO.wheelbase, b.z - fz * MOTO.wheelbase);
+  const gh = (ghF + ghB) / 2;
   const vg = b.lastGh == null ? 0 : (gh - b.lastGh) / dt; // how fast the ground under it is moving
   b.lastGh = gh;
   if (b.grounded && vg > b.vy) b.vy = Math.min(vg, MOTO.hop); // the rise picks the bike up
@@ -113,12 +119,14 @@ export function stepBike(b, input, world, dt) {
   }
   // the chassis follows the slope on the ground and the arc in the air
   if (b.grounded) {
-    b.pitch = damp(b.pitch, clamp(Math.atan2(world.terrain.height(b.x + fx * 0.8, b.z + fz * 0.8) - world.terrain.height(b.x - fx * 0.8, b.z - fz * 0.8), 1.6) * (v >= 0 ? 1 : -1), -0.62, 0.62), 9, dt);
+    const slope = Math.atan2(ghF - ghB, MOTO.wheelbase * 2) * (v >= 0 ? 1 : -1);
+    b.pitch = damp(b.pitch, clamp(slope, -0.7, 0.7), 10, dt);
   } else {
-    b.pitch = damp(b.pitch, b.vy > 0 ? 0.2 : -0.26, 2.4, dt); // nose up on the way up, down on the way down
+    b.pitch = damp(b.pitch, b.vy > 0 ? 0.22 : -0.3, 2.4, dt); // nose up on the way up, down on the way down
   }
   b.air = b.grounded ? Math.max(0, b.air - dt * 4) : Math.min(1, b.air + dt * 4);
   b.sus = Math.max(0, b.sus - dt * 2.2);
+  b.compress = damp(b.compress || 0, b.grounded ? 0 : 1, 6, dt);
 
   // the lean: into the turn at speed, upright in the air
   const leanT = onGround ? -b.steer * MOTO.lean * clamp(Math.abs(v) / 6, 0, 1) : b.roll * 0.4;
@@ -271,6 +279,7 @@ export class MotoPark {
     this.rider = -1;
     this.riders.clear();
     this.mountT = 0;
+    this._dropCockpit();
     const yaw = g.trainingYaw || 0.6;
     for (let i = 0; i < 4; i++) {
       const off = (i - 1.5) * 1.5;
@@ -366,8 +375,9 @@ export class MotoPark {
     if (!silent) g.hud.popup(t('motoOff'), 'dim');
     g.audio?.motoOff?.();
     if (g.sync) g.sync.ev('mb', i, 0);
-    this.place(); // it was hidden while under you (the cockpit stood in for it)
-    if (b && b.mesh) b.mesh.visible = true; // and it is in the frame, whatever happened above
+    if (b && b.mesh) b.mesh.visible = true; // it was hidden while under you: show it *before* the next place()
+    this.place(); // ...which then keeps it shown (rider is -1 now)
+    if (b && b.mesh) b.mesh.visible = true; // belt and braces: it is never left as the invisible ride
   }
 
   // a friend got on/off their bike ('mb': every machine marks it, and draws it under them)
@@ -395,6 +405,7 @@ export class MotoPark {
   update(dt, input) {
     const g = this.g;
     this.mountT = Math.max(0, this.mountT - dt);
+    if (this.rider >= 0 && !this.bikes[this.rider]) this.rider = -1; // the ride was taken away under them
     if (this.rider >= 0 && g.state !== 'training') this.dismount(true); // the range ended under you
     this._reconcile();
     if (this.rider < 0) {
@@ -482,12 +493,22 @@ export class MotoPark {
       let x = b.x, z = b.z, yaw = b.yaw, y = b.y, roll = b.roll, pitch = b.pitch, spin = b.spin;
       if (b.i !== this.rider && riderId) {
         const r = g.remotes.get(riderId);
-        if (r) { x = r.x; z = r.z; yaw = r.yaw; y = r.y; spin = (r.moved || 0) * 2.2; }
+        if (r && Number.isFinite(r.x) && Number.isFinite(r.z)) {
+          // Their state is the bike's state: write it back into the bike itself, so the machine is
+          // standing where they stepped off it (and not back at the rack where it was parked).
+          const dyaw = wrap(r.yaw - b.yaw);
+          b.x = x = r.x; b.z = z = r.z; b.y = y = r.y; b.yaw = yaw = r.yaw;
+          b.roll = roll = damp(b.roll, clamp(-dyaw * 14, -0.45, 0.45), 6, 1 / 60);
+          b.pitch = pitch = damp(b.pitch, 0, 4, 1 / 60);
+          spin = (r.moved || 0) * 2.2;
+        }
       }
       if (!b.mesh.parent && g.scene) g.scene.add(b.mesh); // a mesh that lost its parent comes home
-      b.mesh.position.set(x, y, z);
+      // a landing compresses the suspension: the body sits a hand's width lower for a moment
+      const squat = (b.sus || 0) * 0.07;
+      b.mesh.position.set(x, y - squat, z);
       b.mesh.rotation.set(pitch, yaw, roll, 'YXZ');
-      b.mesh.visible = !(b.i === this.rider && g.state === 'training'); // yours is replaced by the cockpit (see placeCockpit)
+      b.mesh.visible = !(b.i === this.rider && this.rider >= 0 && g.state === 'training'); // yours is replaced by the cockpit (see placeCockpit)
       // the front wheel also turns with the bars; both roll with the road
       for (let k = 0; k < b.wheels.length; k++) {
         const w = b.wheels[k];
@@ -504,8 +525,17 @@ export class MotoPark {
       b.shade?.dispose();
     }
     this.bikes = [];
-    if (this.cockpit?.mesh.parent) this.cockpit.mesh.parent.remove(this.cockpit.mesh);
-    this.cockpit = null;
+    this._dropCockpit();
+  }
+
+  // the bars in front of you are one mesh, made on the first ride and reused: take it out of the scene
+  // with the park (it used to stay behind, frozen at the last camera position)
+  _dropCockpit() {
+    for (const key of ['cockpitMesh']) {
+      const m = this[key];
+      if (m?.parent) m.parent.remove(m);
+      if (m) { m.geometry?.dispose?.(); this[key] = null; }
+    }
   }
 
   // the cockpit under the camera: built once, hidden while walking, leaning with the bike

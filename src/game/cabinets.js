@@ -454,7 +454,7 @@ export class Cabinets {
           x -= ITEM_W[j];
         }
         if (c.kind === 'firstaid' && k === 0) kind = 'glow';
-        if (g.online && c.id === 'zarya:aid' && k === 0) kind = 'syringe'; // co-op: the medicine cabinet keeps a dose
+        if (c.id === 'zarya:aid' && k === 0) kind = 'syringe'; // the medicine cabinet keeps a dose (solo too: it goes in your own thigh)
         if (c.spec.loot?.[k]) kind = c.spec.loot[k];
         const mesh = new THREE.Mesh(this.itemGeo[kind], this.mat);
         const y = SHELF_Y[c.kind][k] + (c.kind === 'firstaid' ? 0 : 0);

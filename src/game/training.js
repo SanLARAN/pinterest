@@ -164,6 +164,15 @@ export class Training {
     crate.frustumCulled = false;
     this.group.add(crate);
 
+    // It is a stand, not a picture: the board and the two posts push back. One capsule along the back
+    // board (with the posts' feet inside it) is enough — the shelves are shallow and the kit is meant
+    // to be reached for, so the collider stops you at the boards and never at the boxes on them.
+    this.colIdx = [];
+    const [ax, az] = world(-1.15, -0.2), [bx2, bz2] = world(1.15, -0.2);
+    this.colIdx.push(g.world.col.add(ax, az, bx2, bz2, 0.3, 1.7, KIND.WOOD));
+    const [cx2, cz2] = world(-1.55, 0.5);
+    this.colIdx.push(g.world.col.circle(cx2, cz2, 0.26, 0.5, KIND.WOOD)); // the crate of stones
+
     // The two field tools come to the stand too, lying flat on the ground just past each end — out of
     // the stand's use radius, so E at the shelves still means "take the whole kit". (There are two of
     // each in the world; the stand borrows whichever lies closest.)

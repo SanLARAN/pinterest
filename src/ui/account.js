@@ -81,6 +81,24 @@ export class AccountUI {
   await this.cloud.authenticate(kind,{email:v.email,password:v.password,name:v.display_name});if(kind==='register')this.message=W.sent;if(kind==='recover')this.message=W.recoverySent;if(kind==='password')this.message=W.passwordSaved;
  });}
  async find(){clearTimeout(this.searchTimer);const query=this.query.trim().replace(/^@/,'').toLowerCase();if(!/^[a-z0-9_]{3,20}$/.test(query)){this.results=null;this.render();return;}const ticket=this.searchTicket=(this.searchTicket||0)+1;try{const result=await this.cloud.search(query);if(ticket===this.searchTicket){this.results=result;this.error='';this.scheduleRender();}}catch(e){if(ticket===this.searchTicket){this.error=cloudError(e);this.render();}}}
+ // a toast's own buttons: accept the invitation (or turn it down) without opening the panel
+ async toastInvite(id, accept) {
+  if (!id || this.busy) return false;
+  this.busy = true;
+  try {
+   const room = await this.cloud.answerInvite(id, !!accept);
+   if (!accept) return true;
+   if (!room || !/^[A-HJ-NP-Z2-9]{4,8}$/.test(room.room_code)) throw new Error('not_in_lobby');
+   await this.onJoin(room);
+   return true;
+  } catch (e) {
+   this.error = cloudError(e);
+   this.render();
+   return false;
+  } finally {
+   this.busy = false;
+  }
+ }
  action(action,id,confirmed=false){
   const W=cloudWords();if(['profile','friends'].includes(action)){this.capture();this.scrollReset=true;this.view=action;this.render();if(action==='friends'&&this.cloud.user)this.cloud.refreshSocial().catch(e=>{this.error=cloudError(e);this.render();});return;}
   if(['login','register','recover'].includes(action)){this.clearPasswords();this.mode=action;this.message='';this.error='';this.view='profile';this.render();return;}

@@ -469,10 +469,33 @@ export class Rescue {
   startJab() {
     const g = this.g;
     if (this.jab) return;
-    if (g.inventory.syringes <= 0) return;
+    if (g.inventory.syringes <= 0) { g.hud.popup(t('syrEmpty'), 'dim'); return; }
     const b = this.jabTarget();
-    if (!b) { g.hud.popup(t('syrNoOne'), 'dim'); return; }
-    this.jab = { id: b.id, t: 0 };
+    if (b) { this.jab = { id: b.id, t: 0 }; return; }
+    // No one down within reach. If a friend is down somewhere else, keep the dose: that is the point
+    // of it. If there is no one to raise at all — a solo shift, or everyone on their feet — the dose
+    // goes into your own thigh: the breath comes back, and the legs go for five minutes.
+    if (this.downed().some((q) => q !== g.player && !q.carriedBy && !q.onCot && !q.consumed && !q.gone)) {
+      g.hud.popup(t('syrNoOne'), 'dim');
+      return;
+    }
+    this.selfJab();
+  }
+
+  // your own dose: the stamina bar refills at once and the exhaustion lifts, at the syringe's price
+  selfJab() {
+    const g = this.g, p = g.player;
+    if (!p?.alive || (g.inventory.syringes | 0) <= 0) return false;
+    g.inventory.syringes--;
+    p.stamina = CFG.PLAYER.stamina;
+    p.exhausted = false;
+    p.adrenaline = CFG.SYRINGE.debuff;
+    g.inventory.reconcile();
+    g.hud.popup(t('syrSelf'), 'warn');
+    g.hud.popup(t('syrRubber'), 'dim');
+    g.audio?.reviveGasp?.(p.x, p.y + 1.2, p.z, true);
+    if (g.stats) g.stats.syringes = (g.stats.syringes | 0) + 0;
+    return true;
   }
 
   _jabTick(dt) {

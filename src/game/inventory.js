@@ -48,12 +48,13 @@ export class Backpack {
         <header class="bp-head">
           <div class="bp-kicker">HUSH · FIELD KIT</div>
           <h2 class="bp-title"></h2>
-          <div class="bp-cap"><span class="bp-cap-k"></span><b class="bp-cap-v"></b></div>
+          <div class="bp-head-r"><span class="bp-tab-name"></span><i class="bp-heart" aria-hidden="true"></i><i class="bp-heart" aria-hidden="true"></i><i class="bp-heart gap" aria-hidden="true"></i></div>
         </header>
         <nav class="bp-tabs" role="tablist"></nav>
         <div class="bp-main">
           <div class="bp-gridwrap"><div class="bp-grid" role="listbox"></div><p class="bp-tip"></p></div>
           <aside class="bp-side">
+            <div class="bp-cap"><span class="bp-cap-k"></span><b class="bp-cap-v"></b></div>
             <figure class="bp-fig" aria-hidden="true">
               <span class="bp-fig-glow"></span>
               <svg class="bp-body" viewBox="0 0 220 340">
@@ -87,6 +88,7 @@ export class Backpack {
                 <button type="button" data-bp="equip"></button>
                 <button type="button" data-bp="drop"></button>
               </div>
+              <div class="bp-card-foot"><span>◀ ▶</span><span>E</span><span>DEL</span></div>
             </div>
           </aside>
         </div>
@@ -498,6 +500,7 @@ export class Backpack {
     this.el.querySelector('.bp-close').textContent=t('bagClose');
     this.el.querySelector('.bp-hint').textContent=t(touch?'bagTipT':'bagTip');
     this.el.querySelector('.bp-keys').textContent=t(touch?'bpKeysT':'bpKeys');
+    this.el.querySelector('.bp-tab-name').textContent=t('bpTab_'+this.tab);
     this.tabsEl.querySelectorAll('[data-tab]').forEach((b)=>{
       const on=b.dataset.tab===this.tab;
       b.textContent=t('bpTab_'+b.dataset.tab);

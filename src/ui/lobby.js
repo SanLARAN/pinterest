@@ -175,10 +175,12 @@ export class Lobby {
       const me = this.coop.me();
       this.el.classList.toggle('over-me', !!me && s === me.slot && bare(e) && !this.starting);
       this.el.classList.toggle('over-mate', s >= 0 && (!me || s !== me.slot) && bare(e) && !this.starting);
+      this._gateHint();
     });
     this.el.addEventListener('pointerleave', () => {
       if (this.garage) this.garage.pointer(0, 0, false);
       this.el.classList.remove('over-me', 'over-mate');
+      this._gateHint();
     });
     this.el.addEventListener('click', (e) => {
       if (!this.garage || !this._inRoom() || this.starting || !bare(e)) return;
@@ -203,6 +205,19 @@ export class Lobby {
         if (p) this._toggleVol(p.id);
       }
     });
+  }
+
+  // the gates under the pointer: say what they are for, and who may open them
+  _gateHint() {
+    const el = document.getElementById('coopGateHint');
+    if (!el) return;
+    const over = !!this.garage?.overGate && this._inRoom() && !this.starting;
+    this.el.classList.toggle('over-gate', over);
+    el.hidden = !over;
+    if (!over) return;
+    const host = this.coop.isHost && this.coop.active;
+    const text = t(host ? 'gateHintHost' : 'gateHintGuest');
+    if (el.textContent !== text) el.textContent = text;
   }
 
   openRules() {
@@ -459,6 +474,7 @@ export class Lobby {
   // every frame while the garage is drawn: hang each tag over its place (CSS px from garage.anchors())
   place(anchors) {
     this.placeRules();
+    this._gateHint(); // the gates' cue follows the pointer, whichever way the camera settled
     if (!this._inRoom() || !anchors || !anchors.length) return;
     const W = innerWidth, H = innerHeight;
     const top = this.garage ? this.garage.safe.top - 26 : 60;

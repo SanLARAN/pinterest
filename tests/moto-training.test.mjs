@@ -411,3 +411,69 @@ test('the stand is solid while the range is up, and the ground is clear again af
   col.remove(idx);
   assert.equal(col.free(0, 0, 0.3), true, 'packed up, the way is clear again');
 });
+
+// ---------------- 2.1f: the two-wheel contact, and a machine that never goes missing ----------------
+test('both wheels read the hill: the chassis follows the slope and rests between the axles', () => {
+  const slope = { height: (x, z) => -z * 0.28 }; // the ground falls away ahead (−z is forward)
+  const b = newBike(0, 0, 0, 0);
+  drive(b, world(slope), 3);
+  assert.ok(b.speed > 5, 'it rolls down a slope');
+  const mid = slope.height(b.x, b.z);
+  assert.ok(Math.abs(b.y - mid) < 0.05, `the body sits on the surface between the wheels (${(b.y - mid).toFixed(3)} m off)`);
+  assert.ok(b.pitch > 0.2 && b.pitch < 0.4, `nose follows the fall line (pitch ${b.pitch.toFixed(2)})`);
+  // and up the other way the nose lifts, still without leaving the ground on a smooth bank
+  const up = { height: (x, z) => z * 0.3 };
+  const c = newBike(1, 0, 0, 0);
+  drive(c, world(up), 3);
+  assert.ok(c.pitch < -0.2, `uphill the nose rises (pitch ${c.pitch.toFixed(2)})`);
+});
+
+function riddenPark(scene) {
+  const p = Object.create(MotoPark.prototype);
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 0.3), new THREE.MeshBasicMaterial());
+  scene.add(mesh);
+  p.g = {
+    state: 'training', scene,
+    remotes: new Map(),
+    player: { x: 0, z: 0, vx: 0, vz: 0, y: 0, yaw: 0, speed: 0, alive: true },
+    hud: { popup() {}, setUse() {} },
+    audio: {},
+    sync: null,
+    world: { terrain: { height: () => 0 } },
+  };
+  p.bikes = [Object.assign(newBike(0, 1, 2, 0.5), { mesh, wheels: [], shade: null })];
+  p.riders = new Map();
+  p.rider = -1;
+  p.mountT = 0;
+  p.hum = null;
+  return p;
+}
+
+test('a parked machine comes back the moment you step off it (it used to stay hidden)', () => {
+  const p = riddenPark(new THREE.Scene());
+  p.rider = 0; // sitting on it: the cockpit stands in for the mesh
+  p.place();
+  assert.equal(p.bikes[0].mesh.visible, false, 'while riding, your own bike is the cockpit');
+  p.dismount(true);
+  assert.equal(p.rider, -1);
+  assert.equal(p.bikes[0].mesh.visible, true, 'stepped off: the machine is in the frame');
+  const b = p.bikes[0];
+  assert.ok(Math.abs(b.y) < 0.02 && b.grounded !== false, 'standing on both wheels where it was left');
+});
+
+test("a friend's ride is their bike: the state they send moves the machine, and stepping off leaves it there", () => {
+  const p = riddenPark(new THREE.Scene());
+  p.riders.set(0, 'p1');
+  p.g.remotes.set('p1', { id: 'p1', x: 7, y: 0, z: -4, yaw: 1.1, riding: 0, alive: true, moved: 0.2 });
+  p.place();
+  const b = p.bikes[0];
+  assert.ok(Math.abs(b.x - 7) < 1e-6 && Math.abs(b.z + 4) < 1e-6, 'the bike is under the rider, not at the rack');
+  assert.ok(Math.abs(b.yaw - 1.1) < 1e-6);
+  assert.equal(b.mesh.visible, true, 'and it is drawn');
+  // they step off here: the machine stays here (the next packet carries riding = -1)
+  p.g.remotes.set('p1', { ...p.g.remotes.get('p1'), riding: -1 });
+  p._reconcile();
+  assert.equal(p.riders.size, 0, 'no one is on it now');
+  p.place();
+  assert.ok(Math.abs(b.mesh.position.x - 7) < 1e-6 && Math.abs(b.mesh.position.z + 4) < 1e-6, 'the bike did not teleport home');
+});

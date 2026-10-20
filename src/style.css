@@ -1429,3 +1429,9 @@ body.touch .bino-time { bottom: auto; top: 48px; font-size: 12px; }
   .book-close svg { width: 18px; height: 18px; }
   .pg-close { padding: 9px 16px; font-size: 11px; }
 }
+
+
+/* the lobby's gates: under the pointer they light up and crack open — say so, in the host's words */
+#coopGateHint { position: fixed; left: 50%; bottom: calc(150px + var(--safe-b, 0px)); z-index: 4; transform: translateX(-50%); padding: 7px 16px; border: 1px solid #9fc4d366; border-radius: 2px; background: #08131af0; color: #cfe6ef; font-size: 10px; letter-spacing: .14em; text-transform: uppercase; pointer-events: none; box-shadow: 0 10px 40px #000a, 0 0 22px #7fc3dd22; }
+#coopPanel.over-gate { cursor: pointer; }
+@media (max-height: 640px) { #coopGateHint { bottom: calc(120px + var(--safe-b, 0px)); } }

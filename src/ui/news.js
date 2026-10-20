@@ -7,6 +7,31 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v:'2.1f',date:'2026-10-20',
+    ru:{title:'Две оси и полевой справочник',items:[
+      'Мотоцикл больше не липнет к земле одной точкой: высота читается под каждой осью, корпус идёт по уклону, а приземление приседает на подвеске',
+      'Слез — машина стоит там, где ты её оставил, на обоих колёсах; друг на мотоцикле двигает саму машину, и после него она не уезжает к стеллажу',
+      'Рюкзак открывается как полевой справочник: заголовок по центру, вкладки с подчёркиванием, полки с иконками и счётчиками, выживший с предметом в руках и карточка с красным корешком. Выбросить — перетащить мышкой',
+      'На полигоне в паузе больше нет ни «ЗАВЕРШИТЬ ПОЛИГОН», ни «ЗАНОВО»: оттуда выходят через «МЕНЮ»',
+      'Ворота гаража под курсором светятся сильнее и приоткрываются, а под лобби появляется строка, что они открываются, и кто их открывает',
+      'Шприц адреналина есть и в одиночной смене: если рядом никто не лежит, укол идёт в собственное бедро — выносливость возвращается, ноги ватные пять минут',
+      'Записка с трупа гасит подсказку «удерживай E»; раньше она возвращалась после закрытия записки',
+      'Приглашение в комнату приходит с кнопками «Войти» и «Отклонить» — присоединиться можно прямо из уведомления',
+      'Атлас: если витрина страницы падает, страница остаётся читаемой, а игла шприца перерисована без вырожденных треугольников',
+    ]},
+    en:{title:'Two axles and a field guide',items:[
+      'The bike no longer sticks to the ground at one point: the hill is read under each axle, the body follows the slope, and a landing compresses the suspension',
+      'Step off and the machine stands where you left it, on both wheels; a friend riding moves the bike itself, and when they step off it does not jump back to the rack',
+      'The backpack opens like a field guide: a centred title, underlined tabs, shelves with icons and counts, the survivor holding the item and a card with a red spine. Drop it by dragging',
+      'The range pause menu has neither END THE TRAINING nor RESTART: leave the range through MENU',
+      'The garage gates under the pointer light up harder and come off the latch, and a line under the lobby says what they do and who opens them',
+      'The adrenaline syringe exists in a solo shift too: with nobody down nearby the dose goes into your own thigh — stamina returns, the legs go for five minutes',
+      'The note from a body now clears the hold-E prompt; it used to come back when the note closed',
+      'A room invitation arrives with JOIN and DECLINE buttons — you can join straight from the toast',
+      'Atlas: if a plate throws, the page still reads, and the syringe needle is rebuilt without degenerate triangles',
+    ]},
+  },
+  {
     v:'2.1e',date:'2026-10-20',
     ru:{title:'Ночь с порога',items:[
       'Смена начинается ночью сразу: за воротами больше нет трёх секунд утреннего света — темнота приходит вместе с машиной',

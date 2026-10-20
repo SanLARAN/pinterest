@@ -706,7 +706,12 @@ export class Objectives {
 
   openNote(kicker, text) {
     this.note = { t: NOTE_SECONDS };
-    this.g.hud.showNote(kicker, text);
+    const hud = this.g.hud;
+    // the page you found covers the prompt: drop the "hold E to search" under it, or it comes back
+    // when the note goes (it was never told the search had finished)
+    hud.setUse(null);
+    hud.setHint(null);
+    hud.showNote(kicker, text);
     this.g.audio.paper();
   }
 

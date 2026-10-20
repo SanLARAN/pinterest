@@ -1772,7 +1772,11 @@ export class Game {
       // in daylight — or in any real light: a lamp, a flare, a glow stick, the hut's lantern — they're simply
       // there, in their own clothes (not while you're behind their eyes, or they're on your shoulder)
       const lit = day ? 1 : this.glowAt(r.x, r.y + (r.alive || r.carriedBy ? 1.2 : 0.4), r.z);
-      r.rig.root.visible = watched !== r && !this.onShoulder(r) && lit > 0.03 && this.state !== 'idle' && !this.cabinets.hides(r);
+      // On the range there is nothing to hide behind: a friend is drawn there whatever the hour, the
+      // lamp or the cupboard thinks. (They used to blink out when a state packet landed mid-teardown.)
+      const range = this.state === 'training';
+      r.rig.root.visible = watched !== r && !this.onShoulder(r)
+        && (range ? r.alive : lit > 0.03 && this.state !== 'idle' && !this.cabinets.hides(r));
       if (lit > 0.06 && !day) r.revealT = this.time;
     }
   }

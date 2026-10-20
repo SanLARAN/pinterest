@@ -686,8 +686,20 @@ export function buildCarWheels(opts = {}, only = -1) {
     b.cylinder(10, r * 0.55, r * 0.55, 0.03, P, { y0: -0.015, capBottom: true });
     b.place(cx, cy, cz + sz * w * 0.45, PI / 2, 0, 0);
     b.cylinder(6, 0.07, 0.07, 0.03, GK.CHROME, { y0: -0.015 });
-    // a bright valve on the rim: a wheel that turns has to look like it turns, even from across the garage
-    boxAt(b, cx + r * 0.55, cy + r * 0.55, cz + sz * (w * 0.46), 0.05, 0.05, 0.018, GK.CHROME);
+    // A wheel has to look like a wheel that turns. The tyre gets tread blocks around its shoulder and
+    // the rim gets four spokes and a bright valve, so a revolution reads even across a dark garage.
+    for (let k = 0; k < 12; k++) {
+      const a = (k / 12) * Math.PI * 2;
+      const tx = cx + Math.cos(a) * (r * 0.96), ty = cy + Math.sin(a) * (r * 0.96);
+      b.place(tx, ty, cz, 0, 0, a + Math.PI / 2);
+      b.box(0.1, 0.055, w * 0.92, GK.DARK);
+    }
+    for (let k = 0; k < 4; k++) {
+      const a = (k / 4) * Math.PI;
+      b.place(cx + Math.cos(a) * r * 0.28, cy + Math.sin(a) * r * 0.28, cz + sz * (w * 0.4), 0, 0, a);
+      b.box(r * 0.5, 0.045, 0.02, GK.CHROME);
+    }
+    boxAt(b, cx + r * 0.6, cy + r * 0.6, cz + sz * (w * 0.47), 0.07, 0.07, 0.02, GK.BONE);
   });
   return b.toArrays();
 }

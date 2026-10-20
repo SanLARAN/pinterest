@@ -130,7 +130,22 @@ export class Atlas {
   // the main loop calls this every frame while the atlas is open
   frame(dt) {
     if (!this.shown) return;
-    if (this.spec) this.spec.frame(dt);
+    if (this.spec) {
+      // A plate that throws on its own frame is a black page and nothing else — the text beside it
+      // still reads. Count the failures and put the specimen down rather than retrying it forever.
+      try {
+        this.spec.frame(dt);
+        this.specFails = 0;
+      } catch (e) {
+        this.specFails = (this.specFails | 0) + 1;
+        if (this.specFails === 1) console.warn('[atlas] the plate stumbled', e);
+        if (this.specFails > 4) {
+          try { this.spec.hide?.(); } catch { /* */ }
+          this.spec = null;
+          $('atlasPlate').classList.add('nogl');
+        }
+      }
+    }
     // a page turn that never landed (a tab that slept through the timer, a frame that threw while the
     // page was being laid down) would freeze the book on that leaf: land it late rather than never
     if (this.busy && this.turnAt && performance.now() - this.turnAt > 1200) {
