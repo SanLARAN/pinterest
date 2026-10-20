@@ -364,6 +364,7 @@ export class MotoPark {
     g.audio?.motoOff?.();
     if (g.sync) g.sync.ev('mb', i, 0);
     this.place(); // it was hidden while under you (the cockpit stood in for it)
+    if (b && b.mesh) b.mesh.visible = true; // and it is in the frame, whatever happened above
   }
 
   // a friend got on/off their bike ('mb': every machine marks it, and draws it under them)
@@ -479,6 +480,7 @@ export class MotoPark {
         const r = g.remotes.get(riderId);
         if (r) { x = r.x; z = r.z; yaw = r.yaw; y = r.y; spin = (r.moved || 0) * 2.2; }
       }
+      if (!b.mesh.parent && g.scene) g.scene.add(b.mesh); // a mesh that lost its parent comes home
       b.mesh.position.set(x, y, z);
       b.mesh.rotation.set(pitch, yaw, roll, 'YXZ');
       b.mesh.visible = b.i !== this.rider; // yours is replaced by the cockpit (see placeCockpit)
