@@ -52,6 +52,33 @@ test('a crest at speed throws it into the air; it lands, and the landing is an e
   assert.ok(Math.abs(b.y - cliff.height(b.x, b.z)) < 0.02, 'and settled on the ground');
 });
 
+test('a rolling hill throws it into the air and lands it again; flat ground keeps it planted', () => {
+  const hill = { height: (x, z) => 2.2 * Math.sin(z * 0.1) + 0.8 * Math.sin(z * 0.33 + 1) };
+  const b = newBike(0, 0, 0, 0);
+  let air = 0, landed = 0, gap = 0;
+  for (let i = 0; i < 900; i++) {
+    const ev = stepBike(b, { move: { x: 0, y: 1 } }, world(hill), 1 / 60);
+    if (!b.grounded) {
+      air += 1 / 60;
+      gap = Math.max(gap, b.y - hill.height(b.x, b.z));
+    }
+    if (ev.landed > 0) landed++;
+  }
+  assert.ok(air > 0.5, `it spends real time in the air over crests (${air.toFixed(2)} s)`);
+  assert.ok(gap > 0.15, `and gets off the ground (${gap.toFixed(2)} m)`);
+  assert.ok(landed > 2, `coming down again is an event (${landed} landings)`);
+  assert.ok(Math.abs(b.y - hill.height(b.x, b.z)) < 0.1, 'and it is back on the hill, not floating');
+  // the same bike on the flat never leaves the ground
+  const f = newBike(1, 0, 0, 0);
+  let flatAir = 0;
+  for (let i = 0; i < 300; i++) {
+    stepBike(f, { move: { x: 0, y: 1 } }, world(), 1 / 60);
+    if (!f.grounded) flatAir += 1 / 60;
+  }
+  assert.equal(flatAir, 0, 'no phantom hops on level ground');
+  assert.equal(f.y, 0);
+});
+
 test('a tree head-on at speed throws the rider; a glancing blow only bumps', () => {
   const b = newBike(0, 0, 0, 0);
   drive(b, world(), 2.2); // ~13 m/s
@@ -105,6 +132,27 @@ test('a friend\'s bike is not yours to take: the park hides what is ridden', () 
   const found2 = [];
   p.consider((b) => found2.push(b.i));
   assert.deepEqual(found2, [0, 1]);
+});
+
+test('a friend on a bike is read off the wire: the machine follows them, and frees up when they step off', () => {
+  const p = park();
+  const friend = { id: 'b', alive: true, riding: 1 };
+  p.g.remotes = new Map([['b', friend]]);
+  p._reconcile();
+  assert.equal(p.riders.get(1), 'b', 'bike 1 is under them');
+  const found = [];
+  p.consider((b) => found.push(b.i));
+  assert.deepEqual(found, [0], 'and it is not yours to take');
+  // the packet says they are walking again (a lost 'mb' does not matter)
+  friend.riding = -1;
+  p._reconcile();
+  assert.equal(p.riders.has(1), false, 'the bike is free the moment they step off');
+  // a friend who is gone or down never keeps a machine
+  friend.riding = 1;
+  p._reconcile();
+  friend.alive = false;
+  p._reconcile();
+  assert.equal(p.riders.has(1), false, 'a downed rider frees the bike');
 });
 
 test('mounting claims the nearest free bike and dismounting steps you off beside it', () => {
@@ -242,11 +290,30 @@ test('the departure film: it starts once, plays its beats, and fires exactly onc
     for (let i = 0; i < 60 * 8; i++) garage._departure(1 / 60);
     assert.equal(fired, 1, 'the destination is called exactly once');
     assert.equal(garage.depart, null);
-    assert.equal(garage.gateLeaves, null, 'the room is whole again');
+    assert.ok(garage.gateLeaves.every((m) => Math.abs(m.rotation.y) < 1e-6), 'the gates swing shut again');
     // and it can play again
     assert.equal(garage.startDepart(() => fired++), true);
     garage._endDepart();
     assert.equal(fired, 1, 'a cancelled film never fires its destination');
+  } finally {
+    stub.restore();
+  }
+});
+
+test('the gates answer the pointer: they light up and come off the latch, then settle when it leaves', async () => {
+  const stub = await garageStub();
+  const garage = stub.garage;
+  try {
+    assert.equal(garage.u.uGate.value, 0, 'dark to begin with');
+    garage.overGate = true;
+    for (let i = 0; i < 60; i++) garage._departure(1 / 60);
+    assert.ok(garage.u.uGate.value > 0.4, `the steel picks up the light (${garage.u.uGate.value.toFixed(2)})`);
+    assert.ok(Math.abs(garage.gateLeaves[1].rotation.y) > 0.05, 'the near leaf cracks open');
+    assert.ok(garage.gateLeaves[0].rotation.y < 0, 'and so does the far one');
+    garage.overGate = false;
+    for (let i = 0; i < 90; i++) garage._departure(1 / 60);
+    assert.ok(garage.u.uGate.value < 0.05, 'the light goes when the pointer does');
+    assert.ok(Math.abs(garage.gateLeaves[1].rotation.y) < 0.01, 'and the leaves settle shut');
   } finally {
     stub.restore();
   }

@@ -68,6 +68,7 @@ uniform vec3 uDye[4];
 uniform vec4 uGlow;
 uniform vec3 uGlowCol;
 uniform float uHover;
+uniform float uGate;
 uniform float uAppear;  // 1 = here; 0..1 = materialising from the feet up
 uniform vec2 uAppearY;
 uniform float uAlpha;   // < 1: glass
@@ -220,6 +221,8 @@ void main() {
   col += base * edge * (0.05 + 0.3 * min(lum, 1.5) + 0.35 * uHover + 0.8 * lit + 1.3 * ring);
   col += vec3(0.78, 0.85, 0.9) * ring * edge * 0.45;
   col += vec3(0.6, 0.8, 0.9) * uHover * edge * 0.25;
+  // the gates, when the pointer is on them: their edges pick up a cold light, so it reads as a way out
+  if (k == 30) col += vec3(0.42, 0.72, 0.86) * uGate * (0.35 + 0.9 * edge) * (0.75 + 0.25 * sin(uTime * 3.4));
 
   if (k == 17 || k == 18) {
     float fl = 0.86 + 0.14 * sin(uTime * 9.0 + vWorld.y * 40.0) * sin(uTime * 5.3);
@@ -541,6 +544,7 @@ export class Garage {
       uBlob: { value: Array.from({ length: 10 }, () => V4()) },
       uCarBox: { value: V4(CAR.x, CAR.z, CAR.len / 2 + 0.05, CAR.wid / 2 + 0.02) },
       uCarDye: { value: [new THREE.Color('#4e6b3c'), new THREE.Color('#8a6a48')] },
+      uGate: { value: 0 }, // the gates under the pointer: a lit edge, and they crack open
     };
     this.matSet = this._mat({}, { side: THREE.DoubleSide });
     this.matGlass = this._mat({ uAlpha: { value: 0.16 } }, { transparent: true, depthWrite: false, side: THREE.DoubleSide });
@@ -627,13 +631,24 @@ export class Garage {
 
   _build() {
     const S = this.scene;
-    this.roomMesh = this._mesh(buildRoom());
+    // the room is built without its gate leaves: they live on their own meshes, so they can crack open
+    // when the pointer rests on them and swing wide when the film starts
+    this.roomMesh = this._mesh(buildRoom(false));
     this.ceiling = this._mesh(buildCeiling());
     this._mesh(buildProps());
     this._buildRulesPoster();
-    // the wicket door, ajar, swaying in the draught
+    this.gateLeaves = [-1, 1].map((side) => {
+      const m = this._mesh(buildGateLeaf(side));
+      m.position.set(ROOM.X0, 0, side < 0 ? GATE.z0 : GATE.z1);
+      return m;
+    });
+    this.gateHover = 0;
+    this.gateWasOver = false;
+    this.overGate = false;
+    // the wicket door, ajar, swaying in the draught — hanging on the near leaf, so it opens with it
     this.wicket = this._mesh(buildWicket());
-    this.wicket.position.set(ROOM.X0 - 0.05, GATE.wy0 + 0.01, GATE.wz1 - 0.01);
+    this.wicket.position.set(-0.05, GATE.wy0 + 0.01, GATE.wz1 - GATE.z1);
+    this.gateLeaves[1].add(this.wicket);
     // the bulb on its wire
     this.bulbPivot = new THREE.Group();
     this.bulbPivot.position.set(BULB.x, ROOM.H - 0.2, BULB.z);
@@ -999,42 +1014,20 @@ export class Garage {
     this.wheelSpin = 0;
     for (const w of this.wheelMeshes) w.rotation.z = 0;
     this.carRoot.position.set(CAR.x, 0, CAR.z);
-    // the static gate leaves give way to their own swinging meshes
-    this.roomMesh.geometry.dispose();
-    this.roomMesh.geometry = geometryFrom(buildRoom(false));
-    this.gateLeaves = [-1, 1].map((side) => {
-      const m = this._mesh(buildGateLeaf(side));
-      m.position.set(ROOM.X0, 0, side < 0 ? GATE.z0 : GATE.z1);
-      return m;
-    });
-    // the wicket rides the near leaf from now on
-    const near = this.gateLeaves[1];
-    this.wicket.position.set(-0.05, GATE.wy0 + 0.01, GATE.wz1 - GATE.z1);
-    near.add(this.wicket);
+    this.gateHover = 0; // the film takes the gates from here
     this.open(this.view === 'home' ? 'room' : this.view);
     return true;
   }
 
   // the gates are shut and the room is whole again (the film ended, or was cancelled)
   _endDepart() {
-    if (!this.depart && !this.gateLeaves) return;
+    if (!this.depart) return;
     this.depart = null;
-    if (this.gateLeaves) {
-      for (const m of this.gateLeaves) {
-        if (m.parent) m.parent.remove(m);
-        m.geometry.dispose();
-      }
-      this.gateLeaves = null;
-    }
-    if (this.wicket) {
-      this.scene.add(this.wicket);
-      this.wicket.position.set(ROOM.X0 - 0.05, GATE.wy0 + 0.01, GATE.wz1 - 0.01);
-      this.wicket.rotation.set(0, 0, 0);
-    }
-    if (this.roomMesh) {
-      this.roomMesh.geometry.dispose();
-      this.roomMesh.geometry = geometryFrom(buildRoom(true));
-    }
+    // the leaves swing shut and the wicket hangs on the near one again
+    if (this.gateLeaves) for (const m of this.gateLeaves) m.rotation.y = 0;
+    this.wicket.rotation.set(0, 0, 0);
+    this.gateHover = 0;
+    this.u.uGate.value = 0;
     this.u.uGap.value.set(ROOM.X0 - 0.25, 1.0, (GATE.wz0 + GATE.wz1) / 2, 0.9);
     this.u.uHeadI.value = 0;
     this.u.uTail.value.w = 0;
@@ -1073,6 +1066,15 @@ export class Garage {
         this.gateWob = Math.max(0, this.gateWob - dt);
         this.u.uGap.value.w = 0.9 + Math.sin(this.t * 42) * 0.12 * this.gateWob;
         if (this.gateWob <= 0) this.u.uGap.value.w = 0.9;
+      }
+      // under the pointer the gates light up and come off the latch a hand's width — the way out invites
+      const want = this.overGate ? 1 : 0;
+      this.gateHover = damp(this.gateHover || 0, want, 7, dt);
+      this.u.uGate.value = this.gateHover * 0.85;
+      if (this.gateLeaves) {
+        const crack = 0.17 * this.gateHover;
+        this.gateLeaves[0].rotation.y = -crack;
+        this.gateLeaves[1].rotation.y = crack;
       }
       return;
     }
@@ -2143,6 +2145,12 @@ export class Garage {
     this.ptr.x = (clientX / this.w) * 2 - 1;
     this.ptr.y = (clientY / this.h) * 2 - 1;
     this.ptr.on = on;
+    // the gates: the pointer resting on them lights them and eases them off the latch, with a soft latch
+    // click the first moment it lands there
+    const over = on && !this.depart && !this.cut && this.hitGate(clientX, clientY);
+    if (over && !this.gateWasOver && this.audio?.ready) this.audio.clank(ROOM.X0, 1.2, GATE.mid, 0.28);
+    this.gateWasOver = over;
+    this.overGate = over;
     this.hoverSlot = on ? this.hit(clientX, clientY) : -1;
     return this.hoverSlot;
   }

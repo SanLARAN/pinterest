@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { CFG } from '../core/config.js';
 import { BAG_KINDS } from './backpackData.js';
 import { clamp, lerp, angleDiff } from '../core/rng.js';
-import { buildSurvivor, poseSurvivor, poseCarrier, poseGlowHand, poseTorchHand, poseFur } from './survivor.js';
+import { buildSurvivor, poseSurvivor, poseCarrier, poseGlowHand, poseTorchHand, poseFur, poseRider } from './survivor.js';
 import { cleanFit } from './outfit.js';
 import { createPersonMaterial, dressPerson, undressPerson } from '../render/people.js';
 
@@ -92,6 +92,9 @@ export class RemotePlayer {
     this.torchOn = !!(f & PF.torch);
     this.torchDip = !!(f & PF.dip); // its flat battery's moment of dark
     this.torchCharge = a[9] !== undefined ? +a[9] || 0 : 1;
+    // which bike they are sitting on (-1: on their feet). This is in every state packet, so a friend who
+    // joins the range late — or whose mount event was lost — still sees them riding, not walking through a bike
+    this.riding = a[12] !== undefined ? +a[12] | 0 : -1;
     if (a[8] !== undefined) this.score = +a[8] || 0;
     // note: "alive" only ever changes through the host's word (a kill event), never from a state packet
   }
@@ -143,7 +146,13 @@ export class RemotePlayer {
         }
       }
     }
-    poseSurvivor(this.rig, this.phase, this.alive ? this.speed : 0, this.crouching, !this.alive);
+    if (this.riding >= 0 && this.alive) {
+      // a rider: knees bent, chest over the bars, leaning with the machine they are on
+      const bike = this.game.motos?.bikes?.[this.riding];
+      poseRider(this.rig, bike?.roll || 0, bike?.steer || 0, this.game.time || 0);
+    } else {
+      poseSurvivor(this.rig, this.phase, this.alive ? this.speed : 0, this.crouching, !this.alive);
+    }
     if (this.alive) poseFur(this.rig, dt, this.speed);
     const r = this.rig.root;
     const es = this.game.escape;
@@ -164,7 +173,9 @@ export class RemotePlayer {
       if (rs && rs.poseBody(this)) return; // over someone's shoulder, or on the cot
     }
     this._equipment();
-    r.position.set(this.x, this.y + (this.alive ? 0 : 0.2), this.z);
+    // on a bike the root rides the seat (the machine itself is drawn by MotoPark, under this body)
+    const seat = this.riding >= 0 ? 0.86 : 0; // the seat's top, in the bike's own frame
+    r.position.set(this.x, this.y + (this.alive ? seat : 0.2), this.z);
     r.rotation.set(this.alive ? 0 : -Math.PI / 2, this.yaw + Math.PI, 0); // the rig faces +z, players look down -z
   }
 

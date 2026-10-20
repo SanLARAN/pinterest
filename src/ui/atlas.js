@@ -131,6 +131,14 @@ export class Atlas {
   frame(dt) {
     if (!this.shown) return;
     if (this.spec) this.spec.frame(dt);
+    // a page turn that never landed (a tab that slept through the timer, a frame that threw while the
+    // page was being laid down) would freeze the book on that leaf: land it late rather than never
+    if (this.busy && this.turnAt && performance.now() - this.turnAt > 1200) {
+      $('atlasLeaf').className = 'leaf';
+      this.busy = 0;
+      this.turnAt = 0;
+      this._renderAll();
+    }
     if (this._saveT > 0) {
       this._saveT -= dt;
       if (this._saveT <= 0) this._flushSave(true);
@@ -200,13 +208,32 @@ export class Atlas {
     const back = leaf.querySelector('.leaf-back');
     const right = $('atlasRight');
     this.busy = 1;
+    this.turnAt = performance.now();
     const done = () => {
-      leaf.className = 'leaf';
-      front.innerHTML = '';
-      back.innerHTML = '';
-      if (dir > 0) this._renderLeft();
-      else this._renderRight();
-      this.busy = 0;
+      // Whatever happens while the page lands (a plate that will not build, a number that will not
+      // format), the book has to come back: a thrown render used to leave busy = 1 for good, and the
+      // atlas stopped answering every click after the syringe page. `finally` is the whole fix.
+      try {
+        leaf.className = 'leaf';
+        front.innerHTML = '';
+        back.innerHTML = '';
+        if (dir > 0) this._renderLeft();
+        else this._renderRight();
+      } catch (e) {
+        console.warn('[atlas] the page landed badly', e);
+        plateLess();
+      } finally {
+        this.busy = 0;
+        this.turnAt = 0;
+      }
+    };
+    // last resort for a plate that cannot be drawn: the page opens without its specimen
+    const plateLess = () => {
+      try {
+        if (this.spec) this.spec.hide?.();
+        const pl = $('atlasPlate');
+        if (pl) pl.classList.add('nogl');
+      } catch (e) { /* nothing left to do: the page itself is still readable */ }
     };
     try {
     if (dir > 0) {
@@ -234,6 +261,7 @@ export class Atlas {
     } catch (e) {
       // a page whose plate or text failed still has to turn: land it now, keep the book usable
       console.warn('[atlas] the page would not render', e);
+      plateLess();
       done();
       return;
     }
@@ -278,8 +306,18 @@ export class Atlas {
     const n = this.i;
     const plate = $('atlasPlate');
     const cap = $('atlasCap');
-    if (this.spec) this.spec.show(this._model(p.id));
-    plate.classList.toggle('nogl', !this.spec);
+    let plateOk = !!this.spec;
+    if (this.spec) {
+      try {
+        this.spec.show(this._model(p.id));
+      } catch (e) {
+        // a specimen that will not build (the syringe did this once) leaves the page without its plate
+        console.warn('[atlas] the plate would not build', e);
+        this.spec.hide?.();
+        plateOk = false;
+      }
+    }
+    plate.classList.toggle('nogl', !plateOk);
     const c = this._cap(p, n, T);
     cap.innerHTML = c.html;
     cap.className = c.cls;

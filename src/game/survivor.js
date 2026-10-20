@@ -925,6 +925,23 @@ export function poseSeated(rig, driver = false, t = 0, steer = 0) {
   }
 }
 
+// on a bike: stood on the pegs rather than sat in a chair — knees bent, chest over the bars, both hands
+// out on the grips. The caller puts the root on the bike and leans it with the machine.
+export function poseRider(rig, lean = 0, steer = 0, t = 0) {
+  const n = rig.nodes;
+  rig.root.rotation.x = 0;
+  n.hips.position.set(0, 0, 0);
+  n.hips.rotation.set(0.12, 0, 0);
+  n.chest.rotation.set(0.3 + Math.sin(t * 2.3) * 0.01, 0, -lean * 0.35);
+  n.head.rotation.set(-0.22, 0, 0);
+  for (const [A, s] of [['L', -1], ['R', 1]]) {
+    n['th' + A].rotation.set(-1.28 - lean * 0.1, 0, s * 0.16);
+    n['kn' + A].rotation.x = 1.55;
+    n['sh' + A].rotation.set(-1.32 + s * steer * 0.18, 0, s * 0.3);
+    n['el' + A].rotation.x = -0.62;
+  }
+}
+
 // down, propped in a seat: slumped sideways, head lolling (the caller places the root as for poseSeated)
 export function poseSlumped(rig, t = 0) {
   poseSeated(rig, false, 0);

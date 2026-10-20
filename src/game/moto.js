@@ -32,7 +32,7 @@ export const MOTO = {
 
 // the bike itself: a plain state object the park moves around (pure math, tested without a scene)
 export function newBike(i, x, z, yaw) {
-  return { i, x, z, y: 0, yaw, vx: 0, vz: 0, vy: 0, roll: 0, pitch: 0, steer: 0, air: 0, spin: 0, speed: 0, hit: 0 };
+  return { i, x, z, y: 0, yaw, vx: 0, vz: 0, vy: 0, roll: 0, pitch: 0, steer: 0, air: 0, spin: 0, speed: 0, hit: 0, grounded: true, sus: 0, lastGh: null };
 }
 
 // one step of a rider's bike. input: { move: {x,y}, brake } with y>0 throttle, x steering; world:
@@ -40,13 +40,13 @@ export function newBike(i, x, z, yaw) {
 export function stepBike(b, input, world, dt) {
   const ev = { throttle: 0, brake: 0, landed: 0, threw: false, bump: 0 };
   const ground = world.terrain.height(b.x, b.z);
-  const onGround = b.y <= ground + 0.02 && b.vy <= 0.01;
+  const onGround = b.grounded !== false;
   b.air = onGround ? Math.max(0, b.air - dt * 4) : Math.min(1, b.air + dt * 4);
 
   // the bar: quick at a crawl, heavy at speed
   const steerRate = MOTO.steer * lerp(1, MOTO.steerFade, clamp(Math.abs(b.speed) / MOTO.max, 0, 1));
   b.steer = damp(b.steer, clamp(input.move.x, -1, 1), 8, dt);
-  const moving = clamp(Math.abs(b.speed) / 2, 0, 1); // the bar turns, the heading follows the wheels
+  const moving = clamp(Math.abs(b.speed) / 2, 0, 1) * (onGround ? 1 : 0.22); // in the air the bar hardly bites
   const yawRate = b.steer * steerRate * clamp(1 - 0.25 * Math.abs(b.speed) / MOTO.max, 0.6, 1) * moving;
   b.yaw -= yawRate * dt * (b.speed >= 0 ? 1 : -1);
 
@@ -88,29 +88,37 @@ export function stepBike(b, input, world, dt) {
   b.x = clamp(pos.x, -286, 286);
   b.z = clamp(pos.z, -286, 286);
 
-  // the ground: follow it, or leave it over a crest
-  const g2 = world.terrain.height(b.x, b.z);
-  if (onGround) {
-    const drop = g2 - ground;
-    if (drop < -0.16 && Math.abs(v) > 4) { // the ground fell away: airborne
-      b.vy = Math.max(0.4 * v * -drop, MOTO.hop * -drop * 0.5);
-      b.y = ground;
-    } else {
-      b.y = g2;
-      b.vy = 0;
-      b.pitch = damp(b.pitch, clamp(Math.atan2(world.terrain.height(b.x + fx, b.z + fz) - g2, 1) * (v >= 0 ? 1 : -1), -0.6, 0.6), 6, dt);
-    }
-  } else {
-    b.vy -= MOTO.gravity * dt;
-    b.pitch = damp(b.pitch, b.vy > 0 ? 0.18 : -0.25, 1.5, dt); // nose up on the jump, down on the fall
-  }
+  // ---- the ground: a sprung machine on a hill, not a decal sliding over it ----
+  // The wheels track whatever is under them, and a rise shoves the bike up at the speed the ground
+  // itself is rising. That upward speed is kept (gravity eats it, the hill does not), so the next crest
+  // simply lets go and the machine is in the air — which is what a jump over a bank is. Where the hill
+  // falls away faster than gravity can take the bike down, it flies there too; on anything smooth the
+  // suspension keeps it planted, and a landing compresses it (b.sus, drawn by place()).
+  const gh = world.terrain.height(b.x, b.z);
+  const vg = b.lastGh == null ? 0 : (gh - b.lastGh) / dt; // how fast the ground under it is moving
+  b.lastGh = gh;
+  if (b.grounded && vg > b.vy) b.vy = Math.min(vg, MOTO.hop); // the rise picks the bike up
+  b.vy -= MOTO.gravity * dt;
   b.y += b.vy * dt;
-  const g3 = world.terrain.height(b.x, b.z);
-  if (b.y < g3) {
-    if (b.vy < -4) ev.landed = Math.min(1, -b.vy / 9);
-    b.y = g3;
-    b.vy = 0;
+  if (b.y <= gh) {
+    if (!b.grounded && b.vy < -3) {
+      ev.landed = Math.min(1, -b.vy / 9);
+      b.sus = clamp(-b.vy / 7, 0, 1); // the suspension's travel on the way down
+    }
+    b.y = gh;
+    b.vy = Math.max(0, b.vy);
+    b.grounded = true;
+  } else if (b.y - gh > 0.03) {
+    b.grounded = false;
   }
+  // the chassis follows the slope on the ground and the arc in the air
+  if (b.grounded) {
+    b.pitch = damp(b.pitch, clamp(Math.atan2(world.terrain.height(b.x + fx * 0.8, b.z + fz * 0.8) - world.terrain.height(b.x - fx * 0.8, b.z - fz * 0.8), 1.6) * (v >= 0 ? 1 : -1), -0.62, 0.62), 9, dt);
+  } else {
+    b.pitch = damp(b.pitch, b.vy > 0 ? 0.2 : -0.26, 2.4, dt); // nose up on the way up, down on the way down
+  }
+  b.air = b.grounded ? Math.max(0, b.air - dt * 4) : Math.min(1, b.air + dt * 4);
+  b.sus = Math.max(0, b.sus - dt * 2.2);
 
   // the lean: into the turn at speed, upright in the air
   const leanT = onGround ? -b.steer * MOTO.lean * clamp(Math.abs(v) / 6, 0, 1) : b.roll * 0.4;
@@ -277,16 +285,25 @@ export class MotoPark {
       b.mesh.rotation.order = 'YXZ'; // heading first: the lean and the slope belong to the machine
       b.shade = new GroundShade({ rx: 0.44, rz: 1.08, strength: 0.52 }); // where it meets the grass
       b.shade.place(x, z, yaw, true);
-      // both wheels on the ground: sample the hill under the axles, not under the middle
-      const fx = -Math.sin(yaw), fz = -Math.cos(yaw);
-      const hf = g.world.terrain.height(x + fx * 0.62, z + fz * 0.62);
-      const hb = g.world.terrain.height(x - fx * 0.62, z - fz * 0.62);
-      b.y = (hf + hb) / 2 + 0.01;
-      b.pitch = Math.atan2(hf - hb, 1.24);
+      this._seat(b); // both wheels on the ground: the hill under the axles, not under the middle
       g.scene.add(b.mesh);
       this.bikes.push(b);
     }
     this.place();
+  }
+
+  // stand a parked machine on the hill: the two axles are sampled on their own, so a bike left on a slope
+  // rests on both wheels instead of sinking into it (which is how it used to vanish when you stepped off)
+  _seat(b) {
+    const t = this.g.world.terrain;
+    const fx = -Math.sin(b.yaw), fz = -Math.cos(b.yaw);
+    const hf = t.height(b.x + fx * 0.62, b.z + fz * 0.62);
+    const hb = t.height(b.x - fx * 0.62, b.z - fz * 0.62);
+    b.y = (hf + hb) / 2 + 0.01;
+    b.vy = 0;
+    b.grounded = true;
+    b.lastGh = null;
+    b.pitch = Math.atan2(hf - hb, 1.24);
   }
 
   // the nearest mountable bike within reach (Objectives-style: what E can find) — or, in the saddle,
@@ -341,7 +358,7 @@ export class MotoPark {
       g.player.vx = g.player.vz = 0;
       b.vx = b.vz = 0;
       b.speed = 0;
-      b.y = g.world.terrain.height(b.x, b.z);
+      this._seat(b); // down on both wheels where you left it, even on a slope
     }
     if (!silent) g.hud.popup(t('motoOff'), 'dim');
     g.audio?.motoOff?.();
@@ -355,10 +372,26 @@ export class MotoPark {
     else this.riders.delete(i);
   }
 
+  // …and every state packet carries the bike they sit on, so the picture survives a lost 'mb' (and a
+  // friend who joins the range halfway through a lap still sees them riding rather than walking)
+  _reconcile() {
+    const remotes = this.g.remotes;
+    if (!remotes || !remotes.size) return;
+    for (const r of remotes.values()) {
+      const i = r.riding | 0;
+      if (i >= 0 && this.bikes[i]) this.riders.set(i, r.id);
+    }
+    for (const [i, id] of [...this.riders]) {
+      const r = remotes.get(id);
+      if (!r || !r.alive || (r.riding | 0) !== i) this.riders.delete(i);
+    }
+  }
+
   // your own ride: the input drives the bike, the player rides it (remote sync carries the position)
   update(dt, input) {
     const g = this.g;
     this.mountT = Math.max(0, this.mountT - dt);
+    this._reconcile();
     if (this.rider < 0) {
       // on foot: a parked machine is a solid thing, not a picture — and your own must be back in
       // sight the moment you step off (place() is what makes it visible again)

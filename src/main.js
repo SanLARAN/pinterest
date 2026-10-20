@@ -625,7 +625,8 @@ function ensureSoloFig() {
 
 // pack up the training: no scores, no records — the garage/lobby is where you were
 function endTraining() {
-  if (!game || state !== 'playing' || !game.training) return;
+  // the button lives in the pause menu, and the pause menu is `paused` — not `playing`
+  if (!game || (state !== 'playing' && state !== 'paused') || !game.training) return;
   const online = runOnline;
   game.inventory.close(false);
   game.fieldView.reset();
@@ -876,10 +877,13 @@ function handleEvents(events) {
         if (state === 'playing' && !input.touch) pause();
         break;
       case 'restart':
+        // the range has no "again": its one way out is ЗАВЕРШИТЬ ПОЛИГОН in the pause menu
+        if (game?.training) break;
         if (state === 'over' || (state === 'paused' && !runOnline)) restartRun();
         break;
       case 'confirm':
         if (account.isOpen() || atlas.isOpen() || wardrobe.isOpen() || menus.isOpen('settingsPanel') || menus.isOpen('howPanel') || menus.isOpen('scoresPanel') || lobby.isOpen()) break;
+        if (game?.training) break;
         if (state === 'over') restartRun();
         else if (state === 'menu') startRun();
         else if (state === 'paused') resume();

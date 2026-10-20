@@ -686,6 +686,8 @@ export function buildCarWheels(opts = {}, only = -1) {
     b.cylinder(10, r * 0.55, r * 0.55, 0.03, P, { y0: -0.015, capBottom: true });
     b.place(cx, cy, cz + sz * w * 0.45, PI / 2, 0, 0);
     b.cylinder(6, 0.07, 0.07, 0.03, GK.CHROME, { y0: -0.015 });
+    // a bright valve on the rim: a wheel that turns has to look like it turns, even from across the garage
+    boxAt(b, cx + r * 0.55, cy + r * 0.55, cz + sz * (w * 0.46), 0.05, 0.05, 0.018, GK.CHROME);
   });
   return b.toArrays();
 }

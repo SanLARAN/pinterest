@@ -7,7 +7,30 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
-    v:'2.1.2',date:'2026-10-20',
+    v:'2.1c',date:'2026-10-21',
+    ru:{title:'Ночь, ворота и мотоциклы',items:[
+      'Смена начинается сразу с ночи: ворота гаража открываются в темноту, а утро приходит только с рассветом. Четыре дня остались на месте — просто первый из них ночной',
+      'Мотоцикл больше не приклеен к земле. Подъём подкидывает его со скоростью, с которой растёт сама земля, поэтому гребень и банка работают как трамплин; в воздухе руль почти не слушается, а приземление сжимает подвеску',
+      'Слез с мотоцикла — он стоит на обоих колёсах. На склоне машина больше не уходит в землю и не пропадает из виду',
+      'Друзей на мотоцикле видно: всадник сидит в седле, а не идёт пешком сквозь машину. Даже если событие о посадке потерялось или друг подключился к заезду позже — номер машины едет в каждом пакете состояния',
+      'В полигоне больше никто не исчезает: тренировочный выезд не считался днём, и тела друзей гасились «эхом»',
+      '«ЗАВЕРШИТЬ ПОЛИГОН» работает — раньше из меню паузы кнопка ничего не делала. «ЗАНОВО» на полигоне убрано совсем, вместе с R и Enter',
+      'Ворота отвечают курсору: навёл — сталь подсвечивается, створки отходят от щеколды на пол-ладони и щёлкают; увёл — закрываются. Раньше подсветки не было вовсе',
+      'Атлас больше не может застрять на середине страницы: переворот, который не доехал, догружается на следующем кадре, а страница без витрины всё равно открывается',
+    ]},
+    en:{title:'Night, gates and bikes',items:[
+      'The shift opens in the dark: the garage gates swing onto the first night, and morning only comes with a dawn. The four days are still there — the first one is simply a night',
+      'The bike is no longer glued to the ground. A rise picks it up at the speed the ground itself is rising, so a crest or a bank works as a jump; in the air the bars barely bite, and a landing compresses the suspension',
+      'Step off and the bike stands on both wheels: on a slope it no longer sinks into the hill and disappears',
+      'A friend on a bike is visible as a rider — knees bent, hands on the bars — instead of a walker passing through the machine. The bike index rides in every state packet, so a lost mount event or a friend joining late changes nothing',
+      'Nobody vanishes on the range any more: the training ground was not counted as daylight, so teammates were blanked by the echo rule',
+      'ЗАВЕРШИТЬ ПОЛИГОН works — from the pause menu the button used to do nothing. The restart button is gone from the range altogether, along with R and Enter',
+      'The gates answer the cursor: hover lights the steel, eases the leaves off the latch a hand\'s width and clicks; move away and they close',
+      'The atlas can no longer stick mid-page: a turn that never landed is finished on the next frame, and a page without its plate still opens',
+    ]},
+  },
+  {
+    v:'2.1b',date:'2026-10-20',
     ru:{title:'Ствол, стеллаж и атлас',items:[
       'Слез с мотоцикла — он на месте: машина пряталась под всадником и после «слезть» оставалась невидимой. Теперь она возвращается в кадр в тот же кадр',
       'Мотоцикл, стеллаж с предметами, ящик и мишени стали твёрдыми: сквозь них больше не пройти. Столкновение с соседней машиной тоже честное — на ходу она упирается, а не проезжает насквозь',

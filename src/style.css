@@ -27,6 +27,9 @@ html, body {
 canvas#gl { position: fixed; inset: 0; width: 100%; height: 100%; display: block; outline: none; }
 button { font-family: var(--mono); color: inherit; }
 .hidden { display: none !important; }
+/* `hidden` must win over a class that sets a display of its own (the pause menu uses it to swap buttons:
+   a flex button ignores the attribute's UA style, so both ГАРАЖ-кнопки showed at once) */
+[hidden] { display: none !important; }
 .red { color: var(--red); }
 
 /* film grain over the menus (cheap CSS noise) */

@@ -305,6 +305,9 @@ export class Game {
       this.train = null;
       this.motos.dispose();
     }
+    // the shift opens in the dark: the gates open straight onto the first night. The dusk is played out
+    // from the morning light (three seconds of a bulb dying), and every morning after it comes with a dawn.
+    if (!this.training) this.startDusk();
   }
 
   // everything that measures the night starts from zero when the light dies
@@ -1756,7 +1759,9 @@ export class Game {
   updateRemotes(dt) {
     if (this.online) for (const id of this.audio.voices.keys()) if (!this.remotes.has(id)) this.audio.voiceSet(id, 0, 0, 0, 0);
     if (!this.remotes.size) return;
-    const day = this.state === 'morning' || (this.state === 'dusk' && this.duskT < 1.5) || this.state === 'dawn' || this.state === 'won';
+    // daylight — including the range, which is a morning that never ends (a teammate used to vanish
+    // there: nothing was lighting them, so the echo rule blanked their body)
+    const day = this.state === 'morning' || this.state === 'training' || (this.state === 'dusk' && this.duskT < 1.5) || this.state === 'dawn' || this.state === 'won';
     const meAlive = this.player.alive;
     const watched = this.spectate && this.spectate.target;
     for (const r of this.remotes.values()) {
