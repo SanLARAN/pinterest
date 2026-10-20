@@ -147,13 +147,7 @@ export function buildMoto(paint = GK.CARPAINT) {
   const WZ = 0.68; // half the wheelbase
   const R = 0.32; // wheel radius
 
-  // two wheels, axles along X (a disc built along Y, turned a quarter about Z)
-  for (const z of [-WZ, WZ]) {
-    b.place(0, R, z, 0, 0, PI / 2);
-    b.cylinder(16, R, R, 0.11, RUBBER, { y0: -0.055, capBottom: true });
-    b.place(0, R, z, 0, 0, PI / 2);
-    b.cylinder(10, 0.075, 0.075, 0.13, STEEL, { y0: -0.065 });
-  }
+  // the wheels are separate meshes (see MotoPark.wheelGeo): the tyres have to turn with the road
 
   // the frame: a headstock, one thick spine back to the seat rails, a down tube, the swingarm
   box(0, 0.94, -0.46, 0.1, 0.18, 0.12, DARK); // headstock
@@ -241,14 +235,21 @@ export class MotoPark {
     this.paints = [GK.CARPAINT, GK.REDPAINT, GK.YELLOW, GK.GATE];
     this.geos = this.paints.map((k) => buildMoto(k));
     this.cockpits = this.paints.map((k) => buildCockpit(k));
+    // A whole wheel, axle along X: the tyre and the rim are geometry you can see turning, not a disc
+    // hidden inside the body. (The old spokes lived under the tyre, so a rolling bike looked parked.)
     this.wheelGeo = (() => {
-      const b = new MeshBuilder(128);
-      for (let i = 0; i < 4; i++) { // four bars across the hub = eight spokes, in the wheel's plane
-        b.place(0, 0, 0, (i / 4) * PI, 0, 0);
-        b.box(0.022, 0.56, 0.022, GK.CHROME);
-      }
+      const b = new MeshBuilder(256), R = 0.32;
       b.place(0, 0, 0, 0, 0, PI / 2);
-      b.cylinder(8, 0.06, 0.06, 0.03, GK.CHROME, { y0: -0.015 });
+      b.cylinder(16, R, R, 0.11, GK.RUBBER, { y0: -0.055, capBottom: true });
+      b.place(0, 0, 0, 0, 0, PI / 2);
+      b.cylinder(12, 0.2, 0.2, 0.07, GK.TIN, { y0: -0.035 });
+      b.place(0, 0, 0, 0, 0, PI / 2);
+      b.cylinder(8, 0.055, 0.055, 0.09, GK.CHROME);
+      for (let i = 0; i < 6; i++) { // six spokes across the rim, in the wheel's plane
+        b.place(0, 0, 0, (i / 6) * PI, 0, 0);
+        b.box(0.018, 0.42, 0.018, GK.CHROME);
+      }
+      b.place(0, 0.23, 0.075, 0, 0, 0.2); b.box(0.03, 0.05, 0.028, GK.EFFIGY); // a bright valve: the turn reads
       return geometryOf(b.toArrays());
     })();
     this.bikes = [];
@@ -279,8 +280,9 @@ export class MotoPark {
       b.mesh = new THREE.Mesh(this.geos[i % this.geos.length], g.world.material);
       b.mesh.frustumCulled = false;
       b.wheels = [new THREE.Mesh(this.wheelGeo, g.world.material), new THREE.Mesh(this.wheelGeo, g.world.material)];
-      b.wheels[0].position.set(0, 0.3, -0.62);
-      b.wheels[1].position.set(0, 0.3, 0.62);
+      b.wheels[0].position.set(0, 0.32, -0.68);
+      b.wheels[1].position.set(0, 0.32, 0.68);
+      b.wheels[0].rotation.order = 'YXZ'; b.wheels[1].rotation.order = 'YXZ';
       b.mesh.add(...b.wheels);
       b.mesh.rotation.order = 'YXZ'; // heading first: the lean and the slope belong to the machine
       b.shade = new GroundShade({ rx: 0.44, rz: 1.08, strength: 0.52 }); // where it meets the grass
@@ -352,9 +354,10 @@ export class MotoPark {
     const i = this.rider;
     this.rider = -1;
     this.mountT = 0.45;
-    if (b) { // step off beside it; the bike stands where you left it, at rest
-      g.player.x = b.x + Math.cos(b.yaw) * 0.9;
-      g.player.z = b.z - Math.sin(b.yaw) * 0.9;
+    if (b) { // step off beside it and half a pace back — the machine stays in the corner of your eye;
+      // it stands where you left it, at rest, on both wheels
+      g.player.x = b.x + Math.cos(b.yaw) * 1.05 + Math.sin(b.yaw) * 0.3;
+      g.player.z = b.z - Math.sin(b.yaw) * 1.05 + Math.cos(b.yaw) * 0.3;
       g.player.vx = g.player.vz = 0;
       b.vx = b.vz = 0;
       b.speed = 0;
@@ -392,6 +395,7 @@ export class MotoPark {
   update(dt, input) {
     const g = this.g;
     this.mountT = Math.max(0, this.mountT - dt);
+    if (this.rider >= 0 && g.state !== 'training') this.dismount(true); // the range ended under you
     this._reconcile();
     if (this.rider < 0) {
       // on foot: a parked machine is a solid thing, not a picture — and your own must be back in
@@ -445,7 +449,7 @@ export class MotoPark {
     for (const b of this.bikes) {
       if (this.riders.get(b.i)) continue; // a friend is sitting on it: their body does the colliding
       this._near(b, p.x, p.z, q);
-      const rr = 0.36 + 0.3; // half the machine's width, plus the walker
+      const rr = 0.44 + 0.3; // half the machine's width, plus the walker
       if (q.d >= rr) continue;
       p.x += q.nx * (rr - q.d);
       p.z += q.nz * (rr - q.d);
@@ -483,8 +487,13 @@ export class MotoPark {
       if (!b.mesh.parent && g.scene) g.scene.add(b.mesh); // a mesh that lost its parent comes home
       b.mesh.position.set(x, y, z);
       b.mesh.rotation.set(pitch, yaw, roll, 'YXZ');
-      b.mesh.visible = b.i !== this.rider; // yours is replaced by the cockpit (see placeCockpit)
-      for (const w of b.wheels) w.rotation.x = spin;
+      b.mesh.visible = !(b.i === this.rider && g.state === 'training'); // yours is replaced by the cockpit (see placeCockpit)
+      // the front wheel also turns with the bars; both roll with the road
+      for (let k = 0; k < b.wheels.length; k++) {
+        const w = b.wheels[k];
+        w.rotation.x = spin;
+        w.rotation.y = k === 0 ? (b.steer || 0) * 0.55 : 0;
+      }
       b.shade?.place(x, z, yaw);
     }
   }

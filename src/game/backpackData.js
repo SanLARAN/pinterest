@@ -6,6 +6,14 @@ export const BAG_KINDS = ['stones', 'glow', 'torch', 'flare', 'battery', 'tape',
 export const BAG_LIMIT = { stones: 3, glow: 3, torch: 1, flare: 6, battery: 3, tape: 1, crowbar: 1, map: 1, syringe: 2 };
 export const LOOT_KIND = { nuts: 'stones', glow: 'glow', battery: 'battery', flare: 'flare', syringe: 'syringe' };
 export const kindIndex = (kind) => BAG_KINDS.indexOf(kind);
+
+// The inventory's shelves: the tabs across the top of the pack. Every kind lives in exactly one.
+export const BAG_TABS = [
+  { id: 'all', kinds: BAG_KINDS },
+  { id: 'light', kinds: ['glow', 'torch', 'flare', 'battery'] },
+  { id: 'tools', kinds: ['stones', 'tape', 'crowbar', 'map'] },
+  { id: 'aid', kinds: ['syringe'] },
+];
 export function fitsPocket(slots, kind) {
   return BAG_KINDS.includes(kind) && Array.isArray(slots) && slots.length === BAG_SIZE && (slots.includes(kind) || slots.includes(null));
 }

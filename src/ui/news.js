@@ -7,14 +7,50 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
-    v:'2.1c',date:'2026-10-21',
+    v:'2.1e',date:'2026-10-20',
+    ru:{title:'Ночь с порога',items:[
+      'Смена начинается ночью сразу: за воротами больше нет трёх секунд утреннего света — темнота приходит вместе с машиной',
+      'Слез с мотоцикла — шаг в сторону и полшага назад: машина остаётся в поле зрения, а не прячется под камерой. Если полигон закончился, пока ты в седле, игра сама ставит тебя рядом с машиной',
+      'Стеллаж, ящик, мишени и мотоциклы держат форму: мимо них не пройти, а на ходу соседняя машина упирается, а не проезжает сквозь',
+      'Рюкзак на телефоне больше не оставляет пустой экран под полками, а на столе раскладка выросла до пяти рядов — страница заполнена от заголовка до подвала',
+      'Атлас: страница шприца открывается и листается дальше — прогон по всем страницам и по перелистыванию через шприц прошёл без зависаний',
+      'Патчи с исправлениями теперь с буквами: 2.1a, 2.1b, 2.1c, 2.1d, 2.1e',
+    ]},
+    en:{title:'Night from the threshold',items:[
+      'The shift opens at night at once: the gates no longer hold three seconds of morning light — the dark arrives with the car',
+      'Step off the bike and you step a pace to the side and half a pace back, so the machine stays in view instead of hiding under the camera. If the range ends while you are in the saddle, the game sets you down beside it',
+      'The rack, its crate, the targets and the bikes hold their shape: you walk around them, and a moving bike stops against its neighbour instead of passing through',
+      'The pack page on a phone no longer leaves an empty screen under the shelves, and on the desktop the field of slots grew to five rows — the page is filled from header to footer',
+      'The atlas: the syringe page opens and turns on — a run across every page and back through the syringe finished without a stall',
+      'Bug-fix patches are lettered now: 2.1a, 2.1b, 2.1c, 2.1d, 2.1e',
+    ]},
+  },
+  {
+    v:'2.1d',date:'2026-10-20',
+    ru:{title:'Рюкзак-страница',items:[
+      'Рюкзак открывается целой страницей, как полевой журнал: слева — полки со всем снаряжением и счётчиками, справа — выживший с выбранным предметом в руках и его описание',
+      'Предмет можно выбросить, перетащив его мышкой за пределы рюкзака или на полосу «Выбросить»; на телефоне — тем же жестом или кнопкой',
+      'Вкладки «Всё / Свет / Инструмент / Аптечка», «Можно нести 2 / 4», выбор стрелками, двойной клик — в руки, Delete — выбросить',
+      'Колёса мотоциклов стали настоящими: шина, обод и спицы крутятся с дорогой, а переднее поворачивает вместе с рулём',
+      '«ЗАВЕРШИТЬ ПОЛИГОН» убрана из паузы совсем; с полигона выходят через «МЕНЮ» — оно прибирает мотоциклы, стеллаж и мишени',
+    ]},
+    en:{title:'The pack as a page',items:[
+      'The backpack opens as a page of its own, like a field journal: shelves of gear with counts on the left, the survivor holding the chosen item and its description on the right',
+      'Throw an item away by dragging it off the pack or onto the drop strip; on a phone, the same gesture or the button',
+      'Tabs for everything / light / tools / aid, CAN HOLD 2 / 4, arrow-key selection, double-click to equip, Delete to drop',
+      'The bikes finally roll on real wheels: tyre, rim and spokes turn with the road, and the front wheel follows the bars',
+      'END THE TRAINING is gone from the pause menu; leave the range with MENU, which packs the bikes, the rack and the targets away',
+    ]},
+  },
+  {
+    v:'2.1c',date:'2026-10-20',
     ru:{title:'Ночь, ворота и мотоциклы',items:[
       'Смена начинается сразу с ночи: ворота гаража открываются в темноту, а утро приходит только с рассветом. Четыре дня остались на месте — просто первый из них ночной',
       'Мотоцикл больше не приклеен к земле. Подъём подкидывает его со скоростью, с которой растёт сама земля, поэтому гребень и банка работают как трамплин; в воздухе руль почти не слушается, а приземление сжимает подвеску',
       'Слез с мотоцикла — он стоит на обоих колёсах. На склоне машина больше не уходит в землю и не пропадает из виду',
       'Друзей на мотоцикле видно: всадник сидит в седле, а не идёт пешком сквозь машину. Даже если событие о посадке потерялось или друг подключился к заезду позже — номер машины едет в каждом пакете состояния',
       'В полигоне больше никто не исчезает: тренировочный выезд не считался днём, и тела друзей гасились «эхом»',
-      '«ЗАВЕРШИТЬ ПОЛИГОН» работает — раньше из меню паузы кнопка ничего не делала. «ЗАНОВО» на полигоне убрано совсем, вместе с R и Enter',
+      '«ЗАНОВО» на полигоне убрано совсем, вместе с R и Enter; кнопку «ЗАВЕРШИТЬ ПОЛИГОН» в 2.1d убрали — с полигона выходят через «МЕНЮ»',
       'Ворота отвечают курсору: навёл — сталь подсвечивается, створки отходят от щеколды на пол-ладони и щёлкают; увёл — закрываются. Раньше подсветки не было вовсе',
       'Атлас больше не может застрять на середине страницы: переворот, который не доехал, догружается на следующем кадре, а страница без витрины всё равно открывается',
     ]},
@@ -24,7 +60,7 @@ export const NEWS = [
       'Step off and the bike stands on both wheels: on a slope it no longer sinks into the hill and disappears',
       'A friend on a bike is visible as a rider — knees bent, hands on the bars — instead of a walker passing through the machine. The bike index rides in every state packet, so a lost mount event or a friend joining late changes nothing',
       'Nobody vanishes on the range any more: the training ground was not counted as daylight, so teammates were blanked by the echo rule',
-      'ЗАВЕРШИТЬ ПОЛИГОН works — from the pause menu the button used to do nothing. The restart button is gone from the range altogether, along with R and Enter',
+      'The restart button is gone from the range altogether, along with R and Enter; END THE TRAINING followed it in 2.1d — leave the range with MENU',
       'The gates answer the cursor: hover lights the steel, eases the leaves off the latch a hand\'s width and clicks; move away and they close',
       'The atlas can no longer stick mid-page: a turn that never landed is finished on the next frame, and a page without its plate still opens',
     ]},
@@ -49,7 +85,7 @@ export const NEWS = [
     ]},
   },
   {
-    v:'2.1',date:'2026-10-19',
+    v:'2.1a',date:'2026-10-19',
     ru:{title:'Смена затянулась',items:[
       'Смена стала четыре дня: ночь — 8 минут, утро — 1 минута 45 секунд. Лимита «45 минут» больше нет: рассветы первых трёх ночей — передышка, рассвет четвёртой — победа. Через четыре минуты после начала четвёртой ночи лес просыпается окончательно',
       'Рассвет поднимает павших: кто лежал или истёк к утру — встаёт на ногах там, где его застал свет. Шкафандр оставляет себе то, что взял. Каждое падение укорачивает следующее кровотечение',
@@ -62,7 +98,7 @@ export const NEWS = [
       'Починка полигона: там теперь можно ходить, брать всё со стеллажа и кататься. Раньше выезд за ворота оставался стоячей картинкой. На мотоцикле E только сажает и слезет, обзор сидит на седле и кренится вместе с ним, стеллаж и мотоциклы больше не спорят за одну клавишу',
       'Рюкзак в руках стал читаемым: у него своя подсветка сверху слева, швы, стяжки и стальное кольцо, лямка руки уходит из кадра, а лес за ним мягко затемняется — ночь больше не съедает тёмную ткань',
       'Телефон держится с первого кадра: тач-режим включается сразу (без «нажмите, чтобы захватить курсор»), в портрете обзор шире — не 72°, а до 104°, — и подписи с разрядкой больше не уезжают за край',
-      'Сборка 2.1: исправлены пропущенные куски тренировочного обновления и возвращены проверки, которые их ловят',
+      'Сборка 2.1a: исправлены пропущенные куски тренировочного обновления и возвращены проверки, которые их ловят',
     ]},
     en:{title:'The long shift',items:[
       'The shift is four days: a night is 8 minutes, a morning 1:45. The 45-minute limit is gone: the first three dawns are a breather, the fourth is the win. Four minutes into the last night the forest wakes up for good',
@@ -76,7 +112,7 @@ export const NEWS = [
       'The range repaired: you can walk it, take the whole rack and ride. The drive through the gates used to leave you in a frozen picture. On a bike E only mounts and steps off, the eye line sits on the seat and leans with the machine, and the rack and the bikes no longer fight over one key',
       'The pack in your hands reads as gear now: its own key light from the upper left, seams, compression straps and a steel D-ring; the swinging arm leaves the frame, and the forest dims softly behind it — the night no longer swallows dark canvas',
       'Phones are live from the first frame: touch mode starts immediately (no "click to capture the cursor"), portrait opens the view up (72° to as much as 104°), and letter-spaced captions stay inside the screen',
-      'Build fix: the missing half of the training update is in, with the checks that catch it next time',
+      'Build 2.1a: the missing half of the training update is in, with the checks that catch it next time',
     ]},
   },
   {

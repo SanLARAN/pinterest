@@ -166,8 +166,10 @@ test('mounting claims the nearest free bike and dismounting steps you off beside
   p.mountT = 0;
   p.dismount();
   assert.equal(p.rider, -1);
-  const ex = 0.4 + Math.cos(0.2) * 0.9, ez = 0.1 - Math.sin(0.2) * 0.9;
+  const ex = 0.4 + Math.cos(0.2) * 1.05 + Math.sin(0.2) * 0.3;
+  const ez = 0.1 - Math.sin(0.2) * 1.05 + Math.cos(0.2) * 0.3;
   assert.ok(Math.abs(p.g.player.x - ex) < 0.01 && Math.abs(p.g.player.z - ez) < 0.01, 'stepped off to the side');
+  assert.ok(Math.hypot(p.g.player.x - 0.4, p.g.player.z - 0.1) > 1.0, 'a full step clear of the machine');
 });
 
 test('stepping off puts your machine back in sight, and a parked bike is solid', () => {

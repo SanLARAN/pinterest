@@ -225,7 +225,6 @@ const menus = new Menus({
   onPlay: () => startRun(),
   onResume: () => resume(),
   onRestart: () => restartRun(),
-  onEndTraining: () => endTraining(),
   onRange: () => startTrainingSolo(),
   onMenu: () => toMenu(),
   onCoop: () => lobby.open(),
@@ -623,46 +622,6 @@ function ensureSoloFig() {
   if (!garage.figs[0]) garage.setPlayers([{ id: 'me', name: settings.name || '???', slot: 0, self: true, fit: myFit() }]);
 }
 
-// pack up the training: no scores, no records — the garage/lobby is where you were
-function endTraining() {
-  // the button lives in the pause menu, and the pause menu is `paused` — not `playing`
-  if (!game || (state !== 'playing' && state !== 'paused') || !game.training) return;
-  const online = runOnline;
-  game.inventory.close(false);
-  game.fieldView.reset();
-  game.tools.silence(true);
-  game.expedition.silence();
-  game.flares.clear();
-  game.motos.dismount(true);
-  game.motos.dispose();
-  game.train?.end();
-  game.train = null;
-  game.training = false;
-  game.state = 'idle';
-  game.inputMuted = false;
-  runOnline = false;
-  document.body.classList.remove('spectating', 'cutscene', 'coop');
-  mates.clear();
-  hud.show(false);
-  input.exitLock();
-  audio.setPaused(false);
-  if (online) {
-    if (coop.isHost) coop.endRun(); else coop.leaveRun();
-    game.teardownOnline();
-    state = 'menu';
-    setBodyState();
-    lobby.open();
-    lobby.render();
-  } else {
-    state = 'menu';
-    setBodyState();
-    menus.only('menu');
-    home.enter();
-  }
-  cloud.presenceChanged();
-  lastFrame = performance.now();
-}
-
 // "again": solo restarts at once; in co-op only the host can call a new night (for everyone)
 function restartRun() {
   if (runOnline || coop.active) {
@@ -690,7 +649,6 @@ function pause() {
     : night
     ? `${fmtTime(game.time)} · ${t('generators')} ${game.objectives.count}/5<br>${t('score')} ${fmtScore(game.score)} ×${game.mult.toFixed(1)}`
     : `${t('morningBig')}`;
-  $('btnEndTraining').hidden = !training;
   $('btnRestartP').hidden = training;
   renderPauseVoices();
   menus.only('pause');
@@ -731,6 +689,14 @@ function toMenu(keepRoom = false) {
   if (game) {
     for (const m of game.monsters) m.dispose();
     game.monsters = [];
+    // the range is packed up with the run: no bike left standing in the lobby, nobody left in the saddle
+    if (game.training) {
+      game.motos.dismount(true);
+      game.motos.dispose();
+      game.train?.end();
+      game.train = null;
+      game.training = false;
+    }
     game.state = 'idle';
     game.objectives.silence();
     game.escape.silence();

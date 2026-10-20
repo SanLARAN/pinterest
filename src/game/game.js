@@ -305,9 +305,9 @@ export class Game {
       this.train = null;
       this.motos.dispose();
     }
-    // the shift opens in the dark: the gates open straight onto the first night. The dusk is played out
-    // from the morning light (three seconds of a bulb dying), and every morning after it comes with a dawn.
-    if (!this.training) this.startDusk();
+    // the shift opens in the dark: the gates open straight onto the first night — no morning sun to walk
+    // around in, no dusk film to sit through. (The next days still come up at dawn.)
+    if (!this.training) this.startNight();
   }
 
   // everything that measures the night starts from zero when the light dies

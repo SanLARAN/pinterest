@@ -1,15 +1,16 @@
 // Diegetic backpack + a bridge to the field simulations. World claims and dropped parcels are host
 // authoritative. Claims are retained in the heartbeat: a lost event cannot eat or duplicate a pickup.
 import * as THREE from 'three';
-import { t } from '../core/i18n.js';
+import { t, getLang } from '../core/i18n.js';
 import {TORCH} from './torch.js';
 import { MeshBuilder, KIND } from '../world/builder.js';
 import { geometryOf } from './uaz.js';
 import { buildFlareGun } from './objectives.js';
-import { BAG_SIZE, BAG_KINDS, BAG_LIMIT, LOOT_KIND, fitsPocket, cleanPockets, cleanParcel, iconSvg } from './backpackData.js';
+import { BAG_SIZE, BAG_KINDS, BAG_LIMIT, BAG_TABS, LOOT_KIND, fitsPocket, cleanPockets, cleanParcel, iconSvg } from './backpackData.js';
 
 const round = (v) => Math.round(v * 100) / 100;
-const KEYS = { stones: 'bagStones', glow: 'bagGlow', torch: 'torchName', flare: 'flareGun', battery: 'bagBattery', tape: 'tapeName', crowbar: 'crowbarName', map: 'partMapName', syringe: 'bagSyringe' };
+const esc = (v) => String(v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const KEYS = { stones: 'bagStones', glow: 'bagGlow', torch: 'torchItem', flare: 'flareGun', battery: 'bagBattery', tape: 'tapeItem', crowbar: 'crowbarName', map: 'partMapName', syringe: 'bagSyringe' };
 export const bagName = (kind) => t(KEYS[kind] || 'bagEmpty');
 
 function parcelGeometry(kind) {
@@ -39,33 +40,139 @@ export class Backpack {
     this.el = document.createElement('section');
     this.el.id = 'backpack'; this.el.hidden = true;
     this.el.setAttribute('role','dialog'); this.el.setAttribute('aria-modal','true');
-    this.el.innerHTML = `<div class="bag-shade"></div><div class="bag-wrap"><div class="bag-handle"></div><div class="bag-strap a"></div><div class="bag-strap b"></div><div class="bag-shell"><div class="bag-flap"><span class="bag-stamp">HUSH / FIELD EQUIPMENT</span><h2></h2><span class="bag-serial">04 · PERSONAL KIT</span><i class="bag-buckle a"></i><i class="bag-buckle b"></i></div><div class="bag-pockets">${Array.from({length:BAG_SIZE},(_,i)=>`<button type="button" class="bag-pocket" data-slot="${i}"><span class="bag-num">0${i+1}</span><span class="bag-item"></span><span class="bag-item-name"></span><span class="bag-item-count"></span></button>`).join('')}</div><p class="bag-tip"></p><div class="bag-bottom"><span class="bag-capacity"></span><button type="button" class="bag-close"></button></div></div><p class="bag-world"></p></div><div class="bag-menu" hidden><span></span><button type="button" data-action="equip"></button><button type="button" data-action="drop"></button></div>`;
+    this.tab = 'all';
+    this.sel = null;
+    this.el.innerHTML = `
+      <div class="bp-veil"></div>
+      <div class="bp-frame">
+        <header class="bp-head">
+          <div class="bp-kicker">HUSH · FIELD KIT</div>
+          <h2 class="bp-title"></h2>
+          <div class="bp-cap"><span class="bp-cap-k"></span><b class="bp-cap-v"></b></div>
+        </header>
+        <nav class="bp-tabs" role="tablist"></nav>
+        <div class="bp-main">
+          <div class="bp-gridwrap"><div class="bp-grid" role="listbox"></div><p class="bp-tip"></p></div>
+          <aside class="bp-side">
+            <figure class="bp-fig" aria-hidden="true">
+              <span class="bp-fig-glow"></span>
+              <svg class="bp-body" viewBox="0 0 220 340">
+                <g fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
+                  <path d="M64 112q-6 2-6 18v92q0 10 9 10h86q9 0 9-10v-92q0-16-6-18" fill="#1b2118"/>
+                  <path d="M64 112q-6 2-6 18v92q0 10 9 10h86q9 0 9-10v-92q0-16-6-18"/>
+                  <path d="M70 128h80M70 216h80" stroke="#39422e" stroke-width="1.6"/>
+                  <rect x="88" y="138" width="44" height="28" rx="3" fill="#242b1f" stroke="#3f4934"/>
+                  <path d="M94 214l-7 92h26l1-92Z" fill="#2b3225"/>
+                  <path d="M126 214l7 92h-26l-1-92Z" fill="#232a1e"/>
+                  <path d="M84 306h28M110 306h28" stroke="#0e120c" stroke-width="8"/>
+                  <path d="M84 92q26-12 52 0l6 92q1 22-10 34H88q-11-12-10-34Z" fill="#414c36"/>
+                  <path d="M110 96v122M90 148h40M90 180h40" stroke="#2c3526" stroke-width="2"/>
+                  <path d="M92 90q18 12 36 0l-2 16q-16 9-32 0Z" fill="#7d4534"/>
+                  <path d="M86 100q-15 15-14 43l1 33q0 7 7 7l9-3 2-33 8-30Z" fill="#3a432f"/>
+                  <path d="M134 100q15 15 14 43l-1 33q0 7-7 7l-9-3-2-33-8-30Z" fill="#3a432f"/>
+                  <path d="M100 188q10 8 20 0"/>
+                  <circle cx="110" cy="66" r="21" fill="#4a5540"/>
+                  <path d="M89 66q21-26 42 0Z" fill="#1f2519"/>
+                  <path d="M92 60q18-12 36 0" stroke="#1f2519" stroke-width="4"/>
+                </g>
+              </svg>
+              <span class="bp-held" aria-hidden="true"></span>
+            </figure>
+            <div class="bp-card">
+              <h3 class="bp-name"></h3>
+              <p class="bp-latin"></p>
+              <p class="bp-desc"></p>
+              <div class="bp-chips"></div>
+              <div class="bp-actions">
+                <button type="button" data-bp="equip"></button>
+                <button type="button" data-bp="drop"></button>
+              </div>
+            </div>
+          </aside>
+        </div>
+        <footer class="bp-foot">
+          <span class="bp-hint"></span>
+          <span class="bp-keys"></span>
+          <button type="button" class="bp-close"></button>
+        </footer>
+        <div class="bp-drop" hidden><b></b><span></span></div>
+      </div>`;
     document.body.append(this.el);
-    this.pockets = [...this.el.querySelectorAll('[data-slot]')];
-    this.menu = this.el.querySelector('.bag-menu');
-    this.el.addEventListener('contextmenu', e => e.preventDefault());
-    for(const button of this.pockets) {
-      button.addEventListener('contextmenu', e => { e.preventDefault(); this.context(+button.dataset.slot); });
-      button.addEventListener('click', () => this.context(+button.dataset.slot));
-    }
-    this.el.querySelector('.bag-close').addEventListener('click', () => this.close());
-    const shade=this.el.querySelector('.bag-shade');
+    this.grid = this.el.querySelector('.bp-grid');
+    this.tabsEl = this.el.querySelector('.bp-tabs');
+    this.nameEl = this.el.querySelector('.bp-name');
+    this.latinEl = this.el.querySelector('.bp-latin');
+    this.descEl = this.el.querySelector('.bp-desc');
+    this.chipsEl = this.el.querySelector('.bp-chips');
+    this.heldEl = this.el.querySelector('.bp-held');
+    this.capEl = this.el.querySelector('.bp-cap-v');
+    this.equipBtn = this.el.querySelector('[data-bp="equip"]');
+    this.dropBtn = this.el.querySelector('[data-bp="drop"]');
+    this.dropZone = this.el.querySelector('.bp-drop');
+    this.tabsEl.innerHTML = BAG_TABS.map((x) => `<button type="button" role="tab" data-tab="${x.id}"></button>`).join('');
+    this.el.addEventListener('contextmenu', (e) => e.preventDefault());
+    this.tabsEl.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-tab]');
+      if (!b) return;
+      this.tab = b.dataset.tab;
+      this.renderKey = '';
+      this.render();
+      this.grid.querySelector('.bp-slot.owned')?.focus({ preventScroll: true });
+    });
+    this.grid.addEventListener('click', (e) => {
+      if (performance.now() < (this._skipClickUntil || 0)) return;
+      const b = e.target.closest('.bp-slot[data-kind]');
+      if (!b || b.disabled) return;
+      const kind = b.dataset.kind;
+      const now = performance.now();
+      if (this._lastClick && this._lastClick.kind === kind && now - this._lastClick.t < 380) {
+        this._lastClick = null;
+        this.equipKind(kind);
+        return;
+      }
+      this._lastClick = { kind, t: now };
+      this.sel = kind;
+      this.renderKey = '';
+      this.render();
+    });
+    this.grid.addEventListener('pointerdown', (e) => this._dragStart(e));
+    this.equipBtn.addEventListener('click', () => this.equipKind(this.sel));
+    this.dropBtn.addEventListener('click', () => this.dropKind(this.sel));
+    this.el.querySelector('.bp-close').addEventListener('click', () => this.close());
+    const shade = this.el.querySelector('.bp-veil');
     // Touch BAG opens on pointerdown and hides that control. Its eventual click can be retargeted
-    // onto the shade: only dismiss if this gesture actually STARTED on the shade.
-    shade.addEventListener('pointerdown',()=>{this.shadePressed=this.uiReady;});
-    shade.addEventListener('pointercancel',()=>{this.shadePressed=false;});
-    shade.addEventListener('click',()=>{const dismiss=this.shadePressed;this.shadePressed=false;if(dismiss)this.close();});
-    this.el.querySelector('[data-action="equip"]').addEventListener('click', () => this.equip(this.menuSlot));
-    this.el.querySelector('[data-action="drop"]').addEventListener('click', () => this.drop(this.menuSlot));
-    this.el.addEventListener('keydown', e => {
-      if(!this.opened) return;
-      if(e.code === 'Escape' && !this.menu.hidden) { e.stopPropagation(); this.menu.hidden = true; this.pockets[this.menuSlot]?.focus(); }
-      // Keep keyboard focus in the open bag, without letting Tab raise the watch behind it.
-      if(e.code === 'Tab') {
+    // onto the veil: only dismiss if this gesture actually STARTED on the veil.
+    shade.addEventListener('pointerdown', () => { this.shadePressed = this.uiReady; });
+    shade.addEventListener('pointercancel', () => { this.shadePressed = false; });
+    shade.addEventListener('click', () => { const dismiss = this.shadePressed; this.shadePressed = false; if (dismiss) this.close(); });
+    this.el.addEventListener('keydown', (e) => {
+      if (!this.opened) return;
+      if (e.code === 'Escape') { e.stopPropagation(); this.close(); return; }
+      const list = [...this.grid.querySelectorAll('.bp-slot[data-kind]:not([disabled])')];
+      const at = list.indexOf(document.activeElement);
+      const step = { ArrowRight: 1, ArrowLeft: -1, ArrowDown: 5, ArrowUp: -5 }[e.code];
+      if (step) {
         e.preventDefault(); e.stopPropagation();
-        const buttons = [...this.el.querySelectorAll('button')].filter(b => !b.disabled && b.offsetParent !== null);
+        const next = at < 0 ? 0 : (at + step + list.length) % list.length;
+        list[next]?.focus({ preventScroll: true });
+        return;
+      }
+      if (e.code === 'Enter' || e.code === 'Space') {
+        e.preventDefault();
+        if (this.sel) this.equipKind(this.sel);
+        return;
+      }
+      if (e.code === 'Delete' || e.code === 'Backspace') {
+        e.preventDefault();
+        if (this.sel) this.dropKind(this.sel);
+        return;
+      }
+      // Keep keyboard focus in the open bag, without letting Tab raise the watch behind it.
+      if (e.code === 'Tab') {
+        e.preventDefault(); e.stopPropagation();
+        const buttons = [...this.el.querySelectorAll('button')].filter((b) => !b.disabled && b.offsetParent !== null);
         const i = buttons.indexOf(document.activeElement), d = e.shiftKey ? -1 : 1;
-        buttons[(i+d+buttons.length)%buttons.length]?.focus();
+        buttons[(i + d + buttons.length) % buttons.length]?.focus();
       }
     });
     this.reset();
@@ -138,21 +245,20 @@ export class Backpack {
     if(!g.player.alive || !['play','morning','dawn','training'].includes(g.state) || g.inputMuted) return false;
     if(g.player.carrying || g.escape.held || g.escape.mySeat>=0 || g.cabinets.busy || g.expedition.onTower) { g.handsFull(); return false; }
     this.opened=true; this.uiReady=false; this.shadePressed=false; this.el.hidden=false; this.el.classList.remove('ready');
-    this.menu.hidden=true; this.reconcile(); this.renderKey=''; this.render();
+    this.reconcile(); this.sel=this.equipped||null; this.renderKey=''; this.render();
     g.input.uiMode=true; g.input.reset(); g.charge.active=false; g.pingQueue=null;
     g.tools.cancelRecord();g.partMap?.fold(true);
     if(g.torch.on) g.torch.toggle();
     g.objectives.closeNote(); g.hud.setHint(null); g.hud.setUse(null);
-    if(this.round) { document.body.classList.add('bag-open','bag-3d'); g.bag3d.open(); }
-    else document.body.classList.add('bag-open');
+    document.body.classList.add('bag-open');
     g.input.exitLock();
     if(g.audio.ready) g.audio.paper();
     return true;
   }
   close(lock=true) {
     const had=this.opened;
-    this.opened=false; this.uiReady=false; this.menu.hidden=true; this.el.classList.remove('ready');
-    document.body.classList.remove('bag-open','bag-3d');
+    this.opened=false; this.uiReady=false; this.el.classList.remove('ready');
+    document.body.classList.remove('bag-open','bag-3d','bag-dragging');
     if(this.g.bag3d) this.g.bag3d.close();
     this.g.input.uiMode=false;
     if(had) {
@@ -161,25 +267,6 @@ export class Backpack {
     }
     this.el.hidden=true;
     if (this.el.contains(document.activeElement)) document.activeElement.blur();
-  }
-  context(i, at = null) {
-    const kind=this.slots[i];
-    if(!kind || !this.opened || !this.uiReady || this.pending.size) return;
-    this.menuSlot=i; this.menu.hidden=false;
-    this.menu.querySelector('span').textContent=bagName(kind);
-    this.menu.querySelector('[data-action="equip"]').textContent=t(this.equipped===kind?'bagStow':'bagEquip');
-    this.menu.querySelector('[data-action="drop"]').textContent=t('bagDrop');
-    // the flat grid pins the menu to its pocket button; the round pack, to the click that opened it
-    const r = at ? { x: at.x - 110, y: at.y - 30, width: 220, height: 60 } : this.pockets[i].getBoundingClientRect();
-    this.menu.style.left=`${Math.max(12,Math.min(innerWidth-232,r.x+r.width*.4))}px`;
-    this.menu.style.top=`${Math.max(12,Math.min(innerHeight-150,r.y+r.height*.5))}px`;
-    this.menu.querySelector('button').focus();
-  }
-  // the round pack's pointer chose a pouch (Bag3D): lift the item out and pin the menu to the click
-  pickPocket(i, x, y) {
-    if(!this.opened || !this.uiReady || this.pending.size || !this.slots[i]) return false;
-    this.context(i, { x, y });
-    return true;
   }
   equip(i) {
     const kind=this.slots[i]; if(!kind || this.pending.size) return;
@@ -247,7 +334,7 @@ export class Backpack {
       if(!it) return false;
       if(death) { if(g.auth) g.tools.dropFor(g.player.id,g.player.x,g.player.z); }
       else g.tools.request('drop',it.i,it.clip);
-      this.menu.hidden=true; return true;
+      return true;
     }
     if(kind==='glow' && g.glows.held) {
       const s=g.glows.held; g.glows.dropFor(g.player.id,g.player.x,g.player.z);
@@ -256,7 +343,7 @@ export class Backpack {
     const parcel=this.parcel(kind);
     if(!parcel) { this.reconcile(); this.renderKey=''; return true; }
     const nonce=`${this.epoch}.${++this.seq}`;
-    this.pending.set(nonce,{kind,parcel,death,retry:2}); this.menu.hidden=true;
+    this.pending.set(nonce,{kind,parcel,death,retry:2});
     if(g.auth) this.hostDrop(g.player.id,nonce,parcel,death);
     else g.coop.toHost('ibd',[nonce,parcel,death?1:0]);
     return true;
@@ -268,7 +355,7 @@ export class Backpack {
     const id=`${pid}:${nonce}`,old=this.world.get(id);
     if(old) { if(g.sync) g.sync.ev('ibp',old); else this.applyParcel(old); return true; } // retry the ACK, never spawn twice
     if(d.kind==='map'&&g.partMap?.owner!==pid)return bad();
-    if(!['play','morning','dying','dawn'].includes(g.state)) return bad();
+    if(!['play','morning','dying','dawn','training'].includes(g.state)) return bad();
     if(!forced&&!death && (!p.alive || p.carrying || g.escape.load(pid) || g.escape.seatOf(pid)>=0 || g.cabinets.locked(pid))) return bad();
     if(!forced&&death && p.alive && !(pid===g.player.id&&g.state==='dying')) return bad();
     if(d.kind!=='map'&&[...this.world.values()].filter(q=>!q.taker).length>=96) { this.reject(pid,nonce); return false; }
@@ -378,7 +465,7 @@ export class Backpack {
     if(this.opened && (!alive || g.inputMuted || !['play','morning','dawn','training'].includes(g.state))) this.close(false);
     this.progress=Math.max(0,Math.min(1,this.progress+(this.opened?1:-1)*dt/(this.opened?.7:.32)));
     this.equipT=Math.max(0,this.equipT-dt);
-    if(this.opened && this.progress>.94 && !this.uiReady && !g.input.locked && !document.pointerLockElement) { this.uiReady=true; this.el.classList.add('ready'); this.pockets.find(b=>!b.disabled)?.focus({preventScroll:true}); }
+    if(this.opened && this.progress>.94 && !this.uiReady && !g.input.locked && !document.pointerLockElement) { this.uiReady=true; this.el.classList.add('ready'); this.grid.querySelector('.bp-slot.owned')?.focus({preventScroll:true}); }
     if(this.claimPending && (this.claimPending.left-=dt)<=0) this.claimPending=null;
     if(g.player.carrying || g.escape.held) { if(g.torch.on) g.torch.toggle(); }
     if(g.online && !g.auth) for(const [nonce,req] of this.pending) { req.retry-=dt; if(req.retry<=0) { req.retry=2; g.coop.toHost('ibd',[nonce,req.parcel,req.death?1:0]); } }
@@ -389,29 +476,141 @@ export class Backpack {
     this.beat-=dt;
     if(this.beat<=0) { this.beat=3; if(g.sync) g.sync.send('ip',this.slots.slice()); }
   }
+  // ---------------- the page ----------------
+  // The pack opens as a page of its own: tabs, a field of slots, and the item you point at described
+  // on the right beside the survivor who has to carry it. No 3D rucksack, no four-pocket diagram.
   render() {
     const g=this.g;
-    const key=[t('bagTitle'),this.equipped,this.slots.join(','),...BAG_KINDS.map(k=>this.count(k)),g.torch.charge.toFixed(2),g.tools.tapeHeld?.charges,this.pending.size,!!g.glows.held,!!g.player.hasFlare].join('|');
+    const lang=getLang();
+    const key=[t('bagTitle'),lang,this.tab,this.sel,this.equipped,this.slots.join(','),...BAG_KINDS.map(k=>this.count(k)),g.torch.charge.toFixed(2),g.tools.tapeHeld?.charges,this.pending.size,!!g.glows.held,!!g.player.hasFlare].join('|');
     if(key===this.renderKey) return; this.renderKey=key;
+    const touch=g.input.touch;
+    const tab=BAG_TABS.find(x=>x.id===this.tab)||BAG_TABS[0];
+    const kinds=tab.kinds;
+    const owns=(k)=>this.count(k)>0||this.owns(k);
+    if(!this.sel||!kinds.includes(this.sel)) this.sel=kinds.find(owns)||null;
+    const k=this.sel, has=k?owns(k):false;
     this.el.setAttribute('aria-label',t('bagTitle'));
-    this.el.querySelector('h2').textContent=t('bagTitle');
-    this.el.querySelector('.bag-tip').textContent=t(g.input.touch?'bagTipT':this.round?'bagTip3d':'bagTip');
-    this.el.querySelector('.bag-world').textContent=t('bagWorld');
-    this.el.querySelector('.bag-capacity').textContent=`${this.slots.filter(Boolean).length} / ${BAG_SIZE} · ${t('bagSlots')}`;
-    this.el.querySelector('.bag-close').textContent=`${t('bagClose')}  [ I / ESC ]`;
-    this.slots.forEach((kind,i)=>{
-      const b=this.pockets[i]; b.classList.toggle('empty',!kind); b.classList.toggle('equipped',!!kind&&kind===this.equipped);
-      b.disabled=!!this.pending.size;
-      b.querySelector('.bag-item').innerHTML=kind?iconSvg(kind):'<i>+</i>';
-      const name=kind==='flare'&&!g.player.hasFlare?t('bagCartridges'):bagName(kind);
-      b.querySelector('.bag-item-name').textContent=kind?name:t('bagEmpty');
-      let sub=kind?`${this.count(kind)}${['stones','glow','battery','flare','syringe'].includes(kind)?` / ${BAG_LIMIT[kind]}`:''}`:'';
-      if(kind==='torch') sub=`${Math.ceil(g.torch.charge*100)}%`;
-      if(kind==='tape') sub=`${g.tools.tapeHeld?.charges||0} / 2`;
-      if(kind==='glow' && g.glows.held) sub+=` · ${t('bagLit')}`;
-      if(kind && kind===this.equipped) sub+=` · ${t('bagInHands')}`;
-      b.querySelector('.bag-item-count').textContent=sub;
-      b.setAttribute('aria-label',`${i+1}: ${kind?name:t('bagEmpty')}${sub?`, ${sub}`:''}`);
+    this.el.querySelector('.bp-title').textContent=t('bagTitle');
+    this.el.querySelector('.bp-kicker').textContent=t('bagKicker');
+    this.el.querySelector('.bp-cap-k').textContent=t('bagCanHold');
+    this.capEl.textContent=`${this.slots.filter(Boolean).length} / ${BAG_SIZE}`;
+    this.el.querySelector('.bp-close').textContent=t('bagClose');
+    this.el.querySelector('.bp-hint').textContent=t(touch?'bagTipT':'bagTip');
+    this.el.querySelector('.bp-keys').textContent=t(touch?'bpKeysT':'bpKeys');
+    this.tabsEl.querySelectorAll('[data-tab]').forEach((b)=>{
+      const on=b.dataset.tab===this.tab;
+      b.textContent=t('bpTab_'+b.dataset.tab);
+      b.setAttribute('aria-selected',on?'true':'false');
+      b.tabIndex=on?0:-1;
     });
+    // the field of slots: every kind of the chosen shelf, then its empty places
+    const tiles=kinds.map((kind)=>{
+      const n=this.count(kind), on=this.equipped===kind;
+      const sel=kind===this.sel;
+      const name=kind==='flare'&&!g.player.hasFlare?t('bagCartridges'):bagName(kind);
+      const live=owns(kind);
+      return `<button type="button" class="bp-slot${live?' owned':' void'}${sel?' sel':''}${on?' on':''}" data-kind="${kind}" ${live?'':'disabled'} aria-label="${esc(name)}${live?`, ${n}`:''}"${sel?' aria-current="true"':''}>
+        <span class="bp-ico">${iconSvg(kind)}</span>
+        <span class="bp-lbl">${esc(name)}</span>
+        <span class="bp-n">${live?'×'+n:''}</span>
+        ${on?`<i class="bp-mark">${esc(t('bagInHands'))}</i>`:''}
+      </button>`;
+    });
+    while(tiles.length%5||tiles.length<25) tiles.push('<span class="bp-slot void filler" aria-hidden="true"></span>');
+    this.grid.innerHTML=tiles.join('');
+    // the right-hand page: what it is, and what it costs you to carry
+    const nm=k?(k==='flare'&&!g.player.hasFlare?t('bagCartridges'):bagName(k)):t('bagEmpty');
+    this.nameEl.textContent=nm;
+    this.latinEl.textContent=k?t('bagSub_'+k):t('bagPickHint');
+    this.descEl.textContent=k?t('bagAbout_'+k):t('bagPickHint');
+    const chips=[];
+    if(k){
+      const cnt=this.count(k);
+      const limited=['stones','glow','battery','flare','syringe'].includes(k);
+      chips.push([t('bagCount'), limited?`${cnt} / ${BAG_LIMIT[k]}`:`${cnt}`]);
+      const i=this.slots.indexOf(k);
+      if(i>=0) chips.push([t('bagSlot'), `${i+1} / ${BAG_SIZE}`]);
+      if(k==='torch') chips.push([t('bagCharge'), `${Math.ceil(g.torch.charge*100)}%`]);
+      if(k==='tape') chips.push([t('bagCharge'), `${g.tools.tapeHeld?.charges||0} / 2`]);
+      if(k==='glow'&&g.glows.held) chips.push([t('bagState'), t('bagLit')]);
+      if(this.equipped===k) chips.push([t('bagState'), t('bagInHands')]);
+      if(this.pending.size) chips.push([t('bagState'), t('bagPending')]);
+    }
+    this.chipsEl.innerHTML=chips.map(([a,b])=>`<span><i>${esc(a)}</i><b>${esc(b)}</b></span>`).join('');
+    this.equipBtn.textContent=this.equipped===k?t('bagStow'):t('bagEquip');
+    this.equipBtn.disabled=!has||!!this.pending.size;
+    this.dropBtn.textContent=t('bagDrop');
+    this.dropBtn.disabled=!has||!!this.pending.size;
+    this.heldEl.innerHTML=k&&has?iconSvg(k):'';
+    this.heldEl.className='bp-held'+(k&&has?' show':'');
+    this.dropZone.querySelector('b').textContent=t('bagDrop');
+    this.dropZone.querySelector('span').textContent=t('bagDropHint');
+    this.dropZone.hidden=!document.body.classList.contains('bag-dragging');
+  }
+
+  // ---------------- throwing things out ----------------
+  // Drag a tile off the page (or onto the drop strip) and let go: the item leaves the pack and lies
+  // where you stand, the same way the old context menu did it, whether you are host or guest.
+  _dragStart(e) {
+    if(!this.opened||!this.uiReady||e.button>0) return;
+    const b=e.target.closest('.bp-slot[data-kind]');
+    if(!b||b.disabled) return;
+    this.drag={kind:b.dataset.kind,x:e.clientX,y:e.clientY,live:false};
+    this._md=(ev)=>this._dragMove(ev);
+    this._mu=(ev)=>this._dragEnd(ev);
+    addEventListener('pointermove',this._md);
+    addEventListener('pointerup',this._mu);
+    addEventListener('pointercancel',this._mu);
+  }
+  _dragMove(e) {
+    const d=this.drag; if(!d) return;
+    if(!d.live&&Math.hypot(e.clientX-d.x,e.clientY-d.y)<8) return;
+    if(!d.live){
+      d.live=true;
+      d.ghost=document.createElement('div');
+      d.ghost.className='bp-ghost';
+      d.ghost.innerHTML=`${iconSvg(d.kind)}<b>×${this.count(d.kind)}</b>`;
+      document.body.append(d.ghost);
+      document.body.classList.add('bag-dragging');
+      this.dropZone.hidden=false;
+    }
+    d.ghost.style.transform=`translate(${e.clientX}px,${e.clientY}px) translate(-50%,-50%)`;
+    const zone=this.dropZone.getBoundingClientRect();
+    const onZone=e.clientX>=zone.left&&e.clientX<=zone.right&&e.clientY>=zone.top&&e.clientY<=zone.bottom;
+    const over=document.elementFromPoint(e.clientX,e.clientY);
+    this.dropZone.classList.toggle('hot',onZone);
+    this.dropZone.classList.toggle('away',!onZone&&(!over||!over.closest('.bp-frame')));
+  }
+  _dragEnd(e) {
+    removeEventListener('pointermove',this._md);
+    removeEventListener('pointerup',this._mu);
+    removeEventListener('pointercancel',this._mu);
+    const d=this.drag; this.drag=null;
+    if(!d||!d.live){ return; }
+    const zone=this.dropZone.getBoundingClientRect();
+    const onZone=e.clientX>=zone.left&&e.clientX<=zone.right&&e.clientY>=zone.top&&e.clientY<=zone.bottom;
+    const over=document.elementFromPoint(e.clientX,e.clientY);
+    const out=onZone||!over||!over.closest('.bp-frame');
+    d.ghost?.remove();
+    document.body.classList.remove('bag-dragging');
+    this.dropZone.hidden=true; this.dropZone.classList.remove('hot','away');
+    this._skipClickUntil=performance.now()+300;
+    if(out) this.dropKind(d.kind);
+  }
+  equipKind(kind) {
+    if(!kind||!this.opened||this.pending.size) return;
+    const i=this.slots.indexOf(kind);
+    if(i>=0) this.equip(i);
+  }
+  dropKind(kind) {
+    if(!kind||!this.opened||this.pending.size) return false;
+    const i=this.slots.indexOf(kind);
+    if(i<0) return false;
+    const ok=this.drop(i);
+    if(ok&&this.g.audio?.ready) this.g.audio.paper();
+    this.renderKey='';
+    this.render();
+    return ok;
   }
 }
