@@ -531,11 +531,10 @@ export class MotoPark {
   // the bars in front of you are one mesh, made on the first ride and reused: take it out of the scene
   // with the park (it used to stay behind, frozen at the last camera position)
   _dropCockpit() {
-    for (const key of ['cockpitMesh']) {
-      const m = this[key];
-      if (m?.parent) m.parent.remove(m);
-      if (m) { m.geometry?.dispose?.(); this[key] = null; }
-    }
+    // (its geometry belongs to this.cockpits and is reused by the next ride: only the mesh goes)
+    const m = this.cockpitMesh;
+    if (m?.parent) m.parent.remove(m);
+    this.cockpitMesh = null;
   }
 
   // the cockpit under the camera: built once, hidden while walking, leaning with the bike
