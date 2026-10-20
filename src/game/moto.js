@@ -10,6 +10,7 @@ import { t } from '../core/i18n.js';
 import { MeshBuilder, KIND } from '../world/builder.js';
 import { GK } from '../ui/garageSet.js';
 import { geometryOf } from './uaz.js';
+import { GroundShade } from './groundShade.js';
 
 const PI = Math.PI;
 export const MOTO = {
@@ -253,7 +254,10 @@ export class MotoPark {
   // park them in a row by the camp, noses out — one per slot, waiting
   reset() {
     const g = this.g;
-    for (const m of this.bikes) if (m.mesh.parent) m.mesh.parent.remove(m.mesh);
+    for (const m of this.bikes) {
+      if (m.mesh.parent) m.mesh.parent.remove(m.mesh);
+      m.shade?.dispose();
+    }
     this.bikes = [];
     this.rider = -1;
     this.riders.clear();
@@ -271,6 +275,8 @@ export class MotoPark {
       b.wheels[1].position.set(0, 0.3, 0.62);
       b.mesh.add(...b.wheels);
       b.mesh.rotation.order = 'YXZ'; // heading first: the lean and the slope belong to the machine
+      b.shade = new GroundShade({ rx: 0.44, rz: 1.08, strength: 0.52 }); // where it meets the grass
+      b.shade.place(x, z, yaw, true);
       // both wheels on the ground: sample the hill under the axles, not under the middle
       const fx = -Math.sin(yaw), fz = -Math.cos(yaw);
       const hf = g.world.terrain.height(x + fx * 0.62, z + fz * 0.62);
@@ -444,11 +450,15 @@ export class MotoPark {
       b.mesh.rotation.set(pitch, yaw, roll, 'YXZ');
       b.mesh.visible = b.i !== this.rider; // yours is replaced by the cockpit (see placeCockpit)
       for (const w of b.wheels) w.rotation.x = spin;
+      b.shade?.place(x, z, yaw);
     }
   }
 
   dispose() {
-    for (const b of this.bikes) if (b.mesh.parent) b.mesh.parent.remove(b.mesh);
+    for (const b of this.bikes) {
+      if (b.mesh.parent) b.mesh.parent.remove(b.mesh);
+      b.shade?.dispose();
+    }
     this.bikes = [];
     if (this.cockpit?.mesh.parent) this.cockpit.mesh.parent.remove(this.cockpit.mesh);
     this.cockpit = null;

@@ -14,6 +14,7 @@ export const NEWS = [
       'Атлас больше не запинается: страница шприца адреналина падала на сборке своей 3D-модели, перелистывание застревало на середине и книга переставала отвечать. Модель починена и перерисована, а сбой одной страницы теперь просто оставляет её без витрины, но листать не мешает',
       'Фильм выезда: у машины крутятся колёса — каждое на своей оси, с шагом по скорости',
       'Стеллаж на полигоне: камни, химсвет, ракета, батарея, карта и пенал со шприцем стоят каждый на своей полке, сверху — «СТАРТ»',
+      'Мотоциклы, стеллаж и мишени больше не висят над травой: под каждым — мягкая тень на земле, её рисует сам шейдер леса (без лишних вызовов отрисовки)',
     ]},
     en:{title:'The bike, the rack and the atlas',items:[
       'Step off the bike and it is still there: the machine hid under its rider and stayed invisible after stepping down. It is back in the frame the moment you dismount',
@@ -21,6 +22,7 @@ export const NEWS = [
       'The atlas no longer jams: the adrenaline syringe page crashed while building its 3D plate, the page turn stopped halfway and the book stopped answering. The model is fixed and redrawn, and a page that fails now just opens without its plate',
       'The departure film rolls its wheels: four of them, one per axle, turning in step with the road',
       'The range rack: stones, a glow stick, a flare, the battery, the map and the syringe case each stand on their own shelf under a painted СТАРТ',
+      'Bikes, rack and targets no longer hover over the grass: each sits in a soft pool of contact shade, drawn by the forest shader itself (no extra draw calls)',
     ]},
   },
   {

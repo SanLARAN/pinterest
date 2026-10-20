@@ -5,6 +5,7 @@ import { CFG } from '../core/config.js';
 
 const N = CFG.PULSE.slots;
 export const GLOW_SLOTS = 6; // small lights: glow sticks, the first-aid hut's lantern
+export const DISC_SLOTS = 12; // contact-shade pools on the meadow (see shared.uDisc)
 export const LAMP_SLOTS = 13; // five main sites, yard floodlight, seven lamps on Zarya’s independent local grid
 // omni shadows (see render/shadows.js): every small light and every lamp has six faces of distances in one
 // atlas — a row per light, a tile per face
@@ -42,6 +43,11 @@ export const shared = {
   uRoadK: { value: new THREE.Vector3(0, 0, 0) },
   // the УАЗ's headlights: between the two lamps + intensity, and which way they point
   uHead: { value: new THREE.Vector4(0, -100, 0, 0) },
+  // soft pools of shade on the meadow under the solid things (the bikes, the rack, a target): where
+  // something meets the ground. uDisc = x, z, cos, sin of the owner's frame; uDiscR = half-axes,
+  // strength (0 = the slot is free). Written by game/groundShade.js.
+  uDisc: { value: Array.from({ length: DISC_SLOTS }, () => new THREE.Vector4(0, 0, 1, 0)) },
+  uDiscR: { value: Array.from({ length: DISC_SLOTS }, () => new THREE.Vector4(1, 1, 0, 0)) },
   uHeadD: { value: new THREE.Vector3(0, 0, 1) },
 };
 
@@ -314,6 +320,8 @@ void main() {
 const WORLD_FRAG = /* glsl */ `
 ${PULSE_GLSL}
 ${EDGE_GLSL}
+uniform vec4 uDisc[${DISC_SLOTS}]; // contact shade: x, z, cos, sin (game/groundShade.js)
+uniform vec4 uDiscR[${DISC_SLOTS}]; // ...half-axes and strength (0 = the slot is free)
 #ifdef SELF_LIT
 uniform float uSelfLit; // (what's in your arms: you can always just about make it out)
 #endif
@@ -372,6 +380,20 @@ void main() {
     if(side>.93+moss*.055)discard;
     float worn=(1.-smoothstep(.28,.93,side+moss*.16))*(.84+.16*sin(vWorld.z*3.7+vWorld.x*2.3));
     dayC=mix(DC[0]*vec3(.87,.9,.9),dayC,worn);
+  }
+
+  // contact shade: where a solid thing meets the meadow, the grass and the earth go dark under it
+  float shade = 0.0;
+  if (k == 0 || (k >= 54 && k <= 56)) {
+    for (int i = 0; i < ${DISC_SLOTS}; i++) {
+      vec4 A = uDisc[i];
+      vec4 B = uDiscR[i];
+      if (B.z <= 0.0) continue;
+      vec2 d = vWorld.xz - A.xy;
+      vec2 l = vec2(d.x * A.z - d.y * A.w, d.x * A.w + d.y * A.z);
+      float q = length(l / B.xy);
+      if (q < 1.0) shade = max(shade, B.z * (1.0 - q * q));
+    }
   }
 
   float ring;
@@ -447,7 +469,7 @@ void main() {
     day = mix(day, fogC, fog);
     col = mix(col, day + col * 0.3, uDawn);
   }
-  gl_FragColor = vec4(col, 1.0 - nat * 0.95);
+  gl_FragColor = vec4(col * (1.0 - shade), 1.0 - nat * 0.95);
 }
 `;
 

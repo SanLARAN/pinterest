@@ -10,6 +10,7 @@ import { BAG_LIMIT } from './backpackData.js';
 import { MeshBuilder, KIND } from '../world/builder.js';
 import { geometryOf } from './uaz.js';
 import { lettering } from '../world/expedition.js';
+import { GroundShade } from './groundShade.js';
 
 const TARGETS = [
   { d: 9, off: 2.5 },
@@ -140,6 +141,14 @@ export class Training {
     const props = new THREE.Mesh(geometryOf(pb.toArrays()), g.world.material);
     props.frustumCulled = false;
     this.group.add(props);
+    // the shade the stand throws on the grass (and the crate's), so the rack sits on the meadow
+    this.shades = [];
+    for (const [lx, lz, rx, rz, st] of [[0, 0.1, 1.32, 0.62, 0.55], [-1.55, 0.5, 0.4, 0.36, 0.35]]) {
+      const [sx, sz] = world(lx, lz);
+      const sh = new GroundShade({ rx, rz, strength: st });
+      sh.place(sx, sz, R, true);
+      this.shades.push(sh);
+    }
 
     // a crate of stones beside the stand's left foot
     const c = new MeshBuilder(64);
@@ -200,6 +209,9 @@ export class Training {
       this.group.add(m);
       // the board's post is solid too: you can walk round a target, not through it
       if (g.world?.col?.circle) this.colIdx.push(g.world.col.circle(x, z, 0.16, 1.5, 2));
+      const sh = new GroundShade({ rx: 0.5, rz: 0.3, strength: 0.32 });
+      sh.place(x, z, Math.atan2(ox, oz) + Math.PI, true);
+      this.shades.push(sh);
       return { mesh: m, x, y, z, k: 0, up: 1, resetT: 0, i };
     });
 
@@ -271,6 +283,10 @@ export class Training {
     if (this.group) {
       g.scene.remove(this.group);
       this.group = null;
+    }
+    if (this.shades) {
+      for (const sh of this.shades) sh.dispose();
+      this.shades = [];
     }
     if (this.colIdx) {
       for (const i of this.colIdx) g.world?.col?.remove?.(i);
