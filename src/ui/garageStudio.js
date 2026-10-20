@@ -78,7 +78,7 @@ export class GarageStudio {
       box(b,x,h*.4,z,.18,h*.8,.18,1);for(let k=0;k<3;k++){b.place(x,h*.35+k*h*.21,z);b.cone(5,.9-k*.2,h*.55,2);}}
     this.g._mesh(b.toArrays());
   }
-  openBook(callback) { if(this.bookCallback)return;this.bookWant=1;this.bookCallback=callback;this.bookStarted=performance.now(); }
+  openBook(callback) { this.bookWant=1;this.bookCallback=callback;this.bookStarted=performance.now(); } // a second click replaces the wait, never wedges it
   cancelBook() { this.bookCallback=null;this.bookWant=0; }
   bookRect() {
     this.book.updateMatrixWorld(true);const a=[];

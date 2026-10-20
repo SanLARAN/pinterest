@@ -46,7 +46,13 @@ export class GarageHome {
   openAtlas() {
     if(!this.active)return;
     const g=this.ensureGarage();
-    if(g?.studio)g.studio.openBook(()=>{if(this.active)this.atlas.open();});else this.atlas.open();
+    if(!g?.studio)return this.atlas.open();
+    // The cover lifts in the garage's frame. If that frame stalls (an overlay opened, the tab lost
+    // focus mid-animation), the callback would never fire and the book would be stuck half-open with
+    // no journal behind it — so the click itself guarantees the journal opens either way.
+    let opened=false;
+    g.studio.openBook(()=>{opened=true;if(this.active)this.atlas.open();});
+    setTimeout(()=>{if(!opened&&this.active&&!this.atlas.shown){g.studio.cancelBook();this.atlas.open();}},1400);
   }
   atlasClosed() {
     this.ensureGarage()?.studio?.cancelBook();this.returnBookFocus=true;

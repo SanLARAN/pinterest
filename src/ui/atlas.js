@@ -67,6 +67,12 @@ export class Atlas {
   isOpen() {
     // something else may have swapped the screens under us (e.g. menus.only): then we're closed
     if (this.shown && !this.el.classList.contains('show')) this.close();
+    // a defensive sweep: the body class is the other half of "open", and a stray one left behind
+    // keeps the menu's book hidden for good
+    if (!this.shown && document.body.classList.contains('atlas-open')) {
+      document.body.classList.remove('atlas-open');
+      document.body.classList.add('garage-home');
+    }
     return this.shown;
   }
 
@@ -88,6 +94,7 @@ export class Atlas {
     }
     this.shown = true;
     this.el.classList.add('show');
+    this.el.style.pointerEvents = 'auto';
     this.el.setAttribute('aria-hidden', 'false');
     document.body.classList.add('atlas-open');
     if (atlasLog.fresh) {
@@ -113,6 +120,7 @@ export class Atlas {
       this._renderAll();
     }
     this.el.classList.remove('show');
+    this.el.style.pointerEvents = '';
     this.el.setAttribute('aria-hidden', 'true');
     document.body.classList.remove('atlas-open');
     this._flushSave(true);
@@ -297,6 +305,7 @@ export class Atlas {
         <span class="pg-keys">${KEY_L}${KEY_R} ${esc(T.ui.keys)}</span>
         <button class="pg next" data-nav="1" aria-label="${esc(T.ui.next)}" ${n === this.pages.length - 1 ? 'disabled' : ''}>${ICON_NEXT}</button>
         <span class="pno">${esc(T.ui.page)} ${2 * n + 2}</span>
+        <button class="pg-close" data-close aria-label="${esc(T.ui.close)}">${esc(T.ui.close)}</button>
       </div>`;
     if (!target && p.id !== 'contents') {
       if (!atlasLog.read[p.id]) {
@@ -661,13 +670,18 @@ export class Atlas {
         this.go(this.i + (+nav.dataset.nav));
         return;
       }
+      if (e.target.closest('[data-close]')) {
+        e.preventDefault();
+        this.close();
+        return;
+      }
       const snd = e.target.closest('[data-sound]');
       if (snd) {
         e.preventDefault();
         this.playSound(snd.dataset.sound);
         return;
       }
-      if (e.target.closest('#atlasClose') || e.target === this.el) {
+      if (e.target.closest('#atlasClose') || e.target === this.el || e.target.classList?.contains('spread') || e.target.classList?.contains('book')) {
         e.preventDefault();
         this.close();
       }

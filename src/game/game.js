@@ -2298,7 +2298,9 @@ export class Game {
     this.audio.setListener(camera.position.x, camera.position.y, camera.position.z, _v.x, _v.y, _v.z);
     this.expedition.applyView(camera);
     this.world.grass?.update(camera);
-    const hands = !cutCam && !sp && !this.expedition.onTower && this.player.alive && (this.state === 'play' || this.state === 'dawn' || this.state === 'training');
+    // on a bike your hands are on the bars: the first-person arms would be drawn across the cockpit
+    const riding = this.motos?.rider >= 0;
+    const hands = !cutCam && !sp && !riding && !this.expedition.onTower && this.player.alive && (this.state === 'play' || this.state === 'dawn' || this.state === 'training');
     const gear = hands && !this.partMap.active && !this.cabinets.busy && !this.inventory.active && this.inventory.equipT <= 0 && this.fieldView.watch < 0.1 && !this.escape.held && !this.player.carrying;
     const active = this.inventory.equipped;
     this.glows.placeView(camera, gear && active === 'glow');
@@ -2307,8 +2309,9 @@ export class Game {
     this.torch.placeView(camera, gear && active === 'torch');
     this.tools.placeView(camera, gear && (active === 'tape' || active === 'crowbar'));
     this.partMap.place(camera,hands&&!this.cabinets.busy&&!this.inventory.active);
-    this.fieldView.place(camera, !cutCam && !sp && this.player.alive && !this.cabinets.busy && !this.expedition.onTower && ['play','morning','dawn','training'].includes(this.state));
+    this.fieldView.place(camera, !cutCam && !sp && this.player.alive && !riding && !this.cabinets.busy && !this.expedition.onTower && ['play','morning','dawn','training'].includes(this.state));
     this.bag3d.place(camera);
+    this.motos.placeCockpit(camera, riding); // the rider's own bars (the arms above are off while riding)
     // your own body, under your eyes
     const st = this.state;
     this.selfBody.place(!cutCam && !sp && this.player.alive && !this.cabinets.busy && !this.expedition.onTower && (st === 'play' || st === 'dawn' || st === 'morning' || st === 'dusk' || st === 'training'));

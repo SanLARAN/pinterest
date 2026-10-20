@@ -9,6 +9,7 @@ import { CFG } from '../core/config.js';
 import { BAG_LIMIT } from './backpackData.js';
 import { MeshBuilder, KIND } from '../world/builder.js';
 import { geometryOf } from './uaz.js';
+import { lettering } from '../world/expedition.js';
 
 const TARGETS = [
   { d: 9, off: 2.5 },
@@ -39,52 +40,137 @@ export class Training {
     this.yaw = yaw;
     const rx = gen.x + ox * 3.2, rz = gen.z + oz * 3.2;
     this.rx = rx; this.rz = rz;
-    g.rackX = rx + ox * 4.6; g.rackZ = rz + oz * 4.6; // the bikes park well past the rack: its apron stays clear
-    g.trainingYaw = yaw;
+    // Where the four bikes stand: the camp sits on a hillside, and a row parked across it either floats
+    // or buries its wheels. Look around the stand for the flattest clear strip that fits four machines
+    // abreast, and park them there, noses out toward the open forest.
+    const t = g.world.terrain;
+    let spot = null;
+    for (let a = 0; a < 16; a++) {
+      const ang = yaw + (a / 16) * Math.PI * 2;
+      const ax = -Math.sin(ang), az = -Math.cos(ang); // the row's facing
+      const bx = -az, bz = ax; // across the row
+      for (const d of [4.5, 5.5, 6.5, 7.5]) {
+        const cx = rx + ax * d, cz = rz + az * d;
+        let hi = -1e9, lo = 1e9, blocked = 0;
+        for (let i = 0; i < 4; i++) {
+          const o = (i - 1.5) * 1.75;
+          const x = cx + bx * o, z = cz + bz * o;
+          const h = t.height(x, z);
+          hi = Math.max(hi, h); lo = Math.min(lo, h);
+          const q = { x, z };
+          if (g.world.col.resolve(q, 1.1).hit) blocked++;
+        }
+        const score = (hi - lo) + blocked * 3 - d * 0.05;
+        if (!spot || score < spot.score) spot = { x: cx, z: cz, ax, az, score };
+      }
+    }
+    g.rackX = spot.x; g.rackZ = spot.z;
+    g.trainingYaw = Math.atan2(-spot.ax, -spot.az); // the bikes face along (ax, az)
+    this.side = [-spot.az, spot.ax];
 
+    // The stand: a field rack with a back board, three shelves and a painted header, facing the camp
+    // (the player walks up to its open face). Everything is laid out in the stand's own frame first —
+    // `at()` is the only thing that knows where that frame is in the world, so a shelf and the kit
+    // standing on it can never drift apart. (`place()` replaces the matrix; it does not compose.)
     const b = new MeshBuilder(512);
-    // the rack: two posts, two shelves, a sign
-    for (const s of [-1, 1]) {
-      b.place(rx + Math.cos(yaw) * s * 1.1, 0.55, rz - Math.sin(yaw) * s * 1.1, 0, -yaw, 0);
-      b.box(0.09, 1.1, 0.09, KIND.WOOD);
+    const gy = g.world.terrain.height(rx, rz); // the camp meadow is not flat: the stand stands on it
+    const R = yaw + Math.PI; // the stand's local -z looks back at the camp
+    const cosR = Math.cos(R), sinR = Math.sin(R);
+    const world = (x, z) => [rx + cosR * x + sinR * z, rz - sinR * x + cosR * z];
+    const at = (x, y, z, ry = 0, rx2 = 0, rz2 = 0) => {
+      const [wx, wz] = world(x, z);
+      b.place(wx, gy + y, wz, rx2, R + ry, rz2);
+    };
+    const W = KIND.WOOD, Wd = KIND.BARK, Bn = KIND.BONE;
+    for (const x of [-1.15, 1.15]) { // the two end posts, each on a foot
+      at(x, 0.77, -0.02); b.box(0.1, 1.54, 0.1, Wd);
+      at(x, 0.05, 0.0); b.box(0.16, 0.1, 0.66, Wd);
+      at(x, 1.56, -0.02); b.box(0.13, 0.06, 0.13, W);
     }
-    for (const y of [0.42, 0.92]) {
-      b.place(rx, y, rz, 0, -yaw, 0);
-      b.box(2.35, 0.05, 0.4, y > 0.6 ? KIND.WOOD : KIND.BARK);
+    at(0, 0.8, -0.22); b.box(2.42, 1.34, 0.035, W); // the back board
+    // a plank skyline: boards of unequal width, so the stand reads as built, not extruded
+    b.identity(); // (the skyline is drawn as separate planks below)
+    for (const [px, pw, py] of [[-0.9, 0.5, 1.5], [0.0, 0.62, 1.53], [0.95, 0.44, 1.49]]) {
+      at(px, py, -0.22); b.box(pw, 0.1, 0.05, Wd);
     }
-    b.place(rx, 1.32, rz, 0, -yaw, 0);
-    b.box(2.3, 0.34, 0.03, KIND.BONE); // the sign
+    for (const y of [0.47, 0.93, 1.4]) { // three shelves, each with a front lip
+      at(0, y, 0.03); b.box(2.3, 0.05, 0.46, y > 1 ? W : Wd);
+      at(0, y - 0.07, 0.24); b.box(2.3, 0.05, 0.04, Wd);
+    }
+    at(0, 1.5, -0.12); b.box(1.5, 0.26, 0.05, Wd); // the header, dark timber with bone lettering
+    {
+      const [hx, hz] = world(0, -0.088); // just proud of the header's face, so it reads from the camp
+      lettering(b, 'СТАРТ', hx, gy + 1.5, hz, 0.045, Bn, R);
+    }
+    at(0, 0.16, -0.04); b.box(2.3, 0.08, 0.08, Wd); // a stretcher tying the two posts at the foot
     const mesh = new THREE.Mesh(geometryOf(b.toArrays()), g.world.material);
     mesh.frustumCulled = false;
     g.scene.add(mesh);
     this.group = new THREE.Group();
     g.scene.add(this.group);
     this.group.add(mesh);
-    // the goods on the shelves (the tape and the crowbar are the real physical ones, moved here)
-    const onShelf = ['stones', 'glow', 'flare', 'battery', 'map', 'syringe'];
-    onShelf.forEach((kind, i) => {
-      const geo = g.inventory.geo[kind];
-      if (!geo) return;
-      const m = new THREE.Mesh(geo, g.world.material);
-      const s = i % 3 - 1;
-      m.position.set(rx + Math.cos(yaw) * (s * 0.6), i < 3 ? 0.62 : 1.06, rz - Math.sin(yaw) * (s * 0.6));
-      m.rotation.y = -yaw + (i - 2.5) * 0.3;
-      m.frustumCulled = false;
-      this.group.add(m);
-    });
-    const tools = g.tools;
-    for (const kind of ['tape', 'crowbar']) {
-      const it = tools.items.find((q) => q.kind === kind && q.state === 'ground');
-      if (!it) continue;
-      // at the two ends of the rack, on the ground: from its face E means the whole kit, not one tool
-      const s = kind === 'tape' ? -1.55 : 1.55;
-      it.x = rx + Math.cos(yaw) * s;
-      it.z = rz - Math.sin(yaw) * s;
-      it.y = g.world.terrain.height(it.x, it.z) + 0.03;
-      it.yaw = -yaw;
-      tools._place(it);
-    }
 
+    // What stands on the shelves: the whole field kit, laid out to be read at a glance. These are
+    // display props, not the pickup parcels — the parcels' geometry is a handful of gold cylinders at
+    // pocket scale, which on a shelf reads as gravel. Each prop here is built to be recognised from
+    // two metres: a pile of stones, a glow stick, a flare, a battery, the map and the syringe case.
+    const pb = new MeshBuilder(256); // the shelf props get their own mesh: `b` is already baked
+    const pat = (x, y, z, ry = 0, rx2 = 0, rz2 = 0) => {
+      const [wx, wz] = world(x, z);
+      pb.place(wx, gy + y, wz, rx2, R + ry, rz2);
+    };
+    const TOP1 = 0.495, TOP2 = 0.955; // the top faces of the two lower shelves
+    for (const [px, pz, pr, py] of [[-0.86, 0.06, 0.052, 1.0], [-0.735, 0.15, 0.062, 2.3], [-0.64, 0.03, 0.046, 4.1]]) {
+      pat(px, TOP1 + pr * 0.42, pz, py); pb.cylinder(6, pr, pr * 0.82, pr * 0.85, KIND.ROCK); // a stone
+    }
+    pat(-0.02, TOP1 + 0.016, 0.1, 0, 0, Math.PI / 2); pb.cylinder(6, 0.015, 0.015, 0.19, KIND.SHARD); // a glow stick
+    pat(0.078, TOP1 + 0.016, 0.1); pb.box(0.024, 0.024, 0.026, Wd); // its dark switch cap
+    pat(0.68, TOP1 + 0.023, 0.1, 0.16, 0, Math.PI / 2); pb.cylinder(6, 0.022, 0.022, 0.17, KIND.EFFIGY); // a flare
+    pat(0.76, TOP1 + 0.023, 0.1, 0.16, 0, Math.PI / 2); pb.box(0.03, 0.03, 0.03, Wd); // its striker cap
+    pat(-0.74, TOP2 + 0.045, 0.1); pb.box(0.17, 0.09, 0.1, Wd); // the battery case
+    pat(-0.74, TOP2 + 0.098, 0.1); pb.box(0.17, 0.012, 0.1, W); // its lid
+    for (const x of [-0.79, -0.69]) { pat(x, TOP2 + 0.115, 0.1); pb.box(0.03, 0.03, 0.03, Bn); } // the posts
+    pat(-0.74, TOP2 + 0.05, 0.152); pb.box(0.1, 0.016, 0.012, KIND.EFFIGY); // a red band on the front
+    pat(0.0, TOP2 + 0.012, 0.1, 0.1); pb.box(0.24, 0.014, 0.19, Bn); // the folded map
+    for (const x of [-0.07, 0.04]) { pat(x, TOP2 + 0.02, 0.1, 0.1); pb.box(0.005, 0.004, 0.17, Wd); } // its creases
+    pat(0.76, TOP2 + 0.026, 0.1, -0.12); pb.box(0.15, 0.05, 0.075, Bn); // the syringe case
+    pat(0.76, TOP2 + 0.026, 0.1, -0.12); pb.box(0.15, 0.012, 0.077, KIND.EFFIGY); // the red stripe on it
+    pat(0.84, TOP2 + 0.026, 0.1, -0.12); pb.box(0.03, 0.03, 0.055, Wd); // its catch
+
+    const props = new THREE.Mesh(geometryOf(pb.toArrays()), g.world.material);
+    props.frustumCulled = false;
+    this.group.add(props);
+
+    // a crate of stones beside the stand's left foot
+    const c = new MeshBuilder(64);
+    {
+      const [wx, wz] = world(-1.55, 0.5);
+      c.place(wx, gy + 0.12, wz, 0, R, 0);
+      c.box(0.46, 0.24, 0.34, Wd);
+      const [ix, iz] = world(-1.55, 0.5);
+      c.place(ix, gy + 0.21, iz, 0, R, 0);
+      c.box(0.37, 0.06, 0.26, W); // the dark inside of the crate
+    }
+    const crate = new THREE.Mesh(geometryOf(c.toArrays()), g.world.material);
+    crate.frustumCulled = false;
+    this.group.add(crate);
+
+    // The two field tools come to the stand too, lying flat on the ground just past each end — out of
+    // the stand's use radius, so E at the shelves still means "take the whole kit". (There are two of
+    // each in the world; the stand borrows whichever lies closest.)
+    for (const kind of ['tape', 'crowbar']) {
+      const it = g.tools.items
+        .filter((q) => q.kind === kind && q.state === 'ground')
+        .sort((a, b) => Math.hypot(a.x - rx, a.z - rz) - Math.hypot(b.x - rx, b.z - rz))[0];
+      if (!it) continue;
+      const [tx, tz] = world(kind === 'tape' ? -1.86 : 1.86, 0.66);
+      it.x = tx;
+      it.z = tz;
+      it.y = g.world.terrain.height(tx, tz) + 0.02;
+      it.yaw = R + (kind === 'crowbar' ? 0.42 : -0.12);
+      it.rev = (it.rev | 0) + 1; // the host tells everyone where they went
+      g.tools._place(it);
+    }
     // the targets: three boards down the meadow, a painted ring on each
     this.targets = TARGETS.map((T, i) => {
       const x = gen.x + ox * T.d + Math.cos(yaw) * T.off;
