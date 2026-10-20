@@ -389,7 +389,10 @@ body.spectating #pulse { display: none; }
 #note.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; transition: opacity 0.35s, transform 0.35s; }
 #note .k { font-size: 10px; letter-spacing: 0.3em; text-transform: uppercase; color: var(--amber); margin-bottom: 9px; }
 #note .t { font-size: 13px; line-height: 1.65; color: var(--bone); font-style: italic; }
-body.note-open #use { opacity: 0; }
+/* the page found on a body covers the prompt line, the hint and the touch HANDS key */
+body.note-open #use, body.note-open #hint { opacity: 0; }
+body.note-open #tUse { display: none !important; }
+body.note-open.can-use #tUse { display: none !important; }
 body.touch #note { left: calc(14px + var(--safe-l)); width: min(440px, 62vw); transform: translate(0, 10px); }
 body.touch #note.show { transform: translate(0, 0); }
 #note .f { margin-top: 10px; font-size: 9px; letter-spacing: 0.24em; text-transform: uppercase; text-align: right; color: rgba(167, 180, 182, 0.45); }

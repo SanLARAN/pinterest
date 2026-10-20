@@ -72,6 +72,7 @@ export class HUD {
     this.popIdx = 0;
     this.cache = {};
     this.hintKey = null;
+    this.noteOpen = false; // a page found on a body owns the screen: nothing else may ask for a hand
     this.clock = 0;
     this.peekUntil = 0;
     this.stonesUntil = 0;
@@ -85,7 +86,11 @@ export class HUD {
 
   show(on) {
     this.el.classList.toggle('hidden', !on);
-    if (!on) document.body.classList.remove('can-use', 'morning', 'note-open', 'can-carry', 'has-glow', 'carrying', 'holding', 'in-car');
+    if (!on) {
+      document.body.classList.remove('can-use', 'morning', 'note-open', 'can-carry', 'has-glow', 'carrying', 'holding', 'in-car');
+      this.noteOpen = false;
+      this.noteEl?.classList.remove('show');
+    }
     if (on) {
       this.cache = {};
       this.lastMinute = -1;
@@ -199,6 +204,7 @@ export class HUD {
 
   // the prompt under the dot. progress 0..1 draws a ring; active = it's something you can do now
   setUse(text, progress = 0, active = true, blocked = false) {
+    if (this.noteOpen && text) text = null; // the page covers the prompt; it may not flash under it
     const key = text ? `${text}|${active}|${blocked}` : '';
     if (this.cache.use !== key) {
       this.cache.use = key;
@@ -220,11 +226,22 @@ export class HUD {
   // a note found on a body. null hides it
   showNote(kicker, text) {
     const el = this.noteEl;
-    document.body.classList.toggle('note-open', !!kicker);
+    this.noteOpen = !!kicker;
+    document.body.classList.toggle('note-open', this.noteOpen);
     if (!kicker) {
       el.classList.remove('show');
+      // the page is gone: so is whatever it covered. The next frame asks again, from scratch.
+      this.hintKey = null;
+      this.hint.classList.remove('show');
+      this.setUse(null);
       return;
     }
+    // the page is on top: the "hold E" line and the hint must not peek out from under it
+    this.hintKey = null;
+    this.hint.classList.remove('show');
+    this.setUse(null);
+    this.useEl.classList.remove('show');
+    document.body.classList.remove('can-use');
     el.querySelector('.k').textContent = kicker;
     el.querySelector('.t').textContent = text;
     el.querySelector('.f').textContent = t('noteClose');
@@ -350,6 +367,7 @@ export class HUD {
   }
 
   setHint(text) {
+    if (this.noteOpen && text) return;
     if (this.hintKey === text) return;
     this.hintKey = text;
     if (!text) {

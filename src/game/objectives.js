@@ -527,6 +527,14 @@ export class Objectives {
 
   _interact(dt, doorsOnly = false) {
     const game = this.g;
+    // the page you just found lies over everything: while it is open nothing asks for your hands
+    // (the prompt used to keep searching for a target under it and stayed after it closed)
+    if (this.note) {
+      this.target = null;
+      this.searchT = 0;
+      game.hud.setUse(null);
+      return;
+    }
     const p = game.player;
     const input = game.input;
     this.working = null; // set again below while your hands are actually on an engine
@@ -718,7 +726,9 @@ export class Objectives {
   closeNote() {
     if (!this.note) return;
     this.note = null;
-    this.g.hud.showNote(null);
+    this.searchT = 0;
+    this.target = null;
+    this.g.hud.showNote(null); // the HUD puts away the prompt and the hint with it
   }
 
   _work(g, dt) {

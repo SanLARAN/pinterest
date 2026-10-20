@@ -7,6 +7,21 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v:'2.1g',date:'2026-10-20',
+    ru:{title:'Записка не оставляет хвоста, приглашение отвечают на месте',items:[
+      'Записка с тела больше не оставляет под собой строку «E · обыскать»: пока страница открыта, её не видно и нечем «прицелиться», а закрыл — приглашение появляется только когда рядом правда есть что взять',
+      'Подсказки и кнопка «РУКИ» на телефоне тоже уходят под записку и не выглядывают из-под неё',
+      'Смерть или конец смены закрывают записку вместе с подсказками — она не висит поверх посмертного экрана',
+      'Приглашение в комнату приходит с двумя кнопками: «Присоединиться» и «Отказаться» (раньше у отказа не было подписи). Обе отвечают сразу из уведомления, а если сеть не приняла ответ — тост остаётся и говорит, что не вышло',
+    ]},
+    en:{title:'The note leaves no tail, the invitation is answered on the spot',items:[
+      'The note from a body no longer leaves the “E · search” line under it: while the page is open nothing is shown and nothing is aimed at, and once it closes the prompt only comes back if there is really something to take',
+      'Hints and the HANDS key on a phone go under the page too, and do not peek out from beneath it',
+      'Death or the end of a shift closes the page with the hints — it no longer hangs over the death screen',
+      'A room invitation arrives with two keys: JOIN and DECLINE (the decline one had no label at all). Both answer straight from the toast, and if the wire did not take the answer the toast stays and says so',
+    ]},
+  },
+  {
     v:'2.1f',date:'2026-10-20',
     ru:{title:'Две оси и полевой справочник',items:[
       'Мотоцикл больше не липнет к земле одной точкой: высота читается под каждой осью, корпус идёт по уклону, а приземление приседает на подвеске',

@@ -1463,6 +1463,7 @@ export class Game {
     this.fx.glitch = 1;
     this.hud.setHint(null);
     this.hud.setIntro(null);
+    this.objectives.closeNote(); // the page in your hands goes with you, prompt and all
     this.hud.peekUntil = 0;
     for (const q of this.monsters) if (q !== m && q.breath) { q.breath.stop(); q.breath = null; }
     this.jsGhost = null;
