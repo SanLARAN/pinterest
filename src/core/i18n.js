@@ -498,6 +498,7 @@ const STR = {
     time: 'время',
     // settings
     sVolume: 'Громкость',
+    sMusic: 'Музыка',
     sMouse: 'Чувствительность мыши',
     sInvert: 'Инверсия Y',
     sMic: 'Микрофон',
@@ -1131,6 +1132,7 @@ const STR = {
     name: 'name',
     time: 'time',
     sVolume: 'Volume',
+    sMusic: 'Music',
     sMouse: 'Mouse sensitivity',
     sInvert: 'Invert Y',
     sMic: 'Microphone',

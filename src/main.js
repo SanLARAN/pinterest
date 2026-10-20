@@ -25,6 +25,7 @@ import { Ghosts } from './render/ghosts.js';
 import { Eyes } from './render/eyes.js';
 import { Particles } from './render/particles.js';
 import { audio } from './audio/audio.js';
+import { MenuMusic } from './audio/music.js';
 import { mic, Mic } from './audio/mic.js';
 import { Input } from './input/input.js';
 import { HUD, fmtTime, fmtScore } from './ui/hud.js';
@@ -111,6 +112,7 @@ if (matchMedia('(pointer: coarse)').matches && !matchMedia('(any-pointer: fine)'
 const coop = new Coop({ audio, mic });
 const mates = new Mates($('mates'));
 const voiceMix = new VoiceMix(audio); // your volume for each friend's voice
+const menuMusic = new MenuMusic(); // the record under the main menu (its own volume setting)
 const pauseVoices = new VoiceList($('pauseVoiceRows'), voiceMix, audio);
 // the atlas (main menu): a field journal with live 3D plates. its own little canvas; the forest isn't drawn while it's open
 const atlas = new Atlas({ audio, world, onClose: () => home.atlasClosed() });
@@ -237,7 +239,8 @@ const menus = new Menus({
   onLobby: () => toMenu(true),
   onMicToggle: () => toggleMic(),
   onSettingsChanged: (key) => {
-    if (key === 'volume') audio.setVolume(settings.volume);
+    if (key === 'volume') { audio.setVolume(settings.volume); menuMusic.applyVolume(); }
+    if (key === 'music') menuMusic.applyVolume();
     if (key === 'voiceEcho') mic.setEcho(settings.voiceEcho);
     if (key === 'micEnabled') {
       if (!settings.micEnabled && mic.state === 'on') mic.stop();
@@ -305,7 +308,7 @@ const home=new GarageHome({ensureGarage,atlas,onWardrobe:()=>wardrobe.open()});
 const canApplyAccount=()=>state==='menu'&&!coop.active&&!lobby.starting&&!wardrobe.isOpen()&&!atlas.isOpen()&&!micCal.isOpen()&&!['settingsPanel','howPanel','scoresPanel'].some(id=>menus.isOpen(id));
 const cloud=new CloudController({
  canApply:canApplyAccount,
- onApplied:()=>{setLang(settings.lang);menus.applyI18n();menus.loadSettingsForm();$('nameInput').value=settings.name;if(!coop.active)$('coopName').value=settings.name;atlas.applyI18n();atlas.refreshBadge();wardrobe.applyI18n();news.render();audio.setVolume(settings.volume);mic.setEcho(settings.voiceEcho);updateMicUI();lobby.menuLabel();if(garage?.view==='menu'){const f=myFit();garage.setCar(f.car,f.cc);garage.studio.setFit(f);}syncIdentityFields();account?.render();social.update();},
+ onApplied:()=>{setLang(settings.lang);menus.applyI18n();menus.loadSettingsForm();$('nameInput').value=settings.name;if(!coop.active)$('coopName').value=settings.name;atlas.applyI18n();atlas.refreshBadge();wardrobe.applyI18n();news.render();audio.setVolume(settings.volume);menuMusic.applyVolume();mic.setEcho(settings.voiceEcho);updateMicUI();lobby.menuLabel();if(garage?.view==='menu'){const f=myFit();garage.setCar(f.car,f.cc);garage.studio.setFit(f);}syncIdentityFields();account?.render();social.update();},
  getPresence:()=>{const room=coop.active&&!coop.inRun&&coop.phase==='lobby'?coop.code:null;return{state:['playing','paused'].includes(state)?'playing':room?'lobby':'online',room,strategy:coop.signalling?.only||'default'};},
  onNotice:notice=>notifications.push(notice)
 });
@@ -408,10 +411,11 @@ $('pauseBtn').addEventListener('click', (e) => {
   e.stopPropagation();
   if (state === 'playing') pause();
 });
-$('btnStart').addEventListener('click', () => audio.init());
-// first interaction anywhere unlocks audio (browser autoplay policy)
-window.addEventListener('pointerdown', () => audio.init(), { capture: true });
-window.addEventListener('keydown', () => audio.init(), { capture: true });
+$('btnStart').addEventListener('click', () => { audio.init(); menuMusic.retry(); });
+// first interaction anywhere unlocks audio (browser autoplay policy) — and the menu's record
+const unlockAudio = () => { audio.init(); menuMusic.retry(); };
+window.addEventListener('pointerdown', unlockAudio, { capture: true });
+window.addEventListener('keydown', unlockAudio, { capture: true });
 
 // ---------------- attract mode (menu background) ----------------
 const attract = { rig: null, yaw: 0.6, nextPing: 0.4, nextGlint: 2.2 };
@@ -550,6 +554,7 @@ function startRun(opts = {}) {
   wardrobe.close(); // ...or trying on a hat
   audio.init();
   audio.setVolume(settings.volume);
+  menuMusic.stop(); // the record is for the garage, not for the forest
   menus.only(null);
   menus.show('settingsPanel', false);
   menus.show('howPanel', false);
@@ -585,6 +590,7 @@ function startRun(opts = {}) {
   post.u.uFade.value = 1;
   if (!input.touch) input.requestLock();
   audio.startAmbience();
+  audio.prefetchMeadow(); // the corpses' meadow is fetched before you reach the first one
   audio.resetFx(); // never start a run muffled, silent, or with the last death still ringing
   audio.setAmbience(0.9, 0);
   audio.setPaused(false);
@@ -602,6 +608,7 @@ function startTrainingSolo() {
   if (!garage && !ensureGarage()) return;
   audio.init();
   audio.setVolume(settings.volume);
+  menuMusic.stop();
   menus.only(null);
   home.leave();
   lobby.close();
@@ -736,6 +743,7 @@ function toMenu(keepRoom = false) {
   hud.setHint(null);
   state = 'menu';
   setBodyState();
+  menuMusic.start();
   menus.only('menu');
   menus.renderScores();
   updateMicUI();
@@ -1001,10 +1009,12 @@ function boot() {
       perf.fpsEl.style.cssText = 'position:fixed;right:8px;top:64px;z-index:99;font:11px JetBrains Mono,monospace;color:#8ef0ff;opacity:.8;pointer-events:none';
       document.body.appendChild(perf.fpsEl);
     }
-    window.__hush = { world, game, shared, pulses, ghosts, eyes, renderer, perf, mic, audio, input, hud, post, shadows, coop, lobby, atlas, wardrobe, micCal, news, home, debug: DEBUG, startRun, pause, resume, toMenu, ensureGarage, cloud, account, social, notifications, get garage() { return garage; }, get state() { return state; } };
+    window.__hush = { world, game, shared, pulses, ghosts, eyes, renderer, perf, mic, audio, music: menuMusic, input, hud, post, shadows, coop, lobby, atlas, wardrobe, micCal, news, home, debug: DEBUG, startRun, pause, resume, toMenu, ensureGarage, cloud, account, social, notifications, get garage() { return garage; }, get state() { return state; } };
     state = 'menu';
     menuTime = 0;
     post.u.uFade.value = 0;
+    menuMusic.applyVolume();
+    menuMusic.start(); // the browser may hold it until the first tap: a gesture calls retry()
     menus.only('menu');
     home.enter();
     updateMicUI();

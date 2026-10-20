@@ -126,6 +126,7 @@ export class Menus {
       });
     };
     bindRange('sVolume', 'volume');
+    bindRange('sMusic', 'music');
     bindRange('sMouse', 'mouseSens');
     bindRange('sMicSens', 'micSens');
     bindCheck('sInvert', 'invertY');
@@ -144,6 +145,7 @@ export class Menus {
 
   loadSettingsForm() {
     $('sVolume').value = settings.volume;
+    $('sMusic').value = settings.music ?? 0.55;
     $('sMouse').value = settings.mouseSens;
     $('sMicSens').value = settings.micSens;
     $('sInvert').checked = settings.invertY;

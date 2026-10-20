@@ -7,6 +7,23 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v:'2.1h',date:'2026-10-20',
+    ru:{title:'Пластинка в гараже и луг над телами',items:[
+      'В гараже тихо играет «Knock at the Door»: плавный вход, бесшовная петля — трек передаёт эстафету второму плееру за три секунды до конца',
+      'В настройках появился отдельный ползунок «Музыка»: общая громкость по-прежнему главная, а музыку можно убрать в ноль, не трогая лес',
+      'Музыка гаснет, когда начинается смена или полигон, и возвращается в меню; браузер, который не пускает звук без жеста, получит его на первом тапе',
+      'Над телами больше не жужжат синтезированные мухи: играет настоящая запись луга (z_uki-prirody-lug.mp3) — петлёй, с панорамой у каждого тела и по-разному с каждого',
+      'В атласе на странице тела — тот же луг; пока запись грузится, игра честно спрашивает снова, а если файла нет, остаётся старый звук',
+    ]},
+    en:{title:'A record in the garage and a meadow over the bodies',items:[
+      'Knock at the Door plays quietly in the garage: a gentle fade-in and a seamless loop — the track hands over to a second player three seconds before its end',
+      'Settings has its own Music slider: the master volume still rules, and the music can go to zero without touching the forest',
+      'The music fades out when a shift or the range begins and returns in the menu; a browser that will not start sound without a gesture gets it on the first tap',
+      'No more synthesised flies over the bodies: a real meadow recording (z_uki-prirody-lug.mp3) loops there — panned at every body and starting from a different point on each',
+      'The atlas corpse page plays the same meadow; while it is loading the game honestly asks again, and if the file is missing the old sound stays',
+    ]},
+  },
+  {
     v:'2.1g',date:'2026-10-20',
     ru:{title:'Записка не оставляет хвоста, приглашение отвечают на месте',items:[
       'Записка с тела больше не оставляет под собой строку «E · обыскать»: пока страница открыта, её не видно и нечем «прицелиться», а закрыл — приглашение появляется только когда рядом правда есть что взять',

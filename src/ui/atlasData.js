@@ -197,7 +197,7 @@ const TEXT = {
         ],
         tips: [
           'Когда эхо касается тела, внутри что-то сжимается. Ты почувствуешь.',
-          'Над телами вьются мухи — вблизи их слышно.',
+          'Над телами стоит луг: запись сверчков и травы — вблизи её слышно, и по ней тело находят в темноте.',
           'Сумка светится янтарём, когда её находит звук.',
         ],
         facts: [['тел', '5 — по одному у генератора'], ['очки', '400 × множитель'], ['обыск', 'удерживать E']],
@@ -763,7 +763,7 @@ const TEXT = {
         ],
         tips: [
           'When your echo touches a body, something tightens in your chest. You will feel it.',
-          'Flies circle the bodies — you can hear them up close.',
+          'A meadow stands over every body: crickets and grass — you hear it up close, and it is how a body is found in the dark.',
           'The bag glows amber when a sound finds it.',
         ],
         facts: [['bodies', '5 — one by each generator'], ['score', '400 × multiplier'], ['search', 'hold E']],

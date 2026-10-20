@@ -7,6 +7,7 @@ const MAX_SCORES = 10;
 const DEFAULTS = {
   lang: (navigator.language || 'ru').toLowerCase().startsWith('ru') ? 'ru' : 'en',
   volume: 0.85,
+  music: 0.55, // the menu record: 0..1, its own slider (master volume still applies)
   mouseSens: 1.0,
   invertY: false,
   micEnabled: true,

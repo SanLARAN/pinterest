@@ -19,8 +19,10 @@ const ICON_TOC = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M5
 const KEY_L = '<kbd><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 7l-5 5 5 5"/></svg></kbd>';
 const KEY_R = '<kbd><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 7l5 5-5 5"/></svg></kbd>';
 
-// flies over a body, for the book: the game's own loop rides the ambience bus, which is silent in the menu
+// flies over a body, for the book: the same meadow recording the game plays (one shot, on the UI bus);
+// until it has decoded, the old synthesized buzz stands in
 function buzz(A, [x, y, z], dur) {
+  if (A.meadowCue?.(x, y, z, dur, 0.4)) return;
   const t = A.now;
   const pn = A._panner(x, y, z, 1.2, 1.4);
   pn.connect(A.sfx);
@@ -57,6 +59,7 @@ export class Atlas {
     this.spec = null;
     this.busy = 0; // a page is turning
     this.timers = [];
+    this.audio.prefetchMeadow?.(); // the meadow over a corpse: fetched while you turn to its page
     this.soundUntil = 0;
     this.touched = false; // the drag hint goes away once you've turned something
     this._saveT = 0;
@@ -78,6 +81,7 @@ export class Atlas {
 
   // ---------------- open / close ----------------
   open(id = null) {
+    this.audio.prefetchMeadow?.(); // the sound bus only exists after the first gesture
     if (!this.spec) {
       try {
         this.spec = new Specimen($('atlasPlate'), { ctx: { world: this.world }, onScale: (s) => this._ruler(s) });

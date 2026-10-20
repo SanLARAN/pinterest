@@ -98,6 +98,9 @@ export class AudioEngine {
     this.voiceGains = new Map(); // co-op: your volume for each friend (linear gain), kept across reconnects
     this.voiceMemo = new Map(); // co-op: what the auto-level learned about each friend's mic (a new stream picks it up)
     this._agcTimer = 0;
+    this._samples = new Map(); // recorded sounds, fetched and decoded once (public/audio)
+    this._meadowState = 'idle'; // 'idle' | 'loading' | 'ok' | 'fail'
+    this._meadowBuf = null;
   }
 
   get ready() {
@@ -2176,8 +2179,98 @@ export class AudioEngine {
     [0.16, 0.24].forEach((d) => this._noiseBurst(t + d, { type: 'bandpass', f: 3400, q: 5, a: 0.0006, d: 0.025, gain: 0.25, dest: this.body }));
   }
 
-  // flies over a body: returns { stop() }
+  // ---------- recorded sound ----------
+  // A file from public/audio, fetched and decoded once and kept for the whole session. The menu's
+  // record is streamed as an <audio> element (see audio/music.js); a short loop like the meadow is
+  // decoded here so it can live on the ambience bus with a panner like any other voice.
+  _sample(path) {
+    let p = this._samples.get(path);
+    if (p) return p;
+    p = (async () => {
+      if (!this.ctx || typeof fetch !== 'function' || typeof document === 'undefined') return null;
+      const url = new URL(path, document.baseURI).href;
+      const res = await fetch(url);
+      if (!res.ok) return null;
+      const bytes = await res.arrayBuffer();
+      return await this.ctx.decodeAudioData(bytes);
+    })().catch(() => null);
+    this._samples.set(path, p);
+    return p;
+  }
+
+  // the meadow over a body: z_uki-prirody-lug.mp3, one loop for every corpse
+  _loadMeadow() {
+    if (this._meadowState !== 'idle') return;
+    this._meadowState = 'loading';
+    this._sample('audio/meadow.mp3').then((buf) => {
+      this._meadowBuf = buf || null;
+      this._meadowState = buf ? 'ok' : 'fail';
+    });
+  }
+
+  // start fetching it early (the atlas opens on the corpse page, the menu has time to spare)
+  prefetchMeadow() {
+    if (!this.ready) return;
+    this._loadMeadow();
+  }
+
+  _meadowVoice(x, y, z, { dur = 0, gain = 0.34, dest = null } = {}) {
+    const buf = this._meadowBuf;
+    if (!buf) return null;
+    const t = this.now;
+    const pn = this._panner(x, y, z, 1.7, 1.4);
+    pn.connect(dest || this.amb);
+    const hp = this._filter('highpass', 150, 0.7); // a field recording's room tone would sit on the sonar
+    const g = this._gain(0);
+    hp.connect(g).connect(pn);
+    const src = this.ctx.createBufferSource();
+    src.buffer = buf;
+    src.loop = dur <= 0;
+    src.playbackRate.value = 0.92 + Math.random() * 0.12;
+    src.connect(hp);
+    const offset = Math.random() * Math.max(0.05, buf.duration - 0.6);
+    src.start(t, offset);
+    const fade = dur > 0 ? Math.min(0.5, dur * 0.25) : 0.9;
+    g.gain.setTargetAtTime(gain, t, fade / 2);
+    if (dur > 0) {
+      g.gain.setTargetAtTime(0, t + Math.max(0.05, dur - fade), 0.18);
+      try { src.stop(t + dur + 0.4); } catch { /* */ }
+    }
+    const self = this;
+    let stopped = false;
+    return {
+      stop() {
+        if (stopped) return;
+        stopped = true;
+        const n = self.now;
+        g.gain.setTargetAtTime(0, n, 0.22);
+        try { src.stop(n + 1.4); } catch { /* already gone */ }
+      },
+    };
+  }
+
+  // a short meadow cue, for the atlas plate: true when the recording was there to play
+  meadowCue(x, y, z, dur = 2.6, gain = 0.4) {
+    if (!this.ready) return false;
+    if (!this._meadowBuf) {
+      this._loadMeadow();
+      return false;
+    }
+    const h = this._meadowVoice(x, y, z, { dur, gain, dest: this.sfx });
+    return !!h;
+  }
+
+  // flies over a body: returns { stop() }. The meadow recording when it is loaded; the old
+  // synthesized buzz while it decodes (or if the file cannot be fetched at all)
   flies(x, y, z) {
+    if (!this.ready) return null;
+    if (this._meadowState === 'idle') { this._loadMeadow(); return null; }
+    if (this._meadowState === 'loading') return null; // the game asks again once the loop is in memory
+    if (this._meadowBuf) return this._meadowVoice(x, y, z, { gain: 0.32 });
+    return this._fliesSynth(x, y, z);
+  }
+
+  _fliesSynth(x, y, z) {
     if (!this.ready) return null;
     const t = this.now;
     const pn = this._panner(x, y, z, 1.1, 1.5);
