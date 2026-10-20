@@ -222,7 +222,7 @@ void main() {
   col += vec3(0.78, 0.85, 0.9) * ring * edge * 0.45;
   col += vec3(0.6, 0.8, 0.9) * uHover * edge * 0.25;
   // the gates, when the pointer is on them: their edges pick up a cold light, so it reads as a way out
-  if (k == 30) col += vec3(0.42, 0.72, 0.86) * uGate * (0.35 + 0.9 * edge) * (0.75 + 0.25 * sin(uTime * 3.4));
+  if (k == 30) col += vec3(0.42, 0.72, 0.86) * uGate * (0.12 + 0.5 * edge) * (0.75 + 0.25 * sin(uTime * 3.4));
 
   if (k == 17 || k == 18) {
     float fl = 0.86 + 0.14 * sin(uTime * 9.0 + vWorld.y * 40.0) * sin(uTime * 5.3);
@@ -1070,7 +1070,7 @@ export class Garage {
       // under the pointer the gates light up and come off the latch a hand's width — the way out invites
       const want = this.overGate ? 1 : 0;
       this.gateHover = damp(this.gateHover || 0, want, 7, dt);
-      this.u.uGate.value = this.gateHover * 0.85;
+      this.u.uGate.value = this.gateHover * 0.5;
       if (this.gateLeaves) {
         const crack = 0.17 * this.gateHover;
         this.gateLeaves[0].rotation.y = -crack;
