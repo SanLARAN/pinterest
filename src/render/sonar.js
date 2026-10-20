@@ -655,8 +655,10 @@ export function createSky() {
     fragmentShader: /* glsl */ `
       uniform float uDawn;
       uniform float uMorning;
+      uniform float uTime;
       uniform vec3 uSun;
       varying vec3 vDir;
+      float h21(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
       void main() {
         float h = clamp(vDir.y, -0.2, 1.0);
         vec3 top = mix(vec3(0.28, 0.42, 0.7), vec3(0.34, 0.54, 0.86), uMorning);
@@ -664,7 +666,18 @@ export function createSky() {
         vec3 c = mix(hor, top, smoothstep(-0.05, 0.55, h));
         float sun = pow(max(dot(vDir, uSun), 0.0), 64.0) * 2.5 + pow(max(dot(vDir, uSun), 0.0), 6.0) * 0.4;
         c += vec3(1.0, 0.75, 0.5) * sun;
-        gl_FragColor = vec4(c * uDawn, 1.0);
+        // stars (2.1j): a sparse field on the dome that only comes out once the day is gone — a cell grid
+        // with one star in it here and there, each breathing on its own clock
+        vec3 d = normalize(vDir);
+        vec2 sp = vec2(atan(d.z, d.x) * 14.0, asin(clamp(d.y, -1.0, 1.0)) * 30.0);
+        vec2 cell = floor(sp);
+        float rnd = h21(cell);
+        vec2 off = (vec2(h21(cell + 3.1), h21(cell + 7.7)) - 0.5) * 0.6;
+        float dist = length(fract(sp) - 0.5 - off);
+        float star = step(0.951, rnd) * smoothstep(0.2, 0.02, dist) * (0.35 + 0.65 * h21(cell + 1.7));
+        float tw = 0.7 + 0.3 * sin(uTime * (0.9 + rnd * 2.2) + rnd * 41.0);
+        vec3 night = vec3(0.72, 0.79, 0.95) * star * tw * (1.0 - uDawn) * smoothstep(0.0, 0.18, d.y);
+        gl_FragColor = vec4(c * uDawn + night, 1.0);
       }`,
     side: THREE.BackSide,
     depthWrite: false,

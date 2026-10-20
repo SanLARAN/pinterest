@@ -233,6 +233,9 @@ const STR = {
     tutUse: "у генератора лежит тело — удерживай E · Tab — взглянуть на часы",
     tutUseTouch: "у тела — удерживай РУКИ · тап по верху — взглянуть на часы",
     tutScream: 'и что бы ни случилось — не кричи',
+    // the opening cut scene (2.1j)
+    introBig: 'последний свет',
+    introSmall: 'лагерь засыпает · костёр гаснет',
     // morning
     morningBig: 'утро',
     morningBigN: 'утро {n}-го дня',
@@ -874,6 +877,8 @@ const STR = {
     tutUse: "there is a body by the generator — hold E · Tab — check your watch",
     tutUseTouch: "at the body — hold HANDS · tap the top — check your watch",
     tutScream: 'and whatever happens — do not scream',
+    introBig: 'the last light',
+    introSmall: 'the camp goes to sleep · the fire goes out',
     morningBig: 'morning',
     morningBigN: 'morning, day {n}',
     trainingBig: 'THE RANGE',

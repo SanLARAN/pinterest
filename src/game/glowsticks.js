@@ -438,6 +438,7 @@ export class GlowSticks {
       out.push({ x: s.x, y: s.y + (s.state === 'ground' ? 0.35 : 0.1), z: s.z, I, c: G.color, R: G.radius, prio: s.state === 'held' && s.owner === me ? 2 : 0, near: 0.1, id: s });
     }
     if (this.g.torch) this.g.torch.lightSources(out); // (flashlights: small lights with a direction)
+    if (this.g.fire) this.g.fire.lightSource(out); // the camp fire (only while there is one — see campfire.js)
     return out;
   }
 

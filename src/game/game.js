@@ -32,6 +32,8 @@ import { MotoPark, MOTO } from './moto.js';
 import { Training } from './training.js';
 import { VoiceMimic } from './voiceMimic.js';
 import { Dread } from './dread.js';
+import { Campfire } from './campfire.js';
+import { IntroCutscene } from './intro.js';
 import { CAP } from '../world/world.js';
 import { shared } from '../render/sonar.js';
 import { Pulses } from '../render/pulses.js';
@@ -101,6 +103,9 @@ export class Game {
     this.motos = new MotoPark(this); // the training ground's bikes (idle outside it)
     this.train = null; // the Training instance, while the shift is a training one
     this.voiceMimic = new VoiceMimic(this);
+    this.fire = new Campfire(this); // the camp's fire: lit for the last evening, out for the night
+    this.opening = new IntroCutscene(this); // the opening cut scene (2.1j) — (this.intro is the monster reveal)
+    this.fadeIn = 0; // s of fade-in after the cut scene hands over to the night
   }
 
   // ---------------- co-op: who is where ----------------
@@ -246,6 +251,7 @@ export class Game {
     this.rescue.resetPlayer(this.player);
     for (const r of this.remotes.values()) this.rescue.resetPlayer(r);
     this.glows.reset();
+    this.fire.reset();
     this.pulses.clear();
     this.ghosts.clear();
     this.particles.clear();
@@ -305,9 +311,22 @@ export class Game {
       this.train = null;
       this.motos.dispose();
     }
-    // the shift opens in the dark: the gates open straight onto the first night — no morning sun to walk
-    // around in, no dusk film to sit through. (The next days still come up at dawn.)
-    if (!this.training) this.startNight();
+    // The shift opens in the evening: the camp is still awake around the fire, the camera comes down out of
+    // the sky, and the first night begins when the fire is out (see intro.js). A debug jump into the night
+    // (main.js) calls startNight itself, which puts the film away.
+    this.fadeIn = 0;
+    if (!this.training) this.opening.begin();
+  }
+
+  // the opening cut scene is playing: the world is posed for it, the player is not on their feet yet
+  // (not updateIntro — that name belongs to the monsters' first reveal)
+  updateOpening(dt, raw) {
+    this.time += dt;
+    this.netFrame(dt); // a guest still answers the host, and everyone sees where everyone is
+    this.opening.update(dt, raw.events);
+    this.glows.update(dt); // the fire is one of the small lights (see GlowSticks.lightSources)
+    this._commonFx(dt);
+    if (this.opening.done) this.startNight();
   }
 
   // everything that measures the night starts from zero when the light dies
@@ -520,6 +539,8 @@ export class Game {
   }
 
   startNight() {
+    // (the opening film is over by now, or a debug jump / a skip is putting it away)
+    if (this.opening && this.opening.state === 'run') this.opening.cancel();
     this.state = 'play';
     this.time = 0;
     shared.uDawn.value = 0;
@@ -1785,6 +1806,7 @@ export class Game {
   update(dt, raw) {
     const fx = this.fx;
     const input = this.input;
+    this.fire.update(dt); // burns through every state, so the camp never forgets it was there
     if (this.inputMuted) raw = { look: NO_LOOK, events: [] };
     this.inventory.update(dt);
     this.fieldView.update(dt);
@@ -1797,6 +1819,7 @@ export class Game {
     this.tools.update(dt);
     this.expedition.update(dt);
     if (this.expedition.viewing) look = { dx: look.dx * 0.3, dy: look.dy * 0.3 };
+    if (this.state === 'intro') return this.updateOpening(dt, raw);
     if (this.state === 'morning') return this.updateMorning(dt, raw);
     if (this.state === 'dusk') return this.updateDusk(dt, raw);
     if (this.state === 'training') return this.updateTraining(dt, raw);
@@ -2276,7 +2299,8 @@ export class Game {
     const p = sp || this.player;
     const fx = this.fx;
     const sh = fx.trauma * fx.trauma;
-    const cutCam = (this.state === 'escape' || this.state === 'won') && this.escape.applyCutCamera(camera);
+    const introCam = this.state === 'intro' && this.opening.applyCamera(camera);
+    const cutCam = introCam || ((this.state === 'escape' || this.state === 'won') && this.escape.applyCutCamera(camera));
     if (cutCam) {
       // the fly-by's camera (a hit from the gate still shakes it)
       if (sh > 0.001) {

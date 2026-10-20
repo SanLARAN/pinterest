@@ -263,11 +263,14 @@ export class HUD {
     el.classList.add('go');
   }
 
-  setSkip(on) {
-    if (this.cache.skip === on) return;
-    this.cache.skip = on;
+  // cls: how the hint reads — 'morning' for the walk before a dusk, 'intro' for the opening cut scene
+  setSkip(on, cls = 'morning') {
+    const key = on ? cls : '';
+    if (this.cache.skip === key) return;
+    this.cache.skip = key;
     this.skipEl.textContent = on ? t('skipHint') : '';
-    document.body.classList.toggle('morning', on);
+    document.body.classList.toggle('morning', on && cls === 'morning');
+    document.body.classList.toggle('intro', on && cls === 'intro');
   }
 
   flashStones() {

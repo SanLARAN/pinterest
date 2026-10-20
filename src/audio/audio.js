@@ -22,6 +22,29 @@ const sstep = (a, b, v) => {
   return x * x * (3 - 2 * x);
 };
 
+// The meadow recording is a field recording: it arrives 20-25 dB quieter than the game's own voices, which
+// is exactly why the flies over a body could not be heard (2.1j). Normalize it once, on load, to a level
+// that sits with the synthesized ambience — a gentle lift only (never past 16x), so loud material stays put.
+export const MEADOW_RMS_DB = -21;
+export function meadowGain(buf, targetDb = MEADOW_RMS_DB, max = 16) {
+  if (!buf || typeof buf.getChannelData !== 'function') return 1; // (the tests' stand-in buffers)
+  let sum = 0, n = 0;
+  const ch = buf.numberOfChannels || 1;
+  for (let c = 0; c < ch; c++) {
+    const d = buf.getChannelData(c);
+    if (!d) continue;
+    for (let i = 0; i < d.length; i += 16) {
+      const v = d[i];
+      sum += v * v;
+      n++;
+    }
+  }
+  if (!n || sum < 1e-12) return 1;
+  const rmsDb = 10 * Math.log10(sum / n);
+  const lift = Math.pow(10, (targetDb - rmsDb) / 20);
+  return Math.min(max, Math.max(1, lift));
+}
+
 function makeNoise(ctx, type, seconds = 2) {
   const len = Math.floor(ctx.sampleRate * seconds);
   const buf = ctx.createBuffer(1, len, ctx.sampleRate);
@@ -101,6 +124,7 @@ export class AudioEngine {
     this._samples = new Map(); // recorded sounds, fetched and decoded once (public/audio)
     this._meadowState = 'idle'; // 'idle' | 'loading' | 'ok' | 'fail'
     this._meadowBuf = null;
+    this._meadowNorm = 1; // (how far the quiet field recording is lifted — see meadowGain)
   }
 
   get ready() {
@@ -1798,6 +1822,83 @@ export class AudioEngine {
     [3136, 3322].forEach((f) => this._tone(tb, { f, a: 0.002, d: 2.2, gain: 0.012, dest: this.body }));
   }
 
+  // ---------- the camp fire ----------
+  // A bed of flame (brown noise under a lowpass, a breath of hiss over it) panned at the pit, plus the odd
+  // crack. Returns { level(k), crackle(), stop() }: the intro drives it through the last evening and the
+  // dousing — see game/intro.js.
+  fire(x, y, z) {
+    if (!this.ready) return { level() {}, crackle() {}, stop() {} };
+    const t = this.now;
+    const pn = this._panner(x, y + 0.5, z, 1.5, 1.05);
+    pn.connect(this.sfx);
+    const n = this._noise(this.brown);
+    const lp = this._filter('lowpass', 380, 0.8);
+    const g = this._gain(0);
+    n.connect(lp).connect(g).connect(pn);
+    const h = this._noise(this.pink); // the hiss of the flame
+    const bp = this._filter('bandpass', 1350, 0.55);
+    const hg = this._gain(0);
+    h.connect(bp).connect(hg).connect(pn);
+    n.start(t, Math.random() * 2);
+    h.start(t, Math.random() * 2);
+    const self = this;
+    let level = 1;
+    let stopped = false;
+    return {
+      level(k, damp = 0.14) {
+        level = Math.max(0, k);
+        const now = self.now;
+        g.gain.setTargetAtTime(0.2 * level, now, damp);
+        hg.gain.setTargetAtTime(0.035 * level, now, damp);
+        lp.frequency.setTargetAtTime(300 + 420 * level, now, damp);
+      },
+      crackle(strength = 1) {
+        if (stopped || level < 0.05) return;
+        self._noiseBurst(self.now, { f: 900 + Math.random() * 1500, q: 1.4, a: 0.001, d: 0.02 + Math.random() * 0.04, gain: (0.05 + Math.random() * 0.12) * level * strength, dest: pn });
+      },
+      stop(damp = 1.4) {
+        if (stopped) return;
+        stopped = true;
+        const now = self.now;
+        g.gain.setTargetAtTime(0, now, damp / 3);
+        hg.gain.setTargetAtTime(0, now, damp / 3);
+        setTimeout(() => { try { n.stop(); h.stop(); } catch { /* */ } }, damp * 1000 + 400);
+      },
+    };
+  }
+
+  // water over the coals: a hard hiss that softens into steam
+  steam(x, y, z, k = 1) {
+    if (!this.ready) return;
+    const t = this.now;
+    const pn = this._panner(x, y + 0.4, z, 1.2, 1.1);
+    pn.connect(this.sfx);
+    this._noiseBurst(t, { f: 3400, fEnd: 900, q: 0.7, a: 0.01, d: 0.9 + k * 0.7, gain: 0.3 * k, dest: pn, rev: 0.25 });
+    this._noiseBurst(t + 0.02, { buf: this.brown, type: 'lowpass', f: 300, a: 0.02, d: 0.5, gain: 0.5 * k, dest: pn });
+    [0, 0.11, 0.26].forEach((d, i) => this._tone(t + d, { f: 2200 + i * 700, fEnd: 900, a: 0.004, d: 0.25, gain: 0.02 * k, dest: pn }));
+  }
+
+  // a boot on the embers (or a tarp beating the flames): a soft thud and a scatter of sparks
+  stomp(x, y, z, k = 1) {
+    if (!this.ready) return;
+    const t = this.now;
+    const pn = this._panner(x, y + 0.2, z, 1.6, 1.1);
+    pn.connect(this.sfx);
+    this._tone(t, { f: 96, fEnd: 44, a: 0.004, d: 0.22, gain: 0.5 * k, dest: pn });
+    this._noiseBurst(t, { type: 'lowpass', f: 700, a: 0.002, d: 0.16, gain: 0.42 * k, dest: pn });
+    for (let i = 0; i < 6; i++) this._noiseBurst(t + 0.02 + Math.random() * 0.22, { f: 1800 + Math.random() * 2600, q: 1.6, a: 0.001, d: 0.02 + Math.random() * 0.03, gain: 0.05 * k, dest: pn });
+  }
+
+  // a folded tarp / a jacket over the flames: a flat whump of cloth, then the fire's breath cut short
+  whump(x, y, z, k = 1) {
+    if (!this.ready) return;
+    const t = this.now;
+    const pn = this._panner(x, y + 0.5, z, 1.4, 1.1);
+    pn.connect(this.sfx);
+    this._noiseBurst(t, { buf: this.pink, type: 'lowpass', f: 520, a: 0.02, d: 0.28, gain: 0.34 * k, dest: pn });
+    this._noiseBurst(t + 0.03, { f: 1400, q: 0.6, a: 0.01, d: 0.2, gain: 0.06 * k, dest: pn });
+  }
+
   // ---------- generators ----------
   // a persistent engine at (x,y,z): returns { spin(level 0..1), sputter(), stop() }
   // the enduro bike under you: a two-stroke buzz whose pitch follows the throttle, non-spatial
@@ -2204,6 +2305,7 @@ export class AudioEngine {
     this._meadowState = 'loading';
     this._sample('audio/meadow.mp3').then((buf) => {
       this._meadowBuf = buf || null;
+      this._meadowNorm = meadowGain(buf);
       this._meadowState = buf ? 'ok' : 'fail';
     });
   }
@@ -2217,6 +2319,7 @@ export class AudioEngine {
   _meadowVoice(x, y, z, { dur = 0, gain = 0.34, dest = null } = {}) {
     const buf = this._meadowBuf;
     if (!buf) return null;
+    gain *= this._meadowNorm || 1; // (the recording is normalized on load, see meadowGain)
     const t = this.now;
     const pn = this._panner(x, y, z, 1.7, 1.4);
     pn.connect(dest || this.amb);
@@ -2266,7 +2369,7 @@ export class AudioEngine {
     if (!this.ready) return null;
     if (this._meadowState === 'idle') { this._loadMeadow(); return null; }
     if (this._meadowState === 'loading') return null; // the game asks again once the loop is in memory
-    if (this._meadowBuf) return this._meadowVoice(x, y, z, { gain: 0.32 });
+    if (this._meadowBuf) return this._meadowVoice(x, y, z, { gain: 0.42 });
     return this._fliesSynth(x, y, z);
   }
 
@@ -2292,7 +2395,7 @@ export class AudioEngine {
       srcs.push(o, m, tr);
     });
     srcs.forEach((q) => q.start(t));
-    g.gain.setTargetAtTime(0.36, t, 0.6);
+    g.gain.setTargetAtTime(0.5, t, 0.6);
     const self = this;
     return {
       stop() {

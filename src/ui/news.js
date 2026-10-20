@@ -7,6 +7,36 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v:'2.1j',date:'2026-10-20',
+    ru:{title:'Смена начинается фильмом: ночь наступает на глазах',items:[
+      'Камера спускается с неба на лагерь у костра, пока последний день уходит из света: небо гаснет вместе с огнём, проступают звёзды',
+      'Четверо у огня тушат его каждый по-своему — водой из котелка, сапогом, брезентом, ведром — и расходятся спать: на спину, клубком, в палатку, у скамьи',
+      'Одному — свой ритуал: разворошить угли палкой, затушить остатки и лечь под одеяло у огня',
+      'Фильм пропускается Enter (на телефоне — кнопкой SKIP) и заканчивается ровно там, где раньше начиналась первая ночь: часы, генераторы и сеть не меняются',
+      'Retina: кадр рисуется до 2× по устройству с бюджетом пикселей, а «авто» и «высокая» сами подстраивают шкалу под fps',
+      'Мухи над телом наконец слышны: запись луга нормализуется по RMS и звучит на 24 dB громче',
+    ]},
+    en:{title:'The shift opens with a film: night falls in front of you',items:[
+      'The camera comes down out of the sky onto the camp while the last day drains out of the light: the sky goes with the fire, and the stars come out',
+      'Four people around the fire put it out their own way — a pot of water, a boot, a tarp, a bucket — then go to bed their own way: on their back, curled up, into the tent, down by the bench',
+      'Alone it is your own ritual: rake the coals apart with a stick, put out what is left, and lie down by the fire under a blanket',
+      'The film skips with Enter (SKIP on a phone) and ends exactly where the first night used to start: the clocks, the generators and the net are untouched',
+      'Retina: the frame renders up to 2× the device pixels within a pixel budget, and auto and high adjust the scale to the frame rate themselves',
+      'The flies over a body can finally be heard: the meadow recording is normalized by RMS and plays 24 dB louder',
+    ]},
+  },
+  {
+    v:'2.1i',date:'2026-10-20',
+    ru:{title:'Сглаживание стало настоящим',items:[
+      'Кадр сцены рисуется в мультисэмплированный буфер: 4× на «высокой» графике, 2× на «авто», без него на «низкой»',
+      'Зубцы на силуэтах деревьев, заборе и спицах колёс больше не видны; смена пресета пересобирает буферы без перезагрузки',
+    ]},
+    en:{title:'Antialiasing that actually antialiases',items:[
+      'The scene frame renders into a multisampled buffer: 4× on high, 2× on auto, none on low',
+      'The jaggies on tree silhouettes, the fence and wheel spokes are gone; changing the preset rebuilds the buffers without a reload',
+    ]},
+  },
+  {
     v:'2.1h',date:'2026-10-20',
     ru:{title:'Пластинка в гараже и луг над телами',items:[
       'В гараже тихо играет «Knock at the Door»: плавный вход, бесшовная петля — трек передаёт эстафету второму плееру за три секунды до конца',

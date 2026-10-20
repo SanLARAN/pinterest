@@ -401,6 +401,13 @@ body.touch #note.show { transform: translate(0, 0); }
 #skip { position: absolute; right: calc(18px + var(--safe-r)); bottom: calc(16px + var(--safe-b)); font-size: 10px; letter-spacing: 0.26em; text-transform: uppercase; color: rgba(36, 28, 20, 0.9); text-shadow: 0 0 8px rgba(255, 240, 220, 0.85); }
 body.touch #skip { display: none; }
 
+/* the opening cut scene: no aim, no radar, and a skip hint that reads over a bright sky as well as the dark */
+body.intro #crosshair, body.intro #radar { opacity: 0; pointer-events: none; }
+body.intro #skip { color: rgba(244, 238, 226, 0.82); text-shadow: 0 0 12px #000, 0 0 3px #000; }
+body.intro #intro .big { color: rgba(255, 246, 233, 0.92); text-shadow: 0 0 26px rgba(20, 12, 6, 0.55); }
+body.intro #intro .small { color: rgba(236, 224, 208, 0.66); }
+body.intro #tSkip { display: grid; }
+
 #hint {
   position: absolute; left: 50%; bottom: calc(26px + var(--safe-b)); transform: translateX(-50%); max-width: min(560px, 70vw); text-align: center;
   font-size: 12px; letter-spacing: 0.1em; color: rgba(214, 205, 192, 0.7); text-shadow: 0 0 8px #000, 0 0 2px #000; opacity: 0; transition: opacity 0.6s;

@@ -66,6 +66,8 @@ const DEBUG = {
   speed: parseFloat(params.get('speed')) || 1,
   autostart: params.has('autostart'),
   night: params.has('night'), // skip the morning
+  nointro: params.has('nointro'), // ...and the opening cut scene
+  seats: parseInt(params.get('seats'), 10) || 0, // preview a lobby's four goodnights alone
   nomic: params.has('nomic'),
   fps: params.has('fps'),
 };
@@ -164,11 +166,20 @@ let menuTime = 0;
 const perf = { acc: 0, n: 0, scale: 1, cool: 3, ceiling: 9, ceilT: 0, fpsEl: null, fps: 60 };
 
 // ---------------- resolution ----------------
+// Retina (2.1j): the scene is rendered at up to two device pixels per CSS pixel — on a retina screen the
+// edges and the film grain are finally as sharp as the display. A pixel budget keeps a big monitor from
+// asking for more than any GPU can push, and the auto/high guard below still trades pixels for frames.
+const PIX_BUDGET = { high: 4.4e6, auto: 2.9e6, low: 1.2e6 };
+function dprCap() {
+  return Math.min(window.devicePixelRatio || 1, 2);
+}
 function scaleBounds() {
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  if (settings.quality === 'high') return [Math.min(dpr, 1.5), Math.min(dpr, 1.5)];
+  const dpr = dprCap();
+  const budget = Math.sqrt((PIX_BUDGET[settings.quality] || PIX_BUDGET.auto) / Math.max(1, innerWidth * innerHeight));
+  const hi = Math.max(0.55, Math.min(dpr, budget));
+  if (settings.quality === 'high') return [Math.min(0.85, hi), hi];
   if (settings.quality === 'low') return [0.55, 0.55];
-  return [0.5, Math.min(dpr, 1.25)];
+  return [0.5, Math.min(hi, 1.5)];
 }
 // edges: the scene pass is multisampled. High gets 4 (smooth silhouettes on a desktop), auto 2, low none
 function applySamples() {
@@ -177,12 +188,16 @@ function applySamples() {
 function applyQuality() {
   const [lo, hi] = scaleBounds();
   perf.scale = Math.min(hi, Math.max(lo, settings.quality === 'auto' ? Math.min(1, hi) : hi));
+  perf.ceiling = 9; // a new preset starts with a clean slate (no ceiling from the old one)
+  perf.ceilT = 0;
+  perf.cool = 3;
+  perf.slow = 0;
   applySamples();
   resize();
 }
 function resize() {
   const w = innerWidth, h = innerHeight;
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.setSize(w, h, false);
   camera.aspect = w / h;
   camera.fov = fovFor(camera.aspect);
@@ -202,25 +217,32 @@ function perfTick(dt) {
   perf.n++;
   perf.cool -= dt;
   perf.ceilT -= dt;
+  perf.slow = perf.slow || 0;
   if (perf.ceilT <= 0) perf.ceiling = 9;
   if (perf.acc < 1) return;
   const avg = perf.acc / perf.n;
   perf.fps = 1 / avg;
   perf.acc = 0;
   perf.n = 0;
-  if (settings.quality === 'auto' && (state === 'playing' || state === 'menu')) {
+  // auto and high both give pixels back when the frames are not there; high starts from retina and gives
+  // them up more reluctantly (two slow seconds, small steps), so a fast machine keeps the sharp picture
+  if (settings.quality !== 'low' && (state === 'playing' || state === 'menu')) {
     const [lo, hi] = scaleBounds();
-    if (avg > 1 / 50 && perf.scale > lo + 0.001) {
+    const slow = settings.quality === 'auto' ? avg > 1 / 50 : avg > 1 / 45;
+    perf.slow = slow ? perf.slow + 1 : 0;
+    if (slow && perf.slow >= (settings.quality === 'auto' ? 1 : 2) && perf.scale > lo + 0.001) {
       perf.ceiling = perf.scale - 0.05;
       perf.ceilT = 30;
       // a device that is far from 60 takes a bigger first step, so the first seconds on a weak phone
       // stop stuttering instead of walking down one notch per second
-      perf.scale = Math.max(lo, perf.scale - (avg > 1 / 35 ? 0.2 : 0.12));
+      perf.scale = Math.max(lo, perf.scale - (avg > 1 / 35 ? 0.2 : settings.quality === 'auto' ? 0.12 : 0.08));
       perf.cool = 4;
+      perf.slow = 0;
       resize();
     } else if (avg < 1 / 57 && perf.scale < Math.min(hi, perf.ceiling) - 0.001 && perf.cool <= 0) {
       perf.scale = Math.min(hi, perf.ceiling, perf.scale + 0.06);
       perf.cool = 5;
+      perf.slow = 0;
       resize();
     }
   }
@@ -580,8 +602,9 @@ function startRun(opts = {}) {
     game.setupOnline(coop, opts.coop.players);
   } else {
     game.setupSolo();
+    game.opening.forceSeats = DEBUG.seats;
     game.reset({ training });
-    if (DEBUG.night || DEBUG.t > 0) game.startNight();
+    if (DEBUG.night || DEBUG.nointro || DEBUG.t > 0) game.startNight();
     if (DEBUG.t > 0) {
       game.time = DEBUG.t;
       game.firstPingT = Math.max(0, DEBUG.t - 30);
@@ -1014,7 +1037,7 @@ function boot() {
       perf.fpsEl.style.cssText = 'position:fixed;right:8px;top:64px;z-index:99;font:11px JetBrains Mono,monospace;color:#8ef0ff;opacity:.8;pointer-events:none';
       document.body.appendChild(perf.fpsEl);
     }
-    window.__hush = { world, game, shared, pulses, ghosts, eyes, renderer, perf, mic, audio, music: menuMusic, input, hud, post, shadows, coop, lobby, atlas, wardrobe, micCal, news, home, debug: DEBUG, startRun, pause, resume, toMenu, ensureGarage, cloud, account, social, notifications, get garage() { return garage; }, get state() { return state; } };
+    window.__hush = { world, game, shared, pulses, ghosts, eyes, renderer, perf, mic, audio, music: menuMusic, input, hud, post, shadows, coop, lobby, atlas, wardrobe, micCal, news, home, debug: DEBUG, startRun, pause, resume, toMenu, get opening() { return game && game.opening; }, ensureGarage, cloud, account, social, notifications, get garage() { return garage; }, get state() { return state; } };
     state = 'menu';
     menuTime = 0;
     post.u.uFade.value = 0;
