@@ -170,9 +170,14 @@ function scaleBounds() {
   if (settings.quality === 'low') return [0.55, 0.55];
   return [0.5, Math.min(dpr, 1.25)];
 }
+// edges: the scene pass is multisampled. High gets 4 (smooth silhouettes on a desktop), auto 2, low none
+function applySamples() {
+  post.setSamples(settings.quality === 'high' ? 4 : settings.quality === 'low' ? 0 : 2);
+}
 function applyQuality() {
   const [lo, hi] = scaleBounds();
   perf.scale = Math.min(hi, Math.max(lo, settings.quality === 'auto' ? Math.min(1, hi) : hi));
+  applySamples();
   resize();
 }
 function resize() {

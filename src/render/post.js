@@ -192,6 +192,16 @@ export class Post {
     this.h = 1;
   }
 
+  // Multisampling of the scene pass: the one cheap thing that removes the stair-stepping on every
+  // silhouette (trees, the fence, a bike's spokes). 0 = off (weak phones), 2 or 4 = WebGL2 MSAA.
+  // Changing it re-creates the render target's buffers on the next frame.
+  setSamples(n) {
+    const v = Math.max(0, Math.min(4, n | 0));
+    if (this.rtScene.samples === v) return;
+    this.rtScene.samples = v;
+    this.rtScene.dispose();
+  }
+
   setSize(cssW, cssH, scale) {
     const w = Math.max(2, Math.round(cssW * scale));
     const h = Math.max(2, Math.round(cssH * scale));
