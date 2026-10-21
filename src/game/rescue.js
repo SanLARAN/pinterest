@@ -75,7 +75,7 @@ export class Rescue {
   }
 
   timeLeft(p) {
-    return p.gone ? 0 : Math.max(0, p.bleedEnd - this.g.time);
+    return p.gone ? 0 : Math.max(0, p.bleedLeft != null ? p.bleedLeft : p.bleedEnd - this.g.time); // (bleedLeft: the clock that survives the night reset, 2.1r)
   }
 
   floorY(x, z) {
@@ -88,6 +88,7 @@ export class Rescue {
     const g = this.g;
     p.bleed = bleed;
     p.bleedEnd = g.time + bleed;
+    p.bleedLeft = bleed;
     p.gone = false;
     p.onCot = false;
     p.downs = (p.downs | 0) + 1;
@@ -130,7 +131,7 @@ export class Rescue {
     const g = this.g;
     if (!g.auth || !g.online) return;
     for (const p of this.downed()) {
-      if (p.gone || g.time < p.bleedEnd) continue;
+      if (p.gone || this.timeLeft(p) > 0) continue;
       p.gone = true;
       g.sync.ev('bo', p.id);
       this._gone(p);
@@ -144,12 +145,13 @@ export class Rescue {
     this._gone(p);
   }
 
-  // dawn does NOT clear the fallen (2.1q): whoever is still down when the light comes stays down —
-  // the night keeps them, exactly as if the bleed had run out under the trees. Only a rescue during
-  // the night itself (the cot, the needle) puts anyone back on their feet; morning is not a medic.
-  dawnClaim() {
+  // dawn raises nobody (2.1q) — but it does not finish anyone either (2.1r): whoever is down stays
+  // down, their bleed clock keeps its own time through the morning, and hands still work in daylight
+  // (the shoulder, the cot, the needle). Only when nobody is left standing to come for anyone does
+  // the morning take everyone at once; then this says so, and the game ends the shift there.
+  dawnPeace() {
     const g = this.g;
-    if (!g.online) return;
+    if (!g.online || g.livePlayers().length > 0) return false;
     for (const p of this.downed()) {
       if (p.consumed || p.gone) continue;
       if (p.carriedBy) {
@@ -161,6 +163,7 @@ export class Rescue {
       if (g.auth && g.sync) g.sync.ev('bo', p.id); // the host's word, as with any bleed-out
       this._gone(p, true);
     }
+    return true;
   }
 
   _gone(p, dawn = false) {
@@ -177,7 +180,7 @@ export class Rescue {
   // you're at it)
   carryKey() {
     const g = this.g, p = g.player;
-    if (!g.online || !p.alive || (g.state !== 'play' && g.state !== 'dawn')) return;
+    if (!g.online || !p.alive || !['play', 'dawn', 'morning', 'dusk'].includes(g.state)) return; // (2.1r: a shoulder works in daylight too)
     if (p.carrying) {
       this.putDown();
       return;
@@ -432,7 +435,7 @@ export class Rescue {
   hostRevive(bodyId, reviverId) {
     const g = this.g;
     const b = g.playerById(bodyId), rv = g.playerById(reviverId);
-    if (!b || b.alive || !b.onCot || b.gone || g.time >= b.bleedEnd || !rv || !rv.alive || !this.hut) return;
+    if (!b || b.alive || !b.onCot || b.gone || this.timeLeft(b) <= 0 || !rv || !rv.alive || !this.hut) return;
     const s = this.hut.standPose();
     this.revive(b, s.x, s.z, s.yaw, reviverId);
     g.sync.ev('rv', bodyId, +s.x.toFixed(2), +s.z.toFixed(2), +s.yaw.toFixed(3), reviverId);
@@ -556,6 +559,8 @@ export class Rescue {
     b.carriedBy = null;
     b.onCot = false;
     b.gone = false;
+    b.bleedLeft = null;
+    b.bleedEnd = 0;
     const c = this.hut ? this.hut.cot : { x, y: g.world.terrain.height(x, z), z };
     g.audio.reviveGasp(c.x, c.y + 0.25, c.z, b === g.player);
     if (b === g.player) g.reviveLocal(x, z, yaw);
@@ -586,6 +591,7 @@ export class Rescue {
     if (!g.online) return;
     this._jabTick(dt);
     this.askT -= dt;
+    for (const p of this.downed()) if (p.bleedLeft != null && !p.gone) p.bleedLeft = Math.max(0, p.bleedLeft - dt); // the sun does not stop this clock
     if (this.waitRv > 0) this.waitRv -= dt;
     this.hostTick();
     const p = g.player;

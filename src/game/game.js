@@ -371,10 +371,13 @@ export class Game {
         }
         this.coop.toHost('sk', 1); // a guest asks; the host's word starts the dusk for everyone
       } else if (e === 'carry') this.carryKey(); // R: set the part down (2.1q: hauling is morning work too)
-      else if (e === 'primary' && this.escape.held) this.inventory.primary(); // ...or throw it down ahead
+      else if (e === 'primary' && (this.escape.held || this.inventory.equipped === 'syringe')) this.inventory.primary(); // ...throw it down ahead — or the needle, in daylight too (2.1r)
     }
     if (this.state !== 'morning') return;
-    const pev = this.angler.myCap() ? (this.angler.captiveFrame(dt, this.inputMuted ? NO_LOOK : raw.look), { step: null, bump: null, breath: null })
+    // (2.1r: down at dawn is a state of its own now — the body lies where it fell until hands move it;
+    // Player.update has no alive-guard and would happily walk the corpse around by keyboard)
+    const pev = !p.alive ? { step: null, bump: null, breath: null }
+      : this.angler.myCap() ? (this.angler.captiveFrame(dt, this.inputMuted ? NO_LOOK : raw.look), { step: null, bump: null, breath: null })
       : p.update(dt, this.input, this.inputMuted || this.inventory.active ? NO_LOOK : raw.look, this.inputMuted || this.inventory.active);
     this.angler.update(dt);
     if (pev.step) this.audio.footstep(pev.step.intensity * 0.8);
@@ -393,6 +396,7 @@ export class Game {
     hud.setHint(hint);
     this.objectives.update(dt, false);
     this.doors.update(dt);
+    this.rescue.update(dt); // the bleed clock and the carrying shoulder do not stop for the sun (2.1r)
     this.escape.update(dt); // the parts live and roll in daylight too (2.1q)
     this.cabinets.update(dt);
     this.medhut.update(dt);
@@ -475,7 +479,7 @@ export class Game {
     if (day <= this.day && this.state !== 'dawn') return;
     this.day = day;
     this.state = 'morning';
-    this.time = 0; // the night's clocks start clean (the fallen stay fallen: see Rescue.dawnClaim)
+    this.time = 0; // the night's clocks start clean (the fallen stay down — their own clock runs on: see Rescue.bleedLeft)
     this.morningT = 0;
     this.duskT = 0;
     this.duskHit = false;
@@ -529,6 +533,7 @@ export class Game {
     }
     this.objectives.update(dt, false);
     this.doors.update(dt);
+    this.rescue.update(dt);
     this.pulses.update(this.time);
     this._commonFx(dt);
     if (k >= CFG.DUSK_SECONDS) this.startNight();
@@ -1690,7 +1695,8 @@ export class Game {
     this.hud.setUse(null);
     this.objectives.closeNote();
     if (this.role === 'host') this.sync.ev('dn', this.day);
-    this.rescue.dawnClaim(); // dawn raises nobody (2.1q): still down at first light = gone
+    const noneStanding = this.rescue.dawnPeace(); // dawn raises nobody (2.1q), but rescue goes on in daylight (2.1r)
+    if (noneStanding && this.day < CFG.SHIFT.DAYS) { this.endOnline(false); return; } // nobody left to come for anyone
     const last = this.day >= CFG.SHIFT.DAYS;
     if (last) {
       this.winBonus = CFG.SCORE.win;

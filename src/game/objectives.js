@@ -592,6 +592,8 @@ export class Objectives {
     if (game.doors && !seated && !riding) game.doors.consider(consider);
     // cupboards (in the morning too: the first-aid hut is right by the camp) — and someone caught in one
     if (game.cabinets && !seated && !riding) game.cabinets.consider(consider, !p.carrying && !(es && es.held));
+    // (2.1r: and in the morning, a friend on the ground or on the cot — dawn raised nobody, so hands do it)
+    if (doorsOnly && game.rescue && !seated && !riding) game.rescue.consider(consider);
     if (best && this.target && best.obj !== this.target.obj) this.searchT = 0;
     this.target = best;
     if (!best || best.kind !== 'lookout') game.expedition?.idle();

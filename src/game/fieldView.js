@@ -6,6 +6,9 @@ import { CFG } from '../core/config.js';
 import { t } from '../core/i18n.js';
 import { fmtTime } from '../ui/hud.js';
 
+// where you stand, the way the guard's map writes it: whole metres, x first (2.1r)
+export function fmtPos(x, z) { return `${Math.round(x)}, ${Math.round(z)}`; }
+
 const VERT=`varying vec3 vN; varying vec3 vP; varying vec2 vUv;
 void main(){vN=normalize(normalMatrix*normal);vP=position;vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`;
 function material(color,light=1) {
@@ -115,7 +118,7 @@ export class FieldView {
     const calm=Math.ceil(g.calmLeft?.()||0),state=g.state,S=CFG.SHIFT;
     // the shift has four days: the big number counts DOWN — to dusk in the morning, to dawn at night
     const rem=state==='play'?Math.max(0,S.NIGHT-(g.time||0)):state==='morning'?Math.max(0,S.MORNING-(g.morningT||0)):(g.time||0);
-    const info={time:fmtTime(rem),day:`${g.day||1}/${S.DAYS}`,gens:g.objectives.count||0,parts:g.escape.count||0,score:Math.floor(g.score||0),mult:(g.mult||1).toFixed(1),team:g.online?`${g.livePlayers().length}/${g.remotes.size+1}`:'1/1',calm,task,torch:g.torch.has?Math.ceil(g.torch.charge*100):null};
+    const info={time:fmtTime(rem),day:`${g.day||1}/${S.DAYS}`,gens:g.objectives.count||0,parts:g.escape.count||0,score:Math.floor(g.score||0),mult:(g.mult||1).toFixed(1),team:g.online?`${g.livePlayers().length}/${g.remotes.size+1}`:'1/1',pos:fmtPos(p.x,p.z),calm,task,torch:g.torch.has?Math.ceil(g.torch.charge*100):null};
     const key=JSON.stringify(info)+t('watchTime')+state;if(key===this.lcdKey) return;this.lcdKey=key;this.data=info;
     const c=this.lcd;c.fillStyle='#151c1d';c.fillRect(0,0,512,672);
     c.fillStyle='#ccd5cd';c.font='bold 40px monospace';c.fillText('HUSH',34,64);
@@ -134,11 +137,13 @@ export class FieldView {
     c.font='bold 22px monospace';
     const rows=wrap(c,task,410);
     // Long objectives scroll by whole lines; no information is removed to fit the small LCD.
-    const start=rows.length>4?Math.floor((g.time||0)/3)%Math.max(1,rows.length-3):0;
-    rows.slice(start,start+4).forEach((s,i)=>c.fillText(s,51,434+i*28));
+    // (2.1r: three task lines now — the bottom line of the screen says where you stand instead.)
+    const start=rows.length>3?Math.floor((g.time||0)/3)%Math.max(1,rows.length-2):0;
+    rows.slice(start,start+3).forEach((s,i)=>c.fillText(s,51,434+i*28));
+    c.fillText(`${t('watchPos')} ${info.pos}`,51,540);
     c.fillStyle='#7b9390';c.font='bold 20px monospace';c.textAlign='center';c.fillText('ALARM · CHRONOGRAPH',256,604);c.font='16px monospace';c.fillText('LIGHT                 DATA',256,645);c.textAlign='left';
     this.lcdTex.needsUpdate=true;
-    if(this.a11y) this.a11y.textContent=`${t('watchDayN').replace('{n}',g.day||1).replace('{d}',S.DAYS)}. ${info.time}. ${t('generators')} ${info.gens}/5. ${t('watchCar')} ${info.parts}/4. ${t('score')} ${info.score} x${info.mult}. ${t('watchAlive')} ${info.team}. ${calm?`${t('watchCalm')} ${calm}. `:''}${task}`;
+    if(this.a11y) this.a11y.textContent=`${t('watchDayN').replace('{n}',g.day||1).replace('{d}',S.DAYS)}. ${info.time}. ${t('generators')} ${info.gens}/5. ${t('watchCar')} ${info.parts}/4. ${t('score')} ${info.score} x${info.mult}. ${t('watchAlive')} ${info.team}. ${t('watchPos')} ${info.pos}. ${calm?`${t('watchCalm')} ${calm}. `:''}${task}`;
   }
   place(camera,show) {
     const g=this.g,bag=g.inventory,reach=bag.progress,k=ease(clamp(this.watch,0,1));

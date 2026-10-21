@@ -7,6 +7,17 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v:'2.1r',date:'2026-10-21',
+    ru:{title:'Часы с координатами',items:[
+      'На часах теперь есть координаты: нижняя строка экрана показывает, где ты стоишь, — в тех же числах, что карта деталей и записки',
+      'Спасать можно и утром: рассвет сам никого не поднимает, но упавший остаётся лежать и ждёт — его минуты идут и при свете, а плечо, койка и шприц работают до последней',
+    ]},
+    en:{title:'Coordinates on the watch',items:[
+      'The watch shows coordinates now: the bottom line of the screen says where you stand, in the same numbers the parts map and the notes use',
+      'Rescue works in the morning too: dawn still raises no one by itself, but the fallen stay down and waiting — their minutes run on in daylight, and the shoulder, the cot and the needle work to the last of them',
+    ]}
+  },
+  {
     v:'2.1q',date:'2026-10-21',
     ru:{title:'Рассвет не спасает',items:[
       'Рассвет больше не поднимает упавших: кто встретил утро на земле, погиб до конца смены. Спасайте ночью — койка и шприц работают как прежде',

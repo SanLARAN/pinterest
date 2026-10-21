@@ -315,7 +315,7 @@ export class Backpack {
   }
   primary() {
     const g=this.g;
-    if(this.lowerWatch() || this.blocked || this.equipT>0 || !g.player.alive || g.inputMuted || !['play','dawn','training'].includes(g.state)) return;
+    if(this.lowerWatch() || this.blocked || this.equipT>0 || !g.player.alive || g.inputMuted || !['play','dawn','training','morning'].includes(g.state)) return; // (2.1r: the morning routes only the part-throw and the needle here)
     if(g.escape.held) { g.escape.throwHeld(); return; }
     if(g.player.carrying || g.cabinets.busy || g.expedition.onTower || g.escape.mySeat>=0) return;
     const k=this.equipped;

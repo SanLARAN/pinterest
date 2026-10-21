@@ -534,7 +534,7 @@ const TEXT = {
           'Только здесь можно спасти друга, которого поймали. Упавший не умирает сразу — он медленно истекает кровью. Донеси его сюда (R — поднять на плечо), положи на койку (R) и работай руками (удерживай E), пока он не вдохнёт.',
           'Сколько ему осталось, не скажет никто. Опустись рядом и нащупай пульс (удерживай E): ровный, слабый, еле слышен — и примерно сколько минут. Чтобы узнать снова, щупай снова.',
         ],
-        tips: ['Рассвет упавшего не поднимет: кто встретил утро на земле, того ночь оставила себе. Всё спасение — только ночью.', 'С другом на плече бежать нельзя, а шаги тяжёлые и громкие. Красная засечка у точки показывает, где хижина.', 'Каждое падение короче прошлого: 4 минуты, потом меньше трёх, потом две.', 'Дверь закрывается (E) — даже с ношей на плече: толкнёшь плечом.', 'Её фонарь видно издалека: тёплая точка в лесу у лагеря.'],
+        tips: ['Рассвет упавшего не поднимет — но и не добьёт: его минуты идут и при свете, а руки работают и утром. Успей до последней.', 'С другом на плече бежать нельзя, а шаги тяжёлые и громкие. Красная засечка у точки показывает, где хижина.', 'Каждое падение короче прошлого: 4 минуты, потом меньше трёх, потом две.', 'Дверь закрывается (E) — даже с ношей на плече: толкнёшь плечом.', 'Её фонарь видно издалека: тёплая точка в лесу у лагеря.'],
         facts: [['где', '~25 м от костра'], ['койка', 'одна'], ['вернуть', '~6 с руками'], ['истекает', '4 · 3 · 2 мин'], ['размер', '{len}']],
       },
       cabin: {
@@ -1131,7 +1131,7 @@ const TEXT = {
           'Only here can a friend who was caught be saved. The fallen do not die at once — they slowly bleed out. Carry them here (R — onto your shoulder), lay them on the cot (R) and work on them (hold E) until they draw breath.',
           'Nobody can tell you how long they have. Kneel and feel for a pulse (hold E): steady, weak, barely there — and roughly how many minutes. To know again, feel again.',
         ],
-        tips: ['Dawn will not raise the fallen: whoever meets the morning on the ground is the night’s to keep. Every rescue happens in the dark or not at all.', 'With a friend on your shoulder you cannot run, and your steps are heavy and loud. A red tick by the dot shows where the hut is.', 'Each fall is shorter than the last: 4 minutes, then under three, then two.', 'The door closes (E) — even with someone on your shoulder: you shove it.', 'Its lantern shows from far off: a warm point in the forest by the camp.'],
+        tips: ['Dawn will not raise the fallen — but it will not finish them either: their minutes run on in daylight, and hands still work in the morning. Be there before the last one.', 'With a friend on your shoulder you cannot run, and your steps are heavy and loud. A red tick by the dot shows where the hut is.', 'Each fall is shorter than the last: 4 minutes, then under three, then two.', 'The door closes (E) — even with someone on your shoulder: you shove it.', 'Its lantern shows from far off: a warm point in the forest by the camp.'],
         facts: [['where', '~25 m from the fire'], ['cot', 'one'], ['bring back', '~6 s by hand'], ['bleeds out', '4 · 3 · 2 min'], ['size', '{len}']],
       },
       cabin: {
