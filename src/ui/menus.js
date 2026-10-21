@@ -14,7 +14,7 @@ function esc(s) {
 export class Menus {
   constructor(handlers) {
     this.h = handlers; // { onPlay, onResume, onRestart, onMenu, onMicToggle, onSettingsChanged, onAtlas, uiSound }
-    this.screens = ['menu', 'pause', 'over', 'settingsPanel', 'howPanel', 'scoresPanel', 'coopPanel', 'atlasPanel', 'wardrobePanel', 'boot'];
+    this.screens = ['menu', 'pause', 'over', 'settingsPanel', 'howPanel', 'scoresPanel', 'soloPanel', 'coopPanel', 'atlasPanel', 'wardrobePanel', 'boot'];
     this.settingsReturn = null;
     this.highlight = -1;
     this.graphics = new AdvancedGraphics({ onChange: key => this.h.onSettingsChanged?.(key), stats: () => this.h.graphicsStats?.() });
@@ -29,12 +29,16 @@ export class Menus {
     $(id).classList.toggle('show', on);
   }
   only(id) {
-    if (id === 'menu') this.paintSoloDays?.();
     for (const s of this.screens) this.show(s, s === id);
     document.body.classList.toggle('in-menu', id === 'menu' || id === 'over' || id === 'pause');
   }
   isOpen(id) {
     return $(id).classList.contains('show');
+  }
+  // the solo shift: length first, then the forest (2.1t)
+  openSolo() {
+    this.paintSoloDays?.();
+    this.show('soloPanel', true);
   }
 
   applyI18n() {
@@ -61,14 +65,28 @@ export class Menus {
       });
       el.addEventListener('mouseenter', () => this.h.uiSound && this.h.uiSound('hover'));
     };
-    click('btnPlay', () => this.h.onPlay());
-    // the solo shift length (2.1s): 2, 4 or 6 nights, remembered like any other setting
-    const daysRow = $('soloDays');
-    if (daysRow) {
-      const paint = () => { for (const b of daysRow.querySelectorAll('[data-days]')) { const n = +b.dataset.days; b.textContent = t('days' + n); b.setAttribute('aria-pressed', String((settings.shiftDays || 4) === n)); } };
-      for (const b of daysRow.querySelectorAll('[data-days]')) b.addEventListener('click', () => { settings.shiftDays = +b.dataset.days; saveSettings(); paint(); this.h.uiSound?.('click'); });
-      paint();
-      this.paintSoloDays = paint;
+    click('btnPlay', () => this.openSolo());
+    // the solo shift length (2.1t): 2, 4 or 6 nights — asked after ОДНОМУ, not on the menu itself.
+    // The card you press is the shift: it is remembered like any other setting.
+    const nights = $('soloPanel');
+    if (nights) {
+      for (const b of nights.querySelectorAll('[data-days]')) {
+        b.addEventListener('click', (e) => {
+          e.preventDefault();
+          this.h.uiSound && this.h.uiSound('click');
+          settings.shiftDays = +b.dataset.days;
+          saveSettings();
+          this.paintSoloDays();
+          this.show('soloPanel', false);
+          this.h.onPlay();
+        });
+        b.addEventListener('mouseenter', () => this.h.uiSound && this.h.uiSound('hover'));
+      }
+      this.paintSoloDays = () => {
+        for (const b of nights.querySelectorAll('[data-days]')) b.setAttribute('aria-pressed', String((settings.shiftDays || 4) === +b.dataset.days));
+      };
+      click('btnSoloBack', () => this.show('soloPanel', false));
+      this.paintSoloDays();
     }
     click('btnCoop', () => this.h.onCoop && this.h.onCoop());
     click('btnLobby', () => this.h.onLobby && this.h.onLobby());

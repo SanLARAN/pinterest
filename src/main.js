@@ -159,7 +159,7 @@ for (const id of ['micCalBtn', 'btnMicCal']) $(id).addEventListener('click', (e)
   micCal.open();
 });
 // a modal over the menu hides the figure: don't draw it then
-const MENU_COVERS = ['settingsPanel', 'howPanel', 'scoresPanel', 'coopPanel'];
+const MENU_COVERS = ['settingsPanel', 'howPanel', 'scoresPanel', 'soloPanel', 'coopPanel'];
 let game = null;
 let runOnline = false; // the current / last run is a co-op night
 
@@ -372,7 +372,7 @@ const lobby = new Lobby({
 });
 const home=new GarageHome({ensureGarage,atlas,onWardrobe:()=>wardrobe.open()});
 // No account gate on play, and no cloud request in the frame loop.
-const canApplyAccount=()=>state==='menu'&&!coop.active&&!lobby.starting&&!wardrobe.isOpen()&&!atlas.isOpen()&&!micCal.isOpen()&&!['settingsPanel','howPanel','scoresPanel'].some(id=>menus.isOpen(id));
+const canApplyAccount=()=>state==='menu'&&!coop.active&&!lobby.starting&&!wardrobe.isOpen()&&!atlas.isOpen()&&!micCal.isOpen()&&!['settingsPanel','howPanel','scoresPanel','soloPanel'].some(id=>menus.isOpen(id));
 const cloud=new CloudController({
  canApply:canApplyAccount,
  onApplied:()=>{setLang(settings.lang);menus.applyI18n();menus.loadSettingsForm();$('nameInput').value=settings.name;if(!coop.active)$('coopName').value=settings.name;atlas.applyI18n();atlas.refreshBadge();wardrobe.applyI18n();news.render();audio.setVolume(settings.volume);menuMusic.applyVolume();mic.setEcho(settings.voiceEcho);updateMicUI();lobby.menuLabel();if(garage?.view==='menu'){const f=myFit();garage.setCar(f.car,f.cc);garage.studio.setFit(f);}syncIdentityFields();account?.render();social.update();},
@@ -410,7 +410,7 @@ function beginCoopRun(d) {
   if (d.cut && state === 'menu' && ensureGarage()) {
     if (atlas.isOpen()) atlas.close();
     if (wardrobe.isOpen()) wardrobe.close();
-    for (const id of ['settingsPanel', 'howPanel', 'scoresPanel']) menus.show(id, false);
+    for (const id of ['settingsPanel', 'howPanel', 'scoresPanel', 'soloPanel']) menus.show(id, false);
     if (!lobby.isOpen()) lobby.open();
     lobby.setStarting(true);
     const depart = d.cut === 2; // the gates open and the car takes the team to the training ground
@@ -626,6 +626,7 @@ function startRun(opts = {}) {
   menus.show('settingsPanel', false);
   menus.show('howPanel', false);
   menus.show('scoresPanel', false);
+  menus.show('soloPanel', false);
   lobby.close();
   home.leave();garage?.close();
   hud.show(true);
@@ -906,6 +907,7 @@ function handleEvents(events) {
           if (!lobby.starting) lobby.close();
         } else if (menus.isOpen('settingsPanel')) menus.closeSettings();
         else if (menus.isOpen('howPanel')) menus.show('howPanel', false);
+        else if (menus.isOpen('soloPanel')) menus.show('soloPanel', false);
         else if (menus.isOpen('scoresPanel')) menus.show('scoresPanel', false);
         else if (state === 'menu' && !news.st.folded) news.setFolded(true);
         else if (state === 'playing') pause();
@@ -924,10 +926,10 @@ function handleEvents(events) {
         if (state === 'over' || (state === 'paused' && !runOnline)) restartRun();
         break;
       case 'confirm':
-        if (account.isOpen() || atlas.isOpen() || wardrobe.isOpen() || menus.isOpen('settingsPanel') || menus.isOpen('howPanel') || menus.isOpen('scoresPanel') || lobby.isOpen()) break;
+        if (account.isOpen() || atlas.isOpen() || wardrobe.isOpen() || menus.isOpen('settingsPanel') || menus.isOpen('howPanel') || menus.isOpen('scoresPanel') || menus.isOpen('soloPanel') || lobby.isOpen()) break;
         if (game?.training) break;
         if (state === 'over') restartRun();
-        else if (state === 'menu') startRun();
+        else if (state === 'menu') menus.openSolo(); // Enter asks for the shift length first (2.1t)
         else if (state === 'paused') resume();
         break;
       case 'mic':
@@ -973,7 +975,7 @@ function step(now, render) {
   handleEvents(events);
 
   const garageOn = state === 'menu' && !atlasOpen && !wardrobeOpen && !!garage;
-  home.setActive(state==='menu'&&!atlasOpen&&!wardrobeOpen&&!lobby.isOpen()&&!['settingsPanel','howPanel','scoresPanel'].some(id=>menus.isOpen(id))&&!micCal.isOpen()&&!account.isOpen());
+  home.setActive(state==='menu'&&!atlasOpen&&!wardrobeOpen&&!lobby.isOpen()&&!['settingsPanel','howPanel','scoresPanel','soloPanel'].some(id=>menus.isOpen(id))&&!micCal.isOpen()&&!account.isOpen());
   if (state === 'menu') {
     if (garageOn) {if(!lobby.isOpen())home.enter();updateGarage(rawDt);}
     else if(atlasOpen||wardrobeOpen) {

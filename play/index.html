@@ -7,8 +7,8 @@
     <meta name="description" content="ТИШЕ — low-poly эхолокационный хоррор. Ты слеп в огромном лесу: твой микрофон — эхолокатор. Запусти пять генераторов и не закричи." />
     <title>ТИШЕ — эхолокационный хоррор</title>
     <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
-  <script type="module" crossorigin src="./assets/index-GaoakqZ_.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-kNgio-my.css">
+  <script type="module" crossorigin src="./assets/index-B6ZFUzi5.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-C9tCe2kI.css">
 </head>
   <body>
     <canvas id="gl" tabindex="-1"></canvas>
@@ -101,7 +101,6 @@
         </div>
         <div class="menu-main">
           <button class="btn primary" id="btnPlay"><span data-i18n="homeSolo">ОДНОМУ</span></button>
-          <div class="shift-days"><span data-i18n="ruleDays"></span><div class="rule-choices" id="soloDays"><button type="button" data-days="2"></button><button type="button" data-days="4"></button><button type="button" data-days="6"></button></div></div>
           <button class="btn" id="btnRange"><span data-i18n="homeRange">ПОЛИГОН</span></button>
           <button class="btn coop-btn" id="btnCoop"><span class="coop-ico" aria-hidden="true"><i></i><i></i></span><span id="btnCoopText" data-i18n="coopBtn">С ДРУЗЬЯМИ</span></button>
                     <button id="btnWardrobe" class="btn fig" type="button" aria-label="wardrobe">
@@ -269,6 +268,20 @@
         <h2 data-i18n="howto"></h2>
         <div id="howBody"></div>
         <button class="btn primary" id="btnHowBack"><span data-i18n="back"></span></button>
+      </div>
+    </div>
+
+    <!-- the solo shift: how many nights — asked after the button, never on the menu itself -->
+    <div id="soloPanel" class="screen modal" role="dialog" aria-modal="true" aria-hidden="true" aria-label="solo shift">
+      <div class="panel form-panel solo-shift">
+        <h2 data-i18n="soloShiftTitle">ДЛИНА СМЕНЫ</h2>
+        <p class="solo-sub" data-i18n="soloShiftSub"></p>
+        <div class="solo-nights">
+          <button class="solo-night" type="button" data-days="2"><b data-i18n="days2">2 ночи</b><span data-i18n="daysHint2"></span></button>
+          <button class="solo-night" type="button" data-days="4"><b data-i18n="days4">4 ночи</b><span data-i18n="daysHint4"></span></button>
+          <button class="solo-night" type="button" data-days="6"><b data-i18n="days6">6 ночей</b><span data-i18n="daysHint6"></span></button>
+        </div>
+        <button class="btn" id="btnSoloBack"><span data-i18n="back">НАЗАД</span></button>
       </div>
     </div>
 

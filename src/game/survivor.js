@@ -532,6 +532,81 @@ const BODY = {
     });
     hands(R);
   },
+
+  // Pigeon (2.1t): a doctor's coat over a pigeon. White linen to the knee, a starched collar, a
+  // stethoscope round the neck and a pen in the pocket — and under it feathers: a fan of dark tail
+  // quills on two bones (they flick), slate trousers, and wing feathers past each cuff.
+  doctorcoat(R) {
+    const n = R.nodes;
+    part(R, n.hips, (b) => {
+      b.place(0, -0.065, 0); b.box(0.31, 0.16, 0.2, BB); // trousers at the waist
+      b.place(0, -0.4, 0); b.taper(0.46, 0.32, 0.4, 0.285, 0.4, BA); // the skirt of the coat
+      b.place(0, -0.415, 0); b.taper(0.475, 0.335, 0.46, 0.32, 0.04, BB); // its hem
+      b.place(0, 0.0, 0, 0, PI / 12, 0); b.cylinder(10, 0.185, 0.19, 0.055, BA); // the waist of it, over the belt
+      b.identity(); b.limb([0, -0.4, 0.16], [0, 0.0, 0.145], 0.011, 0.011, BB, 3); // the front opening
+      for (const s of [-1, 1]) { b.place(s * 0.1, -0.2, 0.15, 0.1, 0, s * 0.05); b.box(0.1, 0.11, 0.014, BB); } // pockets
+    });
+    // the tail: five quills on two bones (they flick: see poseFur)
+    const t0 = node(R, 'ptail0', n.hips, 0, -0.06, -0.1);
+    const t1 = node(R, 'ptail1', t0, 0, -0.02, -0.09);
+    part(R, t0, (b) => { b.identity(); b.limb([0, 0, 0], [0, -0.03, -0.08], 0.055, 0.05, BB, 5); });
+    part(R, t1, (b) => {
+      for (let i = 0; i < 5; i++) {
+        const a = (i / 4 - 0.5) * 0.62;
+        b.identity();
+        b.limb([Math.sin(a) * 0.022, -0.005, -0.03], [Math.sin(a) * 0.085, -0.12 - Math.abs(a) * 0.03, -0.3 + Math.abs(a) * 0.06], 0.026 - Math.abs(a) * 0.005, 0.006, BB, 3);
+      }
+    });
+    part(R, n.chest, (b) => {
+      b.place(0, -0.08, 0); b.taper(0.35, 0.22, 0.44, 0.25, 0.66, BA); // the coat
+      b.place(0, 0.545, 0.004); b.taper(0.29, 0.19, 0.245, 0.17, 0.075, BA); // starched collar
+      for (const s of [-1, 1]) { // lapels, and their seams
+        b.place(s * 0.083, 0.44, 0.1155, 0.0265, 0, s * 0.34); b.box(0.052, 0.23, 0.016, BA);
+        b.place(s * 0.058, 0.44, 0.1245, 0.0265, 0, s * 0.34); b.box(0.008, 0.23, 0.006, BB);
+      }
+      // the button placket down the front, three buttons on it
+      b.place(0, 0.2, 0.1165, 0.0265, 0, 0); b.box(0.026, 0.5, 0.008, BB);
+      for (let i = 0; i < 3; i++) { b.place(0, 0.39 - i * 0.16, 0.1225 + (0.39 - i * 0.16) * 0.0265); b.octa(0.014, 0.014, KIND.BONE); }
+      // the chest pocket: a pen, a penlight, a name tag
+      b.place(0.115, 0.3, 0.1205, 0.0265, 0, 0); b.box(0.095, 0.1, 0.012, BA);
+      b.place(0.1, 0.35, 0.1275, 0.0265, 0, 0.06); b.box(0.011, 0.115, 0.009, KIND.ROCK);
+      b.place(0.138, 0.34, 0.1275, 0.0265, 0, -0.05); b.box(0.014, 0.09, 0.012, KIND.METAL);
+      b.place(-0.12, 0.26, 0.1215, 0.0265, 0, 0); b.box(0.075, 0.04, 0.008, KIND.BONE);
+      // the stethoscope: two tubes from the collar, down to a chestpiece
+      for (const s of [-1, 1]) {
+        b.identity(); b.limb([s * 0.062, 0.545, 0.055], [s * 0.03, 0.4, 0.128], 0.0075, 0.0075, KIND.ROCK, 4);
+        b.identity(); b.limb([s * 0.03, 0.4, 0.128], [0.006, 0.235, 0.135], 0.0075, 0.0075, KIND.ROCK, 4);
+        b.identity(); b.limb([s * 0.062, 0.545, 0.045], [s * 0.052, 0.63, -0.01], 0.006, 0.006, KIND.ROCK, 3); // earpieces
+        b.place(s * 0.052, 0.635, 0.0); b.octa(0.011, 0.014, KIND.METAL);
+      }
+      b.place(0.004, 0.222, 0.139, PI / 2 - 0.05, 0, 0); b.cylinder(8, 0.036, 0.034, 0.018, KIND.METAL);
+      b.place(0.004, 0.232, 0.139, PI / 2 - 0.05, 0, 0); b.cylinder(8, 0.024, 0.024, 0.008, KIND.ROCK);
+    });
+    limbs(R, {
+      upper: (b, s) => { b.identity(); b.limb([0, 0, 0], [s * 0.04, -0.3, 0.02], 0.058, 0.049, BA, 5); },
+      fore: (b) => {
+        b.identity(); b.limb([0, 0, 0], [0, -0.225, 0.052], 0.049, 0.043, BA, 5);
+        b.limb([0, -0.2, 0.048], [0, -0.255, 0.057], 0.05, 0.047, BB, 5); // a cuff
+      },
+      thigh: (b) => { b.identity(); b.limb([0, 0, 0], THIGH, 0.074, 0.06, BB, 5); },
+      shin: (b) => {
+        b.identity(); b.limb([0, 0, 0], SHIN, 0.06, 0.048, BB, 5);
+        b.place(0, -0.445, 0.05); b.box(0.11, 0.07, 0.24, KIND.ROCK); // shoes, polished for the ward round
+      },
+    });
+    // the wing feathers past the cuffs — on their own bones, so they can ruffle (see poseFur)
+    for (const s of [-1, 1]) {
+      const w = node(R, s < 0 ? 'pwingL' : 'pwingR', n['el' + (s < 0 ? 'L' : 'R')], 0, -0.2, 0.03);
+      part(R, w, (b) => {
+        for (let i = 0; i < 4; i++) {
+          const a = (i / 3 - 0.5) * 0.7;
+          b.identity();
+          b.limb([Math.sin(a) * 0.012, -0.015, 0], [Math.sin(a) * 0.07, -0.11 - (i % 2) * 0.035, -0.03 - Math.cos(a) * 0.075], 0.017, 0.005, BB, 3);
+        }
+      });
+    }
+    hands(R);
+  },
 };
 
 // ---------------- headwear ----------------
@@ -807,6 +882,44 @@ const HEAD = {
       b.place(0, -0.062, 0.1); b.box(0.085, 0.018, 0.02, HB); // the moustache shading the mouth
     });
   },
+
+  // Pigeon (2.1t): a city pigeon's skull — bead eye, pale cere, a neck that shifts colour — with the
+  // doctor's head mirror strapped over the crown. The skull sits on its own bone: a pigeon's head
+  // bobs against the body and jerks around to look at things (poseFur drives it).
+  pigeonhead(R) {
+    const n = R.nodes;
+    const ph = node(R, 'phead', n.head, 0, 0, 0);
+    part(R, ph, (b) => {
+      b.identity();
+      lathe(b, [[0, -0.135], [0.062, -0.122], [0.094, -0.078], [0.106, -0.02], [0.1, 0.045], [0.078, 0.095], [0.048, 0.124], [0, 0.134]], 10, HA, { phase: PI / 10 });
+      // the beak, and the soft pale cere over its base
+      b.place(0, -0.018, 0.082, PI / 2 + 0.16, 0, 0, 1, 1, 0.9); b.cone(4, 0.028, 0.1, KIND.BONE, { phase: PI / 4 });
+      b.place(0, 0.004, 0.084); b.octa(0.031, 0.021, KIND.BONE);
+      for (const s of [-1, 1]) { b.place(s * 0.012, 0.018, 0.09); b.octa(0.007, 0.005, KIND.ROCK); } // nostrils
+      b.identity(); b.limb([0, -0.026, 0.092], [0, -0.036, 0.14], 0.004, 0.003, KIND.ROCK, 3); // the bill's seam
+      // the throat and neck: the lower half of the skull in the iridescent colour, a ruff of feathers
+      // where it meets the coat's collar, and a few feathers down the back of the head
+      lathe(b, [[0, -0.142], [0.072, -0.13], [0.1, -0.086], [0.108, -0.035]], 10, HB, { phase: PI / 10 });
+      for (let i = 0; i < 7; i++) {
+        const a = -PI / 2 + (i / 6 - 0.5) * 2.1;
+        spike(b, Math.cos(a) * 0.062, -0.1, 0.012 + Math.sin(a) * 0.058, a + PI / 2, 2.35, 0.02, 0.06, HA, 3);
+      }
+      for (const s2 of [-1, 1]) spike(b, s2 * 0.03, -0.06, -0.095, PI - s2 * 0.4, PI - 0.35, 0.018, 0.075, HA, 3);
+      // the head mirror: a band round the crown (a wall, not a lid), the disc over the forehead
+      b.place(0, 0.078, -0.004, 0, PI / 10, 0); b.cylinder(12, 0.106, 0.103, 0.026, HB, { capTop: false });
+      b.place(0, 0.062, 0.106, PI / 2 - 0.28, 0, 0); b.cylinder(10, 0.044, 0.042, 0.018, KIND.METAL);
+      b.place(0, 0.066, 0.124, PI / 2 - 0.28, 0, 0); b.cylinder(10, 0.031, 0.031, 0.006, KIND.EYE);
+      b.identity(); b.limb([0, 0.05, 0.126], [0, 0.02, 0.13], 0.006, 0.005, KIND.METAL, 3); // its arm
+    });
+    // the eye: a glass bead on each side of the skull (it blinks: see poseFur)
+    const eyes = node(R, 'eyes', ph, 0, 0.008, 0.036);
+    part(R, eyes, (b) => {
+      for (const s of [-1, 1]) {
+        b.place(s * 0.088, 0, 0.026, 0, -s * 0.4, -s * (PI / 2 - 0.3), 1, 1, 1.15); b.cylinder(8, 0.03, 0.03, 0.014, KIND.EYE);
+        b.place(s * 0.092, 0, 0.031, 0, -s * 0.4, -s * (PI / 2 - 0.3), 0.6, 0.9, 0.6); b.octa(0.014, 0.014, KIND.ROCK);
+      }
+    });
+  },
 };
 
 // ---------------- dyes ----------------
@@ -846,7 +959,7 @@ export function buildSurvivor(fitIn = null) {
 // twitch, the eyes blink. Keeps its own clock on the rig. dt: s, moving: m/s (walking wags harder)
 export function poseFur(rig, dt, moving = 0) {
   const n = rig.nodes;
-  if (!n.tail0 && !n.earL && !n.eyes) return;
+  if (!n.tail0 && !n.earL && !n.eyes && !n.phead) return;
   const F = rig.fur || (rig.fur = { t: Math.random() * 20, ph: 0, earT: [0.8, 1.9], earV: [0, 0], blinkT: 1.5 + Math.random() * 2, blink: 0 });
   F.t += dt;
   if (n.tail0) {
@@ -870,6 +983,38 @@ export function poseFur(rig, dt, moving = 0) {
       const tw = Math.sin(F.earV[i] * PI);
       const e = i === 0 ? n.earL : n.earR;
       e.rotation.set(-0.42 * tw + Math.sin(F.t * 1.3 + i * 2) * 0.03, 0, (i === 0 ? -1 : 1) * 0.3 * tw);
+    }
+  }
+  if (n.phead) {
+    // a pigeon's head moves against the body: held still, then thrust forward with each step — and
+    // when it stands, it snaps round to look at things in jerks. The tail flicks, the wing feathers
+    // ruffle, and now and then the whole bird shrugs.
+    const P = rig.pigeon || (rig.pigeon = { ph: 0, scan: 0, to: 0, next: 1.4 + Math.random() * 2, flick: 2 + Math.random() * 3, ruf: 3 + Math.random() * 4, rt: 0 });
+    const step = Math.min(moving, 2.2) / 2.2;
+    P.ph += dt * (2.2 + step * 4.4);
+    const bob = Math.sin(P.ph);
+    n.phead.position.z = 0.014 + step * (0.034 * bob + 0.012);
+    n.phead.position.y = step * 0.01 * Math.abs(bob);
+    n.phead.rotation.x = -step * 0.12 * bob;
+    P.next -= dt;
+    if (P.next <= 0) { P.next = 1.1 + Math.random() * 2.8; P.to = (Math.random() - 0.5) * 1.6; }
+    P.scan += (P.to - P.scan) * Math.min(1, dt * 11);
+    n.phead.rotation.y = P.scan * (1 - step);
+    if (n.ptail0) {
+      P.flick -= dt;
+      if (P.flick <= 0) { P.flick = 2.2 + Math.random() * 3.8; P.rt = 1; }
+      P.rt = Math.max(0, P.rt - dt * 3);
+      const k = Math.sin(P.rt * PI);
+      n.ptail0.rotation.set(0.12 + Math.sin(F.t * 1.1) * 0.03 + k * 0.26, Math.sin(F.t * 0.7) * 0.04, 0);
+      if (n.ptail1) n.ptail1.rotation.x = k * 0.2;
+    }
+    if (n.pwingL) {
+      P.ruf -= dt;
+      if (P.ruf <= 0) { P.ruf = 4 + Math.random() * 6; P.wv = 1; }
+      P.wv = Math.max(0, (P.wv || 0) - dt * 2.4);
+      const w = Math.sin(P.wv * PI) * 0.55;
+      n.pwingL.rotation.set(w * 0.45, 0, w);
+      if (n.pwingR) n.pwingR.rotation.set(w * 0.45, 0, -w);
     }
   }
   if (n.eyes) {

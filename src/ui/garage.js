@@ -2272,14 +2272,16 @@ export class Garage {
   }
 
   // the pointer, for a little parallax (and to find your own figure under it)
-  pointer(clientX, clientY, on = true) {
+  // gates: whether the way out answers to the pointer at all (on the title screen it must not — the
+  // menu is a menu, not a door: 2.1t)
+  pointer(clientX, clientY, on = true, gates = true) {
     this.ptr.x = (clientX / this.w) * 2 - 1;
     this.ptr.y = (clientY / this.h) * 2 - 1;
     this.ptr.on = on;
     // the gates: the pointer resting on them lights them and eases them off the latch, with a soft latch
     // click the first moment it lands there
     this.ptr.cx = clientX; this.ptr.cy = clientY;
-    const over = on && !this.depart && !this.cut && this.hitGate(clientX, clientY);
+    const over = gates && on && !this.depart && !this.cut && this.hitGate(clientX, clientY);
     this._gateOver(over);
     this.hoverSlot = on ? this.hit(clientX, clientY) : -1;
     return this.hoverSlot;

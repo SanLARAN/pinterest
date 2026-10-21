@@ -15,7 +15,7 @@ export const SLOTS = ['head', 'body', 'car'];
 export const WEAR = ['head', 'body']; // what a survivor wears (the car stays in the garage)
 
 // themes: base = the kit you came with
-export const THEMES = ['base', 'taiga', 'zone', 'halloween', 'anime', 'furry', 'keanu', 'leshy', 'plague', 'cosmos', 'tuning', 'signal'];
+export const THEMES = ['base', 'taiga', 'zone', 'halloween', 'anime', 'furry', 'keanu', 'pigeon', 'leshy', 'plague', 'cosmos', 'tuning', 'signal'];
 
 // c: default colours [main, accent]. glow: the accent is a light (carving, lenses) rather than a fabric
 export const ITEMS = {
@@ -27,6 +27,7 @@ export const ITEMS = {
     { id: 'animehair', theme: 'anime', c: ['#e86aa0', '#e9e1d2'] },
     { id: 'boykisser', theme: 'furry', c: ['#e9e1d2', '#e86aa0'] },
     { id: 'keanuhair', theme: 'keanu', c: ['#241a12', '#3a2a1a'] }, // 2.1o
+    { id: 'pigeonhead', theme: 'pigeon', c: ['#8f97a0', '#7a6fae'] }, // 2.1t
     { id: 'screen', theme: 'signal', c: ['#232527', '#9cffb0'], glow: true },
     { id: 'leshyhead', theme: 'leshy', c: ['#4e6b3c', '#9cff6a'], glow: true, shop: 'leshy' },
     { id: 'plaguemask', theme: 'plague', c: ['#e9e1d2', '#232527'], shop: 'plague' },
@@ -40,6 +41,7 @@ export const ITEMS = {
     { id: 'seifuku', theme: 'anime', c: ['#e9e1d2', '#2f4f8f'] },
     { id: 'fluffy', theme: 'furry', c: ['#e9e1d2', '#e86aa0'] },
     { id: 'keanusuit', theme: 'keanu', c: ['#232527', '#e9e1d2'] }, // 2.1o
+    { id: 'doctorcoat', theme: 'pigeon', c: ['#e9e1d2', '#4a5560'] }, // 2.1t
     { id: 'ghillie', theme: 'leshy', c: ['#4e6b3c', '#6b4a33'], shop: 'leshy' },
     { id: 'plaguecoat', theme: 'plague', c: ['#232527', '#6b4a33'], shop: 'plague' },
     { id: 'spacesuit', theme: 'cosmos', c: ['#e9e1d2', '#2f4f8f'], shop: 'cosmos' },
@@ -206,7 +208,7 @@ const TEXT = {
     title: 'ГАРДЕРОБ',
     sub: 'Таким тебя увидят друзья — в эхе и под рабочими лампами.',
     slot: { head: 'Голова', body: 'Костюм', car: 'Машина', shop: 'Магазин' },
-    theme: { base: 'Штатное', taiga: 'Тайга', zone: 'Зона', halloween: 'Хэллоуин', anime: 'Аниме', furry: 'Фурри', keanu: 'Киану', leshy: 'Леший', plague: 'Чума', cosmos: 'Космос', tuning: 'Тюнинг', signal:'Сигнал' },
+    theme: { base: 'Штатное', taiga: 'Тайга', zone: 'Зона', halloween: 'Хэллоуин', anime: 'Аниме', furry: 'Фурри', keanu: 'Киану', pigeon: 'Голубь', leshy: 'Леший', plague: 'Чума', cosmos: 'Космос', tuning: 'Тюнинг', signal:'Сигнал' },
     set: 'комплект',
     color: 'Цвет',
     custom: 'свой цвет',
@@ -264,13 +266,15 @@ const TEXT = {
       seifuku: { name: 'Матроска', parts: ['Блузка', 'Юбка и воротник'], desc: 'Сэйлор-фуку: матросский воротник в полоску, бант, плиссированная юбка, гольфы и лоферы. Ближайшая школа — в трёхстах километрах. Чья это форма, лес не говорит.' },
       keanuhair: { name: 'Киану', parts: ['Волосы', 'Борода'], desc: 'Тёмные волосы до плеч с пробором по центру и короткая борода человека, который не спал со вторника. Он уже всё видел и всё равно пошёл в лес.' },
       keanusuit: { name: 'Чёрный костюм', parts: ['Костюм', 'Рубашка'], desc: 'Чёрная двойка, белая рубашка, галстук ослаблен две ночи назад. Этот костюм видал леса и похуже.' },
+      pigeonhead: { name: 'Голова голубя', parts: ['Оперение', 'Переливы'], desc: 'Сизый голубь: глаз-бусина, восковица над клювом, шея переливается на свету — и лобное зеркальце на ремешке. Он не воркует. Он слушает.' },
+      doctorcoat: { name: 'Халат доктора', parts: ['Халат', 'Стетоскоп'], desc: 'Белый халат до колен, накрахмаленный воротник, стетоскоп и ручка в кармане. Под халатом перья, в ботинках — голубиные лапы, в кармане — крошки. Диплом никто не спрашивает.' },
     },
   },
   en: {
     title: 'WARDROBE',
     sub: 'This is how your friends will see you — in the echoes and under the work lamps.',
     slot: { head: 'Head', body: 'Outfit', car: 'Car', shop: 'Shop' },
-    theme: { base: 'Standard issue', taiga: 'Taiga', zone: 'The Zone', halloween: 'Halloween', anime: 'Anime', furry: 'Furry', keanu: 'Keanu', leshy: 'Leshy', plague: 'Plague', cosmos: 'Cosmos', tuning: 'Tuning', signal:'Signal' },
+    theme: { base: 'Standard issue', taiga: 'Taiga', zone: 'The Zone', halloween: 'Halloween', anime: 'Anime', furry: 'Furry', keanu: 'Keanu', pigeon: 'Pigeon', leshy: 'Leshy', plague: 'Plague', cosmos: 'Cosmos', tuning: 'Tuning', signal:'Signal' },
     set: 'full set',
     color: 'Colour',
     custom: 'custom colour',
@@ -328,6 +332,8 @@ const TEXT = {
       seifuku: { name: 'Sailor fuku', parts: ['Blouse', 'Skirt & collar'], desc: "A sailor collar with stripes, a ribbon, a pleated skirt, knee socks and loafers. The nearest school is three hundred kilometres away. Whose uniform this was, the forest won't say." },
       keanuhair: { name: 'Keanu', parts: ['Hair', 'Beard'], desc: 'Shoulder-length dark hair with a centre parting and the short beard of a man awake since Tuesday. He has seen all of it before and went into the forest anyway.' },
       keanusuit: { name: 'Black suit', parts: ['Suit', 'Shirt'], desc: 'A black two-piece, a white shirt, the tie loosened two nights ago. This suit has seen worse forests.' },
+      pigeonhead: { name: 'Pigeon head', parts: ['Plumage', 'Iridescence'], desc: "A city pigeon: a bead eye, a cere over the beak, a neck that shifts colour in the light — and the doctor's head mirror on a strap. It doesn't coo. It listens." },
+      doctorcoat: { name: "Doctor's coat", parts: ['Coat', 'Stethoscope'], desc: 'A white coat to the knee, a starched collar, a stethoscope and a pen in the pocket. Feathers under the coat, pigeon feet in the shoes, crumbs in the pocket. Nobody asks about the diploma.' },
     },
   },
 };

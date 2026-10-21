@@ -1309,6 +1309,7 @@ body.touch .pg-keys { display: none; }
 .wr-theme.t-leshy { color: #93d16c; border-color: rgba(147, 209, 108, 0.38); }
 .wr-theme.t-plague { color: #c9b28b; border-color: rgba(201, 178, 139, 0.38); }
 .wr-theme.t-cosmos { color: #8fc8ff; border-color: rgba(143, 200, 255, 0.38); }
+.wr-theme.t-pigeon { color: #b9c2cf; border-color: rgba(185, 194, 207, 0.4); }
 .wr-theme.t-tuning { color: #f0b552; border-color: rgba(240, 181, 82, 0.38); }
 @media (max-width: 760px) {
   .wr-wallet { padding: 3px 8px; font-size: 11px; }

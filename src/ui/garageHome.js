@@ -13,7 +13,8 @@ export class GarageHome {
     this.book.addEventListener('focus',()=>{const g=this.ensureGarage();if(g?.studio)g.studio.hover='book';});
     this.book.addEventListener('blur',()=>{const g=this.ensureGarage();if(g?.studio)g.studio.hover='';});
     const menu=document.getElementById('menu');
-    menu.addEventListener('pointermove',e=>{if(!this.active||e.pointerType==='touch')return;this.ensureGarage()?.pointer(e.clientX,e.clientY,true);const over=!e.target.closest('button,input,a')&&this.hitSurvivor(e.clientX,e.clientY);menu.classList.toggle('over-survivor',over);if(this.ensureGarage()?.studio&&this.ensureGarage().studio.hover!=='book')this.ensureGarage().studio.hover=over?'survivor':'';},{passive:true});
+    // (the gates stay shut to the pointer on the title screen: a menu is not a door — 2.1t)
+    menu.addEventListener('pointermove',e=>{if(!this.active||e.pointerType==='touch')return;this.ensureGarage()?.pointer(e.clientX,e.clientY,true,false);const over=!e.target.closest('button,input,a')&&this.hitSurvivor(e.clientX,e.clientY);menu.classList.toggle('over-survivor',over);if(this.ensureGarage()?.studio&&this.ensureGarage().studio.hover!=='book')this.ensureGarage().studio.hover=over?'survivor':'';},{passive:true});
     menu.addEventListener('click',e=>{if(this.active&&!e.target.closest('button,input,a')&&this.hitSurvivor(e.clientX,e.clientY))this.onWardrobe?.();});
     window.addEventListener('pagehide',()=>this.leave());
   }
@@ -30,6 +31,7 @@ export class GarageHome {
     this.active=active;this.book.hidden=!active;this.caption.hidden=!active;
     document.body.classList.toggle('garage-home',active);
     if(!active){document.getElementById('menu').classList.remove('over-survivor');const g=this.ensureGarage();if(g?.studio){g.studio.hover='';g.studio.cancelBook();}}
+    else this.ensureGarage()?._gateOver(false); // (the gates stay shut and unlit behind the title screen: 2.1t)
   }
   place() {
     if(!this.active)return;
