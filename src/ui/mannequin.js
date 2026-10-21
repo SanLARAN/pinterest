@@ -852,12 +852,12 @@ export class Mannequin {
 
   // ---------------- stills for the item cards ----------------
   // draws `fit` into a 2D canvas: slot 'head' = a portrait, 'body' = the whole figure
-  still(fitIn, slot, canvas) {
+  still(fitIn, slot, canvas, view = {}) {
     const fit = cleanFit(fitIn);
     const W = canvas.width, H = canvas.height;
     if (W < 2 || H < 2) return;
     if (slot === 'car') return this._carStill(fit, canvas);
-    const SS = 2; // supersampled, then scaled down
+    const SS = view.supersample === 1 ? 1 : 2; // inventory is interactive; item cards are supersampled
     const rw = W * SS, rh = H * SS;
     if (!this.rt || this.rt.width !== rw || this.rt.height !== rh) {
       if (this.rt) this.rt.dispose();
@@ -898,7 +898,7 @@ export class Mannequin {
     const cam = this.tcam;
     cam.aspect = W / H;
     const head = slot === 'head';
-    const yaw = head ? 0.42 : 0.38;
+    const yaw = Number.isFinite(view.yaw) ? view.yaw : head ? 0.42 : 0.38;
     const ty = head ? 1.7 : 0.98;
     const hh = head ? 0.58 : 2.06;
     const d = (hh * 0.5) / Math.tan(THREE.MathUtils.degToRad(cam.fov) / 2);
@@ -911,7 +911,7 @@ export class Mannequin {
     tu.uKeyPos.value.set(1.4, 2.4, 2.4);
     tu.uNoise.value = head ? 60 : 26;
     tu.uGroundR.value = 0.95;
-    this.tground.visible = !head;
+    this.tground.visible = !head && !view.transparent;
     const hi = item(fit.head);
     this._glow(rig, tu, 1.3, !!(hi && hi.glow));
 
@@ -919,7 +919,7 @@ export class Mannequin {
     const prevClear = r.getClearColor(new THREE.Color());
     const prevAlpha = r.getClearAlpha();
     r.setRenderTarget(this.rt);
-    r.setClearColor(0x0b0908, 1);
+    r.setClearColor(view.transparent ? 0x000000 : 0x0b0908, view.transparent ? 0 : 1);
     r.clear();
     r.render(this.tscene, cam);
     r.readRenderTargetPixels(this.rt, 0, 0, rw, rh, this._px);

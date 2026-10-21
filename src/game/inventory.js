@@ -112,6 +112,22 @@ export class Backpack {
     this.figEl = this.el.querySelector('.bp-fig');
     this.portraitEl = this.el.querySelector('.bp-portrait');
     this.portraitKey = '';
+    this.portraitEl.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0) return;
+      e.stopPropagation();
+      this.portraitDrag = { id: e.pointerId, x: e.clientX };
+      this.portraitEl.setPointerCapture(e.pointerId);
+    });
+    this.portraitEl.addEventListener('pointermove', (e) => {
+      const drag = this.portraitDrag;
+      if (!drag || drag.id !== e.pointerId) return;
+      this.portraitYaw = (this.portraitYaw ?? 0.38) - (e.clientX - drag.x) * 0.012;
+      drag.x = e.clientX;
+      this.portrait();
+    });
+    for (const event of ['pointerup', 'pointercancel', 'lostpointercapture']) {
+      this.portraitEl.addEventListener(event, () => { this.portraitDrag = null; });
+    }
     this.capEl = this.el.querySelector('.bp-cap-v');
     this.equipBtn = this.el.querySelector('[data-bp="equip"]');
     this.dropBtn = this.el.querySelector('[data-bp="drop"]');
@@ -278,6 +294,7 @@ export class Backpack {
   }
   close(lock=true) {
     const had=this.opened;
+    this.portraitDrag=null;
     this.opened=false; this.uiReady=false; this.el.classList.remove('ready');
     document.body.classList.remove('bag-open','bag-3d','bag-dragging');
     if(this.g.bag3d) this.g.bag3d.close();
@@ -498,39 +515,31 @@ export class Backpack {
     if(this.beat<=0) { this.beat=3; if(g.sync) g.sync.send('ip',this.slots.slice()); }
   }
   // ---------------- the page ----------------
-  // The pack opens as a page of its own: tabs, a field of slots, and the item you point at described
-  // on the right beside the survivor who has to carry it — a real 3D still of your own fit (the same
-  // renderer the wardrobe's cards use), painted into the canvas once per outfit, with the flat SVG only
-  // as the fallback for a browser that cannot give us a second WebGL context.
+  // Use the wardrobe's existing 3D thumbnail renderer. No import race, duplicate GL contexts,
+  // or callback lost behind renderKey. A false result is retryable on the next inventory tick.
   portrait() {
     const cv = this.portraitEl;
-    if (!cv) return;
-    let key = '';
+    if (!cv || !this.g.drawPortrait) return;
+    cv.title = t('bagPortraitTurn');
+    if (this.portraitDrag && performance.now() - (this.portraitAt || 0) < 80) return;
+    const fit = myFit(), yaw = this.portraitYaw ?? 0.38;
+    const key = JSON.stringify(fit) + '|' + yaw;
+    if (key === this.portraitKey && cv.classList.contains('on')) return;
     try {
-      const f = myFit();
-      key = JSON.stringify(f);
-      if (key === this.portraitKey && cv.classList.contains('on')) return;
-      if (!this.mq && !this.mqDead) {
-        // (lazy: the bag may never be opened in a shift, and a context is not free)
-        import('../ui/mannequin.js').then(({ Mannequin }) => {
-          try {
-            this.mq = new Mannequin();
-            this.portraitKey = '';
-            if (this.opened) this.render();
-          } catch { this.mqDead = true; }
-        }).catch(() => { this.mqDead = true; });
-        return;
-      }
-      if (!this.mq) return;
-      this.mq.still(f, 'body', cv);
+      if (this.g.drawPortrait(fit, cv, { yaw, supersample: 1, transparent: true }) === false) return;
+      this.portraitAt = performance.now();
       this.portraitKey = key;
       cv.classList.add('on');
       this.figEl.classList.add('has-portrait');
-    } catch {
-      this.mqDead = true; // keep the drawn figure
+    } catch (error) {
+      // The SVG remains usable if WebGL is unavailable; do not cache a failed render as success.
+      this.portraitKey = '';
+      if (!this.portraitWarned) console.warn('[inventory] portrait failed', error);
+      this.portraitWarned = true;
     }
   }
   render() {
+    this.portrait(); // independent of the item-count cache (also retries a renderer not ready at open)
     const g=this.g;
     const lang=getLang();
     const key=[t('bagTitle'),lang,this.tab,this.sel,this.equipped,this.slots.join(','),...BAG_KINDS.map(k=>this.count(k)),g.torch.charge.toFixed(2),g.tools.tapeHeld?.charges,this.pending.size,!!g.glows.held,!!g.player.hasFlare].join('|');
@@ -600,7 +609,6 @@ export class Backpack {
     this.dropZone.querySelector('b').textContent=t('bagDrop');
     this.dropZone.querySelector('span').textContent=t('bagDropHint');
     this.dropZone.hidden=!document.body.classList.contains('bag-dragging');
-    this.portrait();
   }
 
   // ---------------- throwing things out ----------------

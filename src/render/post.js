@@ -2,6 +2,13 @@
 // chromatic aberration, shockwave, glitch, ash grade (only red survives), tunnel vignette,
 // fear flicker and tape-roll interference.
 import * as THREE from 'three';
+import { FXAAShader } from 'three/addons/shaders/FXAAShader.js';
+
+// Reuse Three's tested edge search inside the existing composite, before grain and scanlines.
+// No extra full-size framebuffer, and no multisampled half-float resolve.
+const FXAA = FXAAShader.fragmentShader
+  .slice(FXAAShader.fragmentShader.indexOf('#define EDGE_STEP_COUNT'), FXAAShader.fragmentShader.lastIndexOf('void main()'));
+
 
 const FS_VERT = /* glsl */ `
 varying vec2 vUv;
@@ -60,7 +67,12 @@ uniform float uFade;
 uniform float uWarm;
 uniform float uFlicker;
 uniform float uAsh;
+uniform bool uAA;
 varying vec2 vUv;
+${FXAA}
+vec4 sceneSample(vec2 uv) {
+  return uAA ? ApplyFXAA(tScene, 1.0 / uRes, uv) : texture2D(tScene, uv);
+}
 
 float hash12(vec2 p) {
   vec3 p3 = fract(vec3(p.xyx) * 0.1031);
@@ -99,10 +111,10 @@ void main() {
   vec2 rd = uv - 0.5;
   float ab = uAberr * (0.25 + dot(rd, rd) * 2.5) * 0.022;
   vec3 col;
-  vec4 s0 = texture2D(tScene, uv);
-  col.r = texture2D(tScene, uv + rd * ab).r;
+  vec4 s0 = sceneSample(uv);
+  col.r = ab < 0.00001 ? s0.r : sceneSample(uv + rd * ab).r;
   col.g = s0.g;
-  col.b = texture2D(tScene, uv - rd * ab).b;
+  col.b = ab < 0.00001 ? s0.b : sceneSample(uv - rd * ab).b;
   float ashK = clamp(s0.a, 0.0, 1.0); // the scene marks what a lamp lights in its own colours (alpha → 0)
   vec3 bl = texture2D(tBloom, uv).rgb;
   col += bl * uBloom;
@@ -184,6 +196,7 @@ export class Post {
         uWarm: { value: 0 },
         uFlicker: { value: 0 },
         uAsh: { value: 0.62 },
+        uAA: { value: true },
       },
       vertexShader: FS_VERT, fragmentShader: COMPOSITE_FRAG, depthTest: false, depthWrite: false,
     });
@@ -192,21 +205,11 @@ export class Post {
     this.h = 1;
   }
 
-  // Multisampling of the scene pass: the one cheap thing that removes the stair-stepping on every
-  // silhouette (trees, the fence, a bike's spokes). 0 = off (weak phones), 2 or 4 = WebGL2 MSAA.
-  // Changing it re-creates the render target's buffers on the next frame.
-  setSamples(n) {
-    const v = Math.max(0, Math.min(4, n | 0));
-    if (this.rtScene.samples === v) return;
-    this.rtScene.samples = v;
-    this.rtScene.dispose();
-  }
-
-  // A driver that runs out of memory for a multisampled target does not throw: it hands back black. If the
-  // canvas ever loses its context, the samples are the first thing to give up (2.1k).
-  dropSamples() {
-    if (this.rtScene.samples > 0) this.setSamples(0);
-  }
+  // Never enable half-float MSAA again through a caller or a quality switch. Keeping the target
+  // single-sampled is the fix; FXAA is a shader setting, not a new allocation.
+  setSamples() { this.rtScene.samples = 0; }
+  setAntialias(on) { this.u.uAA.value = !!on; }
+  dropSamples() { this.setSamples(); }
 
   setSize(cssW, cssH, scale) {
     const w = Math.max(2, Math.round(cssW * scale));

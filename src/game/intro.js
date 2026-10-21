@@ -17,6 +17,7 @@ import { buildSurvivor, poseSurvivor, poseFur } from './survivor.js';
 import { createPersonMaterial, dressPerson, undressPerson } from '../render/people.js';
 import { PLAYER_HEX } from './remote.js';
 import { myFit, cleanFit } from './outfit.js';
+import { tentPoint } from '../world/campLayout.js';
 
 const DESCENT = 4.6; // s: the camera's fall from the sky
 const R_SEAT = 2.0; // m: where the four seats sit around the fire
@@ -27,13 +28,13 @@ const FIRE = { x: 0, z: 0 };
 export const SEATS = [
   { angle: 292, act: 'pour', sleep: 'back', bed: { x: 2.6, z: 1.5 } },
   { angle: 248, act: 'stomp', sleep: 'curl', bed: { x: -1.5, z: 3.0 } },
-  { angle: 200, act: 'tarp', sleep: 'tent', bed: { x: -4.2, z: 3.8 }, inside: { x: -4.2, z: 2.4 } },
+  { angle: 200, act: 'tarp', sleep: 'tent', bed: tentPoint(0, 2.45), inside: tentPoint(0, 0.05) },
   { angle: 338, act: 'bucket', sleep: 'slump', bed: { x: 3.2, z: -1.0 } },
 ];
 export const SOLO_SEAT = { angle: 235, act: 'stick', sleep: 'blanket', bed: { x: -2.7, z: 2.15 } };
 
 const ACT_DUR = { pour: 2.0, stomp: 1.9, tarp: 2.1, bucket: 2.0, stick: 2.4 };
-const SLEEP_DUR = { back: 1.15, curl: 1.25, slump: 1.2, tent: 1.9, blanket: 1.35 };
+const SLEEP_DUR = { back: 1.15, curl: 1.25, slump: 1.2, tent: 2.6, blanket: 1.35 };
 
 const POSE_NODES = ['hips', 'chest', 'head', 'shL', 'shR', 'elL', 'elR', 'thL', 'thR', 'knL', 'knR'];
 
@@ -254,8 +255,8 @@ function pSlump(rig, tt) {
 function pCrawl(rig, tt) {
   const n = rig.nodes;
   rig.root.rotation.set(0, rig.root.rotation.y, 0);
-  n.hips.position.set(0, 0.46, 0);
-  n.chest.rotation.set(1.02 + breathe(tt, 0.4), 0, 0);
+  n.hips.position.set(0, 0.30, 0);
+  n.chest.rotation.set(1.3 + breathe(tt, 0.4), 0, 0);
   n.head.rotation.set(-0.55, 0, 0);
   for (const [A, s] of [['L', -1], ['R', 1]]) {
     n['th' + A].rotation.set(-1.42, 0, s * 0.12);
@@ -415,6 +416,7 @@ export class IntroCutscene {
       const seat = p.seat;
       const a = (seat.angle * Math.PI) / 180;
       const rig = buildSurvivor(p.fit);
+      rig.root.rotation.order = 'YXZ'; // yaw around the world up, THEN lean/lie in that heading
       const mat = createPersonMaterial(rig.dyes, PLAYER_HEX[p.slot % 4]);
       mat.uniforms.uShow.value = 1;
       const meshes = dressPerson(rig, mat);
@@ -438,8 +440,8 @@ export class IntroCutscene {
         x: sx,
         z: sz,
         y: ground(sx, sz),
-        yaw: Math.atan2(-(FIRE.x - sx), -(FIRE.z - sz)),
-        yawCur: Math.atan2(-(FIRE.x - sx), -(FIRE.z - sz)),
+        yaw: Math.atan2(FIRE.x - sx, FIRE.z - sz),
+        yawCur: Math.atan2(FIRE.x - sx, FIRE.z - sz),
         px: sx,
         pz: sz,
         spd: 0,
@@ -531,16 +533,17 @@ export class IntroCutscene {
       const dur = ACT_DUR[seat.act] || 2;
       const tWalk = tAct + dur + 0.15;
       const d2 = Math.hypot(seat.bed.x - a.work.x, seat.bed.z - a.work.z);
+      const turn = 0.6; // finish turning on the spot BEFORE taking the first step away
       const walk2 = Math.max(0.7, d2 / (solo ? 1.6 : 1.5));
-      const tBed = tWalk + walk2;
+      const tBed = tWalk + turn + walk2;
       const lie = SLEEP_DUR[seat.sleep] || 1.2;
-      a.plan = { t0, rise, walk1, tAct, dur, tWalk, walk2, tBed, lie };
+      a.plan = { t0, rise, walk1, tAct, dur, tWalk, turn, walk2, tBed, lie };
       this.tEndDouse = Math.max(this.tEndDouse, tAct + dur * 0.6);
       a.douseW = 1 / n; // together they put it out; alone one person does it all
       tEnd = Math.max(tEnd, tBed + lie);
     });
-    this.dur = Math.min(15, Math.max(10.5, tEnd + 1.3));
-    this.tCrane = this.dur - 3.0;
+    this.dur = Math.max(10.5, tEnd + 1.3); // never fade out before the last person has got through the door
+    this.tCrane = Math.min(...this.cast.map(a => a.plan.tWalk));
     this.tFade = this.dur - 1.3;
     // the light goes out with the fire: from the first flame that dies to just after the last one
     // (each actor's douse eats 55% of its action — see _fire)
@@ -634,8 +637,17 @@ export class IntroCutscene {
       const p = a.plan;
       const bufs = this.bufs[i] || (this.bufs[i] = { a: {}, b: {} });
       const n = a.rig.nodes;
+      a.x = Math.cos((a.seat.angle * Math.PI) / 180) * R_SEAT;
+      a.z = Math.sin((a.seat.angle * Math.PI) / 180) * R_SEAT;
       let visible = true;
-      a.mat.uniforms.uShow.value = a.show;
+      a.show = 1;
+      this._propVis(a, false);
+      if (a.blanket) a.blanket.node.visible = false;
+      a.rig.root.rotation.set(0, a.yaw, 0);
+      a.rig.nodes.hips.position.set(0, 0.94, 0);
+      a.rig.nodes.hips.rotation.set(0, 0, 0);
+      pStand(a.rig, tt); // no pose residue when seeking backwards
+      a.mat.uniforms.uShow.value = 1;
 
       // --- the same evening, four ways of ending it ---
       if (tt < p.t0) {
@@ -644,72 +656,80 @@ export class IntroCutscene {
         pSit(a.rig, 1, tt + i * 1.7);
         a.x = Math.cos((a.seat.angle * Math.PI) / 180) * R_SEAT;
         a.z = Math.sin((a.seat.angle * Math.PI) / 180) * R_SEAT;
-        a.yaw = Math.atan2(-(FIRE.x - a.x), -(FIRE.z - a.z));
+        a.yaw = Math.atan2(FIRE.x - a.x, FIRE.z - a.z);
       } else if (tt < p.t0 + p.rise) {
         const k = smoothstep(0, 1, (tt - p.t0) / p.rise);
         poseMix(a.rig, bufs, (r, t) => pSit(r, 1, t), pStand, k, tt + i * 1.7);
-        a.yaw = Math.atan2(-(FIRE.x - a.x), -(FIRE.z - a.z));
+        a.yaw = Math.atan2(FIRE.x - a.x, FIRE.z - a.z);
       } else if (tt < p.tWalk) {
         const u1 = clamp((tt - p.t0 - p.rise) / p.walk1, 0, 1);
         const sx = Math.cos((a.seat.angle * Math.PI) / 180) * R_SEAT;
         const sz = Math.sin((a.seat.angle * Math.PI) / 180) * R_SEAT;
         a.x = lerp(sx, a.work.x, u1);
         a.z = lerp(sz, a.work.z, u1);
-        const toFire = Math.atan2(-(FIRE.x - a.x), -(FIRE.z - a.z));
+        const toFire = Math.atan2(FIRE.x - a.x, FIRE.z - a.z);
         if (tt < p.tAct) {
           // the stride follows the ground: a step per 0.62 m, so the feet do not skate
-          a.phase += a.spd * dt / 0.62 * Math.PI;
-          a.yaw = Math.atan2(-(a.work.x - a.x), -(a.work.z - a.z));
-          poseSurvivor(a.rig, a.phase, clamp(a.spd, 0.5, 2.4), false, false);
-          poseFur(a.rig, dt, clamp(a.spd, 0.5, 2.4));
+          const distance = Math.hypot(a.work.x - sx, a.work.z - sz);
+          a.phase = u1 * distance / 0.62 * Math.PI;
+          a.yaw = toFire; // fixed heading even in the settling beat at the end of the step
+          const speed = u1 < 1 ? distance / p.walk1 : 0;
+          poseSurvivor(a.rig, a.phase, speed, false, false);
+          poseFur(a.rig, dt, speed);
         } else {
-          // (the last step: settle out of the stride instead of snapping the legs straight)
-          const k = clamp((tt - p.tAct) / 0.3, 0, 1);
-          poseMix(a.rig, bufs, (r, t) => { poseSurvivor(r, a.phase, 1.15, false, false); poseFur(r, 0, 1.15); }, pStand, smoothstep(0, 1, k), tt);
           a.yaw = toFire;
           const u = clamp((tt - p.tAct) / p.dur, 0, 1);
           const poser = { pour: pPour, stomp: pStomp, tarp: pTarp, bucket: pBucket, stick: pStick }[a.seat.act] || pPour;
-          poser(a.rig, u, tt + i);
+          const blend = smoothstep(0, 0.12, u) * (1 - smoothstep(0.88, 1, u));
+          poseMix(a.rig, bufs, pStand, (r, t) => poser(r, u, t), blend, tt + i);
           a.u = u;
           this._propVis(a, true);
           this._pivot(a, u);
           this._actFx(a, tt, u, silent);
         }
       } else if (tt < p.tBed) {
-        // walking to bed
-        const u = clamp((tt - p.tWalk) / p.walk2, 0, 1);
+        // Turn first, walk second. Position/stride/yaw are functions of film time, not last frame's speed:
+        // seeking, a slow phone and 60 fps all see the same forward walk.
+        const from = this._actEnd(a), to = a.seat.bed;
+        const want = Math.atan2(to.x - from.x, to.z - from.z);
+        const fireYaw = Math.atan2(FIRE.x - from.x, FIRE.z - from.z);
+        const turn = smoothstep(0, p.turn, tt - p.tWalk);
+        a.yaw = turnTo(fireYaw, want, turn, Math.PI);
+        const u = clamp((tt - p.tWalk - p.turn) / p.walk2, 0, 1);
         const e = smoothstep(0, 1, u);
-        const from = this._actEnd(a);
-        a.x = lerp(from.x, a.seat.bed.x, e);
-        a.z = lerp(from.z, a.seat.bed.z, e);
-        const fy = a.yaw;
-        const want = Math.atan2(-(a.seat.bed.x - from.x), -(a.seat.bed.z - from.z));
-        a.yaw = want;
-        a.phase += a.spd * dt / 0.62 * Math.PI;
-        poseSurvivor(a.rig, a.phase, clamp(a.spd, 0.5, 2.2), false, false);
-        poseFur(a.rig, dt, clamp(a.spd, 0.5, 2.2));
+        a.x = lerp(from.x, to.x, e);
+        a.z = lerp(from.z, to.z, e);
+        const distance = Math.hypot(to.x - from.x, to.z - from.z);
+        a.phase = e * distance / 0.62 * Math.PI;
+        const speed = distance * 6 * u * (1 - u) / p.walk2;
+        poseSurvivor(a.rig, a.phase, speed, false, false);
+        poseFur(a.rig, dt, speed);
         this._propVis(a, false);
-        void fy;
       } else {
         // the last part: lie down your own way
         const k = clamp((tt - p.tBed) / p.lie, 0, 1);
         const sleep = a.seat.sleep;
+        this._propVis(a, false);
         if (sleep === 'tent') {
+          const inside = a.seat.inside;
           const from = this._actEnd(a);
-          const e = smoothstep(0, 1, k);
-          const inside = a.seat.inside || a.seat.bed;
+          const approachYaw = Math.atan2(a.seat.bed.x - from.x, a.seat.bed.z - from.z);
+          const crawlYaw = Math.atan2(inside.x - a.seat.bed.x, inside.z - a.seat.bed.z);
+          // Kneel OUTSIDE the low mouth. Only then move through its centre, along the tent's own axis.
+          const kneel = smoothstep(0, 0.32, k);
+          const e = smoothstep(0.32, 1, k);
           a.x = lerp(a.seat.bed.x, inside.x, e);
           a.z = lerp(a.seat.bed.z, inside.z, e);
-          a.yaw = Math.atan2(-(a.seat.bed.x - from.x), -(a.seat.bed.z - from.z));
-          poseMix(a.rig, bufs, (r) => poseSurvivor(r, 0, 0, false, false), pCrawl, smoothstep(0, 0.45, k), tt);
-          a.show = k < 0.55 ? 1 : Math.max(0, 1 - (k - 0.55) / 0.35);
-          visible = a.show > 0.01;
+          a.yaw = turnTo(approachYaw, crawlYaw, kneel, Math.PI);
+          poseMix(a.rig, bufs, pStand, pCrawl, kneel, tt);
+          // The cloth occludes the person: no fading away in front of the entrance.
+          a.show = 1;
         } else if (sleep === 'blanket') {
           const e = smoothstep(0, 1, k);
           // (they walked here already: the last beat is only the body going down)
           a.x = a.seat.bed.x;
           a.z = a.seat.bed.z;
-          a.yaw = Math.atan2(-(a.seat.bed.x - FIRE.x), -(a.seat.bed.z - FIRE.z));
+          a.yaw = Math.atan2(a.seat.bed.x - a.work.x, a.seat.bed.z - a.work.z);
           poseMix(a.rig, bufs, pStand, (r, t2) => pLieBack(r, t2), e, tt);
           if (a.blanket) {
             const pull = smoothstep(0.45, 1, k);
@@ -723,9 +743,7 @@ export class IntroCutscene {
           // (the walk to bed is over by now — this used to lerp from the fire and they all slid back)
           a.x = a.seat.bed.x;
           a.z = a.seat.bed.z;
-          const bedYaw = sleep === 'slump'
-            ? Math.atan2(-(a.seat.bed.x - FIRE.x), -(a.seat.bed.z - FIRE.z)) + Math.PI
-            : Math.atan2(-(a.seat.bed.x - FIRE.x), -(a.seat.bed.z - FIRE.z));
+          const bedYaw = Math.atan2(a.seat.bed.x - a.work.x, a.seat.bed.z - a.work.z);
           a.yaw = bedYaw;
           const target = sleep === 'back' ? pLieBack : sleep === 'curl' ? pCurl : pSlump;
           poseMix(a.rig, bufs, pStand, target, e, tt + i * 0.9);
@@ -737,7 +755,7 @@ export class IntroCutscene {
       a.spd = dt > 1e-5 ? Math.hypot(a.x - a.px, a.z - a.pz) / dt : 0;
       a.px = a.x;
       a.pz = a.z;
-      a.yawCur = silent ? a.yaw : turnTo(a.yawCur, a.yaw, dt, 5.5);
+      a.yawCur = a.yaw; // the turn is already scheduled above, with no frame-rate lag
       a.rig.root.position.set(a.x, ground(a.x, a.z) + (a.seat.sleep && a.rig.root.rotation.x < -0.2 ? 0.18 : 0), a.z);
       a.rig.root.rotation.y = a.yawCur;
       void n;
@@ -818,14 +836,14 @@ export class IntroCutscene {
     const k = smoothstep(0, DESCENT, tt);
     // out of the sky and down: the rail is a curve, the look is a slower one of its own
     this.camPath.getPointAt(k, this._cam);
-    const crane = smoothstep(this.tCrane, this.dur, tt);
+    const crane = smoothstep(this.tCrane, this.tFade - 0.5, tt);
     if (crane > 0) {
-      this._cam.x = lerp(this._cam.x, 3.0, crane);
-      this._cam.y = lerp(this._cam.y, 2.7, crane);
-      this._cam.z = lerp(this._cam.z, 6.9, crane);
+      this._cam.x = lerp(this._cam.x, 3.3, crane);
+      this._cam.y = lerp(this._cam.y, 4.8, crane);
+      this._cam.z = lerp(this._cam.z, 9.6, crane);
     }
     this._look.set(0, lerp(3.2, 0.85, k), 0);
-    if (crane > 0) this._look.lerp(this._tmp.set(0, 0.45, 0.7), crane);
+    if (crane > 0) this._look.lerp(this._tmp.set(-0.7, 0.45, 1.3), crane);
     camera.position.copy(this._cam);
     camera.lookAt(this._look);
     // a breath of handheld as we come down out of the wind

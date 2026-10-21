@@ -1,3 +1,4 @@
+import { CAMP_TENT } from './campLayout.js';
 // Procedural forest: terrain + thousands of low-poly trees + landmarks, merged into chunk meshes.
 import * as THREE from 'three';
 import { CFG } from '../core/config.js';
@@ -378,8 +379,8 @@ export class World {
       b.limb([-3.4, 0.3, -1.8], [-2.1, 0.3, -3.4], 0.24, 0.22, KIND.BARK, 6);
       b.limb([3.0, 0.3, -2.6], [3.6, 0.3, -0.6], 0.22, 0.22, KIND.BARK, 6);
       // collapsed tent (A-frame) near the fire
-      localPlace(b, base, -4.2, 0, 2.6, 0, 0.4, 0);
-      const hw = 1.1, hl = 1.2, hh = 1.2;
+      localPlace(b, base, CAMP_TENT.x, 0, CAMP_TENT.z, 0, CAMP_TENT.yaw, 0);
+      const { halfWidth: hw, halfLength: hl, height: hh } = CAMP_TENT;
       const A = [-hw, 0, -hl], B = [hw, 0, -hl], C = [0, hh, -hl + 0.3], D = [-hw, 0, hl], E = [hw, 0, hl], F = [0, hh * 0.7, hl];
       b.quadN(A, D, F, C, [-1, 0.6, 0], KIND.WOOD);
       b.quadN(B, C, F, E, [1, 0.6, 0], KIND.WOOD);

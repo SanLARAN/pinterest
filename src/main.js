@@ -166,40 +166,18 @@ let menuTime = 0;
 const perf = { acc: 0, n: 0, scale: 1, cool: 3, ceiling: 9, ceilT: 0, fpsEl: null, fps: 60 };
 
 // ---------------- resolution ----------------
-// Retina (2.1j): the scene is rendered at up to two device pixels per CSS pixel. A pixel budget keeps a big
-// monitor from asking for more than any GPU can push, the auto/high guard trades pixels for frames, and
-// 2.1k ties the budget to the multisample count (see sampleCount) so nothing ever asks for a target no
-// driver will hold — that is what the black tiles were.
-const PIX_BUDGET = { high: 4.4e6, auto: 2.9e6, low: 1.2e6 };
-function dprCap() {
-  return Math.min(window.devicePixelRatio || 1, 2);
-}
+// 2.1l: native-resolution, single-sample HDR. Small MSAA targets still made black tiles on real
+// drivers; a pixel budget cannot make that resolve reliable. FXAA handles edges without a resolve.
+const PIX_BUDGET = { high: 2.4e6, auto: 1.8e6, low: 1.2e6 };
 function scaleBounds() {
-  const dpr = dprCap();
-  // (2.1k: a 4×-multisampled target at 4.4 MP is 141 MB of half-float — too much for many GPUs, and the
-  // drivers that choke on it are the ones that draw the black tiles. Multisampling buys less than resolution.)
-  const n = sampleCount();
-  const msaa = n >= 4 ? 0.55 : n === 2 ? 0.8 : 1;
-  const budget = Math.sqrt(((PIX_BUDGET[settings.quality] || PIX_BUDGET.auto) * msaa) / Math.max(1, innerWidth * innerHeight));
-  const hi = Math.max(0.55, Math.min(dpr, budget));
+  const budget = Math.sqrt((PIX_BUDGET[settings.quality] || PIX_BUDGET.auto) / Math.max(1, innerWidth * innerHeight));
+  const hi = Math.min(1, budget);
   if (settings.quality === 'high') return [Math.min(0.85, hi), hi];
-  if (settings.quality === 'low') return [0.55, 0.55];
-  return [0.5, Math.min(hi, 1.5)];
+  if (settings.quality === 'low') return [Math.min(0.55, hi), Math.min(0.55, hi)];
+  return [Math.min(0.5, hi), hi];
 }
-// Edges: the scene pass is multisampled. 2.1k: how many samples the scene target gets. This is decided by the preset and the size of the window
-// only — never by the live resolution scale — so the multisampled buffers are NOT re-created every time the
-// auto-guard nudges the scale (that reallocation storm is what drew black tiles on retina hardware).
-// It is also capped by memory: a 4× MSAA half-float target is ~8 bytes a sample, and a big desktop at 2×
-// device pixels would ask for more than the driver can hold.
-function sampleCount() {
-  if (settings.quality === 'low') return 0;
-  const dpr = dprCap();
-  const px = innerWidth * innerHeight * dpr * dpr; // the most the scene could ever be at this window size
-  if (settings.quality === 'high') return px <= 2.4e6 ? 4 : px <= 5.0e6 ? 2 : 0;
-  return px <= 3.6e6 ? 2 : 0;
-}
-function applySamples() {
-  post.setSamples(sampleCount());
+function applyAntialias() {
+  post.setAntialias(settings.quality !== 'low');
 }
 function applyQuality() {
   const [lo, hi] = scaleBounds();
@@ -208,24 +186,23 @@ function applyQuality() {
   perf.ceilT = 0;
   perf.cool = 3;
   perf.slow = 0;
-  applySamples();
+  applyAntialias();
   resize();
 }
 function resize() {
   const w = innerWidth, h = innerHeight;
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setPixelRatio(1); // UI remains native DOM; the GPU canvas no longer allocates retina buffers
   renderer.setSize(w, h, false);
   camera.aspect = w / h;
   camera.fov = fovFor(camera.aspect);
   camera.updateProjectionMatrix();
   post.setSize(w, h, perf.scale);
-  applySamples(); // (the safe sample count follows the scale, not just the preset)
+  applyAntialias();
   radar.resize();
   if (garage) garage.resize(w, h);
 }
 window.addEventListener('resize', resize);
-// a lost GL context (the usual way a driver says "that target was too big"): give up the multisampling
-// first, then let the browser restore the context; the scene is re-uploaded on the next frame
+// Keep the native-resolution cap on context recovery too; never re-enable HDR multisampling.
 canvas.addEventListener('webglcontextlost', (e) => {
   e.preventDefault();
   post.dropSamples();
@@ -251,7 +228,7 @@ function perfTick(dt) {
   perf.fps = 1 / avg;
   perf.acc = 0;
   perf.n = 0;
-  // auto and high both give pixels back when the frames are not there; high starts from retina and gives
+  // auto and high both give pixels back when the frames are not there; high starts at native resolution and gives
   // them up more reluctantly (two slow seconds, small steps), so a fast machine keeps the sharp picture
   if (settings.quality !== 'low' && (state === 'playing' || state === 'menu')) {
     const [lo, hi] = scaleBounds();
@@ -1054,7 +1031,11 @@ function boot() {
       throw e;
     }
     for (const g of world.occluders) shadows.addStatic(g);
-    game = new Game({ scene, camera, world, pulses, ghosts, eyes, particles, audio, mic, input, hud, radar, post, shadows });
+    game = new Game({ scene, camera, world, pulses, ghosts, eyes, particles, audio, mic, input, hud, radar, post, shadows, drawPortrait: (fit, canvas, view) => {
+      if (!wardrobe.mq) return false;
+      wardrobe.mq.still(fit, 'body', canvas, view);
+      return true;
+    } });
     game.onEnd = onEnd;
     setupAttract();
     wardrobe.init(); // the live survivor now belongs to the shared garage scene

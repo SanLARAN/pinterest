@@ -184,7 +184,7 @@ export class GarageMannequin {
   toggleLights(){this.g.u.uHeadI.value=this.g.u.uHeadI.value>.1?0:.75;}
   frame(dt){this.g.frame(dt);}
   headScreen(lift=.3){const p=this.rig.nodes.head.getWorldPosition(new THREE.Vector3());p.y+=lift;p.project(this.g.camera);const r=this.host?.getBoundingClientRect();return r&&!this.carOn?{x:(p.x*.5+.5)*this.g.w-r.x,y:(.5-p.y*.5)*this.g.h-r.y}:null;}
-  still(fit,slot,canvas){if(!this.thumbs)this.thumbs=new Mannequin();this.thumbs.still(fit,slot,canvas);}
+  still(fit,slot,canvas,view){if(!this.thumbs)this.thumbs=new Mannequin();this.thumbs.still(fit,slot,canvas,view);}
   tick(dt){if(!this.ptrs.size){this.orbit.yaw+=this.orbit.vyaw*dt;this.orbit.vyaw*=Math.exp(-dt*5);}this.orbit.idle+=dt;}
   _bind(host) {
     if(this.bound.has(host))return;this.bound.add(host);

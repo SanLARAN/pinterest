@@ -7,6 +7,21 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v:'2.1l',date:'2026-10-21',
+    ru:{title:'Лицом к огню, рабочий портрет, без HDR-MSAA',items:[
+      'Из высокой графики убраны HDR-MSAA и Retina: вместо проблемного мультисэмплированного буфера используется FXAA',
+      'В рюкзаке работает 3D-портрет твоего выжившего с выбранной одеждой и цветами — потяни его, чтобы повернуть',
+      'В фильме персонажи смотрят на костёр, разворачиваются перед уходом и идут вперёд, а не задом',
+      'У палатки сначала опускаются на четвереньки снаружи, потом ползут через настоящий вход; камера отходит и не обрезает спящих',
+    ]},
+    en:{title:'Facing the fire, a working portrait, no HDR-MSAA',items:[
+      'High graphics no longer use HDR-MSAA or Retina: FXAA replaces the problematic multisampled framebuffer',
+      'The pack shows a working 3D portrait in your chosen clothes and colours — drag it to turn',
+      'In the film survivors face the fire, turn before leaving, and walk forwards rather than backwards',
+      'At the tent they kneel outside before crawling through the actual entrance; the camera pulls back to keep the sleepers in frame',
+    ]},
+  },
+  {
     v:'2.1k',date:'2026-10-20',
     ru:{title:'Ночь после фильма видно, рюкзак не врёт, чёрных квадратов нет',items:[
       'После вступительного фильма ты просыпаешься лицом к погасшему костру: картинка поднимается из темноты, а угли ещё светят — у лагеря видно, куда идти',
