@@ -29,6 +29,7 @@ export class Menus {
     $(id).classList.toggle('show', on);
   }
   only(id) {
+    if (id === 'menu') this.paintSoloDays?.();
     for (const s of this.screens) this.show(s, s === id);
     document.body.classList.toggle('in-menu', id === 'menu' || id === 'over' || id === 'pause');
   }
@@ -61,6 +62,14 @@ export class Menus {
       el.addEventListener('mouseenter', () => this.h.uiSound && this.h.uiSound('hover'));
     };
     click('btnPlay', () => this.h.onPlay());
+    // the solo shift length (2.1s): 2, 4 or 6 nights, remembered like any other setting
+    const daysRow = $('soloDays');
+    if (daysRow) {
+      const paint = () => { for (const b of daysRow.querySelectorAll('[data-days]')) { const n = +b.dataset.days; b.textContent = t('days' + n); b.setAttribute('aria-pressed', String((settings.shiftDays || 4) === n)); } };
+      for (const b of daysRow.querySelectorAll('[data-days]')) b.addEventListener('click', () => { settings.shiftDays = +b.dataset.days; saveSettings(); paint(); this.h.uiSound?.('click'); });
+      paint();
+      this.paintSoloDays = paint;
+    }
     click('btnCoop', () => this.h.onCoop && this.h.onCoop());
     click('btnLobby', () => this.h.onLobby && this.h.onLobby());
     click('btnHow', () => this.show('howPanel'));

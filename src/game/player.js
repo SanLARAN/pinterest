@@ -46,6 +46,7 @@ export class Player {
     this.distFromSpawn = 0;
     this.carrying = null; // co-op: the id of a friend on your shoulder (see Rescue)
     this.held = false; // the Angler has this one (see angler.js): dragged, tied — not to be hunted by the rest
+    this.floorY = null; // (2.1s: the lookout's deck — while set, you stand on it, not on the terrain)
   }
 
   forward() {
@@ -110,7 +111,7 @@ export class Player {
     this.speed = moved / Math.max(dt, 1e-4);
     this.moved += moved;
     this.distFromSpawn = Math.hypot(this.x - this.world.spawn.x, this.z - this.world.spawn.z);
-    const gy = this.world.terrain.height(this.x, this.z);
+    const gy = this.floorY != null ? this.floorY : this.world.terrain.height(this.x, this.z);
     this.y = damp(this.y, gy, 18, dt);
 
     // stamina

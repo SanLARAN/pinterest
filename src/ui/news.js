@@ -7,6 +7,29 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v:'2.1s',date:'2026-10-22',
+    ru:{title:'Молоко по утрам',items:[
+      'Совхоз в деле: один из пяти генераторов теперь всегда стоит у коровника, а какой-то из лесных вместо него — металлолом на эту смену. У его тела лежит объяснительная записка',
+      'В среднем стойле — мёртвая корова, давно. Мухи над ней гудят метров за семнадцать',
+      'У загона встал трактор. Инструментальный ящик при нём на замке — вскрой ломом, внутри батарея',
+      'Цепи у стойл звенят: заденешь сам — выдашь себя, заденет тварь — услышишь её раньше, чем она тебя',
+      'По площадке пожарной вышки теперь можно ходить. Спуск — через щель у лестницы с южной стороны или клавишей, как раньше',
+      'Наблюдатель больше не убивает мгновенно: он держит тебя взглядом полторы секунды, и мир за это время сходит с ума — картинка и звук. Наведи на него свет, свой или чужой, — отпустит и исчезнет',
+      'Длина смены — на выбор: 2, 4 или 6 ночей (в главном меню одному, в правилах комнаты — у хоста). Сложность растягивается на всю смену: вторая ночь из двух — настоящий финал',
+      'Утром теперь туман. Белый и густой: лес виден метров на двадцать, дальше — молоко',
+    ]},
+    en:{title:'Milk in the morning',items:[
+      'The sovkhoz is in the rotation: one of the five generators always stands by the cowshed now, and one of the forest ones is scrap for that shift instead. A note by its body explains everything',
+      'In the middle stall — a dead cow, long dead. The flies over her hum from seventeen metres off',
+      'A tractor has given up by the paddock fence. Its toolbox is padlocked — pry it with the crowbar, a battery inside',
+      'The stall chains ring: brush one yourself and you give yourself away; a thing brushes one and you hear it first',
+      'You can walk the lookout deck now. Down is through the ladder gap on the south side, or the key, as before',
+      'The Watcher no longer kills on contact: it holds you with its gaze for a second and a half, and the world comes apart while it does — picture and sound both. Put a light on it, yours or a friend’s, and it lets go and is gone',
+      'Shift length is a choice now: 2, 4 or 6 nights (in the main menu solo, in the room rules for a host). Difficulty stretches across the shift: night two of two is a true finale',
+      'Mornings have fog now. White and thick: the forest is visible for twenty metres, then milk',
+    ]}
+  },
+  {
     v:'2.1r',date:'2026-10-21',
     ru:{title:'Часы с координатами',items:[
       'На часах теперь есть координаты: нижняя строка экрана показывает, где ты стоишь, — в тех же числах, что карта деталей и записки',

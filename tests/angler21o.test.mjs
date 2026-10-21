@@ -28,7 +28,7 @@ test('the Angler works from the third night, walks faster than you walk and slow
   assert.ok(A.approach > CFG.PLAYER.walk && A.approach < CFG.PLAYER.sprint, 'you can outrun him — for a while');
   assert.ok(A.haul < A.approach, 'hauling a person is slower than coming for one');
   assert.ok(A.after > CFG.SPAWN_DELAY, 'never during the sleeping-forest calm');
-  assert.equal(PROTOCOL, 16); // 2.1q: generators can be broken over the wire
+  assert.equal(PROTOCOL, 17); // 2.1s: shift length, the sovkhoz in the chain, chains and the Watcher's grip
   assert.ok(TYPES.includes('angler') && STATES.includes('haul') && STATES.includes('finish'), 'on the wire as a fifth monster');
 });
 
@@ -102,7 +102,8 @@ function fakeGame() {
     caps.push({ kind: 0, h: 9, ax: Math.cos(a) * d, az: Math.sin(a) * d, bx: Math.cos(a) * d, bz: Math.sin(a) * d, r: 0.3 });
   }
   const g = {
-    role: 'solo', state: 'play', day: 3, awake: true, time: 120, score: 0, mult: 1,
+    role: 'solo', state: 'play', day: 3, daysTotal: 4, awake: true, time: 120, score: 0, mult: 1,
+    diffDay() { return this.day; }, // a four-night shift: effective day is the day
     player, remotes, monsters: [], timeline: [], events: [],
     rng: new RNG(4242),
     world: {

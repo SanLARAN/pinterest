@@ -20,6 +20,7 @@ export const CABINET_DIMS = {
   cupboard: { w: 0.9, h: 0.86, d: 0.5 },
   firstaid: { w: 0.6, h: 0.72, d: 0.22, lift: 1.09 },
   locker: { w: 0.78, h: 1.9, d: 0.5 },
+  toolbox: { w: 0.95, h: 0.55, d: 0.48 },
 };
 
 export const LANDMARKS = [
@@ -905,8 +906,8 @@ export class World {
   }
 
   // ---------------- the sovkhoz (2.1p) ----------------
-  // A long concrete cowshed and a hollow silo tower. No generator ever stood here:
-  // the loot is in the cupboards, the trouble is that everything is wide open.
+  // A long concrete cowshed and a hollow silo tower. Since 2.1s one of the shift's generators
+  // always stands here instead of at one of the four forest sites (see genSites/objectives).
   lm_sovkhoz(L, rng) {
     const y = this.terrain.height(L.x, L.z);
     const ry = L.ry || 0;
@@ -958,7 +959,18 @@ export class World {
         localPlace(b, base, cx, 0.2, -D / 2 + 2.62); b.box(1.9, 0.5, 0.55, KIND.METAL, { bottom: true });
         localPlace(b, base, cx, 1.02, -D / 2 + 2.32); b.box(1.9, 0.09, 0.09, KIND.WOOD, { bottom: true });
       }
-      for (const cx of [-8.375, -2.875, 2.625]) { localPlace(b, base, cx, 1.75, -D / 2 + 2.32); b.cylinder(5, 0.03, 0.03, 1.25, KIND.METAL, { capTop: false }); }
+      // the cow (2.1s): dead these many years in the middle stall, legs to the sky, flies included
+      const cowX = -2.875, cowZ = -D / 2 + 1.3;
+      localPlace(b, base, cowX, 0.2, cowZ); b.box(1.9, 0.82, 0.98, KIND.FLESH, { bottom: true }); // the barrel, bloated
+      localPlace(b, base, cowX - 0.1, 0.98, cowZ); b.box(1.5, 0.16, 0.7, KIND.FLESH, { bottom: true });
+      localPlace(b, base, cowX + 1.18, 0.2, cowZ + 0.28, 0, 0.5, 0.9); b.box(0.6, 0.42, 0.4, KIND.FLESH, { bottom: true }); // head, lolled sideways
+      localPlace(b, base, cowX + 1.38, 0.42, cowZ + 0.05, 0, 0, 1.9); b.cone(5, 0.05, 0.34, KIND.BONE); // horns
+      localPlace(b, base, cowX + 1.3, 0.42, cowZ + 0.52, 0, 0, 1.5); b.cone(5, 0.05, 0.3, KIND.BONE);
+      for (const [lx, lz, rz] of [[-0.72, -0.3, 2.75], [-0.6, 0.34, 2.95], [0.68, -0.32, 2.65], [0.78, 0.3, 3.05]]) {
+        localPlace(b, base, cowX + lx, 0.95, cowZ + lz, 0, 0, rz); b.box(0.11, 0.85, 0.11, KIND.FLESH, { bottom: true }); // stiff legs
+        localPlace(b, base, cowX + lx, 0.95, cowZ + lz, 0, 0, rz); b.box(0.13, 0.1, 0.15, KIND.BONE, { bottom: true });
+      }
+      localPlace(b, base, cowX - 1.02, 0.75, cowZ, 0, 0, 1.25); b.cylinder(4, 0.025, 0.04, 0.8, KIND.FLESH, { capTop: false }); // tail
       for (const [hx, hz, ha] of bales) { localPlace(b, base, hx, 0.2, hz, 0, ha, 0); b.box(1.15, 0.75, 0.7, KIND.WOOD, { bottom: true }); }
     });
     const segB = (ax, az, bx, bz, r, h, kind) => seg(BX + ax, BZ + az, BX + bx, BZ + bz, r, h, kind);
@@ -970,6 +982,10 @@ export class World {
     for (const sx of stalls) segB(sx, -D / 2 + 0.1, sx, -D / 2 + 2.35, 0.08, 1.2, CAP.WOOD);
     for (let i = 0; i < stalls.length - 1; i++) { const cx = (stalls[i] + stalls[i + 1]) / 2; segB(cx - 0.95, -D / 2 + 2.62, cx + 0.95, -D / 2 + 2.62, 0.28, 0.6, CAP.METAL); }
     for (const [hx, hz] of bales) circ(BX + hx, BZ + hz, 0.55, 0.9, CAP.WOOD);
+    { const [cwx, cwz] = toW(BX - 2.875, BZ - D / 2 + 1.3); this.sovkhozCow = { x: cwx, y: y + 1.05, z: cwz }; }
+    circ(BX - 2.875, BZ - D / 2 + 1.3, 0.95, 0.9, CAP.WOOD);
+    // a tether chain hangs at every stall mouth (2.1s): brush one and it rings (see game/expedition.js)
+    this.sovkhozChains = stalls.map((sx) => { const [x, z] = toW(BX + sx, BZ - D / 2 + 2.35); return { x, y: y + 1.36, z }; });
 
     // ---- the silo tower: a 12-sided hollow ring, one doorway, a grain pile inside
     const SX = 11, SZ = -5, SR = 2.6, SH = 11, SN = 12, dAng = Math.PI * 2 / SN;
@@ -1012,6 +1028,7 @@ export class World {
     if (this.navBuildings) this.navBuildings.push({ id: 'sovkhoz:silo', x: dcx, z: dcz, W: SR * 2, D: SR * 2, ry: Math.atan2(ndx, ndz), gap: [-0.65, 0.65] });
 
     // ---- the yard: a paddock fence, a trough, slabs between the gate and the silo door
+    const TX = 7.5, TZ = 10.5, TA = -0.4; // the tractor (2.1s): east of the paddock fence
     const fence = [[BX - 9, 4.8, BX - 9, 14], [BX - 9, 14, BX + 6.5, 14], [BX + 9, 14, BX + 9, 8]];
     this.addProp(L.x, L.z, (b) => {
       const base = makeBase(L.x, y, L.z, ry);
@@ -1022,11 +1039,28 @@ export class World {
         for (const railY of [0.45, 0.95]) { localPlace(b, base, (ax + bx) / 2, railY, (az + bz) / 2, 0, yaw, 0); b.box(0.06, 0.09, len, KIND.WOOD, { bottom: true }); }
       }
       localPlace(b, base, BX + 6.8, 0, 11.2, 0, 0.3, 0); b.box(2.2, 0.5, 0.7, KIND.METAL, { bottom: true }); // the outside trough
+      // the tractor (2.1s): it gave up by the paddock fence years ago. Forward is local +x.
+      const tbox = (dx, dy, dz, w, h, d, mat = KIND.METAL) => { const [ox, oz] = rot(dx, dz, TA); localPlace(b, base, TX + ox, dy, TZ + oz, 0, TA, 0); b.box(w, h, d, mat, { bottom: true }); };
+      const twheel = (dx, dy, dz, r, w) => { const [ox, oz] = rot(dx, dz - w / 2, TA); localPlace(b, base, TX + ox, dy, TZ + oz, Math.PI / 2, TA, 0); b.cylinder(10, r, r, w, KIND.ROCK); };
+      tbox(0.85, 0.52, 0, 1.55, 0.62, 0.78); // hood
+      tbox(1.64, 0.48, 0, 0.14, 0.6, 0.7, KIND.ROCK); // grille
+      { const [ox, oz] = rot(1.28, 0.24, TA); localPlace(b, base, TX + ox, 1.12, TZ + oz, 0, TA, 0); b.cylinder(6, 0.045, 0.045, 0.95, KIND.METAL); } // exhaust stack
+      { const [ox, oz] = rot(0.08, 0, TA); localPlace(b, base, TX + ox, 1.06, TZ + oz, 0, TA, Math.PI / 2); b.cylinder(8, 0.21, 0.21, 0.85, KIND.METAL); } // fuel tank
+      for (const px of [-1.02, -0.12]) for (const pz of [-0.42, 0.42]) tbox(px, 1.02, pz, 0.07, 1.02, 0.07); // cab posts
+      tbox(-0.57, 2.04, 0, 1.1, 0.07, 1.02); // cab roof
+      tbox(-0.72, 0.98, 0, 0.5, 0.1, 0.52, KIND.WOOD); // seat
+      tbox(-0.98, 1.06, 0, 0.09, 0.5, 0.52, KIND.WOOD); // backrest
+      { const [ox, oz] = rot(-0.08, 0, TA); localPlace(b, base, TX + ox, 1.18, TZ + oz, 0.7, TA, 0); b.cylinder(6, 0.03, 0.03, 0.45, KIND.METAL); } // steering column
+      for (const pz of [-0.62, 0.62]) tbox(-0.78, 1.3, pz, 0.95, 0.07, 0.32); // rear fenders
+      twheel(-0.78, 0.62, -0.62, 0.62, 0.28); twheel(-0.78, 0.62, 0.62, 0.62, 0.28); // rear wheels
+      twheel(1.18, 0.38, -0.55, 0.38, 0.2); twheel(1.18, 0.38, 0.55, 0.38, 0.2); // front wheels
+      { const [ox, oz] = rot(-2.6, -1.6, TA); localPlace(b, base, TX + ox, 0.55, TZ + oz, Math.PI / 2.4, TA + 0.4, 0); b.cylinder(10, 0.55, 0.55, 0.24, KIND.ROCK); } // a spare wheel, leaning forgotten
       const gx = BX + gates[1], gz = D / 2 + 1.2, dx = SX + Math.cos(tmD) * (SR + 1.1), dz = SZ + Math.sin(tmD) * (SR + 1.1);
       for (let i = 1; i <= 3; i++) { const t = i / 4; localPlace(b, base, gx + (dx - gx) * t, 0.02, gz + (dz - gz) * t, 0, t * 2.2, 0); b.box(1.7, 0.09, 1.25, KIND.ROCK, { bottom: true }); }
     });
     for (const [ax, az, bx, bz] of fence) seg(ax, az, bx, bz, 0.1, 1.15, CAP.WOOD);
     circ(BX + 6.8, 11.2, 0.85, 0.6, CAP.METAL);
+    { const [ax, az] = rot(-1.5, 0, TA), [bx2, bz2] = rot(1.75, 0, TA); seg(TX + ax, TZ + az, TX + bx2, TZ + bz2, 0.55, 1.1, CAP.METAL); } // the tractor's long side
 
     // ---- cupboards: a wardrobe in the barn, a cupboard in a stall, a locker in the silo
     if (this.cabinets) {
@@ -1036,16 +1070,19 @@ export class World {
       this.addCabinet(L.id + ':stall', 'cupboard', cx2, y + 0.24, cz2, ry);
       const [lx2, lz2] = toW(SX + SR - 0.55, SZ);
       this.addCabinet(L.id + ':silo', 'locker', lx2, y + 0.2, lz2, ry - Math.PI / 2);
+      const [tbx, tbz] = toW(TX + rot(0.2, 1.3, TA)[0], TZ + rot(0.2, 1.3, TA)[1]);
+      this.addCabinet(L.id + ':tractor', 'toolbox', tbx, y, tbz, ry + TA, false, { locked: true, loot: ['battery', 'shard', 'nuts'] }); // the tractor's toolbox: padlocked, pry it
     }
   }
 
   // ---------------- generators ----------------
-  // Five generator sites: the camp + four landmarks. Each one gets a clear spot for the generator
-  // (with a lamp post), a spot nearby for the body of whoever tried to fix it, and colliders.
+  // Six generator sites: the camp + five landmarks. The chain uses five of them — since 2.1s the
+  // sovkhoz always takes one forest site's place, and that site's machine stands as scrap. Each site
+  // gets a clear spot for the generator (with a lamp post), a body of whoever tried to fix it, colliders.
   genSites() {
     const rng = new RNG(4242);
     this.sites = [];
-    const ids = ['camp', ...CFG.GEN_SITES];
+    const ids = ['camp', ...CFG.GEN_SITES, 'sovkhoz'];
     for (const id of ids) {
       const L = LANDMARKS.find((l) => l.id === id);
       let gx, gz, cx, cz;
@@ -1053,6 +1090,12 @@ export class World {
         // in plain view from where you wake up; the body lies between you and it
         gx = L.x - 3.8; gz = L.z + 7.4;
         cx = L.x - 1.5; cz = L.z + 5.3;
+      } else if (id === 'sovkhoz') {
+        // a chosen spot east of the cowshed, clear of the fence and the stalls' nav alike
+        const [ox, oz] = rot(9.0, 3.4, L.ry || 0);
+        gx = L.x + ox; gz = L.z + oz;
+        const c = this._freeSpot(gx, gz, 2.8, 4.6, 1.0, rng, L);
+        cx = c.x; cz = c.z;
       } else {
         const g = this._freeSpot(L.x, L.z, 4, L.r - 2.5, 2.1, rng);
         gx = g.x; gz = g.z;

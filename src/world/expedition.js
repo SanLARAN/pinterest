@@ -54,7 +54,7 @@ export function buildBinoculars(b = new MeshBuilder(512)) {
 
 export function buildFiretower(world, L) {
   const x = L.x, z = L.z, y = world.terrain.height(x, z), H = FIRETOWER.deck;
-  world.firetower = { x, y, z, ladder: { x, y, z: z + 2.7 }, top: { x, y: y + H, z: z + 0.15 } };
+  world.firetower = { x, y, z, ladder: { x, y, z: z + 2.7 }, top: { x, y: y + H, z: z + 0.15 }, deckY: y + H + 0.09 }; // deckY: the plank tops you walk on (2.1s)
   world.addProp(x, z, (b) => {
     const box = (xx, yy, zz, w, h, d, mat = KIND.WOOD, ry = 0) => boxAt(b, x + xx, y + yy, z + zz, w, h, d, mat, ry);
     const limb = (a, c, r = 0.06, mat = KIND.WOOD) => { b.place(x, y, z); b.limb(a, c, r, r, mat, 4); };

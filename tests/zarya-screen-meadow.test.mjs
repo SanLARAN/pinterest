@@ -33,7 +33,7 @@ test('the first-aid cabinet is mounted against the actual dining wall, with a re
 });
 test('Zarya has a real sixth (local) engine and seven indoor/outdoor fixtures without replacing main sites',()=>{
  const w=realWorld(),C=w.zarya;
- assert.equal(w.sites.length,5);assert.equal(C.generator.id,'zarya-local');assert.equal(C.lights.length,7);
+ assert.equal(w.sites.length,6); // (2.1s: + the sovkhoz site)assert.equal(C.generator.id,'zarya-local');assert.equal(C.lights.length,7);
  assert.equal(C.lights.filter(l=>l.inside).length,4);assert.ok(CAMP_LAMP_FIRST+C.lights.length<=LAMP_SLOTS);
  const f=C.generator.front;assert.ok(w.col.free(f.x,f.z,.35));assert.ok(!w.col.free(C.generator.x,C.generator.z,.35));
  for(const l of C.lights)assert.ok(Number.isFinite(l.x+l.y+l.z));

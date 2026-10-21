@@ -61,6 +61,7 @@ uniform float uDanger;
 uniform float uRed;
 uniform float uWhite;
 uniform float uGlitch;
+uniform float uPsych;
 uniform float uShockR;
 uniform float uShockAmp;
 uniform float uBloom;
@@ -107,6 +108,14 @@ void main() {
     float block = step(1.0 - uGlitch * 0.08, hash12(floor(uv * vec2(12.0, 7.0)) + floor(uTime * 15.0)));
     uv += block * 0.02 * vec2(1.0, 0.0);
   }
+  if (uPsych > 0.001) {
+    // it has hold of you: the world leans in and breathes wrong (2.1s)
+    vec2 pc = uv - 0.5;
+    float br = sin(uTime * 6.3) * 0.5 + sin(uTime * 10.7) * 0.5;
+    uv = 0.5 + pc * (1.0 - uPsych * 0.055 + uPsych * 0.035 * br);
+    uv.x += uPsych * 0.004 * sin(uv.y * 44.0 + uTime * 8.0);
+    uv.y += uPsych * 0.003 * sin(uv.x * 38.0 - uTime * 6.4);
+  }
   vec2 c = uv - 0.5;
   c.x *= aspect;
   float dist = length(c);
@@ -144,6 +153,15 @@ void main() {
   col *= mix(1.0, vig, uUserVignette * 0.92 * (1.0 - 0.72 * uWarm));
   float beat = 0.6 + 0.4 * sin(uTime * 6.0);
   col += vec3(0.3, 0.0, 0.01) * uDanger * (1.0 - vig) * beat;
+
+  if (uPsych > 0.001) {
+    float pl = dot(col, vec3(0.299, 0.587, 0.114));
+    col = mix(col, vec3(pl) * vec3(0.85, 0.95, 1.12), uPsych * 0.6); // the colour leaves first
+    float pulse = 0.5 + 0.5 * sin(uTime * 9.0);
+    col *= 1.0 - uPsych * (0.28 + 0.3 * pulse) * smoothstep(0.25, 0.95, dist); // the edges close in, breathing with it
+    float slice = step(0.986 - uPsych * 0.05, hash12(vec2(floor(uv.y * 22.0), floor(uTime * 13.0))));
+    col = mix(col, 1.0 - col, slice * uPsych * 0.7); // now and then a band of the world is inverted, for a blink
+  }
 
   col = mix(col, vec3(0.62, 0.015, 0.01), clamp(uRed, 0.0, 1.0) * 0.5);
   col += vec3(uWhite);
@@ -197,6 +215,7 @@ export class Post {
         uRed: { value: 0 },
         uWhite: { value: 0 },
         uGlitch: { value: 0 },
+        uPsych: { value: 0 },
         uShockR: { value: 0 },
         uShockAmp: { value: 0 },
         uBloom: { value: 0.8 },

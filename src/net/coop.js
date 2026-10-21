@@ -35,7 +35,7 @@ export class Coop {
     this.code = null;
     this.hostId = null;
     this.roster = new Map(); // id -> { id, name, slot, host, mic, inRun, self, fit }
-    this.rules = cleanLobbyRules({ hideNames: settings.lobbyHideNames });
+    this.rules = cleanLobbyRules({ hideNames: settings.lobbyHideNames, days: settings.shiftDays });
     this.phase = 'lobby'; // lobby | game  (as the host sees it)
     this.status = 'idle'; // idle | joining | waiting | searching | ready | full | version | hostLost | error
     this.joinedAt = 0;
@@ -90,7 +90,7 @@ export class Coop {
     await this.leave();
     this.code = code;
     this.isHost = host;
-    this.rules = cleanLobbyRules(host ? { hideNames: settings.lobbyHideNames } : null);
+    this.rules = cleanLobbyRules(host ? { hideNames: settings.lobbyHideNames, days: settings.shiftDays } : null);
     this.active = true;
     this.phase = 'lobby';
     this.status = 'joining';
@@ -248,8 +248,16 @@ export class Coop {
 
   setHideNames(value) {
     if (!this.active || !this.isHost || this.phase !== 'lobby' || typeof value !== 'boolean') return false;
-    this.rules = cleanLobbyRules({ hideNames: value });
+    this.rules = cleanLobbyRules({ ...this.rules, hideNames: value });
     settings.lobbyHideNames = value; saveSettings();
+    this._broadcastRoster(); this.emit('change'); return true;
+  }
+
+  // (2.1s: how long the shift runs — 2, 4 or 6 nights; the difficulty stretches to fit)
+  setDays(value) {
+    if (!this.active || !this.isHost || this.phase !== 'lobby' || ![2, 4, 6].includes(value)) return false;
+    this.rules = cleanLobbyRules({ ...this.rules, days: value });
+    settings.shiftDays = value; saveSettings();
     this._broadcastRoster(); this.emit('change'); return true;
   }
 

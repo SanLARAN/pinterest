@@ -9,7 +9,8 @@ export const CFG = {
   // camp and an eight-minute night; the fourth night ends the shift in a win — but four minutes into
   // it the forest wakes up for good, and everything comes looking. Escaping in the УАЗ ends it earlier.
   SHIFT: {
-    DAYS: 4,
+    DAYS: 4, // the default shift; the host picks the real length in the lobby (2.1s)
+    OPTIONS: [2, 4, 6],
     NIGHT: 8 * 60, // one night
     MORNING: 105, // 1:45 of daylight between the nights
     LAST_WAKE: 240, // on the last night: the minute the forest stops pretending
@@ -80,7 +81,7 @@ export const CFG = {
     listener: { wander: 1.05, investigate: 2.1, hunt: 4.7, hearing: 1.0, lock: 6.0, radius: 0.45 },
     crawler: { wander: 1.6, investigate: 3.2, hunt: 6.1, hearing: 0.62, stepHearing: 2.2, lock: 3.2, radius: 0.45 },
     // the Watcher: deaf, faceless, moves only while nothing lights it
-    watcher: { stalk: 3.5, hearing: 0, lock: 0, radius: 0.4, litThreshold: 0.13, arrive: 240, arriveGens: 2 },
+    watcher: { stalk: 3.5, hearing: 0, lock: 0, radius: 0.4, litThreshold: 0.13, arrive: 240, arriveGens: 2, seize: 1.6 }, // seize: seconds it holds your gaze before the kill — light still saves you (2.1s)
     // the Howler: half-deaf brute that "sees" with its howl — anything moving when it howls gets charged
     howler: { wander: 1.25, investigate: 2.6, hunt: 6.4, hearing: 0.6, minLoud: 0.4, lock: 6.5, radius: 0.6, arrive: 480, arriveGens: 3, howlR: 46 },
     // the Angler's body rides the monster list (snapshots, echo imprints), but its brain is its own
@@ -152,6 +153,10 @@ export const CFG = {
     restartDur: 6, // s of hands-on work to crank a broken one back up (then cord/spin as usual)
   },
   LAMP_R: 10, // radius of warm light around a running generator
+
+  // the sovkhoz stall chains (2.1s): brush one going through a stall mouth and it jingles —
+  // a free alarm when something else does it, a bell round your own neck when you do
+  CHAIN: { loud: 0.5, r: 0.62, cd: 1.2 },
 
   // the flare gun: one per night, lying by one of the bodies (never the camp's). Two shots.
   FLARE: {
@@ -241,6 +246,13 @@ export function monsterTargets(t, day = 1) {
   if (day >= 3) crawlers = 2;
   if (day >= 4 && m >= 2) crawlers = 3;
   return { listeners: Math.min(listeners, CFG.MAX_LISTENERS), crawlers };
+}
+
+// a shift may run 2, 4 or 6 nights (2.1s), but the tables above were written for four: a night's
+// effective day is where it falls across the whole shift. Night 2 of 2 is a finale; night 2 of 6 is not.
+export function diffDay(day, days) {
+  const n = CFG.SHIFT.OPTIONS.includes(days) ? days : CFG.SHIFT.DAYS;
+  return Math.max(1, Math.min(4, Math.ceil((day * 4) / n)));
 }
 
 export const PALETTE = {

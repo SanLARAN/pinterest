@@ -968,6 +968,7 @@ export class AudioEngine {
     this.duckGain.gain.cancelScheduledValues(t);
     this.duckGain.gain.setValueAtTime(this.duckGain.gain.value, t);
     this.duckGain.gain.linearRampToValueAtTime(1, t + 0.4);
+    this.psychosis(0); // and the Watcher's grip never follows you into the garage
     this._freshDeathBus();
   }
 
@@ -2592,6 +2593,65 @@ export class AudioEngine {
       tt += 0.015 + Math.random() * 0.035;
     }
     this._tone(t, { f: 150, fEnd: 90, a: 0.001, d: 0.05, gain: gain * 0.3, dest: pn });
+  }
+
+  // a tether chain brushed in a stall mouth (2.1s): bright links, a second of ring, one last knock settling
+  chain(x, y, z) {
+    if (!this.ready) return;
+    const t = this.now;
+    const pn = this._panner(x, y, z, 1.6, 1.3);
+    pn.connect(this.sfx);
+    for (let i = 0; i < 6; i++) {
+      const tt = t + i * (0.02 + Math.random() * 0.035);
+      this._noiseBurst(tt, { type: 'bandpass', f: 2900 + Math.random() * 2600, q: 7, a: 0.0005, d: 0.05 + Math.random() * 0.05, gain: 0.5 - i * 0.05, dest: pn });
+    }
+    [3410, 4720, 6180].forEach((f, i) => this._tone(t + i * 0.015, { f, a: 0.001, d: 0.3 - i * 0.06, gain: 0.04, dest: pn }));
+    this._noiseBurst(t + 0.17, { type: 'bandpass', f: 2100, q: 3, a: 0.001, d: 0.09, gain: 0.15, dest: pn });
+  }
+
+  // it has hold of you (2.1s): the sound goes as wrong as the picture — a cluster of close sines
+  // sliding down against each other, something whispering through swept static in almost-syllables,
+  // and your own pulse in your ears, speeding up. level 0 = it let go.
+  psychosis(level) {
+    if (!this.ready) return;
+    if (!this.pNodes) {
+      if (level <= 0) return;
+      const t = this.now;
+      const out = this._gain(1);
+      out.connect(this.body);
+      const gC = this._gain(0), gW = this._gain(0), gH = this._gain(0);
+      const oscs = [];
+      [1244.5, 1318.5, 1396.9, 1479.9, 2093].forEach((f) => {
+        const o = this._osc('sine', f);
+        const og = this._gain(0.15);
+        o.connect(og).connect(gC);
+        o.start(t);
+        oscs.push({ o, f });
+      });
+      const n = this._noise(this.pink);
+      const f1 = this._filter('bandpass', 900, 6), f2 = this._filter('bandpass', 2400, 8);
+      const gate = this._gain(0.5);
+      const glfo = this._osc('square', 3.7); const gg = this._gain(0.5); glfo.connect(gg).connect(gate.gain);
+      const sweep = this._osc('sine', 0.23); const sg = this._gain(480); sweep.connect(sg); sg.connect(f1.frequency); sg.connect(f2.frequency);
+      n.connect(f1); n.connect(f2); f1.connect(gate); f2.connect(gate); gate.connect(gW);
+      n.start(t); glfo.start(t); sweep.start(t);
+      const heart = this._osc('sine', 52);
+      const hg = this._gain(0.55);
+      const hlfo = this._osc('sine', 1.05); const hlg = this._gain(0.5); hlfo.connect(hlg).connect(hg.gain);
+      heart.connect(hg).connect(gH);
+      heart.start(t); hlfo.start(t);
+      [gC, gW, gH].forEach((g) => g.connect(out));
+      this.pNodes = { gC, gW, gH, oscs, hlfo, level: 0 };
+    }
+    const n = this.pNodes;
+    if (level <= 0 && n.level <= 0) return;
+    n.level = level;
+    const t = this.now;
+    n.gC.gain.setTargetAtTime(level * level * 0.13, t, 0.12);
+    n.gW.gain.setTargetAtTime(level * 0.1, t, 0.2);
+    n.gH.gain.setTargetAtTime(level * 0.5, t, 0.1);
+    n.hlfo.frequency.setTargetAtTime(1.05 + level * 1.55, t, 0.3);
+    for (const { o, f } of n.oscs) o.frequency.setTargetAtTime(f * (1 - level * 0.22), t, 0.4);
   }
 
   // the first time your echo finds it: a thin, high shriek of strings and a drop

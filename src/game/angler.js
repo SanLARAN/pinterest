@@ -265,7 +265,7 @@ export class Angler {
     this._leaveTick();
     this.coolT -= dt;
     if (this.coolT > 0) return;
-    if (g.day < a.fromDay || !g.awake || g.time < a.after) return;
+    if (g.diffDay() < a.fromDay || !g.awake || g.time < a.after) return; // (2.1s: by effective day — in a two-night shift he works the finale)
     const target = pickTarget(this._freePlayers(), a);
     if (!target) { this.coolT = 4; return; }
     if (this._spawnBody(target.x, target.z, 34, 48)) { // (2.1q: nearer — a hunt that starts 60 m out rarely ended)

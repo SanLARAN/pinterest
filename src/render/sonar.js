@@ -21,6 +21,7 @@ export const shared = {
   uDawn: { value: 0 },
   uSurvey: { value: 0 }, // binocular image amplification only — NOT a real world light
   uMorning: { value: 0 }, // 1 = the calm morning (high sun, blue sky), 0 = the victory dawn
+  uFog: { value: 0 }, // (2.1s) the morning fog: 1 = milk you could stand a spoon in
   uFear: { value: 0 }, // 0..1 — when something hunts you, the forest bleeds red
   uSun: { value: new THREE.Vector3(0.5, 0.35, -0.8).normalize() },
   // work lamps of running generators (and the yard's floodlight): xyz + intensity (0 = off)
@@ -73,6 +74,7 @@ uniform vec3 uCam;
 uniform float uDawn;
 uniform float uSurvey;
 uniform float uMorning;
+uniform float uFog;
 uniform float uFear;
 uniform vec3 uSun;
 uniform vec4 uLamp[MAXL];
@@ -461,11 +463,13 @@ void main() {
     vec3 dbase = dayC;
     float sunL = max(dot(Nrm, uSun), 0.0);
     float sky = 0.5 + 0.5 * Nrm.y;
+    float milk = uFog * uMorning; // (2.1s: white mornings — the victory dawn stays clear and golden)
     vec3 warm = mix(vec3(1.0, 0.8, 0.62), vec3(1.0, 0.93, 0.82), uMorning);
-    vec3 day = dbase * (mix(0.36, 0.5, uMorning) * sky + 1.05 * sunL * warm) * (0.8 + 0.3 * st);
+    vec3 day = dbase * (mix(0.36, 0.5, uMorning) * sky + 1.05 * sunL * warm * (1.0 - milk * 0.62)) * (0.8 + 0.3 * st);
+    day = mix(day, vec3(dot(day, vec3(0.333))), milk * 0.42); // what colour the day had, drowns
     day += edge * dbase * 0.1;
-    vec3 fogC = mix(vec3(0.62, 0.52, 0.5), vec3(0.72, 0.76, 0.78), uMorning);
-    float fog = 1.0 - exp(-camD * mix(0.016, 0.011, uMorning));
+    vec3 fogC = mix(mix(vec3(0.62, 0.52, 0.5), vec3(0.72, 0.76, 0.78), uMorning), vec3(0.74, 0.76, 0.78), milk);
+    float fog = 1.0 - exp(-camD * mix(mix(0.016, 0.011, uMorning), 0.058, milk));
     day = mix(day, fogC, fog);
     col = mix(col, day + col * 0.3, uDawn);
   }
@@ -644,7 +648,7 @@ export function createMotes(count = 2600) {
 export function createSky() {
   const geo = new THREE.SphereGeometry(140, 24, 12);
   const mat = new THREE.ShaderMaterial({
-    uniforms: { uDawn: shared.uDawn, uSun: shared.uSun, uTime: shared.uTime, uMorning: shared.uMorning },
+    uniforms: { uDawn: shared.uDawn, uSun: shared.uSun, uTime: shared.uTime, uMorning: shared.uMorning, uFog: shared.uFog },
     vertexShader: /* glsl */ `
       varying vec3 vDir;
       void main() {
@@ -655,6 +659,7 @@ export function createSky() {
     fragmentShader: /* glsl */ `
       uniform float uDawn;
       uniform float uMorning;
+      uniform float uFog;
       uniform float uTime;
       uniform vec3 uSun;
       varying vec3 vDir;
@@ -664,7 +669,9 @@ export function createSky() {
         vec3 hor = mix(vec3(1.25, 0.72, 0.5), vec3(0.98, 0.9, 0.82), uMorning);
         vec3 c = mix(hor, top, smoothstep(-0.05, 0.55, h));
         float sun = pow(max(dot(vDir, uSun), 0.0), 64.0) * 2.5 + pow(max(dot(vDir, uSun), 0.0), 6.0) * 0.4;
-        c += vec3(1.0, 0.75, 0.5) * sun;
+        float milk = uFog * uMorning;
+        c += vec3(1.0, 0.75, 0.5) * sun * (1.0 - milk * 0.92); // the fog eats the sun first
+        c = mix(c, vec3(0.74, 0.76, 0.78), milk * (1.0 - 0.4 * smoothstep(0.0, 0.6, h)));
         // no stars any more (the author asked, 2.1o): once the day is gone the sky is simply black —
         // the only light up there is the one you make yourself
         gl_FragColor = vec4(c * uDawn, 1.0);

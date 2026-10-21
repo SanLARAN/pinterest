@@ -46,7 +46,7 @@ export class Lobby {
     this.rulesButton.innerHTML='<span></span>';this.rulesButton.hidden=true;this.el.append(this.rulesButton);
     this.rulesPanel=document.createElement('section');this.rulesPanel.id='lobbyRules';this.rulesPanel.hidden=true;
     this.rulesPanel.setAttribute('role','dialog');this.rulesPanel.setAttribute('aria-modal','true');this.rulesPanel.setAttribute('aria-labelledby','lobbyRulesTitle');
-    this.rulesPanel.innerHTML='<div class="lobby-rules-backdrop"></div><div class="lobby-rules-card"><div class="rules-kicker">HUSH / GARAGE</div><h2 id="lobbyRulesTitle"></h2><p class="rule-authority"></p><div class="rules-line"><span></span><div class="rule-choices"><button type="button" data-hide="yes"></button><button type="button" data-hide="no"></button></div></div><p class="rules-explain"></p><button type="button" class="rules-close"></button></div>';
+    this.rulesPanel.innerHTML='<div class="lobby-rules-backdrop"></div><div class="lobby-rules-card"><div class="rules-kicker">HUSH / GARAGE</div><h2 id="lobbyRulesTitle"></h2><p class="rule-authority"></p><div class="rules-line"><span></span><div class="rule-choices"><button type="button" data-hide="yes"></button><button type="button" data-hide="no"></button></div></div><div class="rules-line days-line"><span></span><div class="rule-choices"><button type="button" data-days="2"></button><button type="button" data-days="4"></button><button type="button" data-days="6"></button></div></div><p class="rules-explain"></p><button type="button" class="rules-close"></button></div>';
     this.el.append(this.rulesPanel);
     this.rulesPanel.addEventListener('keydown',e=>{
       if(!this.rulesOpen) return;
@@ -61,6 +61,7 @@ export class Lobby {
     this.rulesPanel.querySelector('.rules-close').addEventListener('click',()=>this.closeRules());
     this.rulesPanel.querySelector('.lobby-rules-backdrop').addEventListener('click',()=>this.closeRules());
     for(const button of this.rulesPanel.querySelectorAll('[data-hide]')) button.addEventListener('click',()=>{this.coop.setHideNames(button.dataset.hide==='yes');this.renderRules();});
+    for(const button of this.rulesPanel.querySelectorAll('[data-days]')) button.addEventListener('click',()=>{this.coop.setDays(+button.dataset.days);this.renderRules();});
     this._bind();
   }
 
@@ -241,6 +242,8 @@ export class Lobby {
     this.rulesPanel.querySelector('.rules-explain').textContent=t('ruleExplain');
     this.rulesPanel.querySelector('.rules-close').textContent=`${t('bagClose')} [ ESC ]`;
     for(const b of this.rulesPanel.querySelectorAll('[data-hide]')) { const yes=b.dataset.hide==='yes';b.textContent=t(yes?'ruleYes':'ruleNo');b.disabled=!host;b.setAttribute('aria-pressed',String(r.hideNames===yes)); }
+    this.rulesPanel.querySelector('.days-line > span').textContent=t('ruleDays');
+    for(const b of this.rulesPanel.querySelectorAll('[data-days]')) { const n=+b.dataset.days;b.textContent=t('days'+n);b.disabled=!host;b.setAttribute('aria-pressed',String((r.days||4)===n)); }
   }
   placeRules() {
     if(!this._inRoom() || !this.garage || this.starting) return;

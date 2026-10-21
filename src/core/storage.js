@@ -18,6 +18,7 @@ const DEFAULTS = {
   quality: 'auto',
   graphics: { ...GRAPHICS_DEFAULTS },
   lobbyHideNames: false, // host's preferred rule for newly created rooms
+  shiftDays: 4, // preferred shift length in nights: 2, 4 or 6 (solo, and a host's new rooms)
   radar: false, // minimal HUD by default; the radar is an opt-in assist
   name: '',
   tutorialDone: false,

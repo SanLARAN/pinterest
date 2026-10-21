@@ -491,6 +491,16 @@ function animWatcher(m, dt, t) {
   n.head.rotation.y = clamp(m.headYaw, -1.2, 1.2);
   n.faceL.rotation.y = 0;
   n.faceR.rotation.y = 0;
+  const sk = m.seizeK || 0;
+  if (sk > 0) { // the grip (2.1s): both arms come up reaching, and the head's wrong angle straightens — worse
+    n.shoulderL.rotation.x -= sk * 1.35;
+    n.shoulderR.rotation.x -= sk * 1.35;
+    n.elbowL.rotation.x -= sk * 0.5;
+    n.elbowR.rotation.x -= sk * 0.5;
+    n.spine.rotation.x += sk * 0.22;
+    n.neck.rotation.x -= sk * 0.25;
+    n.head.rotation.z *= (1 - sk);
+  }
 }
 
 function animHowler(m, dt, t) {
@@ -1159,6 +1169,11 @@ export class Watcher extends Monster {
     this.strideHz = 0.95;
     this.strideRef = 3.0;
     this.lit = false;
+    this.seizing = null; // (2.1s: someone in its grip — see beginSeize)
+    this.seizeT = 0;
+    this.seizeK = 0; // the pose, eased in present()
+    this.seizeVis = false; // a guest's word of the grip, for the pose
+    this.gripCD = 0;
     this.litStreak = 0;
     this.lampWait = 0;
     this.crackT = 1;
@@ -1211,7 +1226,46 @@ export class Watcher extends Monster {
     return false;
   }
 
+  // it has you (2.1s): not dead yet — held still by the gaze, and the world goes wrong around
+  // the edges. The kill lands when the grip timer runs out; light on the Watcher breaks it first.
+  beginSeize(victim) {
+    const g = this.game;
+    this.seizing = victim;
+    this.seizeT = this.cfg.seize || 1.6;
+    this.seizeVis = true;
+    this.speedCur = 0;
+    if (g.sync) g.sync.ev('wz', this.id, victim.id, 1);
+    if (victim === g.player && g.onSeized) g.onSeized(true);
+    if (g.pulses) g.pulses.emit(this.x, this.y + 2.3, this.z, g.time, { radius: 6, strength: 0.85, decay: 1.8, color: [0.85, 0.9, 1.0], kind: 'seize' });
+  }
+
+  endSeize(killed) {
+    const g = this.game, victim = this.seizing;
+    this.seizing = null;
+    this.seizeVis = false;
+    this.gripCD = 1.2; // it does not simply take hold again in the same breath
+    if (!victim) return;
+    if (g.sync) g.sync.ev('wz', this.id, victim.id, 0);
+    if (victim === g.player && g.onSeized) g.onSeized(false);
+    if (killed) g.kill(this, victim);
+  }
+
+  // while it holds someone. Returns true while the grip lasts; light breaks it — and it is gone.
+  seizeTick(dt, lit) {
+    const v = this.seizing;
+    if (!v) return false;
+    if (!v.alive || Math.abs(v.y - this.y) > 3) { this.endSeize(false); return false; }
+    if (lit) { this.endSeize(false); this.vanish(13 + Math.random() * 9); return false; }
+    this.yaw = Math.atan2(v.x - this.x, v.z - this.z);
+    this.headYaw = 0;
+    this.speedCur = 0;
+    this.seizeT -= dt;
+    if (this.seizeT <= 0) { this.endSeize(true); return false; }
+    return true;
+  }
+
   vanish(sec) {
+    if (this.seizing) this.endSeize(false);
     this.state = 'lurk';
     this.stateT = 0;
     this.lurkT = sec;
@@ -1230,6 +1284,7 @@ export class Watcher extends Monster {
   }
 
   dispose() {
+    if (this.seizing) this.endSeize(false);
     super.dispose();
     this.game.audio.watcherPresence(0);
   }
@@ -1254,6 +1309,11 @@ export class Watcher extends Monster {
     const lit = g.lightAt(this.x, this.y + 1.8, this.z) > cfg.litThreshold || lampL > 0.08;
     this.lit = lit;
     this.state = lit ? 'frozen' : 'stalk';
+    if (this.gripCD > 0) this.gripCD -= dt;
+    if (this.seizing) { // the grip runs the think: no walking, no new prey — only the timer and the light
+      if (this.seizeTick(dt, lit)) return;
+      if (this.state === 'lurk') return; // the light broke it and it went
+    }
     this.litStreak = lit ? this.litStreak + dt : Math.max(0, this.litStreak - dt * 0.5);
     const sheltered = g.objectives.inLamp(p.x, p.z) || (g.smallLightAt && g.smallLightAt(p.x, (p.y || 0) + 1, p.z) > 0.3);
     this.lampWait = p.alive && sheltered ? this.lampWait + dt : 0;
@@ -1286,6 +1346,7 @@ export class Watcher extends Monster {
     if (!lit && this.stateT > 0.6) {
       let victim = null, vd = CFG.MONSTER.killDist + 0.15;
       for (const q of g.livePlayers()) {
+        if (q.held) continue; // the Angler's catch is not to be taken out of his hands
         const d = Math.hypot(q.x - this.x, q.z - this.z);
         if (d < vd) {
           vd = d;
@@ -1296,8 +1357,8 @@ export class Watcher extends Monster {
       if (victim && g.escape && g.escape.blocks(this.x, this.z, victim.x, victim.z)) victim = null;
       if(victim&&Math.abs(victim.y-this.y)>2.3)victim=null;
           if(victim&&g.world.losBlocked(this.x,this.y+1.1,this.z,victim.x,victim.y+1.1,victim.z,.15))victim=null;
-      if (victim) {
-        g.kill(this, victim);
+      if (victim && !this.seizing && this.gripCD <= 0) {
+        this.beginSeize(victim); // (2.1s: it takes hold first — there is a moment to be saved by a light)
         return;
       }
     }
@@ -1313,7 +1374,9 @@ export class Watcher extends Monster {
     this.playerDist = g.distToEars(this.x, this.z);
     const pd = this.playerDist;
     const lit = this.lit;
-    if (!lit && this.speedCur > 0.01) this.animate(dt, t);
+    const wantK = this.seizing || this.seizeVis ? 1 : 0;
+    this.seizeK += clamp(wantK - this.seizeK, -dt * 3.2, dt * 3.2);
+    if ((!lit && this.speedCur > 0.01) || this.seizeK > 0.01) this.animate(dt, t);
     this.syncRig();
     // bones creaking as it walks; a thin ringing that grows as it closes in
     const presence = clamp(1 - pd / 24, 0, 1);

@@ -40,7 +40,7 @@ function fakeGame() {
   for (let gx = -192; gx <= 192; gx += 16) for (let gz = -192; gz <= 192; gz += 16)
     caps.push({ kind: 0, h: 9, ax: gx, az: gz, bx: gx, bz: gz, r: 0.3 });
   const g = {
-    role: 'solo', state: 'play', day: 3, awake: true, time: 120, score: 0, mult: 1,
+    role: 'solo', state: 'play', day: 3, daysTotal: 4, diffDay() { return this.day; }, awake: true, time: 120, score: 0, mult: 1,
     player, remotes, monsters: [], timeline: [], events: [],
     rng: new RNG(4242),
     world: {

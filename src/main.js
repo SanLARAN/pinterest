@@ -638,12 +638,12 @@ function startRun(opts = {}) {
   if (online) {
     const me = opts.coop.players.find((p) => p.id === coop.selfId);
     game.setupSolo();
-    game.reset({ seed: opts.coop.seed, slot: me ? me.slot : 0, online: true, training });
+    game.reset({ seed: opts.coop.seed, slot: me ? me.slot : 0, online: true, training, days: opts.coop.rules?.days });
     game.setupOnline(coop, opts.coop.players);
   } else {
     game.setupSolo();
     game.opening.forceSeats = DEBUG.seats;
-    game.reset({ training });
+    game.reset({ training, days: settings.shiftDays });
     if (DEBUG.night || DEBUG.nointro || DEBUG.t > 0) game.startNight();
     if (DEBUG.t > 0) {
       game.time = DEBUG.t;

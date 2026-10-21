@@ -17,6 +17,7 @@ const S = CFG.SHIFT;
 function bare(shift = {}) {
   const g = Object.create(Game.prototype);
   g.day = 1;
+  g.daysTotal = 4;
   g.time = 0;
   g.morningT = 0;
   g.dawnT = 0;
@@ -66,7 +67,7 @@ test('the shift is four days: 8-minute nights, 1:45 mornings, no 45-minute limit
   assert.equal(S.NIGHT, 480);
   assert.equal(S.MORNING, 105);
   assert.equal('RUN_SECONDS' in CFG, false);
-  assert.equal(PROTOCOL, 16); // 2.1o: the Angler on the snapshots · 2.1q: broken generators ride the objectives state
+  assert.equal(PROTOCOL, 17); // 2.1s: shift length in the rules, the sovkhoz in the chain, chains, the Watcher's grip
 });
 
 test('danger steps every four minutes of a night and again with each dawn survived', () => {

@@ -289,6 +289,16 @@ export class NetSync {
       case 'xe': // it caught
         if (r) g.escape.startEngine(false);
         break;
+      case 'wz': // the Watcher has hold of someone (the host's word): pose for all, psychosis for the held one
+        if (isHostMsg) {
+          const m = g.monsterById(a);
+          if (m) m.seizeVis = !!c;
+          if (b === g.player.id) g.onSeized(!!c);
+        }
+        break;
+      case 'chn': // a sovkhoz stall chain rang somewhere out there
+        if (isHostMsg) g.expedition.netChain(a | 0);
+        break;
       case 'ls': // a friend's rung creaked (the noise to the AI is a separate 'nz')
         if (r && Number.isFinite(a)) g.expedition.ladderFx(r.x, a, r.z);
         break;

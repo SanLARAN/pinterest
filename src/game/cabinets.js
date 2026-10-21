@@ -72,14 +72,14 @@ function bodyOf(kind, D) {
     shell(b, D, KIND.BONE, null);
   } else {
     shell(b, D, GK.GATE, GK.DARK);
-    for (let i = 0; i < 3; i++) boxAt(b, -D.w / 2 + 0.004, 0.4 + i * 0.5, 0, 0.012, 0.02, D.d - 0.08, GK.DARK); // ribs on its side
+    for (let i = 0; i < 3; i++) { const ry2 = 0.4 + i * 0.5; if (ry2 < D.h - 0.08) boxAt(b, -D.w / 2 + 0.004, ry2, 0, 0.012, 0.02, D.d - 0.08, GK.DARK); } // ribs on its side (as many as its height allows)
   }
   return b.toArrays();
 }
 
 function shelvesOf(kind, D) {
   const b = new MeshBuilder(256);
-  for (const y of SHELF_Y[kind]) if (y > 0.1) boxAt(b, 0, y - 0.012, 0, D.w - 0.07, 0.024, D.d - 0.06, kind === 'locker' ? GK.GATE : kind === 'firstaid' ? KIND.BONE : KIND.WOOD);
+  for (const y of SHELF_Y[kind]) if (y > 0.1) boxAt(b, 0, y - 0.012, 0, D.w - 0.07, 0.024, D.d - 0.06, kind === 'locker' || kind === 'toolbox' ? GK.GATE : kind === 'firstaid' ? KIND.BONE : KIND.WOOD);
   if (kind === 'wardrobe') {
     b.place(0, 1.78, 0.02, 0, 0, PI / 2);
     b.cylinder(5, 0.012, 0.012, D.w - 0.08, GK.CHROME, { y0: -(D.w - 0.08) / 2 }); // a rail with two empty hangers
@@ -93,15 +93,15 @@ function shelvesOf(kind, D) {
   return b.toArrays();
 }
 // where things sit (y of each shelf, the floor of the cupboard counting) and the x of the slots
-const SHELF_Y = { wardrobe: [0.075, 0.6, 1.12], cupboard: [0.075, 0.45, 0.45], firstaid: [0.045, 0.37, 0.37], locker: [0.075, 0.62, 1.25] };
-const SLOT_X = { wardrobe: [0.12, -0.15, 0.1], cupboard: [-0.18, -0.12, 0.2], firstaid: [0.0, -0.14, 0.13], locker: [0.05, -0.12, 0.1] };
+const SHELF_Y = { wardrobe: [0.075, 0.6, 1.12], cupboard: [0.075, 0.45, 0.45], firstaid: [0.045, 0.37, 0.37], locker: [0.075, 0.62, 1.25], toolbox: [0.06, 0.06, 0.06] };
+const SLOT_X = { wardrobe: [0.12, -0.15, 0.1], cupboard: [-0.18, -0.12, 0.2], firstaid: [0.0, -0.14, 0.13], locker: [0.05, -0.12, 0.1], toolbox: [-0.28, 0, 0.28] };
 
 // a door leaf, hinge at the origin, the leaf running toward +x (sx = +1) or −x (sx = −1), its face at z = 0
 function leafOf(kind, D, wLeaf, sx) {
   const b = new MeshBuilder(256);
   const h = kind === 'firstaid' ? D.h - 0.02 : D.h - 0.13;
   const y0 = kind === 'firstaid' ? 0.01 : 0.1;
-  const mat = kind === 'firstaid' ? KIND.BONE : kind === 'locker' ? GK.GATE : KIND.WOOD;
+  const mat = kind === 'firstaid' ? KIND.BONE : kind === 'locker' || kind === 'toolbox' ? GK.GATE : KIND.WOOD;
   boxAt(b, sx * wLeaf / 2, y0 + h / 2, -0.012, wLeaf - 0.006, h, 0.024, mat);
   if (kind === 'wardrobe' || kind === 'cupboard') {
     // a raised panel, a little knob by the free edge

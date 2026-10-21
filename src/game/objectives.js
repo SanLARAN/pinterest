@@ -145,6 +145,14 @@ function shuffle(rng, a) {
   return a;
 }
 
+// camp first, then the sovkhoz and three of the four forest sites in a fresh order (2.1s):
+// every shift one forest generator stands down — its machine is scrap, its body keeps a note and nothing else
+export function pickChain(rng, siteCount = 6) {
+  const dropped = 1 + Math.floor(rng.next() * 4);
+  const pool = [1, 2, 3, 4, 5].filter((i) => i !== dropped && i < siteCount);
+  return [0, ...shuffle(rng, pool)];
+}
+
 export class Objectives {
   constructor(game) {
     this.g = game;
@@ -283,8 +291,9 @@ export class Objectives {
 
   // ---------------- run lifecycle ----------------
   reset(rng) {
-    // camp first, then the four landmarks in a different order every night
-    this.chain = [0, ...shuffle(rng, [1, 2, 3, 4])];
+    // camp first, then the sovkhoz and three of the four forest sites in a fresh order (2.1s)
+    this.chain = pickChain(rng, this.sites.length);
+    this.scrap = this.sites.filter((s, i) => !this.chain.includes(i));
     for (const g of this.gens) if (g.hum) g.hum.stop();
     this.gens = this.chain.map((si, k) => ({
       k, si, site: this.sites[si], spec: CFG.GENERATORS[k],
@@ -305,8 +314,9 @@ export class Objectives {
     }
     this.bodies[0].mesh.visible = false; // it wasn't there this morning
     this.bodies[0].item.visible = false;
-    // the flare gun lies by one of the four bodies out in the forest (the seed is shared: co-op agrees)
-    this.flareBody = 1 + Math.floor(rng.next() * 4);
+    // the flare gun lies by one of the bodies out in the forest (never the scrapped site's: the seed is shared)
+    const forest = this.chain.slice(1);
+    this.flareBody = forest[Math.floor(rng.next() * forest.length) % forest.length];
     this.bodies.forEach((body, i) => {
       if (body.gun) body.gun.visible = i === this.flareBody;
     });
@@ -576,6 +586,7 @@ export class Objectives {
     } else if (hands) {
       for (const body of this.bodies) if (!body.searched && body.mesh.visible) consider(body, body.x, body.z, USE_R_BODY, 'body');
       for (const g of this.gens) if (!g.running) consider(g, g.x, g.z, USE_R_GEN, 'gen');
+      for (const s of this.scrap || []) consider(s, s.x, s.z, USE_R_GEN, 'genScrap'); // this shift's stood-down machine: look, don't touch
       if (game.rescue) game.rescue.consider(consider);
       if (game.glows) game.glows.consider(consider);
       if (game.torch) game.torch.consider(consider);
@@ -682,6 +693,7 @@ export class Objectives {
       }
       return;
     }
+    if (best.kind === 'genScrap') { hud.setUse(t('genScrap'), 0, false, true); return; } // stood down this shift: scrap
     // generator
     const g = o;
     const spec = g.spec;
@@ -713,6 +725,13 @@ export class Objectives {
     body.item.visible = false;
     const gun = !!body.gun && body.gun.visible;
     const k = body.k;
+    if (k < 0) { // the body by the scrapped generator: whoever he was, his part fits nothing any more
+      if (game.sync) game.sync.ev('fd', this.bodies.indexOf(body), -1);
+      game.stats.bodies++;
+      game.audio.heartbeat(0.7);
+      this.openNote(t('noteKicker'), t('noteScrap'));
+      return;
+    }
     const g = this.gens[k];
     g.hasPart = true;
     g.known = true;

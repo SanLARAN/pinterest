@@ -1,6 +1,6 @@
 // One run of the game: rules, scoring, director, scares, juice.
 import * as THREE from 'three';
-import { CFG, dangerMultiplier, monsterTargets, fovFor } from '../core/config.js';
+import { CFG, dangerMultiplier, monsterTargets, diffDay, fovFor } from '../core/config.js';
 import { RNG, Simplex2, clamp, lerp, smoothstep, damp } from '../core/rng.js';
 import { t } from '../core/i18n.js';
 import { settings, saveSettings } from '../core/storage.js';
@@ -226,7 +226,7 @@ export class Game {
   }
 
   _fxDefaults() {
-    return { trauma: 0, glitch: 0, red: 0, white: 0, shockT: 9, shockAmp: 0, fovKick: 0, danger: 0, slowT: 0, timeScale: 1, fade: 1, aberr: 0.12 };
+    return { trauma: 0, glitch: 0, psych: 0, red: 0, white: 0, shockT: 9, shockAmp: 0, fovKick: 0, danger: 0, slowT: 0, timeScale: 1, fade: 1, aberr: 0.12 };
   }
 
   // ---------------- lifecycle ----------------
@@ -235,13 +235,16 @@ export class Game {
     this.rng = new RNG(opts.seed != null ? opts.seed >>> 0 : (Date.now() ^ (Math.random() * 1e9)) >>> 0);
     this.baseSeed = opts.seed != null ? opts.seed >>> 0 : 0; // the flare gun's nightly body is chosen from it, alike on every machine
     this.time = 0;
-    this.day = 1; // the shift is four days: every dawn but the last one is just a breather
+    this.day = 1; // every dawn but the last one is just a breather
+    this.daysTotal = CFG.SHIFT.OPTIONS.includes(opts.days) ? opts.days : CFG.SHIFT.DAYS; // (2.1s: the host picks 2, 4 or 6 nights)
+    this.seizedByWatcher = false;
     this.score = 0;
     this.mult = 1;
     this.stats = { shards: 0, close: 0, escapes: 0, loudest: 0, hunts: 0, gens: 0, bodies: 0, thrown: 0, flares: 0, glows: 0, revives: 0, syringes: 0, parts: 0, seen: {} }; // seen: creatures that showed themselves (the atlas); syringes: friends raised with the needle
     this.state = this.training ? 'training' : 'morning'; // the schoolyard has no dusk to wait out
     this.grace = true;
     this.fx = this._fxDefaults();
+    if (this.audio) this.audio.psychosis(0); // never carry the last death's ringing into a new shift
     this.timeline = [];
     this.player.reset(opts.slot || 0);
     this.player.alive = true;
@@ -388,7 +391,7 @@ export class Game {
     // (2.1k: there used to be a 26 m leash round the camp here — an invisible wall that pushed you back
     // with a hint. The morning is short and the forest is the point: walk out if you want to.)
     const hud = this.hud;
-    if (this.morningT > 0.8 && this.morningT < 7.5) hud.setIntro(this.day > 1 ? t('morningBigN').replace('{n}', this.day).replace('{d}', CFG.SHIFT.DAYS) : t('morningBig'), t('morningSmall'));
+    if (this.morningT > 0.8 && this.morningT < 7.5) hud.setIntro(this.day > 1 ? t('morningBigN').replace('{n}', this.day).replace('{d}', this.daysTotal) : t('morningBig'), t('morningSmall'));
     else hud.setIntro(null);
     let hint = null;
     if (this.morningT > 8 && this.morningT < 17) hint = this.input.touch ? t('morningHintTouch') : t('morningHint');
@@ -570,7 +573,7 @@ export class Game {
       p.yaw = a + 0.18;
       p.pitch = -0.12;
     }
-    this.hud.flashAlert(t('nightTag').replace('{n}', this.day).replace('{d}', CFG.SHIFT.DAYS), 'dim', 2.4);
+    this.hud.flashAlert(t('nightTag').replace('{n}', this.day).replace('{d}', this.daysTotal), 'dim', 2.4);
     // nothing is out there yet: the forest sleeps for SPAWN_DELAY seconds (see updateDirector → wake)
     for (const m of this.monsters) m.dispose();
     this.monsters = [];
@@ -588,11 +591,14 @@ export class Game {
     }
   }
 
+  // where tonight falls across the whole shift, in the four-night tables' terms (2.1s)
+  diffDay() { return diffDay(this.day, this.daysTotal); }
+
   // how much of the shift is still ahead (the speed bonus for driving out early is paid by the second)
   shiftLeft() {
     const S = CFG.SHIFT;
     const dayLen = S.NIGHT + S.MORNING + CFG.DUSK_SECONDS;
-    const left = (S.DAYS - this.day) * dayLen;
+    const left = (this.daysTotal - this.day) * dayLen;
     if (this.state === 'play') return Math.max(0, left + Math.max(0, S.NIGHT - this.time));
     if (this.state === 'morning') return Math.max(0, left + Math.max(0, S.NIGHT + S.MORNING - this.morningT));
     if (this.state === 'dusk') return Math.max(0, left + S.NIGHT);
@@ -1296,6 +1302,15 @@ export class Game {
   }
 
   // ---------------- death ----------------
+  // the Watcher has hold of you (2.1s): your feet stop answering; your head and your light still do
+  onSeized(on) {
+    this.seizedByWatcher = !!on;
+    if (on) {
+      this.fx.glitch = Math.max(this.fx.glitch, 0.85);
+      this.addTrauma(0.4);
+    }
+  }
+
   kill(m, victim = this.player) {
     if (this.state !== 'play') return;
     // A thing on the ground cannot reach someone sixteen metres up the lookout. It can wait below.
@@ -1696,8 +1711,8 @@ export class Game {
     this.objectives.closeNote();
     if (this.role === 'host') this.sync.ev('dn', this.day);
     const noneStanding = this.rescue.dawnPeace(); // dawn raises nobody (2.1q), but rescue goes on in daylight (2.1r)
-    if (noneStanding && this.day < CFG.SHIFT.DAYS) { this.endOnline(false); return; } // nobody left to come for anyone
-    const last = this.day >= CFG.SHIFT.DAYS;
+    if (noneStanding && this.day < this.daysTotal) { this.endOnline(false); return; } // nobody left to come for anyone
+    const last = this.day >= this.daysTotal;
     if (last) {
       this.winBonus = CFG.SCORE.win;
       if (!this.player.alive) this.winBonus = Math.round(this.winBonus * 0.3); // your team made it; you didn't
@@ -1711,7 +1726,7 @@ export class Game {
     this.audio.setAmbience(0.25, 0);
     this.hud.setHint(null);
     for (const m of this.monsters) m.setState('flee');
-    this.hud.flashAlert(t(last ? 'winTitle' : 'dawnSurvived').replace('{n}', this.day).replace('{d}', CFG.SHIFT.DAYS), 'dawn', 3);
+    this.hud.flashAlert(t(last ? 'winTitle' : 'dawnSurvived').replace('{n}', this.day).replace('{d}', this.daysTotal), 'dawn', 3);
   }
 
   updateDawn(dt) {
@@ -1729,7 +1744,7 @@ export class Game {
       } else m.update(dt, this.time);
     }
     if (this.dawnT > DAWN_SECONDS && this.state === 'dawn') {
-      if (this.day >= CFG.SHIFT.DAYS) {
+      if (this.day >= this.daysTotal) {
         this.state = 'won';
         if (this.onEnd) this.onEnd({ won: true, coop: this.online, alive: this.player.alive });
       } else this.startMorning(this.day + 1);
@@ -1996,7 +2011,8 @@ export class Game {
     const p = this.player;
     // (in the УАЗ you sit still and look about: see Escape._seated)
     const pev = heldByHim ? (this.angler.captiveFrame(dt, this.inputMuted ? NO_LOOK : raw.look), { step: null, bump: null, breath: null })
-      : es.mySeat >= 0 || caught || this.expedition.onTower ? this.seatedLook(look) : p.update(dt, input, look, this.inputMuted || this.inventory.active, es.load(p.id));
+      : es.mySeat >= 0 || caught || (this.expedition.onTower && !this.expedition.walkTop) ? this.seatedLook(look) : p.update(dt, input, look, this.inputMuted || this.inventory.active || this.seizedByWatcher, es.load(p.id));
+    if (this.expedition.walkTop) this.expedition.clampDeck(); // (2.1s: the lookout's rails)
     if (pev.step) {
       const s = pev.step;
       this.audio.footstep(s.intensity);
@@ -2084,7 +2100,7 @@ export class Game {
     this.audio.setAmbience(0.9, fx.danger);
 
     // four minutes into the last night the forest stops pretending: everything comes looking, for good
-    if (this.day >= CFG.SHIFT.DAYS && this.time >= CFG.SHIFT.LAST_WAKE && this.auth) {
+    if (this.day >= this.daysTotal && this.time >= CFG.SHIFT.LAST_WAKE && this.auth) {
       if (!this.endgame) {
         this.endgame = true;
         this.wakeT = 5;
@@ -2139,7 +2155,7 @@ export class Game {
     this.fx.danger = damp(this.fx.danger, nearest * 0.8, 3, dt);
     this.audio.update(this.fx.danger, Math.min(1, this.time / CFG.SHIFT.NIGHT));
     this.audio.setAmbience(0.9, this.fx.danger);
-    if (this.day >= CFG.SHIFT.DAYS && this.time >= CFG.SHIFT.LAST_WAKE && this.auth && !this.endgame) {
+    if (this.day >= this.daysTotal && this.time >= CFG.SHIFT.LAST_WAKE && this.auth && !this.endgame) {
       this.endgame = true;
       if (this.role === 'host') this.sync.ev('wk');
       this.fxWake();
@@ -2268,7 +2284,7 @@ export class Game {
     const B = CFG.GEN_BREAK;
     if (!this.sab || this.sab.day !== this.day) this.sab = { day: this.day, done: 0, next: B.firstAfter };
     const S = this.sab;
-    if (this.day < B.fromDay || S.done >= B.maxPerNight || this.time < S.next) return;
+    if (this.diffDay() < B.fromDay || S.done >= B.maxPerNight || this.time < S.next) return;
     if (this.monsters.some((m) => m.sab)) return; // one errand at a time
     const ob = this.objectives;
     if (!ob.count || ob.count >= 5) { S.next = this.time + 20; return; } // nothing to break — or the yard already has its power
@@ -2298,7 +2314,7 @@ export class Game {
   }
 
   updateDirector(dt) {
-    this.mult = dangerMultiplier(this.auth ? this.time : this.netT || this.time, this.day);
+    this.mult = dangerMultiplier(this.auth ? this.time : this.netT || this.time, this.diffDay());
     if (this.mult !== this.lastMultStep) {
       this.lastMultStep = this.mult;
       this.hud.flashAlert(`${t('aWake')} ×${this.mult.toFixed(1)}`, 'warn', 2.2);
@@ -2308,7 +2324,7 @@ export class Game {
     if (!this.auth) return;
     const S = CFG.SHIFT;
     const dayLen = S.NIGHT + S.MORNING + CFG.DUSK_SECONDS;
-    const prog = Math.min(1, ((this.day - 1) * dayLen + Math.min(this.time, S.NIGHT)) / (S.DAYS * dayLen));
+    const prog = Math.min(1, ((this.day - 1) * dayLen + Math.min(this.time, S.NIGHT)) / (this.daysTotal * dayLen));
     this.hearingScale = 1 + prog * 0.35;
     this.speedScale = 1 + prog * 0.18;
     if (!this.awake) {
@@ -2318,7 +2334,7 @@ export class Game {
     this.dirT = (this.dirT || 0) - dt;
     if (this.dirT > 0) return;
     this.dirT = 1.0;
-    const want = monsterTargets(this.time, this.day);
+    const want = monsterTargets(this.time, this.diffDay());
     let L = 0, C = 0;
     for (const m of this.monsters) {
       if (m.type === 'listener') L++;
@@ -2397,6 +2413,12 @@ export class Game {
     const fx = this.fx;
     fx.trauma = Math.max(0, fx.trauma - dt * 1.05);
     fx.glitch = Math.max(0, fx.glitch - dt * 1.8);
+    // the Watcher's grip (2.1s): while it holds you the psychosis climbs to the ceiling; let go and it leaks away
+    fx.psych = this.seizedByWatcher ? Math.min(1, fx.psych + dt / 1.1) : Math.max(0, fx.psych - dt * 0.45);
+    if (this.audio?.ready) this.audio.psychosis(fx.psych);
+    // morning fog (2.1s): the day comes up milk-white and by dusk it has mostly burned off
+    const fogT = this.state === 'morning' ? 1 : this.state === 'dawn' ? 0.6 : this.state === 'dusk' ? 0.3 : 0;
+    shared.uFog.value += Math.max(-dt * 0.22, Math.min(dt * 0.22, fogT - shared.uFog.value));
     fx.red = Math.max(0, fx.red - dt * 1.4);
     fx.white = Math.max(0, fx.white - dt * 3.2);
     fx.shockT += dt;
@@ -2471,12 +2493,13 @@ export class Game {
     this.selfBody.place(!cutCam && !sp && this.player.alive && !this.angler.heldLocal() && !this.cabinets.busy && !this.expedition.onTower && (st === 'play' || st === 'dawn' || st === 'morning' || st === 'dusk' || st === 'training'));
 
     const u = this.post.u;
-    u.uAberr.value = 0.12 + fx.glitch * 0.9 + fx.danger * 0.25 + sh * 0.5;
+    u.uAberr.value = 0.12 + fx.glitch * 0.9 + fx.danger * 0.25 + sh * 0.5 + fx.psych * 1.7;
     u.uGlitch.value = fx.glitch;
+    u.uPsych.value = fx.psych;
     u.uRed.value = fx.red;
     u.uWhite.value = fx.white;
     u.uDanger.value = fx.danger;
-    u.uGrain.value = 0.06 + fx.danger * 0.05 + fx.glitch * 0.1;
+    u.uGrain.value = 0.06 + fx.danger * 0.05 + fx.glitch * 0.1 + fx.psych * 0.14;
     u.uShockR.value = fx.shockT * 0.9;
     u.uShockAmp.value = fx.shockAmp * Math.max(0, 1 - fx.shockT * 1.3);
     u.uFade.value = fx.fade;

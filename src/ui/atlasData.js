@@ -576,15 +576,17 @@ const TEXT = {
       sovkhoz: {
         name: 'Совхоз', latin: 'колхоз «Путь Ильича», ферма № 2',
         text: [
-          'Длинный коровник из бетонных панелей и силосная башня рядом. Коров здесь нет давно. Стойла пусты, кормушки пусты, цепи — на месте.',
+          'Длинный коровник из бетонных панелей и силосная башня рядом. Из коров осталась одна, в среднем стойле, и та давно. Мухи над ней гудят так, что ферму слышно раньше, чем видно.',
           'В коровнике всё близко и нарезано перегородками: эхо показывает комнату кусками. В башне наоборот — пусто и высоко, звук уходит вверх и возвращается не сразу.',
         ],
         tips: [
           'В коровнике двое широких ворот и дверь с торца: тупиков нет, но и спина всегда открыта.',
-          'В стойла проходят у перегородок, где кормушки прерываются. Там и шкафчик.',
+          'В стойла проходят у перегородок, где кормушки прерываются. Там висят цепи: заденешь — зазвенит на весь коровник. Работает и на тебя, и на то, что зашло следом.',
+          'У загона стоит трактор. Инструментальный ящик при нём на замке — вскрывается ломом, внутри батарея и мелочь.',
+          'В последнее время один из пяти генераторов всегда здесь, у восточной стены. Какой из лесных вместо него простаивает в эту смену — подскажут записки у тел.',
           'В башне один вход. Зашёл за шкафчиком — послушай у двери, прежде чем выходить.',
         ],
-        facts: [['коровник', '22 × 9 м'], ['башня', '11 м'], ['шкафов', '3'], ['генератора', 'нет'], ['коров', 'нет']],
+        facts: [['коровник', '22 × 9 м'], ['башня', '11 м'], ['шкафов', '4'], ['генератор', 'один из пяти'], ['коров', 'одна, давно']],
         quote: 'В башне эхо вернулось дважды. Я туда больше не кричал.',
       },
       yard: {
@@ -1173,15 +1175,17 @@ const TEXT = {
       sovkhoz: {
         name: 'The Sovkhoz', latin: 'the Path of Ilyich collective farm, unit No. 2',
         text: [
-          'A long cowshed of concrete panels and a silo tower beside it. The cows are long gone. The stalls are empty, the troughs are empty, the chains are still there.',
+          'A long cowshed of concrete panels and a silo tower beside it. One cow remains, in the middle stall, and she has been dead a long time. The flies over her hum loud enough that you hear the farm before you see it.',
           'Inside the cowshed everything is close and cut up by partitions: the echo shows you the room in pieces. The tower is the opposite — empty and tall, and sound goes up and does not come back at once.',
         ],
         tips: [
           'The cowshed has two wide gates and a door in the end wall: no dead ends, but your back is always open.',
-          'You get into the stalls by the partitions, where the troughs break off. That is where the cupboard is, too.',
+          'You get into the stalls by the partitions, where the troughs break off. Chains hang there: brush one and it rings through the whole shed. It works on you, and on whatever followed you in.',
+          'A tractor stands by the paddock fence. Its toolbox is padlocked — a crowbar opens it; a battery and small things inside.',
+          'Lately one of the five generators is always here, by the east wall. Which forest site sits the shift out instead — the notes by the bodies will tell you.',
           'The tower has one door. After the locker, listen at it before you step out.',
         ],
-        facts: [['cowshed', '22 × 9 m'], ['tower', '11 m'], ['cabinets', '3'], ['generator', 'none'], ['cows', 'none']],
+        facts: [['cowshed', '22 × 9 m'], ['tower', '11 m'], ['cabinets', '4'], ['generator', 'one of five'], ['cows', 'one, long dead']],
         quote: 'In the tower the echo came back twice. I did not call out in there again.',
       },
       yard: {
