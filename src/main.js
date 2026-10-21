@@ -21,6 +21,8 @@ import { shared, createWorldMaterial, createMotes, createSky } from './render/so
 import { Pulses } from './render/pulses.js';
 import { Post } from './render/post.js';
 import { qualityPlan } from './render/quality.js';
+import { effectiveGraphics } from './render/graphicsSettings.js';
+import './graphics.css';
 import { OmniShadows } from './render/shadows.js';
 import { Ghosts } from './render/ghosts.js';
 import { Eyes } from './render/eyes.js';
@@ -168,11 +170,11 @@ const perf = { acc: 0, n: 0, scale: 1, cool: 3, ceiling: 9, ceilT: 0, fpsEl: nul
 
 // ---------------- resolution ----------------
 // 2.1m: restore detail without restoring HDR MSAA. High uses a fixed high-resolution scene;
-// auto alone trades pixels for frame time. Bound both the scene and the output canvas by pixel/GL limits.
+// auto (or an explicit custom override) trades pixels for frame time. Bound both the scene and the output canvas by pixel/GL limits.
 const maxTargetSize = Math.min(renderer.capabilities.maxTextureSize,
   renderer.getContext().getParameter(renderer.getContext().MAX_RENDERBUFFER_SIZE));
 function renderPlan() {
-  return qualityPlan(settings.quality, innerWidth, innerHeight, window.devicePixelRatio, maxTargetSize, !!perf.recovery);
+  return qualityPlan(settings.quality, innerWidth, innerHeight, window.devicePixelRatio, maxTargetSize, !!perf.recovery, settings.graphics);
 }
 function scaleBounds() {
   const p = renderPlan();
@@ -180,6 +182,17 @@ function scaleBounds() {
 }
 function applyAntialias() {
   post.setAntialias(renderPlan().fxaa);
+}
+function applyGraphics() {
+  const g = effectiveGraphics(settings.graphics);
+  post.setGraphics(settings.graphics);
+  shadows.enabled = g.shadows;
+  if ((g.showFPS || DEBUG.fps) && !perf.fpsEl) {
+    perf.fpsEl = document.createElement('div');
+    perf.fpsEl.className = 'graphics-fps';
+    document.body.appendChild(perf.fpsEl);
+  }
+  if (perf.fpsEl) perf.fpsEl.hidden = !(g.showFPS || DEBUG.fps);
 }
 function applyQuality() {
   perf.recovery = false; // an explicit preset choice retries full quality after a context fallback
@@ -190,6 +203,7 @@ function applyQuality() {
   perf.cool = 3;
   perf.slow = 0;
   applyAntialias();
+  applyGraphics();
   resize();
 }
 function resize() {
@@ -235,35 +249,47 @@ function perfTick(dt) {
   if (perf.ceilT <= 0) perf.ceiling = 9;
   if (perf.acc < 1) return;
   const avg = perf.acc / perf.n;
-  perf.fps = 1 / avg;
   perf.acc = 0;
   perf.n = 0;
-  // High stays high. Only auto may quietly reduce resolution to recover frame rate.
+  // Preset high stays fixed. Only auto or explicit custom adaptation may reduce detail.
   if (renderPlan().adaptive && (state === 'playing' || state === 'menu')) {
     const [lo, hi] = scaleBounds();
-    const slow = avg > 1 / 50;
+    const target = renderPlan().targetFPS;
+    const slow = avg > 1 / (target * 5 / 6);
     perf.slow = slow ? perf.slow + 1 : 0;
     if (slow && perf.slow >= 1 && perf.scale > lo + 0.001) {
       perf.ceiling = perf.scale - 0.05;
       perf.ceilT = 30;
-      // a device that is far from 60 takes a bigger first step, so the first seconds on a weak phone
+      // a device far from the adaptive target takes a bigger first step, so the first seconds on a weak phone
       // stop stuttering instead of walking down one notch per second
-      perf.scale = Math.max(lo, perf.scale - (avg > 1 / 35 ? 0.2 : 0.12));
+      perf.scale = Math.max(lo, perf.scale - (avg > 1 / (target * 35 / 60) ? 0.2 : 0.12));
       perf.cool = 4;
       perf.slow = 0;
       resize();
-    } else if (avg < 1 / 57 && perf.scale < Math.min(hi, perf.ceiling) - 0.001 && perf.cool <= 0) {
+    } else if (avg < 1 / (target * .95) && perf.scale < Math.min(hi, perf.ceiling) - 0.001 && perf.cool <= 0) {
       perf.scale = Math.min(hi, perf.ceiling, perf.scale + 0.06);
       perf.cool = 5;
       perf.slow = 0;
       resize();
     }
   }
+}
+// Count actual drawn frames against wall time, not the clamped simulation delta or hidden co-op ticks.
+function measureFPS(now) {
+  if (!perf.sampleT) { perf.sampleT = now; perf.sampleFrames = 0; return; }
+  perf.sampleFrames++;
+  const elapsed = now - perf.sampleT;
+  if (elapsed < 1000) return;
+  perf.fps = perf.sampleFrames * 1000 / elapsed;
+  perf.measured = true;
+  perf.sampleT = now; perf.sampleFrames = 0;
   if (perf.fpsEl) perf.fpsEl.textContent = `${perf.fps.toFixed(0)} fps · ${post.w}×${post.h} · ${(renderer.info.render.triangles / 1000).toFixed(0)}k tris`;
 }
+document.addEventListener('visibilitychange', () => { perf.sampleT = 0; perf.measured = false; });
 
 // ---------------- menus ----------------
 const menus = new Menus({
+  graphicsStats: () => ({ w: post.w, h: post.h, ow: canvas.width, oh: canvas.height, fps: perf.measured ? perf.fps : 0, fxaa: post.u.uAA.value }),
   onPlay: () => startRun(),
   onResume: () => resume(),
   onRestart: () => restartRun(),
@@ -290,7 +316,8 @@ const menus = new Menus({
       }
       micChanged();
     }
-    if (key === 'quality') applyQuality();
+    if (key === 'quality' || key?.startsWith('graphics:') && key !== 'graphics:effects') applyQuality();
+    if (key === 'graphics:effects') applyGraphics();
     if (key === 'radar') applyRadar();
     if (key === 'lang' || key === undefined) {
       hud.cache = {};
@@ -931,6 +958,7 @@ setInterval(() => {
 }, 50);
 
 function step(now, render) {
+  if (render && !document.hidden && state !== 'boot') measureFPS(now);
   let rawDt = (now - lastFrame) / 1000;
   lastFrame = now;
   if (!(rawDt > 0)) rawDt = 1 / 60;
@@ -1050,11 +1078,6 @@ function boot() {
     wardrobe.init(); // the live survivor now belongs to the shared garage scene
     // warm up shaders so the first ping doesn't hitch
     renderer.compile(scene, camera);
-    if (DEBUG.fps) {
-      perf.fpsEl = document.createElement('div');
-      perf.fpsEl.style.cssText = 'position:fixed;right:8px;top:64px;z-index:99;font:11px JetBrains Mono,monospace;color:#8ef0ff;opacity:.8;pointer-events:none';
-      document.body.appendChild(perf.fpsEl);
-    }
     window.__hush = { world, game, shared, pulses, ghosts, eyes, renderer, perf, mic, audio, music: menuMusic, input, hud, post, shadows, coop, lobby, atlas, wardrobe, micCal, news, home, debug: DEBUG, startRun, pause, resume, toMenu, get opening() { return game && game.opening; }, ensureGarage, cloud, account, social, notifications, get garage() { return garage; }, get state() { return state; } };
     state = 'menu';
     menuTime = 0;

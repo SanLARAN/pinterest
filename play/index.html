@@ -7,8 +7,8 @@
     <meta name="description" content="ТИШЕ — low-poly эхолокационный хоррор. Ты слеп в огромном лесу: твой микрофон — эхолокатор. Запусти пять генераторов и не закричи." />
     <title>ТИШЕ — эхолокационный хоррор</title>
     <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
-  <script type="module" crossorigin src="./assets/index-BvReR2bB.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-CXdUcSk6.css">
+  <script type="module" crossorigin src="./assets/index-qKm7-gOL.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-B-Ms0ijL.css">
 </head>
   <body>
     <canvas id="gl" tabindex="-1"></canvas>
@@ -183,8 +183,8 @@
     <!-- settings -->
     <div id="settingsPanel" class="screen modal">
       <div class="panel form-panel">
-        <h2 data-i18n="settings"></h2>
-        <div class="form">
+        <h2 class="settings-basic-title" data-i18n="settings"></h2>
+        <div class="form settings-basic">
           <label><span data-i18n="sVolume"></span><input type="range" id="sVolume" min="0" max="1" step="0.01" /></label>
           <label><span data-i18n="sMusic"></span><input type="range" id="sMusic" min="0" max="1" step="0.01" /></label>
           <label><span data-i18n="sMouse"></span><input type="range" id="sMouse" min="0.2" max="3" step="0.05" /></label>
@@ -200,10 +200,12 @@
           <label><span data-i18n="sQuality"></span>
             <select id="sQuality"><option value="auto" data-i18n="sQAuto"></option><option value="high" data-i18n="sQHigh"></option><option value="low" data-i18n="sQLow"></option></select>
           </label>
+          <button class="btn gx-open" id="btnGraphicsAdvanced" type="button" aria-expanded="false" aria-controls="graphicsAdvanced"><span data-i18n="gxTitle"></span><b aria-hidden="true">↗</b></button>
           <label><span data-i18n="sLang"></span>
             <select id="sLang"><option value="ru">Русский</option><option value="en">English</option></select>
           </label>
         </div>
+        <section id="graphicsAdvanced" hidden aria-labelledby="gxTitle"></section>
         <button class="btn primary" id="btnSettingsBack"><span data-i18n="back"></span></button>
       </div>
     </div>

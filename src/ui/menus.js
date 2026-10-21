@@ -1,3 +1,4 @@
+import { AdvancedGraphics } from './graphics.js';
 // Menu screens, settings and high-score tables.
 import { t, setLang, getLang } from '../core/i18n.js';
 import { settings, saveSettings, getScores } from '../core/storage.js';
@@ -16,6 +17,7 @@ export class Menus {
     this.screens = ['menu', 'pause', 'over', 'settingsPanel', 'howPanel', 'scoresPanel', 'coopPanel', 'atlasPanel', 'wardrobePanel', 'boot'];
     this.settingsReturn = null;
     this.highlight = -1;
+    this.graphics = new AdvancedGraphics({ onChange: key => this.h.onSettingsChanged?.(key), stats: () => this.h.graphicsStats?.() });
     this._bind();
     this.applyI18n();
     this.loadSettingsForm();
@@ -23,6 +25,7 @@ export class Menus {
   }
 
   show(id, on = true) {
+    if (id === 'settingsPanel' && !on) this.graphics.close(false);
     $(id).classList.toggle('show', on);
   }
   only(id) {
@@ -44,6 +47,7 @@ export class Menus {
     $('bootText').textContent = t('loading');
     document.title = `${t('title')} — ${t('subtitle')}`;
     this.renderScores();
+    if (this.graphics.opened) this.graphics.render();
   }
 
   _bind() {
@@ -117,6 +121,7 @@ export class Menus {
       const el = $(id);
       el.addEventListener('change', () => {
         settings[key] = el.value;
+        if (key === 'quality') settings.graphics = { ...settings.graphics, enabled: false };
         saveSettings();
         if (key === 'lang') {
           setLang(el.value);
@@ -158,11 +163,13 @@ export class Menus {
   }
 
   openSettings(from) {
+    this.graphics.close(false);
     this.settingsReturn = from;
     this.loadSettingsForm();
     this.show('settingsPanel');
   }
   closeSettings() {
+    if (this.graphics.opened) { this.graphics.close(); return; }
     this.show('settingsPanel', false);
   }
 

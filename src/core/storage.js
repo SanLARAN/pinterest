@@ -1,3 +1,4 @@
+import { GRAPHICS_DEFAULTS, cleanGraphics } from '../render/graphicsSettings.js';
 import {readJSON,writeJSON,readDevice,saveDevice} from './persistence.js';
 // Settings + local high-score table (localStorage, fails gracefully).
 const SETTINGS_KEY = 'hush.settings.v1';
@@ -15,6 +16,7 @@ const DEFAULTS = {
   voiceEcho: true,
   scares: 'full',
   quality: 'auto',
+  graphics: { ...GRAPHICS_DEFAULTS },
   lobbyHideNames: false, // host's preferred rule for newly created rooms
   radar: false, // minimal HUD by default; the radar is an opt-in assist
   name: '',
@@ -25,11 +27,11 @@ const DEFAULTS = {
 
 function read(key,fallback){return readJSON(key,fallback);}
 function write(key,value){const section=key===SETTINGS_KEY?'settings':key===SCORES_KEY?'scores':'atlas';writeJSON(key,value,section);}
-function loadSettings(){const next={...DEFAULTS,...read(SETTINGS_KEY,{})};const device=readDevice();for(const k of['quality','micEnabled','micSens','micCal','voiceVol'])if(k in device)next[k]=device[k];return next;}
+function loadSettings(){const next={...DEFAULTS,...read(SETTINGS_KEY,{})};const device=readDevice();for(const k of['quality','graphics','micEnabled','micSens','micCal','voiceVol'])if(k in device)next[k]=device[k];next.graphics=cleanGraphics(next.graphics);return next;}
 export const settings=loadSettings();
 export function saveSettings(){saveDevice(settings);write(SETTINGS_KEY,settings);}
 export function reloadStorageState(){for(const k of Object.keys(settings))delete settings[k];Object.assign(settings,loadSettings());for(const k of Object.keys(atlasLog))delete atlasLog[k];Object.assign(atlasLog,loadAtlas());}
-export function defaultSettings(){return{...DEFAULTS,voiceVol:{},micCal:null};}
+export function defaultSettings(){return{...DEFAULTS,graphics:{...GRAPHICS_DEFAULTS},voiceVol:{},micCal:null};}
 
 export function getScores() {
   const list = read(SCORES_KEY, []);

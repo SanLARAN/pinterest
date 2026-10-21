@@ -1,3 +1,4 @@
+import { effectiveGraphics } from './graphicsSettings.js';
 // Lightweight post pipeline: HDR scene -> bloom (1/4 res) -> composite with film grain,
 // chromatic aberration, shockwave, glitch, ash grade (only red survives), tunnel vignette,
 // fear flicker and tape-roll interference.
@@ -68,6 +69,13 @@ uniform float uWarm;
 uniform float uFlicker;
 uniform float uAsh;
 uniform bool uAA;
+uniform float uUserExposure;
+uniform float uUserBloom;
+uniform float uUserGrain;
+uniform float uUserAberr;
+uniform float uUserVignette;
+uniform float uUserScanlines;
+uniform float uUserFlicker;
 varying vec2 vUv;
 ${FXAA}
 vec4 sceneSample(vec2 uv) {
@@ -109,7 +117,7 @@ void main() {
     uv -= dir * ring * 0.035 * vec2(1.0 / aspect, 1.0);
   }
   vec2 rd = uv - 0.5;
-  float ab = uAberr * (0.25 + dot(rd, rd) * 2.5) * 0.022;
+  float ab = uAberr * uUserAberr * (0.25 + dot(rd, rd) * 2.5) * 0.022;
   vec3 col;
   vec4 s0 = sceneSample(uv);
   col.r = ab < 0.00001 ? s0.r : sceneSample(uv + rd * ab).r;
@@ -117,11 +125,11 @@ void main() {
   col.b = ab < 0.00001 ? s0.b : sceneSample(uv - rd * ab).b;
   float ashK = clamp(s0.a, 0.0, 1.0); // the scene marks what a lamp lights in its own colours (alpha → 0)
   vec3 bl = texture2D(tBloom, uv).rgb;
-  col += bl * uBloom;
+  col += bl * uBloom * uUserBloom;
 
   // tone: filmic shoulder, crushed toe — shadows fall into true black
   // (in daylight the toe and the tunnel let go: the world is open)
-  col = 1.0 - exp(-col * (1.4 + 0.35 * uWarm));
+  col = 1.0 - exp(-col * uUserExposure * (1.4 + 0.35 * uWarm));
   col = max(col - 0.01, 0.0) * 1.01;
   col = pow(col, vec3(1.15 - 0.17 * uWarm));
   // the forest is ash; only blood (and amber) keeps its colour
@@ -133,7 +141,7 @@ void main() {
 
   // tunnel vision: the dark closes in when something is near
   float vig = smoothstep(1.02 - uDanger * 0.32, 0.1, dist);
-  col *= mix(1.0, vig, 0.92 * (1.0 - 0.72 * uWarm));
+  col *= mix(1.0, vig, uUserVignette * 0.92 * (1.0 - 0.72 * uWarm));
   float beat = 0.6 + 0.4 * sin(uTime * 6.0);
   col += vec3(0.3, 0.0, 0.01) * uDanger * (1.0 - vig) * beat;
 
@@ -142,10 +150,10 @@ void main() {
 
   // grain: the darkness is never empty
   float n = hash12(gl_FragCoord.xy + fract(uTime * 7.13) * 917.0);
-  col += (n - 0.5) * uGrain * (0.75 + 0.5 * (1.0 - clamp(lum * 3.0, 0.0, 1.0)));
-  col *= 0.965 + 0.035 * sin(gl_FragCoord.y * 3.14159 + uTime * 2.0);
+  col += (n - 0.5) * uGrain * uUserGrain * (0.75 + 0.5 * (1.0 - clamp(lum * 3.0, 0.0, 1.0)));
+  col *= mix(1.0, 0.965 + 0.035 * sin(gl_FragCoord.y * 3.14159 + uTime * 2.0), uUserScanlines);
   // slow film breathing + fear flicker
-  col *= (0.975 + 0.025 * sin(uTime * 1.7 + sin(uTime * 0.37) * 3.0)) * (1.0 - uFlicker);
+  col *= mix(1.0, 0.975 + 0.025 * sin(uTime * 1.7 + sin(uTime * 0.37) * 3.0), uUserFlicker) * (1.0 - uFlicker * uUserFlicker);
   col *= uFade;
   gl_FragColor = vec4(max(col, 0.0), 1.0);
 }
@@ -197,6 +205,8 @@ export class Post {
         uFlicker: { value: 0 },
         uAsh: { value: 0.62 },
         uAA: { value: true },
+        uUserExposure: { value: 1 }, uUserBloom: { value: 1 }, uUserGrain: { value: 1 },
+        uUserAberr: { value: 1 }, uUserVignette: { value: 1 }, uUserScanlines: { value: 1 }, uUserFlicker: { value: 1 },
       },
       vertexShader: FS_VERT, fragmentShader: COMPOSITE_FRAG, depthTest: false, depthWrite: false,
     });
@@ -210,6 +220,14 @@ export class Post {
   setSamples() { this.rtScene.samples = 0; }
   setAntialias(on) { this.u.uAA.value = !!on; }
   dropSamples() { this.setSamples(); }
+
+  setGraphics(raw) {
+    const g = effectiveGraphics(raw);
+    for (const [key, value] of Object.entries({ Exposure: g.exposure, Bloom: g.bloom, Grain: g.grain,
+      Aberr: g.aberration, Vignette: g.vignette, Scanlines: +g.scanlines, Flicker: +g.flicker })) {
+      this.u['uUser' + key].value = value;
+    }
+  }
 
   setSize(cssW, cssH, scale) {
     const w = Math.max(2, Math.round(cssW * scale));
@@ -238,17 +256,19 @@ export class Post {
     r.clear();
     r.render(scene, camera);
 
-    this.bright.uniforms.tSrc.value = this.rtScene.texture;
-    this.bright.uniforms.uTexel.value.set(1 / this.w, 1 / this.h);
-    this._pass(this.bright, this.rtA);
-    for (let i = 0; i < 2; i++) {
-      const s = i === 0 ? 1 : 2;
-      this.blur.uniforms.tSrc.value = this.rtA.texture;
-      this.blur.uniforms.uDir.value.set(s / this.bloomW, 0);
-      this._pass(this.blur, this.rtB);
-      this.blur.uniforms.tSrc.value = this.rtB.texture;
-      this.blur.uniforms.uDir.value.set(0, s / this.bloomH);
-      this._pass(this.blur, this.rtA);
+    if (this.u.uBloom.value * this.u.uUserBloom.value > 0) {
+      this.bright.uniforms.tSrc.value = this.rtScene.texture;
+      this.bright.uniforms.uTexel.value.set(1 / this.w, 1 / this.h);
+      this._pass(this.bright, this.rtA);
+      for (let i = 0; i < 2; i++) {
+        const s = i === 0 ? 1 : 2;
+        this.blur.uniforms.tSrc.value = this.rtA.texture;
+        this.blur.uniforms.uDir.value.set(s / this.bloomW, 0);
+        this._pass(this.blur, this.rtB);
+        this.blur.uniforms.tSrc.value = this.rtB.texture;
+        this.blur.uniforms.uDir.value.set(0, s / this.bloomH);
+        this._pass(this.blur, this.rtA);
+      }
     }
     this._pass(this.comp, null);
   }

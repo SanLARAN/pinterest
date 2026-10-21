@@ -7,6 +7,21 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v:'2.1n',date:'2026-10-21',
+    ru:{title:'Большое отделение графики',items:[
+      'В настройках появилась кнопка «Расширенные настройки графики»: четыре блока, 14 параметров с пояснениями и реальными показаниями рендерера',
+      'Масштаб, бюджет пикселей, автоподстройка FPS и FXAA; экспозиция, bloom, виньетка, зерно, аберрация, строки и мерцание; тени ламп и FPS-счётчик',
+      'Применяется сразу и сохраняется на устройстве. Есть сброс к пресету; пока свои параметры выключены, прежняя картинка не меняется',
+      'Панель работает из меню и паузы, на телефоне прокручивается одной колонкой. HDR-MSAA по-прежнему выключен',
+    ]},
+    en:{title:'A full graphics control room',items:[
+      'Settings now has an Advanced graphics settings button: four sections, 14 explained controls and actual renderer readings',
+      'Render scale, pixel budget, adaptive FPS target and FXAA; exposure, bloom, vignette, grain, aberration, scanlines and flicker; lamp shadows and FPS counter',
+      'Changes apply immediately and are saved on this device. Reset to preset is available; existing visuals remain unchanged until custom parameters are enabled',
+      'Available from the menu and pause, with a single scrollable column on phones. HDR-MSAA remains disabled',
+    ]},
+  },
+  {
     v:'2.1m',date:'2026-10-21',
     ru:{title:'Вернули чёткость без HDR-MSAA',items:[
       'В 2.1l мы слишком урезали разрешение. Высокая снова использует Retina до 2×, а на обычном экране — рендер 1.5× с уменьшением для сглаживания',
