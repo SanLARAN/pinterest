@@ -646,6 +646,7 @@ export class Garage {
     this.gateHover = 0;
     this.gateWasOver = false;
     this.overGate = false;
+    this.gatesLive = true; // do the gates answer the pointer at all? (the title screen says no: 2.1t)
     // the wicket door, ajar, swaying in the draught — hanging on the near leaf, so it opens with it
     this.wicket = this._mesh(buildWicket());
     this.wicket.position.set(-0.05, GATE.wy0 + 0.01, GATE.wz1 - GATE.z1);
@@ -1364,7 +1365,7 @@ export class Garage {
     this.hoverT = (this.hoverT || 0) + dt;
     if (this.hoverT > 0.15 && this.ptr.on && this.ptr.cx != null) {
       this.hoverT = 0;
-      this._gateOver(!this.depart && !this.cut && this.hitGate(this.ptr.cx, this.ptr.cy));
+      this._refreshGateHover();
     }
     this._ambient(dt);
     this._car(dt);
@@ -2275,16 +2276,30 @@ export class Garage {
   // gates: whether the way out answers to the pointer at all (on the title screen it must not — the
   // menu is a menu, not a door: 2.1t)
   pointer(clientX, clientY, on = true, gates = true) {
+    this.gatesLive = gates;
     this.ptr.x = (clientX / this.w) * 2 - 1;
     this.ptr.y = (clientY / this.h) * 2 - 1;
     this.ptr.on = on;
     // the gates: the pointer resting on them lights them and eases them off the latch, with a soft latch
-    // click the first moment it lands there
+    // click the first moment it lands there (only where they answer at all: see gatesAnswer)
     this.ptr.cx = clientX; this.ptr.cy = clientY;
-    const over = gates && on && !this.depart && !this.cut && this.hitGate(clientX, clientY);
+    const over = this.gatesLive && on && !this.depart && !this.cut && this.hitGate(clientX, clientY);
     this._gateOver(over);
     this.hoverSlot = on ? this.hit(clientX, clientY) : -1;
     return this.hoverSlot;
+  }
+
+  // does the way out answer the pointer here? (the lobby: yes; the title screen: never — 2.1t)
+  gatesAnswer(on) {
+    this.gatesLive = !!on;
+    if (!on) this._gateOver(false);
+  }
+
+  // the pointer can rest still on the gates for a while: re-check them now and then so their light does not
+  // fade out from under the cursor (the lobby asks). Where gates are mute, this only ever clears them.
+  _refreshGateHover() {
+    if (this.gatesLive === false) { this._gateOver(false); return; }
+    this._gateOver(!this.depart && !this.cut && this.hitGate(this.ptr.cx, this.ptr.cy));
   }
 
   _gateOver(over) {

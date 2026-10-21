@@ -6,6 +6,7 @@ import { readFileSync } from 'node:fs';
 import { ITEMS, THEMES, item, owns, cleanFit, shapeKey, fitKey, fullSet, wt } from '../src/game/outfit.js';
 import { buildSurvivor, poseFur, poseSurvivor } from '../src/game/survivor.js';
 import { t, setLang } from '../src/core/i18n.js';
+import { Garage } from '../src/ui/garage.js';
 
 const fit = () => cleanFit({ head: 'pigeonhead', body: 'doctorcoat' });
 const verts = (rig) => rig.parts.reduce((n, p) => n + p.arr.count, 0);
@@ -109,7 +110,56 @@ test('the shift length is asked after ОДНОМУ, and the title screen no long
 test('the title screen never opens the gates: only the lobby does', () => {
   const garage = readFileSync(new URL('../src/ui/garage.js', import.meta.url), 'utf8');
   assert.match(garage, /pointer\(clientX, clientY, on = true, gates = true\)/);
-  assert.match(garage, /const over = gates && on/);
+  assert.match(garage, /const over = this\.gatesLive && on/);
+  assert.match(garage, /_refreshGateHover\(\)/);
   const home = readFileSync(new URL('../src/ui/garageHome.js', import.meta.url), 'utf8');
-  assert.match(home, /pointer\(e\.clientX,e\.clientY,true,false\)/, 'the menu passes gates: false');
+  assert.match(home, /\.pointer\(e\.clientX,e\.clientY,true,false\)/, 'the menu passes gates: false');
+  assert.match(home, /gatesAnswer\(false\)/);
+  const lobby = readFileSync(new URL('../src/ui/lobby.js', import.meta.url), 'utf8');
+  assert.match(lobby, /gatesAnswer\(true\)/);
+});
+
+// the bug this test exists for: the frame loop re-checks the gates under a pointer that rests still, so a
+// single "no gates in the menu" flag on pointermove was not enough — the latch clank came back 0.15 s later
+function bareGarage() {
+  const g = Object.create(Garage.prototype);
+  g.w = 800; g.h = 600;
+  g.ptr = { x: 0, y: 0, on: true, cx: 400, cy: 300 };
+  g.gatesLive = true;
+  g.depart = null; g.cut = null;
+  g.gateHover = 0; g.gateWasOver = false; g.overGate = false;
+  g.clanks = 0;
+  g.audio = { ready: true, clank() { g.clanks += 1; } };
+  g.hitGate = () => true;
+  g.hit = () => -1;
+  return g;
+}
+
+test('a muted gate stays muted even when the pointer rests on it, and the lobby wakes it up again', () => {
+  const g = bareGarage();
+  g.pointer(400, 300, true); // the lobby: the way out lights up and the latch clicks once
+  assert.equal(g.overGate, true);
+  assert.equal(g.clanks, 1);
+  g.pointer(400, 300, true); // still there: no second click
+  assert.equal(g.clanks, 1);
+
+  const home = bareGarage();
+  home.pointer(400, 300, true, false); // the title screen
+  assert.equal(home.gatesLive, false);
+  assert.equal(home.overGate, false);
+  assert.equal(home.clanks, 0, 'no latch under the cursor on the menu');
+  for (let i = 0; i < 20; i++) home._refreshGateHover(); // the frame loop's re-check
+  assert.equal(home.overGate, false, 'and it does not come back 0.15 s later');
+  assert.equal(home.clanks, 0, 'still silent');
+  home.pointer(420, 310, true, false); // moving along the gates
+  assert.equal(home.clanks, 0);
+
+  home.gatesAnswer(true); // back in the lobby: a door again
+  home._refreshGateHover();
+  assert.equal(home.overGate, true);
+  assert.equal(home.clanks, 1);
+  home.gatesAnswer(false); // ...and shut behind the menu
+  assert.equal(home.overGate, false);
+  home._refreshGateHover();
+  assert.equal(home.overGate, false);
 });

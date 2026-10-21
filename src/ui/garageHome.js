@@ -31,7 +31,7 @@ export class GarageHome {
     this.active=active;this.book.hidden=!active;this.caption.hidden=!active;
     document.body.classList.toggle('garage-home',active);
     if(!active){document.getElementById('menu').classList.remove('over-survivor');const g=this.ensureGarage();if(g?.studio){g.studio.hover='';g.studio.cancelBook();}}
-    else this.ensureGarage()?._gateOver(false); // (the gates stay shut and unlit behind the title screen: 2.1t)
+    else this.ensureGarage()?.gatesAnswer(false); // (the gates stay shut, unlit and silent behind the title screen: 2.1t)
   }
   place() {
     if(!this.active)return;

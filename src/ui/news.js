@@ -10,13 +10,13 @@ export const NEWS = [
     v:'2.1t',date:'2026-10-22',
     ru:{title:'Голубь-доктор',items:[
       'Длина смены теперь спрашивается после кнопки «Одному»: три карточки — 2, 4 или 6 ночей, и та, что нажал, запоминается. С главного экрана ряд кнопок убран',
-      'Ворота гаража в главном меню больше не отзываются на мышь: не подсвечиваются, не приоткрываются и не щёлкают. В лобби всё как было',
+      'Ворота гаража в главном меню больше не отзываются на мышь — ни светом, ни защёлкой: проверка под курсором возвращала звук через мгновение после того, как его убрали, теперь этот путь закрыт. В лобби всё как было',
       'Новый бесплатный комплект «Голубь-доктор»: голова сизого голубя с глазом-бусиной, клювом и лобным зеркальцем на ремешке — и белый халат до колен со стетоскопом, ручкой в кармане и перьями из-под манжет',
       'У голубя своя жизнь: на шаге голова кивает против тела, на месте он резко вертит головой, мигает, дёргает хвостом и топорщит перья на рукавах. Видно и в гардеробе, и в игре у друзей',
     ]},
     en:{title:'Pigeon in a coat',items:[
       'Shift length is asked after the SOLO button now: three cards — 2, 4 or 6 nights — and the one you press is remembered. The row of buttons has left the title screen',
-      'The garage gates no longer answer the mouse on the title screen: they do not light up, crack open or clack. In the lobby everything is as it was',
+      'The garage gates no longer answer the mouse on the title screen — not with light and not with the latch: the under-the-cursor re-check was bringing the sound back a moment after it was silenced; that path is shut now. In the lobby everything is as it was',
       'New free set, the Pigeon Doctor: a city pigeon’s head with a bead eye, a beak and the doctor’s mirror on a strap — and a white coat to the knee with a stethoscope, a pen in the pocket and feathers past the cuffs',
       'The pigeon has a life of its own: its head bobs against the body as it walks, snaps around to look at things when standing, blinks, flicks its tail and ruffles its wing feathers. Visible in the wardrobe and on your friends in a night',
     ]}

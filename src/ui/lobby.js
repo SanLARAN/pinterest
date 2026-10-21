@@ -71,6 +71,7 @@ export class Lobby {
 
   open() {
     if (this.beforeOpen) this.beforeOpen();
+    this.garage?.gatesAnswer(true); // in the room the gates are a door again (2.1t)
     $('coopName').value = settings.name || '';
     this.el.classList.add('show');
     document.body.classList.add('in-lobby');
@@ -81,6 +82,7 @@ export class Lobby {
 
   close() {
     if (this.starting) return; // the engine's running: we're going
+    this.garage?.gatesAnswer(false); // ...and behind the title screen they are not
     this.closeRules(false);
     this.el.classList.remove('show');
     document.body.classList.remove('in-lobby');
