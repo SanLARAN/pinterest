@@ -11,7 +11,8 @@ import { Angler, isolationOf, pickTarget, canSelfFree, struggleStep, irritationS
 import { buildAngler, createMonster, TYPES, STATES } from '../src/game/monsters.js';
 import { buildSurvivor, poseGuitar, rigVerts } from '../src/game/survivor.js';
 import { cleanFit, fullSet, ITEMS, THEMES } from '../src/game/outfit.js';
-import { DEPART, departPlan } from '../src/ui/departure.js';
+import { DEPART, departPlan, faceYaw } from '../src/ui/departure.js';
+import { SCREEN_PRESETS, presetPixels, encodePixels, decodePixels } from '../src/game/screenFace.js';
 import { AudioEngine } from '../src/audio/audio.js';
 import { statSync, readFileSync } from 'node:fs';
 import { CHAPTERS, ENTRIES, atlasText, pageList } from '../src/ui/atlasData.js';
@@ -337,4 +338,24 @@ test('his entrance is a recording the forest borrowed — filed, loadable and wi
   assert.ok(head.toString('latin1') === 'ID3' || (head[0] === 0xff && (head[1] & 0xe0) === 0xe0), 'and it is an MP3');
   assert.equal(typeof AudioEngine.prototype.anglerFound, 'function', 'the engine can play it');
   assert.equal(typeof AudioEngine.prototype.prefetchAnglerFound, 'function', 'and fetch it before the third night');
+});
+
+// ---------- the film faces forward; the screen knows his face ----------
+test('the departure cast faces where it runs: rigs look down +Z, so the yaw is a plain atan2', () => {
+  for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1], [3, 4], [-2, -5], [7, -1]]) {
+    const y = faceYaw(2, -3, 2 + dx, -3 + dz), d = Math.hypot(dx, dz);
+    assert.ok(Math.abs(Math.sin(y) - dx / d) < 1e-9 && Math.abs(Math.cos(y) - dz / d) < 1e-9, `toward ${dx},${dz}`);
+  }
+  assert.equal(faceYaw(5, 5, 5, 9), 0, 'straight down +Z needs no turn at all');
+  assert.equal(faceYaw(0, 0, -4, 0), -Math.PI / 2, 'toward the gates (-X) is the seated yaw — the straggler ran back-first on +PI');
+});
+
+test('the screen head can wear him: a lantern in one hand, a cleaver in the other', () => {
+  assert.ok(SCREEN_PRESETS.includes('angler'));
+  for (const id of SCREEN_PRESETS) {
+    const lit = presetPixels(id).reduce((a, b) => a + b, 0);
+    assert.ok(id === 'blank' ? lit === 0 : lit > 35, `${id}: ${lit}`);
+  }
+  const p = presetPixels('angler');
+  assert.deepEqual([...decodePixels(encodePixels(p))], [...p], 'the wire round-trip keeps every pixel');
 });

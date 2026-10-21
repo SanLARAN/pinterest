@@ -18,7 +18,7 @@ import {
   buildRoom, buildCeiling, buildWicket, buildProps, buildBulb, buildBulb2, buildSteering, CAR_MODELS, GPAL_GLSL,
   buildItems, buildPack, buildPackFlap, buildCigarette, buildCup, buildLighter, buildFlame, buildPasser, buildGateLeaf,
 } from './garageSet.js';
-import { DEPART, DOORS, GRAB_POINT, departPlan } from './departure.js';
+import { DEPART, DOORS, GRAB_POINT, departPlan, faceYaw } from './departure.js';
 
 const PI = Math.PI;
 const VERT = /* glsl */ `
@@ -1194,7 +1194,7 @@ export class Garage {
     if (!c || !dep) return;
     const t = c.t, T = DEPART;
     if (dep.attached) { this._depSeatPose(f); return; }
-    const faceTo = (x, z) => { root.rotation.y = Math.atan2(x - root.position.x, z - root.position.z) + Math.PI; };
+    const faceTo = (x, z) => { root.rotation.y = faceYaw(root.position.x, root.position.z, x, z); };
     if (dep.role === 'board') {
       const door = this._carPoint(dep.door, _w);
       if (t < T.boardTo) {
@@ -1257,7 +1257,7 @@ export class Garage {
       if (since < 0.55) {
         // alongside, one hand on the car, legs still going
         root.position.x = gp.x; root.position.z = gp.z;
-        root.rotation.y = Math.atan2(-1, 0) + Math.PI; // with the car, toward the gates
+        root.rotation.y = -Math.PI / 2 + (this.carRoot.rotation.y || 0); // with the car, toward the gates (the seated yaw)
         this._depGait(f, true);
         n.shL.rotation.x = -1.15; n.shL.rotation.z = -0.5; // holding on
         dep.climbFrom = { x: gp.x, z: gp.z };

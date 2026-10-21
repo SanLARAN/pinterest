@@ -50,3 +50,10 @@ export function departPlan(occupied) {
   boarders.forEach((s, i) => { seats[s] = SEATS[i] || STRAGGLER_SEAT; });
   return { solo: false, straggler, boarders, seats, driveAt: DEPART.driveAt, fadeAt: DEPART.fadeAt, doneAt: DEPART.doneAt };
 }
+
+// the yaw that turns a survivor rig toward a point. The rig faces +Z, so this is a
+// plain atan2 of the direction — no half-turn: with one, the whole cast walked
+// backwards (the straggler chased the car back-first, as sharp eyes reported).
+export function faceYaw(fx, fz, tx, tz) {
+  return Math.atan2(tx - fx, tz - fz);
+}

@@ -1,8 +1,8 @@
 import { getLang } from '../core/i18n.js';
 import { SCREEN_PRESETS, cleanScreen, decodePixels, encodePixels, presetPixels, paintLine, composeScreen } from '../game/screenFace.js';
 const WORDS={
- ru:{title:'ЛИЦО ЭКРАНА',sub:'32 × 24 · люминофор',draw:'Карандаш',erase:'Ластик',undo:'Отменить',clear:'Очистить',text:'Надпись · до 24 знаков, 3 строки',hint:'Рисуй мышью или пальцем. Текст выводится снизу. Цвет свечения меняется во вкладке «Краска».',apply:'ПРИМЕНИТЬ',cancel:'НАЗАД',canvas:'Пиксельный рисунок на голове-экране',presets:{blank:'Пустой',smile:'Улыбка',listener:'Слушатель',crawler:'Ползун',watcher:'Наблюдатель',howler:'Ревун',shade:'Тень'}},
- en:{title:'SCREEN FACE',sub:'32 × 24 · phosphor',draw:'Pencil',erase:'Eraser',undo:'Undo',clear:'Clear',text:'Caption · up to 24 characters, 3 lines',hint:'Draw with a mouse or finger. Text appears along the bottom. Change the phosphor in Paint.',apply:'APPLY',cancel:'BACK',canvas:'Pixel drawing on the screen head',presets:{blank:'Blank',smile:'Smile',listener:'Listener',crawler:'Crawler',watcher:'Watcher',howler:'Howler',shade:'Shade'}},
+ ru:{title:'ЛИЦО ЭКРАНА',sub:'32 × 24 · люминофор',draw:'Карандаш',erase:'Ластик',undo:'Отменить',clear:'Очистить',text:'Надпись · до 24 знаков, 3 строки',hint:'Рисуй мышью или пальцем. Текст выводится снизу. Цвет свечения меняется во вкладке «Краска».',apply:'ПРИМЕНИТЬ',cancel:'НАЗАД',canvas:'Пиксельный рисунок на голове-экране',presets:{blank:'Пустой',smile:'Улыбка',listener:'Слушатель',crawler:'Ползун',watcher:'Наблюдатель',howler:'Ревун',angler:'Удильщик',shade:'Тень'}},
+ en:{title:'SCREEN FACE',sub:'32 × 24 · phosphor',draw:'Pencil',erase:'Eraser',undo:'Undo',clear:'Clear',text:'Caption · up to 24 characters, 3 lines',hint:'Draw with a mouse or finger. Text appears along the bottom. Change the phosphor in Paint.',apply:'APPLY',cancel:'BACK',canvas:'Pixel drawing on the screen head',presets:{blank:'Blank',smile:'Smile',listener:'Listener',crawler:'Crawler',watcher:'Watcher',howler:'Howler',angler:'Angler',shade:'Shade'}},
 };
 export class ScreenEditor {
  constructor({getValue,onApply,getColor}) {
