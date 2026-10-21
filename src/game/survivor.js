@@ -837,74 +837,10 @@ export function buildSurvivor(fitIn = null) {
   }
   BODY[fit.body](R);
   HEAD[fit.head](R);
-  // the full Keanu set travels with a guitar (see poseGuitar): built scale-0 under the chest, so the
-  // echo ghosts — which bake every part by its node's matrix — see nothing of it until it's taken out
-  if (fit.head === 'keanuhair' && fit.body === 'keanusuit') {
-    const gt = node(R, 'guitar', R.nodes.chest, 0.15, 0.1, 0.26);
-    gt.rotation.set(0.12, -0.22, -0.5);
-    gt.scale.setScalar(0.0001);
-    part(R, gt, (b) => {
-      // body: two bouts and the waist between them, sound hole, bridge (front is +z)
-      b.place(0, -0.05, 0, PI / 2, 0, 0); b.cylinder(9, 0.155, 0.155, 0.085, KIND.WOOD, { capTop: true, capBottom: true });
-      b.place(0, 0.105, 0, PI / 2, 0, 0); b.cylinder(9, 0.117, 0.117, 0.082, KIND.WOOD, { capTop: true, capBottom: true });
-      b.place(0, 0.045, 0.046, PI / 2, 0, 0); b.cylinder(8, 0.045, 0.045, 0.006, KIND.ROCK);
-      b.place(0, -0.055, 0.047); b.box(0.09, 0.018, 0.008, KIND.ROCK);
-      // neck up to the left, headstock, three-a-side stubs for tuners
-      b.identity(); b.limb([0, 0.17, 0.01], [-0.3, 0.47, 0.015], 0.021, 0.017, KIND.BARK, 4);
-      b.place(-0.325, 0.495, 0.015, 0, 0, 0.86); b.box(0.035, 0.11, 0.02, KIND.BARK);
-      for (let i = 0; i < 3; i++) { b.place(-0.36 + i * 0.012, 0.46 + i * 0.028, 0.015); b.octa(0.008, 0.008, KIND.METAL); }
-    });
-  }
   R.dyes = dyeColors(fit);
   return R;
 }
 
-// the Keanu set's idle: every so often the guitar comes out and a few quiet bars get played, then it
-// goes away again. A 26 s cycle on the rig's own clock (rest · raise · play · lower), blending over
-// whatever base pose the caller just set — so call it last, like poseFur, and only where a man would
-// actually sit and play: the menu and the wardrobe, never the forest. Strums bump rig.guitarBeat;
-// whoever owns the speakers turns that into notes (Audio.guitarPluck).
-export function poseGuitar(rig, dt) {
-  const n = rig.nodes;
-  const gt = n.guitar;
-  if (!gt) return;
-  const G = rig.gtr || (rig.gtr = { t: Math.random() * 6, beat: 0, next: 0, chord: 0 });
-  G.t += dt;
-  const CYCLE = 26, t = G.t % CYCLE;
-  const ss = (a, b, x) => { const k = clamp((x - a) / (b - a), 0, 1); return k * k * (3 - 2 * k); };
-  const k = ss(7, 8.6, t) * (1 - ss(21, 22.6, t)); // out at 7 s, away again by 22.6 s
-  gt.scale.setScalar(Math.max(0.0001, k));
-  if (k <= 0.001) return;
-  const playing = t >= 8.6 && t < 21;
-  if (playing) {
-    G.next -= dt;
-    if (G.next <= 0) {
-      G.next = 0.48;
-      rig.guitarBeat = (rig.guitarBeat || 0) + 1;
-      if ((rig.guitarBeat & 3) === 0) G.chord = (G.chord + 1) % 3; // the left hand walks the neck
-    }
-  }
-  const strum = playing ? Math.sin((t - 8.6) * (Math.PI * 2 / 0.48)) : 0;
-  const bob = playing ? Math.sin((t - 8.6) * (Math.PI * 2 / 0.96)) : 0;
-  const mix = (node, prop, v) => { node.rotation[prop] = lerp(node.rotation[prop], v, k); };
-  // left arm out along the neck, right over the sound hole; a slight lean into the instrument
-  mix(n.chest, 'x', 0.16 + bob * 0.02);
-  mix(n.chest, 'y', -0.12);
-  mix(n.head, 'x', 0.24 + bob * 0.035);
-  mix(n.head, 'y', -0.18);
-  n.shL.rotation.set(
-    lerp(n.shL.rotation.x, -0.95 - G.chord * 0.07, k),
-    lerp(n.shL.rotation.y, 0.35, k),
-    lerp(n.shL.rotation.z, -0.55 - G.chord * 0.05, k),
-  );
-  mix(n.elL, 'x', -0.55 - G.chord * 0.12);
-  n.shR.rotation.set(
-    lerp(n.shR.rotation.x, -0.5 + strum * 0.06, k),
-    lerp(n.shR.rotation.y, 0, k),
-    lerp(n.shR.rotation.z, 0.3, k),
-  );
-  mix(n.elR, 'x', -0.85 + strum * 0.38);
-}
 
 // fur with a life of its own (the boykisser): the tail sways — and now and then wags in fits — the ears
 // twitch, the eyes blink. Keeps its own clock on the rig. dt: s, moving: m/s (walking wags harder)

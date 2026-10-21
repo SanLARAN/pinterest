@@ -657,6 +657,10 @@ export class Monster {
     this.tgt = null; // the player it is paying attention to (AI)
     this.tgtDist = 1e4;
     this.feedT = 0;
+    this.sab = null; // a generator it has been sent to beat stopped (2.1q; the director assigns, think obeys)
+    this.sabT = 0;
+    this.sabWhack = 0;
+    this.sabAge = 0;
     this.puppet = false;
     this.snaps = [];
   }
@@ -893,6 +897,41 @@ export class Monster {
         if (touch || (feels && !g.grace)) {
           this.startHunt(q);
           break;
+        }
+      }
+    }
+
+    // sent to break a generator (2.1q): it goes to the machine and beats on it until the hum dies.
+    // A player under its nose is still better sport — hunt/feed void the errand, dawn cancels it.
+    if (this.sab) {
+      const sg = this.sab;
+      this.sabAge += dt;
+      if (!sg.running || this.state === 'hunt' || this.state === 'feed' || this.state === 'flee' || this.sabAge > 180) this.sab = null;
+      else {
+        const sd = Math.hypot(sg.x - this.x, sg.z - this.z);
+        if (sd > 2.0) {
+          this.sabT = 0;
+          if (this.state === 'wander' || this.state === 'idle' || this.state === 'search') this.investigate(sg.x, sg.z);
+        } else {
+          if (this.state !== 'idle') this.setState('idle');
+          this.tx = this.x;
+          this.tz = this.z;
+          this.yaw += clamp(angleDiff(this.yaw, Math.atan2(sg.x - this.x, sg.z - this.z)), -3 * dt, 3 * dt);
+          this.sabT += dt;
+          this.sabWhack -= dt;
+          if (this.sabWhack <= 0) {
+            this.sabWhack = 0.8;
+            g.audio.clank(sg.x, sg.y + 0.6, sg.z, 1.2);
+            if (g.sync) g.sync.ev('fx', 'clank', sg.k, 1);
+            g.noise(sg.x, sg.z, 0.55, 'repair');
+            g.particles.burst(sg.x, sg.y + 0.8, sg.z, 7, { color: [1, 0.75, 0.4], speed: 2.4, life: 0.45, size: 0.05, gravity: -5, drag: 1.5 });
+          }
+          if (this.sabT >= CFG.GEN_BREAK.whackTime) {
+            this.sab = null;
+            g.objectives.hostBreakGen(sg);
+            this.setState('wander');
+            this.pickWander();
+          }
         }
       }
     }
@@ -1458,7 +1497,7 @@ export class AnglerBody extends Monster {
     switch (this.mode) {
       case 'stalk': {
         const v = ctl && ctl.huntTarget;
-        if (v) { tx = v.x; tz = v.z; speed = A.approach; net = 'stalk'; this.tgt = v; }
+        if (v) { tx = v.x; tz = v.z; speed = this.stalkSpeed ?? A.approach; net = 'stalk'; this.tgt = v; } // (stalkSpeed: set by the controller — he lopes while far, walks while close)
         break;
       }
       case 'haul':

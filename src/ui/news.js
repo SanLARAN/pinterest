@@ -7,6 +7,25 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v:'2.1q',date:'2026-10-21',
+    ru:{title:'Рассвет не спасает',items:[
+      'Рассвет больше не поднимает упавших: кто встретил утро на земле, погиб до конца смены. Спасайте ночью — койка и шприц работают как прежде',
+      'С третьей ночи твари разбивают работающие генераторы — до двух за ночь. Запчасть остаётся внутри: заведи его заново и иди дальше',
+      'Утром можно таскать и ставить запчасти от УАЗа — светлое время больше не пропадает даром',
+      'Удильщик научился догонять: издалека он идёт быстрее и не отстаёт через сто секунд. Не ходи один',
+      'Фонарей в лесу теперь два (в компании — три), а шприц адреналина попадается и в обычных шкафчиках',
+      'Киану больше не достаёт гитару в гараже',
+    ]},
+    en:{title:'Dawn saves no one',items:[
+      'Dawn no longer raises the fallen: whoever meets the morning on the ground is gone for the shift. Rescue at night — the cot and the syringe work as before',
+      'From the third night the things beat running generators until they stop — up to two a night. The part stays inside: crank it back up and move on',
+      'Car parts can be hauled and fitted in the morning now — daylight is no longer wasted',
+      'The Angler has learned to catch people: from far off he comes faster and does not give up after a hundred seconds. Do not walk alone',
+      'Two flashlights lie in the forest now (three in company), and the adrenaline syringe turns up in ordinary cupboards',
+      'Keanu no longer takes out a guitar in the garage',
+    ]}
+  },
+  {
     v:'2.1p',date:'2026-10-21',
     ru:{title:'Совхоз',items:[
       'Новая локация к западу от лагеря: длинный коровник со стойлами и полая силосная башня. Генератора там нет — есть добыча и сквозняк',

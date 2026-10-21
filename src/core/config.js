@@ -101,7 +101,10 @@ export const CFG = {
     isolateR: 32, // m from every other free living player: alone enough to take
     regroupR: 24, // m: get this close to a friend while he stalks you and he loses interest...
     regroupT: 4, // ...after this many seconds of it
-    approach: 3.8, // m/s coming for you (you walk 3.1, sprint 5.7 — for a while)
+    approach: 3.8, // m/s coming for you up close (you walk 3.1, sprint 5.7 — for a while)
+    approachFar: 5.3, // m/s while he is still far off (see approachSpeed): distance alone will not save a loner
+    farR: 30, // m: beyond this he comes at approachFar, easing down to approach by 12 m
+    huntGiveUp: 300, // s of stalking before he lets the matter drop (regrouping is the real way out)
     haul: 1.65, // m/s with you dragging behind him
     grabR: 1.7, // m: his hand closes
     treeMin: 30, treeMax: 60, // m: how far the tree he picks can be from where he took you
@@ -134,6 +137,20 @@ export const CFG = {
     { part: 'battery', mode: 'spinup', dur: 8, clank: [1.0, 1.5], clankLoud: 0.15, spin: 9, spinLoud: 0.42, startLoud: 0.72 },
   ],
   GEN_SITES: ['cabin', 'tower', 'stones', 'wreck'], // the camp is always the first one
+
+  // generator sabotage (2.1q): from the third night the things have learned what the humming boxes
+  // mean. Up to twice a night one of them is sent to beat a running generator until it stops; the
+  // part stays in it, but it wants cranking again (work → cord/spin, as the first time, faster hands).
+  GEN_BREAK: {
+    fromDay: 3, // nights one and two they still ignore the machines
+    maxPerNight: 2,
+    firstAfter: 170, // s into the night before the first errand
+    gap: [100, 170], // s between errands
+    playerClearR: 18, // m: never under a player's nose — you hear it die from away off
+    minRun: 25, // s an engine must have been running before it is worth breaking
+    whackTime: 2.4, // s of beating on it before it gives up
+    restartDur: 6, // s of hands-on work to crank a broken one back up (then cord/spin as usual)
+  },
   LAMP_R: 10, // radius of warm light around a running generator
 
   // the flare gun: one per night, lying by one of the bodies (never the camp's). Two shots.

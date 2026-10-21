@@ -1,5 +1,5 @@
 // 2.1o regressions: the Angler (isolation hunt, the drag, the rope, the knockout, the finish),
-// the Keanu set with its guitar idle, and the departure film's new boarding schedule.
+// the Keanu set, and the departure film's new boarding schedule. (Its guitar idle left in 2.1q.)
 // Fast and deterministic: the Angler's host loop runs against a fake game, no browser, no relays.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -9,7 +9,7 @@ import { setLang, t } from '../src/core/i18n.js';
 import { PROTOCOL } from '../src/net/net.js';
 import { Angler, isolationOf, pickTarget, canSelfFree, struggleStep, irritationStep, chooseTree } from '../src/game/angler.js';
 import { buildAngler, createMonster, TYPES, STATES } from '../src/game/monsters.js';
-import { buildSurvivor, poseGuitar, rigVerts } from '../src/game/survivor.js';
+import { buildSurvivor, rigVerts } from '../src/game/survivor.js';
 import { cleanFit, fullSet, ITEMS, THEMES } from '../src/game/outfit.js';
 import { DEPART, departPlan, faceYaw } from '../src/ui/departure.js';
 import { SCREEN_PRESETS, presetPixels, encodePixels, decodePixels } from '../src/game/screenFace.js';
@@ -28,7 +28,7 @@ test('the Angler works from the third night, walks faster than you walk and slow
   assert.ok(A.approach > CFG.PLAYER.walk && A.approach < CFG.PLAYER.sprint, 'you can outrun him — for a while');
   assert.ok(A.haul < A.approach, 'hauling a person is slower than coming for one');
   assert.ok(A.after > CFG.SPAWN_DELAY, 'never during the sleeping-forest calm');
-  assert.equal(PROTOCOL, 15);
+  assert.equal(PROTOCOL, 16); // 2.1q: generators can be broken over the wire
   assert.ok(TYPES.includes('angler') && STATES.includes('haul') && STATES.includes('finish'), 'on the wire as a fifth monster');
 });
 
@@ -242,31 +242,16 @@ test('back among friends he lets the matter drop; an untie is the host’s word,
 });
 
 // ---------- Keanu ----------
-test('the Keanu set is free, dyed and complete — and his guitar stays out of the echo until it comes out', () => {
+test('the Keanu set is free, dyed and complete — and travels without a guitar (2.1q took it away)', () => {
   assert.ok(THEMES.includes('keanu'));
   assert.ok(ITEMS.head.some((i) => i.id === 'keanuhair') && ITEMS.body.some((i) => i.id === 'keanusuit'));
   const fit = cleanFit({ head: 'keanuhair', body: 'keanusuit' });
   assert.equal(fit.head, 'keanuhair');
   assert.equal(fullSet(fit), 'keanu');
   const rig = buildSurvivor(fit);
-  assert.ok(rig.nodes.guitar, 'the full set travels with a guitar');
-  assert.ok(rig.nodes.guitar.scale.x < 0.01, 'put away: scale-0, so no ghost will ever bake it');
+  assert.equal(rig.nodes.guitar, undefined, 'no guitar on the rig any more');
   assert.ok(rigVerts(rig) < 8192, `fits the echo buffers (${rigVerts(rig)})`);
   assert.ok(rig.parts.every((p) => p.arr.pos.every(Number.isFinite)));
-  const plain = buildSurvivor(cleanFit({ head: 'keanuhair' }));
-  assert.equal(plain.nodes.guitar, undefined, 'the hair alone brings no guitar');
-  // the idle: the rig's cycle starts at a random phase, so watch a full minute — somewhere in
-  // it the guitar comes out, strums, and somewhere after that goes away again
-  let sawOut = false, putAwayAgain = false;
-  for (let i = 0; i < 60 * 60; i++) {
-    poseGuitar(rig, 1 / 60);
-    const sc = rig.nodes.guitar.scale.x;
-    if (sc > 0.5) sawOut = true;
-    else if (sawOut && sc < 0.01) putAwayAgain = true;
-  }
-  assert.ok(sawOut, 'it comes out');
-  assert.ok((rig.guitarBeat || 0) > 8, `and strums (${rig.guitarBeat} beats)`);
-  assert.ok(putAwayAgain, 'and is put away again');
 });
 
 // ---------- the film ----------

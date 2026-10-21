@@ -4,7 +4,7 @@ import { MeshBuilder } from '../world/builder.js';
 import { clamp, damp, RNG } from '../core/rng.js';
 import { t } from '../core/i18n.js';
 import { myFit, cleanFit, fitKey } from '../game/outfit.js';
-import { poseSurvivor, poseFur, poseGuitar } from '../game/survivor.js';
+import { poseSurvivor, poseFur } from '../game/survivor.js';
 import { GET_UP_SECONDS, teaSeatMotion } from './teaSeat.js';
 import { Mannequin } from './mannequin.js'; // only lazily used for the small, cached catalogue stills
 
@@ -124,8 +124,6 @@ export class GarageStudio {
         if(gesture.t>1.2)this.adapter.gesture=null;
       }
       poseFur(f.rig,dt);
-      // the full Keanu set, standing in the wardrobe: now and then the guitar comes out (2.1o)
-      if(dressing&&motion.up>=.999&&!gesture){poseGuitar(f.rig,dt);const b=f.rig.guitarBeat||0;if(b!==this._gBeat){this._gBeat=b;if(g.audio)g.audio.guitarPluck(b);}}
       g._glow(f);
     } else if(this.ownsCup) {
       // The visible lobby chair owns the real mug again; never overwrite a friend's sip.

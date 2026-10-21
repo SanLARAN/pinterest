@@ -42,6 +42,13 @@ export function isolationOf(p, players) {
   return d;
 }
 
+// how fast he comes for you at `d` metres: a lope across the forest, a workman's walk up close —
+// the last stretch is meant to be out-sprintable toward friends, the distance before it is not
+export function approachSpeed(d, a = A()) {
+  const t = clamp01((d - 12) / Math.max(1, a.farR - 12));
+  return a.approach + (a.approachFar - a.approach) * t;
+}
+
 // who he would take: alive, free (not held, not seated, not down), and alone by A.isolateR.
 // The loneliest first. `players` is the free-living list (the caller filters seats and towers).
 export function pickTarget(players, a = A()) {
@@ -261,7 +268,7 @@ export class Angler {
     if (g.day < a.fromDay || !g.awake || g.time < a.after) return;
     const target = pickTarget(this._freePlayers(), a);
     if (!target) { this.coolT = 4; return; }
-    if (this._spawnBody(target.x, target.z, 48, 64)) {
+    if (this._spawnBody(target.x, target.z, 34, 48)) { // (2.1q: nearer — a hunt that starts 60 m out rarely ended)
       this.hunt = { id: target.id, t: 0, regroup: 0, high: 0 };
       this.huntTarget = target;
       this.body.mode = 'stalk';
@@ -270,7 +277,15 @@ export class Angler {
 
   _spawnBody(cx, cz, dmin, dmax) {
     const g = this.g;
-    if (this.bodyObj()) return true;
+    if (this.bodyObj()) {
+      // a leftover body walking off somewhere past the trees is no use to a new errand:
+      // past a certain distance it is simpler for him to come out of a nearer dark (2.1q)
+      if (Math.hypot(this.body.x - cx, this.body.z - cz) <= dmax + 25) return true;
+      this.body.dispose();
+      const i = g.monsters.indexOf(this.body);
+      if (i >= 0) g.monsters.splice(i, 1);
+      this.body = null;
+    }
     const w = CFG.WORLD_WALL - 6;
     for (let k = 0; k < 40; k++) {
       const ang = g.rng.float(0, Math.PI * 2), d = g.rng.float(dmin, dmax);
@@ -331,9 +346,10 @@ export class Angler {
     this.hunt.regroup = iso < a.regroupR ? this.hunt.regroup + dt : 0;
     // up the lookout where he cannot follow: he will not wait under it forever
     this.hunt.high = target.y - b.y > 4 ? this.hunt.high + dt : 0;
-    if (this.hunt.regroup > a.regroupT || this.hunt.high > 6 || this.hunt.t > 100) { giveUp(); return; }
+    if (this.hunt.regroup > a.regroupT || this.hunt.high > 6 || this.hunt.t > a.huntGiveUp) { giveUp(); return; }
     // the hand closes
     const d = Math.hypot(target.x - b.x, target.z - b.z);
+    b.stalkSpeed = approachSpeed(d, a); // read by AnglerBody.think (kept off the body: no import cycle)
     if (d < a.grabR && Math.abs(target.y - b.y) < 2.3) {
       if (g.doors && g.doors.blocks(b.x, b.z, target.x, target.z)) return;
       if (g.escape && g.escape.blocks(b.x, b.z, target.x, target.z)) return;

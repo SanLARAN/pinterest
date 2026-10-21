@@ -1,4 +1,4 @@
-// The flashlight. One lies out there every night (two on a co-op night) — by a wrecked car, at the foot of a
+// The flashlight. Two lie out there every night (three on a co-op night) — by a wrecked car, at the foot of a
 // tower, among the graves — still switched on, its beam weak across the ground: you see it before you find
 // it. Take it (E), and T switches it: a cone of real light wherever you look, for as long as the battery
 // lasts (it flickers when it's nearly gone; spare batteries turn up in cupboards).
@@ -35,10 +35,11 @@ export const TORCH = {
   beaconEvery: 2.2, // ...checked this often
   pickR: 1.7,
   lying: 0.85, // the one lying out there: still on, weakly
-  lyingR: 10,
+  lyingR: 13,
 };
-// where they lie (not at the five generator sites: those have their own reasons to go to)
-const SPOTS = ['wreck2', 'tower2', 'graves', 'graves2', 'stones2', 'wreck', 'tower'];
+// where they lie (away from the generator sites' centres: those have their own reasons to go to)
+export const SPOTS = ['wreck2', 'tower2', 'graves', 'graves2', 'stones2', 'wreck', 'tower', 'sovkhoz'];
+export const torchCount = (online) => (online ? 3 : 2); // (2.1q: one was a rumor, not a find)
 const PI = Math.PI;
 
 export function torchArrays() {
@@ -123,7 +124,7 @@ export class Torches {
     this.dip = false;
     this.beaconT = TORCH.beaconEvery;
     const pool = SPOTS.slice();
-    const n = online ? 2 : 1;
+    const n = torchCount(online);
     for (let i = 0; i < n && pool.length; i++) {
       const id = pool.splice(Math.floor(rng.next() * pool.length), 1)[0];
       const L = LANDMARKS.find((l) => l.id === id);
@@ -148,8 +149,8 @@ export class Torches {
       // the lens, glowing: a faint point of light you can see from a way off
       const halo = new THREE.Sprite(haloMaterial(0xfff0cc));
       halo.position.set(x - Math.sin(yaw) * 0.12, y + 0.01, z - Math.cos(yaw) * 0.12);
-      halo.scale.setScalar(0.5);
-      halo.material.opacity = 0.55;
+      halo.scale.setScalar(0.85); // (2.1q: players walked past the old one for whole shifts)
+      halo.material.opacity = 0.7;
       halo.renderOrder = 7;
       g.scene.add(halo);
       mesh.userData.halo = halo;

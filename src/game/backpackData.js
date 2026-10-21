@@ -1,6 +1,7 @@
 // The four pockets are the only storage for usable field items. Small consumables stack;
 // mission parts/notes belong to the shared objective, heavy UAZ parts occupy both hands.
-// The adrenaline syringe (co-op only): two a shift, a downed friend on their feet in a jab.
+// The adrenaline syringe: a downed friend on their feet in a jab (a dose at Zarya, one locked away,
+// and since 2.1q they also turn up in ordinary cupboards).
 export const BAG_SIZE = 4;
 export const BAG_KINDS = ['stones', 'glow', 'torch', 'flare', 'battery', 'tape', 'crowbar', 'map', 'syringe'];
 export const BAG_LIMIT = { stones: 3, glow: 3, torch: 1, flare: 6, battery: 3, tape: 1, crowbar: 1, map: 1, syringe: 2 };

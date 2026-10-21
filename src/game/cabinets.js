@@ -34,8 +34,10 @@ export const KEY_LABEL = { U: 'W', L: 'A', D: 'S', R: 'D' };
 const OPEN_R = 1.7;
 export const PRY_TIME = 2.8;
 const GRAB_R = 2.4;
-const ITEMS = ['glow', 'nuts', 'shard', 'flare', 'battery'];
-const ITEM_W = [0.29, 0.29, 0.23, 0.12, 0.07]; // (batteries: rare — the flashlight is for a quick look)
+export const LOOT_ITEMS = ['glow', 'nuts', 'shard', 'flare', 'battery', 'syringe'];
+export const LOOT_W = [0.27, 0.27, 0.21, 0.11, 0.07, 0.07]; // (batteries rare — the flashlight is for a quick look; a dose turns up now and then too)
+const ITEMS = LOOT_ITEMS;
+const ITEM_W = LOOT_W;
 const RES = { NONE: 0, PULL: 1, SYNC: 2, OFF: 3, STRUGGLE: 4, PERFECT: 5 };
 const _v = new THREE.Vector3();
 const _w = new THREE.Vector3();
@@ -453,7 +455,7 @@ export class Cabinets {
           if (x < ITEM_W[j]) { kind = ITEMS[j]; break; }
           x -= ITEM_W[j];
         }
-        if (c.kind === 'firstaid' && k === 0) kind = 'glow';
+        if (c.kind === 'firstaid' && k === 0) kind = rng.next() < 0.5 ? 'syringe' : 'glow'; // a medicine cabinet keeps a dose half the time
         if (c.id === 'zarya:aid' && k === 0) kind = 'syringe'; // the medicine cabinet keeps a dose (solo too: it goes in your own thigh)
         if (c.spec.loot?.[k]) kind = c.spec.loot[k];
         const mesh = new THREE.Mesh(this.itemGeo[kind], this.mat);

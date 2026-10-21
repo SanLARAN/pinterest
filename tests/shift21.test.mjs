@@ -1,5 +1,5 @@
 // Regressions for the 2.1 shift: four days instead of the 45-minute limit, dawns that carry the day,
-// the fallen raised by daylight, the nightly flare gun, and the net messages that keep a room together.
+// the nightly flare gun, and the net messages that keep a room together. (Dawn raised the fallen until 2.1q.)
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
@@ -52,8 +52,8 @@ function bare(shift = {}) {
   g.updateRemotes = () => {};
   g.coop = { toHost() {}, hostId: 'h' };
   g.world = { terrain: { height: () => 0 } };
-  g.rescue = { dawnSweep() {}, update() {} };
-  g.escape = { held: null, mySeat: -1 };
+  g.rescue = { dawnClaim() {}, update() {} };
+  g.escape = { held: null, mySeat: -1, update() {} }; // (2.1q: the yard lives through the morning too)
   g.stats = { revives: 0, syringes: 0 };
   g.onEnd = null;
   g.dread = { reset() {} };
@@ -66,7 +66,7 @@ test('the shift is four days: 8-minute nights, 1:45 mornings, no 45-minute limit
   assert.equal(S.NIGHT, 480);
   assert.equal(S.MORNING, 105);
   assert.equal('RUN_SECONDS' in CFG, false);
-  assert.equal(PROTOCOL, 15); // 2.1o: the Angler rides the snapshots (was 14 for the four-day shift itself)
+  assert.equal(PROTOCOL, 16); // 2.1o: the Angler on the snapshots · 2.1q: broken generators ride the objectives state
 });
 
 test('danger steps every four minutes of a night and again with each dawn survived', () => {
@@ -179,26 +179,33 @@ test("the host's dawn carries the day over the wire; a guest far behind catches 
   assert.equal(g.state, 'play', 'the host does not process its own broadcast');
 });
 
-test('dawn clears the fallen where they lie — down, bled out, on the cot or over a shoulder — but not what the шкафандр took', () => {
+test('dawn raises nobody (2.1q): still down at first light — bleeding, on the cot or over a shoulder — is gone for the shift', () => {
   const g = bare();
-  g.role = 'client';
-  const me = { ...g.player, alive: false, gone: true, downs: 2, bleedEnd: -1, carriedBy: null, carrying: null, onCot: false, consumed: false, revive(x, z, yaw) { this.alive = true; this.x = x; this.z = z; this.yaw = yaw; } };
-  const mate = { id: 'b', alive: false, gone: false, downs: 1, carriedBy: 'a', carrying: null, onCot: true, consumed: false, x: 3, z: 4, yaw: 0, revive() { this.alive = true; } };
-  const eaten = { id: 'c', alive: false, gone: true, downs: 1, carriedBy: null, carrying: null, onCot: false, consumed: true, revive() { assert.fail('the шкафандр keeps what it took'); } };
+  g.role = 'host'; // online and the authority: the 'bo' word is the host's to say
+  const evs = [];
+  g.sync = { ev: (...a) => evs.push(a), process() {}, tick() {} };
+  const me = { ...g.player, alive: false, gone: false, downs: 2, bleedEnd: 99, carriedBy: null, carrying: null, onCot: false, consumed: false };
+  const carrier = { id: 'd', alive: true, gone: false, carrying: 'b', carriedBy: null, consumed: false };
+  const mate = { id: 'b', alive: false, gone: false, downs: 1, carriedBy: 'd', carrying: null, onCot: true, consumed: false, x: 3, z: 4, yaw: 0 };
+  const bledOut = { id: 'e', alive: false, gone: true, downs: 1, carriedBy: null, carrying: null, onCot: false, consumed: false };
+  const eaten = { id: 'c', alive: false, gone: true, downs: 1, carriedBy: null, carrying: null, onCot: false, consumed: true };
   g.player = me;
+  g.remotes.set('d', carrier);
   g.remotes.set('b', mate);
+  g.remotes.set('e', bledOut);
   g.remotes.set('c', eaten);
-  g.reviveLocal = (x, z, yaw) => me.revive(x, z, yaw);
-  g.nameOf = () => 'Mate';
   const r = Object.create(Rescue.prototype);
   r.g = g;
-  r.dawnSweep();
-  assert.equal(me.alive, true);
-  assert.equal(me.gone, false);
-  assert.equal(me.downs, 2, 'the body remembers: the next bleed is shorter');
-  assert.equal(mate.alive, true);
-  assert.equal(mate.onCot, false);
-  assert.equal(eaten.alive, false);
+  r.cotId = null;
+  r.waitRv = 0;
+  r.dawnClaim();
+  assert.equal(me.alive, false, 'morning is not a medic');
+  assert.equal(me.gone, true, 'down at dawn = gone, though the bleed had not run out');
+  assert.equal(mate.gone, true, 'on the cot at dawn is gone too — the cot only counts with hands on it');
+  assert.equal(carrier.carrying, null, "the carrier's hands are empty");
+  assert.equal(bledOut.gone, true);
+  assert.equal(eaten.gone, true, 'the шкафандр still keeps what it took');
+  assert.deepEqual(evs.filter((e) => e[0] === 'bo').map((e) => e[1]).sort(), ['a', 'b'], 'the host says bo for the two newly gone, no more');
 });
 
 test('a repaired camp generator holds its light through every dusk of the shift', () => {

@@ -44,7 +44,6 @@ export function mountSfxPanel(audio) {
     ['Удильщик: верёвка и узел', () => audio.ropeTie(...at(2, 0, 1), 1)],
     ['Удильщик: вырубил', () => audio.koThud(...at(1, 0, 1.2), 1.2)],
     ['Удильщик: тесак', () => audio.cleaverStrike(...at(2.5, 0, 1.4), 1)],
-    ['гитара в гараже (фраза целиком)', () => { for (let i = 0; i < 16; i++) setTimeout(() => audio.guitarPluck(i), i * 480); }],
     ['вдали: металл', () => amb('groan')],
     ['утро: птицы', () => { for (let i = 0; i < 6; i++) setTimeout(() => audio.bird(), i * 450); }],
     ['стемнело', () => { audio.startAmbience(); audio.dusk(); }],

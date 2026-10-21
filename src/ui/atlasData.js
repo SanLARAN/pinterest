@@ -203,6 +203,7 @@ const TEXT = {
           'Откуда пришёл писк, показывает янтарная чёрточка у точки в центре экрана.',
           'Запуск ревёт на весь лес — слышно метров на сорок–пятьдесят. Запустил — уходи.',
           'В тёплом круге лампы (~10 м) видно тварей, а Наблюдатель туда не войдёт.',
+          'С третьей ночи твари научились разбивать работающие генераторы — до двух за ночь: запчасть остаётся внутри, заведи его заново.',
         ],
         facts: [['всего', '5'], ['очки', '2000 × множитель'], ['свет лампы', '~10 м'], ['победа', '5 из 5 · бонус за скорость']],
         quote: 'Свет вырубился разом, генератор заглох.',
@@ -304,7 +305,7 @@ const TEXT = {
         "name": "Фонарик",
         "latin": "Lumen breve",
         "text": [
-          "Лежит ещё включённый у развалин, вышек или могил. В одиночной ночи один, в кооперативе два. Подними (E): в руке он даст узкий конус настоящего тёплого света.",
+          "Лежит ещё включённый у развалин, вышек или могил. В одиночной ночи два, в кооперативе три. Подними (E): в руке он даст узкий конус настоящего тёплого света.",
           "Свет всё ещё опасен, но теперь полезнее: найденный заряд 60 %, около 81 секунды. Свет — маяк; тому, кто видит тебя, даже не обязательно попасть в луч."
         ],
         "tips": [
@@ -508,14 +509,14 @@ const TEXT = {
         facts: [['с собой', '1 на ночь'], ['горит', '~2,5 мин'], ['свет', 'на ~6 м'], ['щелчок', 'слышно в паре шагов']],
       },
       syringe: {
-        name: 'Шприц адреналина', latin: 'две на смену · друг или своё бедро',
+        name: 'Шприц адреналина', latin: 'друг или своё бедро',
         text: [
           'Тяжёлый пакет из аптечки на стене «Зорьки». Адреналин — для сердца, остановившегося от страха, а не от ран: укол возвращает павшего на ноги там, где он лежит. Без носилок, без койки, без шести секунд у постели.',
           'Возьми в руки (I) и нажми ЛКМ рядом с лежащим другом — полторы секунды, и он стоит. Кровотечение за это время не останавливается: не медли и не промахивайся.',
           'Пять минут после укола его ноги как резина: ходьба медленнее на пятую часть, бег — на четверть, дыхание сбивается вдвое быстрее. Это цена скорости.',
         ],
-        tips: ['Одна доза всегда в аптечке у «Зорьки», вторая — в каком-то запертом шкафу (в компании).', 'Укол не действует на того, кто уже истёк: успей до последней капли.', 'Койка в мед-хижине по-прежнему лечит без последствий — если дотащишь.', 'В одиночной смене укол идёт в собственное бедро: дыхание возвращается, ноги ватные пять минут.'],
-        facts: [['укол', '1,5 с'], ['дистанция', '2,2 м'], ['после', '5 мин «резиновых ног»'], ['за смену', '2 · друг или ты']],
+        tips: ['Одна доза всегда в аптечке у «Зорьки», ещё одна — в каком-то запертом шкафу (в компании), а иногда шприц просто попадается в шкафчиках, как всё остальное.', 'Укол не действует на того, кто уже истёк: успей до последней капли.', 'Койка в мед-хижине по-прежнему лечит без последствий — если дотащишь.', 'В одиночной смене укол идёт в собственное бедро: дыхание возвращается, ноги ватные пять минут.'],
+        facts: [['укол', '1,5 с'], ['дистанция', '2,2 м'], ['после', '5 мин «резиновых ног»'], ['в рюкзаке', 'до 2']],
       },
       camp: {
         name: 'Лагерь', latin: 'старая просека · генератор №1',
@@ -533,7 +534,7 @@ const TEXT = {
           'Только здесь можно спасти друга, которого поймали. Упавший не умирает сразу — он медленно истекает кровью. Донеси его сюда (R — поднять на плечо), положи на койку (R) и работай руками (удерживай E), пока он не вдохнёт.',
           'Сколько ему осталось, не скажет никто. Опустись рядом и нащупай пульс (удерживай E): ровный, слабый, еле слышен — и примерно сколько минут. Чтобы узнать снова, щупай снова.',
         ],
-        tips: ['С другом на плече бежать нельзя, а шаги тяжёлые и громкие. Красная засечка у точки показывает, где хижина.', 'Каждое падение короче прошлого: 4 минуты, потом меньше трёх, потом две.', 'Дверь закрывается (E) — даже с ношей на плече: толкнёшь плечом.', 'Её фонарь видно издалека: тёплая точка в лесу у лагеря.'],
+        tips: ['Рассвет упавшего не поднимет: кто встретил утро на земле, того ночь оставила себе. Всё спасение — только ночью.', 'С другом на плече бежать нельзя, а шаги тяжёлые и громкие. Красная засечка у точки показывает, где хижина.', 'Каждое падение короче прошлого: 4 минуты, потом меньше трёх, потом две.', 'Дверь закрывается (E) — даже с ношей на плече: толкнёшь плечом.', 'Её фонарь видно издалека: тёплая точка в лесу у лагеря.'],
         facts: [['где', '~25 м от костра'], ['койка', 'одна'], ['вернуть', '~6 с руками'], ['истекает', '4 · 3 · 2 мин'], ['размер', '{len}']],
       },
       cabin: {
@@ -799,6 +800,7 @@ const TEXT = {
           'An amber tick by the dot in the middle of the screen shows where the beep came from.',
           'Starting it roars through the forest — heard forty to fifty metres away. Start it, then leave.',
           "In the warm circle of its lamp (~10 m) the creatures can be seen, and the Watcher won't come in.",
+          "From the third night the things have learned to beat a running generator until it stops — up to two a night: the part stays inside, just crank it back up.",
         ],
         facts: [['in total', '5'], ['score', '2000 × multiplier'], ['lamp light', '~10 m'], ['victory', '5 of 5 · speed bonus']],
         quote: 'The lights died all at once and the generator stalled.',
@@ -900,7 +902,7 @@ const TEXT = {
         "name": "Flashlight",
         "latin": "Lumen breve",
         "text": [
-          "Still switched on by a wreck, a tower or the graves. One per solo night, two in co-op. Pick it up (E): a narrow cone of real warm light.",
+          "Still switched on by a wreck, a tower or the graves. Two per solo night, three in co-op. Pick it up (E): a narrow cone of real warm light.",
           "Still dangerous, but more useful: found at 60% charge, about 81 seconds. Its light is a beacon, even to things outside the beam."
         ],
         "tips": [
@@ -1104,14 +1106,14 @@ const TEXT = {
         facts: [['carry', '1 a night'], ['burns', '~2.5 min'], ['light', '~6 m'], ['the snap', 'heard a couple of steps away']],
       },
       syringe: {
-        name: 'Adrenaline syringe', latin: 'two a shift · a friend, or your own thigh',
+        name: 'Adrenaline syringe', latin: 'a friend, or your own thigh',
         text: [
           'A heavy packet from the medicine cabinet at Zarya. Adrenaline is for a heart stopped by fear, not wounds: one jab puts a friend who is down back on their feet where they lie. No stretcher, no cot, no six seconds at the bedside.',
           'Equip it (I) and press LMB beside a friend who is down — a second and a half, and they are standing. The bleeding does not stop while you fumble: hurry, and do not miss.',
           'For five minutes after the jab their legs are rubber: walking a fifth slower, running a quarter slower, breath giving out half again as fast. That is the price of speed.',
         ],
-        tips: ['One dose always waits in the medicine cabinet at Zarya; the second, in some locked cupboard.', 'The jab cannot help someone who has already bled out — get there before the last drop.', "The cot in the scouts' hut still heals without after-effects — if you can carry them that far.", 'In a solo shift the dose goes into your own thigh: the breath comes back, the legs go for five minutes.'],
-        facts: [['the jab', '1.5 s'], ['reach', '2.2 m'], ['after', '5 min of rubber legs'], ['a shift', '2 · a friend or you']],
+        tips: ['One dose always waits in the medicine cabinet at Zarya; another hides in some locked cupboard (in company), and now and then one simply turns up in an ordinary cupboard.', 'The jab cannot help someone who has already bled out — get there before the last drop.', "The cot in the scouts' hut still heals without after-effects — if you can carry them that far.", 'In a solo shift the dose goes into your own thigh: the breath comes back, the legs go for five minutes.'],
+        facts: [['the jab', '1.5 s'], ['reach', '2.2 m'], ['after', '5 min of rubber legs'], ['in the bag', 'up to 2']],
       },
       camp: {
         name: 'The camp', latin: 'an old clearing · generator #1',
@@ -1129,7 +1131,7 @@ const TEXT = {
           'Only here can a friend who was caught be saved. The fallen do not die at once — they slowly bleed out. Carry them here (R — onto your shoulder), lay them on the cot (R) and work on them (hold E) until they draw breath.',
           'Nobody can tell you how long they have. Kneel and feel for a pulse (hold E): steady, weak, barely there — and roughly how many minutes. To know again, feel again.',
         ],
-        tips: ['With a friend on your shoulder you cannot run, and your steps are heavy and loud. A red tick by the dot shows where the hut is.', 'Each fall is shorter than the last: 4 minutes, then under three, then two.', 'The door closes (E) — even with someone on your shoulder: you shove it.', 'Its lantern shows from far off: a warm point in the forest by the camp.'],
+        tips: ['Dawn will not raise the fallen: whoever meets the morning on the ground is the night’s to keep. Every rescue happens in the dark or not at all.', 'With a friend on your shoulder you cannot run, and your steps are heavy and loud. A red tick by the dot shows where the hut is.', 'Each fall is shorter than the last: 4 minutes, then under three, then two.', 'The door closes (E) — even with someone on your shoulder: you shove it.', 'Its lantern shows from far off: a warm point in the forest by the camp.'],
         facts: [['where', '~25 m from the fire'], ['cot', 'one'], ['bring back', '~6 s by hand'], ['bleeds out', '4 · 3 · 2 min'], ['size', '{len}']],
       },
       cabin: {

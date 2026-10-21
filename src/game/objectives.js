@@ -7,7 +7,7 @@
 // the Watcher won't step into it. Its radio beeps until it runs, so you can find it by ear.
 //
 // Co-op: every player works on the objectives on their own machine and shares the state. Nothing here
-// ever goes backwards (a part found stays found, progress only grows, a running engine keeps running),
+// ever goes backwards (a part found stays found, progress only grows — a part found stays found. A running engine, though, can be beaten stopped (2.1q): that one step backwards rides a revision counter (breakRev) so the merge below stays honest),
 // so merging is simply "furthest wins" — no host round-trip, and two people on one engine can't conflict.
 import * as THREE from 'three';
 import { CFG } from '../core/config.js';
@@ -163,7 +163,7 @@ export class Objectives {
   // ---------------- co-op ----------------
   netState() {
     return {
-      g: this.gens.map((g) => [PH.indexOf(g.phase), Math.round(g.progress * 1000) / 1000, g.pulls, Math.round(g.spinT * 100) / 100, (g.hasPart ? 1 : 0) | (g.known ? 2 : 0) | (g.running ? 4 : 0)]),
+      g: this.gens.map((g) => [PH.indexOf(g.phase), Math.round(g.progress * 1000) / 1000, g.pulls, Math.round(g.spinT * 100) / 100, (g.hasPart ? 1 : 0) | (g.known ? 2 : 0) | (g.running ? 4 : 0), g.breakRev | 0]),
       b: this.bodies.reduce((m, b, i) => m | (b.searched ? 1 << i : 0), 0),
     };
   }
@@ -175,6 +175,13 @@ export class Objectives {
       const g = this.gens[k], r = s.g[k];
       if (!Array.isArray(r)) continue;
       const ph = PH[r[0]] || 'dead';
+      const rev = r[5] | 0;
+      if (rev < (g.breakRev | 0)) continue; // a stale word from before it was last broken: this machine is ahead
+      if (rev > (g.breakRev | 0)) {
+        g.breakRev = rev;
+        if (g.running) { this._broken(g); this.g.onGenBroken(g, true); }
+        else g.broken = true;
+      }
       const fl = r[4] | 0;
       if (fl & 1) g.hasPart = true;
       if (fl & 2 && !g.known) {
@@ -284,6 +291,7 @@ export class Objectives {
       x: this.sites[si].x, y: this.sites[si].y, z: this.sites[si].z,
       phase: 'dead', progress: 0, pulls: 0, pullCD: 0, spinT: 0, spinNoiseT: 0,
       hasPart: false, known: k === 0, running: false,
+      paid: false, broken: false, breakRev: 0, ranAt: -99, // (2.1q: a running engine can be beaten stopped)
       lamp: 0, flick: 0, hum: null, beaconT: 1.5 + k, clankT: 0.5, sparkT: 1.5,
     }));
     for (const body of this.bodies) {
@@ -413,6 +421,7 @@ export class Objectives {
     const g = this.gens.find((q) => !q.running);
     if (!g) return this.g.escape ? this.g.escape.taskText() : '';
     if (g.phase === 'spin') return t('taskSpin');
+    if (g.broken) return t('taskRestartGen').replace('{site}', this.siteAt(g.site));
     if (g.hasPart) return t('taskRepair').replace('{site}', this.siteAt(g.site));
     if (g.k === 0) return t('taskCamp');
     if (!g.known) return t('taskFindNext');
@@ -577,7 +586,9 @@ export class Objectives {
       for (const body of this.bodies) if (body.searched && body.gun?.visible) consider(body, body.x, body.z, USE_R_BODY, 'bodyGun');
       if (game.expedition) game.expedition.consider(consider);
     }
-    if (es && !doorsOnly && !riding) es.consider(consider);
+    // (2.1q: the morning is for hauling too — a part may be picked up, carried and fitted in daylight;
+    // sitting in the car and driving off still belong to the night)
+    if (es && !riding) es.consider(doorsOnly ? (o, x, z, r, k) => { if (k === 'part' || k === 'carFit') consider(o, x, z, r, k); } : consider);
     if (game.doors && !seated && !riding) game.doors.consider(consider);
     // cupboards (in the morning too: the first-aid hut is right by the camp) — and someone caught in one
     if (game.cabinets && !seated && !riding) game.cabinets.consider(consider, !p.carrying && !(es && es.held));
@@ -685,6 +696,11 @@ export class Objectives {
       }
       return;
     }
+    if (g.broken) { // beaten stopped in the night (2.1q): crank it back up
+      hud.setUse(T('useGenRestart'), g.progress, true);
+      if (held && still) { this._work(g, dt); this.working = g; }
+      return;
+    }
     hud.setUse(T('useHold').replace('{action}', t('actions')[spec.part]), g.progress, true);
     if (held && still) { this._work(g, dt); this.working = g; }
   }
@@ -735,7 +751,7 @@ export class Objectives {
     const game = this.g;
     const spec = g.spec;
     if (g.phase === 'dead') g.phase = 'work';
-    g.progress = Math.min(1, g.progress + dt / spec.dur);
+    g.progress = Math.min(1, g.progress + dt / (g.broken ? CFG.GEN_BREAK.restartDur : spec.dur));
     this.dirty = true;
     g.clankT -= dt;
     if (g.clankT <= 0) {
@@ -789,12 +805,43 @@ export class Objectives {
     const game = this.g;
     g.phase = 'running';
     g.running = true;
+    g.broken = false;
+    g.ranAt = game.time;
     g.flick = 1.2;
     if (g.hum) g.hum.spin(1); // a spun-up engine just keeps going
     this.count = this.gens.filter((q) => q.running).length;
     if (!by) this.dirty = true;
     game.audio.genStart(g.x, g.y + 0.6, g.z);
     game.onGeneratorStarted(g, this.count, by && by !== true ? by : null);
+  }
+
+  // the host's word: a thing beat this engine until it stopped (2.1q). The part stays in it;
+  // the work does not. Guests get here through the revision in the state merge, not an event.
+  hostBreakGen(g) {
+    if (!g.running) return;
+    g.breakRev = (g.breakRev | 0) + 1;
+    this._broken(g);
+    this.dirty = true;
+    this.g.onGenBroken(g, false);
+  }
+
+  // what a beaten-stopped generator looks like on every machine
+  _broken(g) {
+    g.running = false;
+    g.phase = 'dead';
+    g.progress = 0;
+    g.pulls = 0;
+    g.spinT = 0;
+    g.broken = true;
+    g.flick = 1.2;
+    g.beaconT = 1.2; // it calls for help again, like any engine that is not running
+    this.count = this.gens.filter((q) => q.running).length;
+    if (g.hum) {
+      g.hum.sputter();
+      const h = g.hum;
+      g.hum = null;
+      setTimeout(() => h.stop(), 1600);
+    }
   }
 
   // a sound wave just found something

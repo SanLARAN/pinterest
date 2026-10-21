@@ -370,7 +370,8 @@ export class Game {
           return;
         }
         this.coop.toHost('sk', 1); // a guest asks; the host's word starts the dusk for everyone
-      }
+      } else if (e === 'carry') this.carryKey(); // R: set the part down (2.1q: hauling is morning work too)
+      else if (e === 'primary' && this.escape.held) this.inventory.primary(); // ...or throw it down ahead
     }
     if (this.state !== 'morning') return;
     const pev = this.angler.myCap() ? (this.angler.captiveFrame(dt, this.inputMuted ? NO_LOOK : raw.look), { step: null, bump: null, breath: null })
@@ -392,6 +393,7 @@ export class Game {
     hud.setHint(hint);
     this.objectives.update(dt, false);
     this.doors.update(dt);
+    this.escape.update(dt); // the parts live and roll in daylight too (2.1q)
     this.cabinets.update(dt);
     this.medhut.update(dt);
     this.torch.update(dt);
@@ -473,7 +475,7 @@ export class Game {
     if (day <= this.day && this.state !== 'dawn') return;
     this.day = day;
     this.state = 'morning';
-    this.time = 0; // everyone still down was raised at dawn: the night's clocks start clean
+    this.time = 0; // the night's clocks start clean (the fallen stay fallen: see Rescue.dawnClaim)
     this.morningT = 0;
     this.duskT = 0;
     this.duskHit = false;
@@ -1259,9 +1261,12 @@ export class Game {
 
   onGeneratorStarted(g, count, by = null) {
     this.stats.gens = count;
-    const pts = CFG.SCORE.generator * this.mult;
+    const pts = g.paid ? 0 : CFG.SCORE.generator * this.mult; // (2.1q: cranking a beaten engine back earns the light, not the points twice)
+    g.paid = true;
     this.score += pts;
-    this.hud.popup(by ? `+${Math.round(pts)} · ${t('mateStarted').replace('{name}', this.nameOf(by))}` : `+${Math.round(pts)}`, 'amber');
+    this.hud.popup(pts > 0
+      ? (by ? `+${Math.round(pts)} · ${t('mateStarted').replace('{name}', this.nameOf(by))}` : `+${Math.round(pts)}`)
+      : t('genRestarted'), 'amber');
     this.hud.flashAlert(t('aGenOn').replace('{n}', count), 'dawn', 2.6);
     this.hud.peek(4);
     // the light coming back: a warm wave rolls out from the lamp
@@ -1273,6 +1278,16 @@ export class Game {
     this.noise(g.x, g.z, g.spec.startLoud, 'repair'); // the engine roars — the host's monsters hear it whoever started it
     // all five: there's power at the forestry yard — its floodlight, its siren, its gate (every machine sees it)
     if (count >= 5) this.timeline.push({ at: this.time + 1.8, fn: () => { if (this.state === 'play') this.escape.powerOn(); } });
+  }
+
+  // a thing beat a running generator until it stopped (2.1q): the count falls and the task points back
+  onGenBroken(g, remote = false) {
+    this.stats.gens = this.objectives.count;
+    if (!remote && this.sab && this.sab.day === this.day) this.sab.done++;
+    this.hud.flashAlert(t('aGenBroken').replace('{site}', this.objectives.siteAt(g.site)), 'danger', 3);
+    this.hud.peek(4);
+    this.audio.sting(0.4);
+    this.noise(g.x, g.z, g.spec.startLoud, 'repair'); // the death rattle carries: things come to look
   }
 
   // ---------------- death ----------------
@@ -1663,7 +1678,7 @@ export class Game {
   }
 
   // ---------------- dawn ----------------
-  // the night is over. Dawns one to three are a breather — the fallen get up and the next day begins;
+  // the night is over. Dawns one to three are a breather for whoever is still standing;
   // the fourth is the end of the shift and the win. The host's word starts it for everyone.
   startDawn() {
     this.state = 'dawn';
@@ -1675,7 +1690,7 @@ export class Game {
     this.hud.setUse(null);
     this.objectives.closeNote();
     if (this.role === 'host') this.sync.ev('dn', this.day);
-    this.rescue.dawnSweep(); // dawn clears the fallen (the шкафандр keeps what it took)
+    this.rescue.dawnClaim(); // dawn raises nobody (2.1q): still down at first light = gone
     const last = this.day >= CFG.SHIFT.DAYS;
     if (last) {
       this.winBonus = CFG.SCORE.win;
@@ -2241,6 +2256,41 @@ export class Game {
     }
   }
 
+  // from the third night the things have learned what the humming boxes mean (2.1q): up to twice a
+  // night one of them is sent to beat a running generator until it stops. Host-only, at the 1 Hz tick.
+  _sabotageTick() {
+    const B = CFG.GEN_BREAK;
+    if (!this.sab || this.sab.day !== this.day) this.sab = { day: this.day, done: 0, next: B.firstAfter };
+    const S = this.sab;
+    if (this.day < B.fromDay || S.done >= B.maxPerNight || this.time < S.next) return;
+    if (this.monsters.some((m) => m.sab)) return; // one errand at a time
+    const ob = this.objectives;
+    if (!ob.count || ob.count >= 5) { S.next = this.time + 20; return; } // nothing to break — or the yard already has its power
+    let best = null, bestD = -1;
+    for (const g of ob.gens) {
+      if (!g.running || this.time - (g.ranAt ?? -99) < B.minRun) continue;
+      let nd = 1e9;
+      for (const p of this.livePlayers()) nd = Math.min(nd, Math.hypot(p.x - g.x, p.z - g.z));
+      if (nd < B.playerClearR) continue; // not under your nose: you hear it die from away off
+      if (nd > bestD) { bestD = nd; best = g; }
+    }
+    if (!best) { S.next = this.time + 15; return; }
+    let m0 = null, md = 1e9;
+    for (const m of this.monsters) {
+      if (m.type !== 'listener' && m.type !== 'crawler') continue;
+      if (m.state === 'hunt' || m.state === 'feed' || m.state === 'flee' || m.scripted) continue;
+      const d = Math.hypot(m.x - best.x, m.z - best.z);
+      if (d < md) { md = d; m0 = m; }
+    }
+    if (!m0 || md > 110) { S.next = this.time + 15; return; }
+    m0.sab = best;
+    m0.sabT = 0;
+    m0.sabWhack = 0;
+    m0.sabAge = 0;
+    m0.investigate(best.x, best.z);
+    S.next = this.time + this.rng.float(B.gap[0], B.gap[1]);
+  }
+
   updateDirector(dt) {
     this.mult = dangerMultiplier(this.auth ? this.time : this.netT || this.time, this.day);
     if (this.mult !== this.lastMultStep) {
@@ -2277,6 +2327,7 @@ export class Game {
       if ((m.state === 'wander' || m.state === 'idle') && m.tgtDist > 120 && !m.intro) this.relocate(m);
       if (m.intro && m.tgtDist > 120) { m.intro = false; this.relocate(m); }
     }
+    this._sabotageTick();
   }
 
   updateIntro(dt) {

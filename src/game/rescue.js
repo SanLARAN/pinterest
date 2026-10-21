@@ -144,26 +144,28 @@ export class Rescue {
     this._gone(p);
   }
 
-  // dawn clears the fallen: anyone still down — or already bled out — gets up where they are, whole.
-  // The шкафандр keeps what it took. Their next bleed is shorter: the body remembers (see REVIVE.bleed).
-  dawnSweep() {
+  // dawn does NOT clear the fallen (2.1q): whoever is still down when the light comes stays down —
+  // the night keeps them, exactly as if the bleed had run out under the trees. Only a rescue during
+  // the night itself (the cot, the needle) puts anyone back on their feet; morning is not a medic.
+  dawnClaim() {
     const g = this.g;
     if (!g.online) return;
     for (const p of this.downed()) {
-      if (p.consumed) continue;
+      if (p.consumed || p.gone) continue;
       if (p.carriedBy) {
         const c = g.playerById(p.carriedBy);
         if (c && c.carrying === p.id) c.carrying = null;
+        p.carriedBy = null;
       }
-      this.revive(p, p.x, p.z, p.yaw, null);
-      if (p === g.player) g.hud.popup(t('dawnRaise'), 'dawn');
-      else g.hud.popup(t('mateDawnRaise').replace('{name}', g.nameOf(p.id)), 'dawn');
+      p.gone = true;
+      if (g.auth && g.sync) g.sync.ev('bo', p.id); // the host's word, as with any bleed-out
+      this._gone(p, true);
     }
   }
 
-  _gone(p) {
+  _gone(p, dawn = false) {
     const g = this.g;
-    if (p === g.player) g.hud.popup(t('youGone'), 'dim'); // (nobody else is told: they'd have to feel for it)
+    if (p === g.player) g.hud.popup(t(dawn ? 'dawnNoRaise' : 'youGone'), 'dim'); // (nobody else is told: they'd have to feel for it)
     if (this.waitRv > 0 && this.cotId === p.id) {
       this.waitRv = 0;
       g.hud.pulse(t('reviveLate'), 'none');

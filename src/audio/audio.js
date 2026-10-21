@@ -3314,29 +3314,6 @@ export class AudioEngine {
     out.connect(this.gSfx);
   }
 
-  // a guitar taken down in the garage (the Keanu set's idle): plucked strings, synthesized — three
-  // partials and a pick transient per note, through the music setting on the garage bus. The phrase
-  // is a slow minor walk; `step` walks it, call by call, and the caller keeps the beat.
-  guitarPluck(step = 0, I = 1) {
-    if (!this.ctx) return;
-    this._gbus();
-    if (!this.gSfx) return;
-    const PHRASE = [0, null, 7, null, 5, 3, null, 5, 0, null, -4, null, 0, 3, null, 2]; // semitones over A2; null: a rest
-    const semi = PHRASE[((step % PHRASE.length) + PHRASE.length) % PHRASE.length];
-    if (semi === null) return;
-    const f0 = 110 * Math.pow(2, semi / 12);
-    const t = this.now;
-    const g = Math.pow(settings.music ?? 0.55, 1.15) * 0.55 * I;
-    if (g <= 0.001) return;
-    const dest = this._gain(g);
-    dest.connect(this.gSfx);
-    if (this.gRevSend) dest.connect(this.gRevSend);
-    this._noiseBurst(t, { type: 'bandpass', f: f0 * 6, q: 1.2, a: 0.001, d: 0.03, gain: 0.35, dest }); // the pick
-    this._tone(t, { type: 'triangle', f: f0, a: 0.002, d: 1.9, gain: 0.5, dest });
-    this._tone(t, { f: f0 * 2, a: 0.002, d: 1.2, gain: 0.22, dest });
-    this._tone(t, { f: f0 * 3.01, a: 0.002, d: 0.7, gain: 0.1, dest });
-    this._tone(t, { f: f0 * 0.5, a: 0.004, d: 0.9, gain: 0.12, dest }); // the body's thump under the string
-  }
 
   // rain on the tin roof, wind in the gap of the wicket door, the bulb's hum, now and then a drip
   garageAmb(on) {
