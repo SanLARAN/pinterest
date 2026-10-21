@@ -14,6 +14,7 @@ export const NEWS = [
       'Развязал друга — +750. Одинокий может сам перегрызть верёвку, но это слышно. Рассвет верёвку не снимает: часы идут и днём',
       'Старт из гаража — теперь фильм: все садятся в УАЗ, кроме одного. Тот спотыкается, бежит следом и хватает борт на ходу',
       'Новый бесплатный комплект «Киану»: волосы с пробором, борода, чёрный костюм. В полном комплекте — гитара в гараже и раздевалке',
+      'В атласе — страница Удильщика: привычки, цифры и как пережить встречу. Он там ходит с фонарём и даже подходит ближе',
     ]},
     en:{title:'The man with the lantern',items:[
       'From the third night the Angler walks the forest: a big man with a lantern and a cleaver. He takes whoever strayed from the others',
@@ -21,6 +22,7 @@ export const NEWS = [
       'Untie a friend for +750. Alone, you can chew through the rope yourself, but it makes noise. Dawn does not untie you: his clock keeps running in daylight',
       'Leaving the garage is a film now: everyone boards the UAZ but one. He trips, runs after it and grabs the side at a crawl',
       'A new free set, Keanu: centre-parted hair, a beard, a black suit. Worn whole, a guitar comes out now and then in the garage and the wardrobe',
+      'The atlas has his page now: habits, numbers and how to survive him. He walks there with his lantern — and comes closer',
     ]},
   },
   {

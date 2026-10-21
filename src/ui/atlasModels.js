@@ -10,7 +10,7 @@ import * as THREE from 'three';
 import { MeshBuilder, KIND } from '../world/builder.js';
 import { RNG, clamp, lerp, angleDiff } from '../core/rng.js';
 import { World, LANDMARKS } from '../world/world.js';
-import { buildListener, buildCrawler, buildWatcher, buildHowler, buildShade, ANIMS } from '../game/monsters.js';
+import { buildListener, buildCrawler, buildWatcher, buildHowler, buildAngler, buildShade, ANIMS } from '../game/monsters.js';
 import { placer, buildCorpse, buildToolBag, buildFlareGun } from '../game/objectives.js';
 import { buildDoorLeaf } from '../game/doors.js';
 import { buildForestCar, buildPart, WHEELS, MISSING, HOOD_HINGE, HOOD_OPEN, PARTS } from '../game/uaz.js';
@@ -156,6 +156,31 @@ function howler(mat) {
       ANIMS.howler(m, S.dt, S.t);
       // between howls it breathes like bellows
       if (m.state === 'idle') rig.nodes.chest.scale.setScalar(1 + Math.sin(S.t * 1.4) * 0.025);
+    },
+  };
+}
+
+// a man, and in no hurry: he walks his round with the lantern up. When his sound plays he
+// comes and takes — first the stride, then the lean of a man hauling something by the arm
+function angler(mat) {
+  const rig = buildAngler();
+  const root = rigMeshes(rig, mat);
+  const m = puppet(rig, 3.7);
+  const still = (st, spd, ph) => () => { setState(m, st); m.speedCur = spd; m.phase = ph; ANIMS.angler(m, 0, 0); };
+  return {
+    root, base: 0.3, view: { yaw: 0.6, pitch: 0.07 },
+    poses: [still('hunt', 2.1, 0.9), still('tie', 0, 0)],
+    tick(S) {
+      m.stateT += S.dt;
+      if (S.react < 2.5) setState(m, 'hunt');
+      else if (S.react < 4.2) setState(m, 'haul');
+      else setState(m, 'idle');
+      const stride = m.state === 'hunt' ? 2.1 : m.state === 'haul' ? 1.15 : 0.55 + 0.3 * Math.max(0, Math.sin(S.t * 0.45));
+      m.speedCur = lerp(m.speedCur, stride, 1 - Math.exp(-3 * S.dt));
+      m.phase += S.dt * m.speedCur * 2.6;
+      if (S.react < 4.2) m.attendT = 1.1; // he heard the page turn
+      attend(m, S, 2.4, 4, 0.65);
+      ANIMS.angler(m, S.dt, S.t);
     },
   };
 }
@@ -673,7 +698,7 @@ function shkaf(mat) {
 
 // ---------------- registry ----------------
 const MODELS = {
-  listener, crawler, watcher, howler, shkaf, shade,
+  listener, crawler, watcher, howler, angler, shkaf, shade,
   generator: (mat) => generator(mat, true),
   corpse, fuel, plug, fuses, belt, battery, shard, stone, flare, glowstick, flashlight,
   syringe,

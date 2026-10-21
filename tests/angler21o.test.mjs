@@ -12,6 +12,9 @@ import { buildAngler, createMonster, TYPES, STATES } from '../src/game/monsters.
 import { buildSurvivor, poseGuitar, rigVerts } from '../src/game/survivor.js';
 import { cleanFit, fullSet, ITEMS, THEMES } from '../src/game/outfit.js';
 import { DEPART, departPlan } from '../src/ui/departure.js';
+import { CHAPTERS, ENTRIES, atlasText, pageList } from '../src/ui/atlasData.js';
+import { buildModel } from '../src/ui/atlasModels.js';
+import * as THREE from 'three';
 
 const A = CFG.ANGLER;
 
@@ -291,4 +294,34 @@ test('the Angler is named in both languages, on the death screen and at the rope
     assert.equal(t('deathBy').angler, 'The Angler');
     assert.match(t('anglerGrabbed'), /HAS YOU/);
   } finally { setLang('ru'); globalThis.document = oldDoc; }
+});
+
+// ---------- the atlas ----------
+test('the atlas has his page: entry, both languages, and a plate that stands, walks and hauls', () => {
+  const beasts = CHAPTERS.find((c) => c.id === 'beasts');
+  assert.ok(beasts.entries.includes('angler'), 'chapter I lists him');
+  assert.equal(ENTRIES.angler.kind, 'beast');
+  assert.deepEqual(ENTRIES.angler.log.map((l) => l[1]), ['seen:angler', 'kills:angler'], 'the log reads his stats');
+  for (const lang of ['ru', 'en']) {
+    const e = atlasText(lang).entries.angler;
+    assert.ok(e && e.name && e.latin && e.text.length >= 2 && e.tips.length >= 3 && e.facts.length >= 5 && e.quote, lang);
+  }
+  assert.equal(atlasText('ru').entries.angler.name, 'Удильщик');
+  assert.equal(atlasText('en').entries.angler.name, 'The Angler');
+  // the whole book still resolves: every listed page has an entry and both texts
+  for (const p of pageList()) {
+    if (p.id === 'contents') continue;
+    assert.ok(ENTRIES[p.id], p.id);
+    assert.ok(atlasText('ru').entries[p.id] && atlasText('en').entries[p.id], p.id);
+  }
+  const mat = new THREE.MeshBasicMaterial();
+  const model = buildModel('angler', mat);
+  assert.ok(model && model.root.children.length > 0, 'the plate builds');
+  const S = { t: 0, dt: 1 / 30, lit: 0.5, pinged: false, camAz: 0.3, react: 99 };
+  for (let i = 0; i < 90; i++) { S.t += S.dt; model.tick(S); } // his idle round
+  S.react = 0;
+  for (let i = 0; i < 150; i++) { S.t += S.dt; S.react += S.dt; model.tick(S); } // his sound: the walk, the grab, the haul
+  for (const pose of model.poses || []) pose();
+  model.root.traverse((o) => { if (o.geometry) { assert.ok(o.geometry.attributes.position.array.every(Number.isFinite)); o.geometry.dispose(); } });
+  mat.dispose();
 });

@@ -6,7 +6,7 @@
 // fact values may use {h} (height) and {len} (longest side) — measured from the 3D model itself.
 
 export const CHAPTERS = [
-  { id: 'beasts', num: 'I', entries: ['listener', 'crawler', 'watcher', 'howler', 'shkaf', 'shade'] },
+  { id: 'beasts', num: 'I', entries: ['listener', 'crawler', 'watcher', 'howler', 'shkaf', 'angler', 'shade'] },
   { id: 'tasks', num: 'II', entries: ['generator', 'corpse', 'fuel', 'plug', 'fuses', 'belt', 'battery', 'shard', 'stone', 'flare', 'glowstick', 'flashlight', 'tape', 'crowbar', 'binoculars', 'syringe'] },
   { id: 'places', num: 'III', entries: ['camp', 'medhut', 'cabin', 'tower', 'stones', 'wreck', 'firetower', 'zarya'] },
   { id: 'way', num: 'IV', entries: ['yard', 'uaz', 'wheel', 'carbattery', 'carb', 'jerrycan'] },
@@ -18,6 +18,7 @@ export const ENTRIES = {
   watcher: { model: 'watcher', sound: 'watcher', kind: 'beast', rate: [0, 5, 2, 4], log: [['seen', 'seen:watcher'], ['killed', 'kills:watcher']] },
   howler: { model: 'howler', sound: 'howler', kind: 'beast', rate: [2, 4, 5, 5], log: [['seen', 'seen:howler'], ['killed', 'kills:howler']] },
   shkaf: { model: 'shkaf', sound: 'shkaf', kind: 'beast', rate: [0, 1, 0, 5], log: [['seen', 'seen:shkaf'], ['killed', 'kills:shkaf']] },
+  angler: { model: 'angler', sound: 'angler', kind: 'beast', rate: [3, 4, 2, 5], log: [['seen', 'seen:angler'], ['killed', 'kills:angler']] },
   shade: { model: 'shade', sound: 'shade', kind: 'beast', rate: [null, null, null, null], log: [['appeared', 'seen:shade']] },
   generator: { model: 'generator', sound: 'generator', kind: 'thing', log: [['started', 'gens'], ['wins', 'wins']] },
   corpse: { model: 'corpse', sound: 'corpse', kind: 'thing', log: [['searched', 'bodies']] },
@@ -161,6 +162,22 @@ const TEXT = {
         ],
         facts: [['высота', '{h}'], ['слух', 'нет'], ['время', '15 с'], ['встречается', 'редко · один за ночь'], ['после', 'больше не работает']],
         quote: 'Шкаф был тёплый. Я подумал — печка за стенкой.',
+      },
+      angler: {
+        name: 'Удильщик', latin: 'Piscator hominum',
+        text: [
+          'Большой человек — единственный здесь, кто вообще похож на человека. Фартук мясника, в левой руке штормовой фонарь, в правой тесак. Идёт не быстро и не прячется. Ему не надо.',
+          'Он не охотится на шум и не боится света. Он ждёт, пока кто-нибудь останется один — по-настоящему один, когда рядом никого. Тогда приходит, берёт за руку и волочит по земле к дереву, которое выбрал заранее.',
+          'У дерева привязывает — и уходит. Через пять минут возвращается и заканчивает. Навсегда: медпункт такого не поднимает.',
+        ],
+        tips: [
+          'Держитесь вместе. Едва ты снова среди своих — он теряет интерес.',
+          'Схватил — вырывайся: A и D по очереди, рывками. На земле у тебя только глаза и одна свободная рука.',
+          'Не кричи, пока он тебя волочит. Крика он не выносит: вырубит — и потащит сонного.',
+          'Привязанного ищите в 30–60 м от места, где его взяли. Развязать — 3 с у верёвки. Одному верёвку можно перегрызть самому, но это слышно.',
+        ],
+        facts: [['рост', '{h}'], ['приходит', '3-я ночь'], ['берёт', 'одного · никого в 32 м'], ['шаг · волочит', '3.8 · 1.65 м/с'], ['у дерева', '300 с'], ['крик', 'нокаут 8 с'], ['в лесу', 'один']],
+        quote: 'У него свет. Я пошёл на свет.',
       },
       shade: {
         name: 'Тень', latin: 'Umbra incerta',
@@ -727,6 +744,22 @@ const TEXT = {
         ],
         facts: [['height', '{h}'], ['hearing', 'none'], ['time', '15 s'], ['found', 'rarely · one a night'], ['after', 'never works again']],
         quote: 'The cupboard was warm. I thought there was a stove behind the wall.',
+      },
+      angler: {
+        name: 'The Angler', latin: 'Piscator hominum',
+        text: [
+          "A big man — the only thing here that looks like a man at all. A butcher's apron, a storm lantern in his left hand, a cleaver in his right. He walks unhurried and does not hide. He doesn't have to.",
+          'He does not hunt noise and does not fear light. He waits until someone is alone — properly alone, with nobody near. Then he comes, takes them by the arm and drags them along the ground to a tree he picked beforehand.',
+          'He ties his catch to it and leaves. In five minutes he comes back and finishes. For good: the med hut does not bring those back.',
+        ],
+        tips: [
+          'Stay together. The moment you are among your own again, he loses interest.',
+          'Taken — tear free: A and D in turn, in jerks. On the ground you have only your eyes and one free arm.',
+          'Do not scream while he drags you. He cannot stand screaming: he will knock you out and haul you sleeping.',
+          'Look for the tied one 30–60 m from where they were taken. Untying takes 3 s at the rope. Alone, you can chew through it yourself, but it makes noise.',
+        ],
+        facts: [['height', '{h}'], ['comes', 'the 3rd night'], ['takes', 'the alone · nobody within 32 m'], ['walk · haul', '3.8 · 1.65 m/s'], ['at the tree', '300 s'], ['a scream', '8 s knockout'], ['in the forest', 'one']],
+        quote: 'He had a light. I walked toward the light.',
       },
       shade: {
         name: 'Shade', latin: 'Umbra incerta',

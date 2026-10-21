@@ -573,6 +573,16 @@ export class Atlas {
         });
         dur = 5.2;
         break;
+      case 'angler':
+        // steps coming out of the dark, the grab, then something dragged away along the ground
+        A.heavyStep(...at(-1.2, -1.2, 5), 0.5);
+        later(650, () => A.heavyStep(...at(-1.1, -1.2, 4), 0.62));
+        later(1300, () => A.heavyStep(...at(-1, -1.2, 3), 0.78));
+        later(1950, () => A.heavyStep(...at(-0.9, -1.2, 2.2), 0.95));
+        later(2500, () => A.anglerGrab(...at(-0.8, -0.2, 1.6), 0.9));
+        later(3300, () => A.dragScrape(...at(-1, -1.3, 2.6), 0.7));
+        dur = 4.4;
+        break;
       case 'shade':
         A.whisper(...at(-1.1, 0, 0.9));
         dur = 2.8;
