@@ -521,7 +521,7 @@ function placeGeometry(id, world) {
   if (!_places) {
     _places = {};
     const rng = new RNG(world ? world.seed : 1337);
-    for (const L of [...LANDMARKS.slice(0, 5), ...['medhut', 'firetower', 'zarya'].map((id) => LANDMARKS.find((l) => l.id === id))]) {
+    for (const L of [...LANDMARKS.slice(0, 5), ...['medhut', 'firetower', 'zarya', 'sovkhoz'].map((id) => LANDMARKS.find((l) => l.id === id))]) {
       const kind = L.id.replace(/\d+$/, '');
       const props = [];
       const fake = {
@@ -707,6 +707,7 @@ const MODELS = {
   binoculars: fieldTool(buildBinoculars, { yaw: 0.65, pitch: 0.4 }),
   firetower: place('firetower', { yaw: 0.55, pitch: 0.12, fit: 1.1, focus: [0, 10, 0] }),
   zarya: place('zarya', { yaw: 0.3, pitch: 0.7, fit: 0.95 }),
+  sovkhoz: place('sovkhoz', { yaw: 0.8, pitch: 0.32, fit: 0.72 }),
   camp: place('camp', { yaw: 2.6, pitch: 0.62, fit: 0.78 }),
   medhut: place('medhut', { yaw: 3.75, pitch: 0.26, fit: 0.66, focus: [0, 1.5, 0] }),
   cabin: place('cabin', { yaw: 0.9, pitch: 0.34, fit: 0.95 }),

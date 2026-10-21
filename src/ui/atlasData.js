@@ -8,7 +8,7 @@
 export const CHAPTERS = [
   { id: 'beasts', num: 'I', entries: ['listener', 'crawler', 'watcher', 'howler', 'shkaf', 'angler', 'shade'] },
   { id: 'tasks', num: 'II', entries: ['generator', 'corpse', 'fuel', 'plug', 'fuses', 'belt', 'battery', 'shard', 'stone', 'flare', 'glowstick', 'flashlight', 'tape', 'crowbar', 'binoculars', 'syringe'] },
-  { id: 'places', num: 'III', entries: ['camp', 'medhut', 'cabin', 'tower', 'stones', 'wreck', 'firetower', 'zarya'] },
+  { id: 'places', num: 'III', entries: ['camp', 'medhut', 'cabin', 'tower', 'stones', 'wreck', 'sovkhoz', 'firetower', 'zarya'] },
   { id: 'way', num: 'IV', entries: ['yard', 'uaz', 'wheel', 'carbattery', 'carb', 'jerrycan'] },
 ];
 
@@ -38,6 +38,7 @@ export const ENTRIES = {
   syringe: { model: 'syringe', kind: 'thing', log: [['jabbed', 'syringes']] },
   firetower: { model: 'firetower', kind: 'place', log: [['visited', 'lookouts']] },
   zarya: { model: 'zarya', sound: 'speaker', kind: 'place', log: [['visited', 'camps']] },
+  sovkhoz: { model: 'sovkhoz', kind: 'place', log: [['visited', 'farms']] },
   camp: { model: 'camp', kind: 'place', log: [['startedHere', 'site:camp']] },
   medhut: { model: 'medhut', kind: 'place', log: [['revived', 'revives']] },
   cabin: { model: 'cabin', kind: 'place', log: [['startedHere', 'site:cabin']] },
@@ -570,6 +571,20 @@ const TEXT = {
         ],
         tips: ['Таких машин в лесу две. Генератор — только у одной.'],
         facts: [['генератор', 'один из №2–5 · каждую ночь по-новому'], ['размер', '{len}']],
+      },
+      sovkhoz: {
+        name: 'Совхоз', latin: 'колхоз «Путь Ильича», ферма № 2',
+        text: [
+          'Длинный коровник из бетонных панелей и силосная башня рядом. Коров здесь нет давно. Стойла пусты, кормушки пусты, цепи — на месте.',
+          'В коровнике всё близко и нарезано перегородками: эхо показывает комнату кусками. В башне наоборот — пусто и высоко, звук уходит вверх и возвращается не сразу.',
+        ],
+        tips: [
+          'В коровнике двое широких ворот и дверь с торца: тупиков нет, но и спина всегда открыта.',
+          'В стойла проходят у перегородок, где кормушки прерываются. Там и шкафчик.',
+          'В башне один вход. Зашёл за шкафчиком — послушай у двери, прежде чем выходить.',
+        ],
+        facts: [['коровник', '22 × 9 м'], ['башня', '11 м'], ['шкафов', '3'], ['генератора', 'нет'], ['коров', 'нет']],
+        quote: 'В башне эхо вернулось дважды. Я туда больше не кричал.',
       },
       yard: {
         name: 'Площадка лесхоза', latin: 'у северного края · выход',
@@ -1152,6 +1167,20 @@ const TEXT = {
         ],
         tips: ['There are two such trucks in the forest. Only one has a generator.'],
         facts: [['generator', 'one of #2–5 · reshuffled every night'], ['size', '{len}']],
+      },
+      sovkhoz: {
+        name: 'The Sovkhoz', latin: 'the Path of Ilyich collective farm, unit No. 2',
+        text: [
+          'A long cowshed of concrete panels and a silo tower beside it. The cows are long gone. The stalls are empty, the troughs are empty, the chains are still there.',
+          'Inside the cowshed everything is close and cut up by partitions: the echo shows you the room in pieces. The tower is the opposite — empty and tall, and sound goes up and does not come back at once.',
+        ],
+        tips: [
+          'The cowshed has two wide gates and a door in the end wall: no dead ends, but your back is always open.',
+          'You get into the stalls by the partitions, where the troughs break off. That is where the cupboard is, too.',
+          'The tower has one door. After the locker, listen at it before you step out.',
+        ],
+        facts: [['cowshed', '22 × 9 m'], ['tower', '11 m'], ['cabinets', '3'], ['generator', 'none'], ['cows', 'none']],
+        quote: 'In the tower the echo came back twice. I did not call out in there again.',
       },
       yard: {
         name: 'The forestry yard', latin: 'by the north edge · the way out',

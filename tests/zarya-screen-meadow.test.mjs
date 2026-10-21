@@ -96,7 +96,7 @@ test('free CRT geometry changes with the artwork, colours do not, and the fulles
 
 test('the physical atlas can still build every place, including the new local generator and wall cabinet',()=>{
  const mat=new THREE.MeshBasicMaterial(),w=realWorld();
- for(const id of['camp','cabin','medhut','tower','stones','wreck','firetower','zarya']){
+ for(const id of['camp','cabin','medhut','tower','stones','wreck','firetower','zarya','sovkhoz']){
   const model=buildModel(id,mat,{world:w});assert.ok(model.root.children.length>0,id);
   model.root.traverse(o=>{if(o.geometry){assert.ok(o.geometry.attributes.position.array.every(Number.isFinite));o.geometry.dispose();}});
  }

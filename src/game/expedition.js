@@ -15,6 +15,7 @@ export class Expedition {
     this.g = game;
     this.F = game.world.firetower;
     this.C = game.world.zarya;
+    this.S = game.world.sovkhoz; // the farm (2.1p)
     this.optic = new THREE.Mesh(geometryOf(buildBinoculars().toArrays()), game.world.material);
     this.optic.position.set(this.F.x, this.F.y + FIRETOWER.deck + 1.32, this.F.z - 0.7);
     this.optic.frustumCulled = false;
@@ -223,11 +224,11 @@ export class Expedition {
       }
     } else if (this.sound) { this.sound.stop(); this.sound = null; }
     // Optional landmarks get a single discreet arrival toast, not persistent HUD clutter.
-    if (p.alive && g.state === 'play') for (const [key, L, radius] of [['zarya', this.C, 33], ['firetower', this.F, 13]]) {
-      if (!this.discovered.has(key) && Math.hypot(p.x - L.x, p.z - L.z) < radius) {
+    if (p.alive && g.state === 'play') for (const [key, L, radius, stat, toast] of [['zarya', this.C, 33, 'camps', 'zaryaArrival'], ['firetower', this.F, 13, 'lookouts', 'lookoutArrival'], ['sovkhoz', this.S, 24, 'farms', 'sovkhozArrival']]) {
+      if (L && !this.discovered.has(key) && Math.hypot(p.x - L.x, p.z - L.z) < radius) {
         this.discovered.add(key);
-        g.stats[key === 'zarya' ? 'camps' : 'lookouts'] = 1;
-        g.hud.popup(t(key === 'zarya' ? 'zaryaArrival' : 'lookoutArrival'), 'dim');
+        g.stats[stat] = 1;
+        g.hud.popup(t(toast), 'dim');
       }
     }
   }

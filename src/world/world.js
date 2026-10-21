@@ -45,6 +45,7 @@ export const LANDMARKS = [
   { id: 'cabin3', x: -88, z: -226, r: 13, ry: -.5 },
   { id: 'cabin4', x: 154, z: 70, r: 13, ry: 1.6 },
   { id: 'cabin5', x: -220, z: -20, r: 13, ry: .3 },
+  { id: 'sovkhoz', x: -60, z: -40, r: 20, ry: 0.45 }, // 2.1p: the collective farm — a cowshed and a silo tower
 ];
 
 // the tracks that lead to and from the yard: no trees grow on them
@@ -122,6 +123,7 @@ export class World {
     this.doors = []; // cabin doors (the game hangs and swings them)
     this.cabinets = []; // cupboards in the buildings (the game fills them — and one of them may not be a cupboard)
     this.medhut = null; // the first-aid hut: where its cot and lantern are (see lm_medhut)
+    this.sovkhoz = null; // the farm (2.1p): where its middle is, for the arrival toast
   }
 
   generate() {
@@ -900,6 +902,141 @@ export class World {
     const ty = this.terrain.height(L.x + tx, L.z + tz);
     this.deadTree(L.x + tx, ty, L.z + tz, 1.5, rng);
     this.effigy(L.x + tx + 1.3, L.z + tz + 0.5, rng);
+  }
+
+  // ---------------- the sovkhoz (2.1p) ----------------
+  // A long concrete cowshed and a hollow silo tower. No generator ever stood here:
+  // the loot is in the cupboards, the trouble is that everything is wide open.
+  lm_sovkhoz(L, rng) {
+    const y = this.terrain.height(L.x, L.z);
+    const ry = L.ry || 0;
+    this.sovkhoz = { x: L.x, z: L.z };
+    // landmark-local point -> world (both buildings share the landmark yaw)
+    const toW = (lx, lz) => { const [ax, az] = rot(lx, lz, ry); return [L.x + ax, L.z + az]; };
+    const seg = (ax, az, bx, bz, r, h, kind) => { const [x1, z1] = toW(ax, az), [x2, z2] = toW(bx, bz); this.col.add(x1, z1, x2, z2, r, h, kind); };
+    const circ = (lx, lz, r, h, kind) => { const [cx, cz] = toW(lx, lz); this.col.circle(cx, cz, r, h, kind); };
+
+    // ---- the cowshed: 22 x 9 m of concrete panels, two gates, stalls along the north wall
+    const BX = -4.5, BZ = 0; // barn centre, landmark-local
+    const W = 22, D = 9, H = 3.0, T = 0.24, ridge = H + 2.0, ov = 0.6;
+    const gates = [-6, 5], GW = 3.2, GH = 2.4; // south gates (centres in barn-local x)
+    const doorZ = 1.6, DW = 1.1; // the small door in the east end
+    const spans = [[-W / 2, gates[0] - GW / 2], [gates[0] + GW / 2, gates[1] - GW / 2], [gates[1] + GW / 2, W / 2]];
+    const stalls = []; for (let i = 0; i < 7; i++) stalls.push(-9.75 + i * 2.75);
+    const bales = []; for (let i = 0; i < 4; i++) bales.push([rng.float(-9, 9), rng.float(0.8, 3.2), rng.float(0, 3)]);
+    this.addProp(L.x, L.z, (b) => {
+      const [bx, bz] = toW(BX, BZ);
+      const base = makeBase(bx, y, bz, ry);
+      localPlace(b, base, 0, 0, 0); b.box(W + 0.8, 0.24, D + 0.8, KIND.ROCK, { bottom: true }); // slab
+      // north wall: low band, a row of window slits under the roof, top strip
+      localPlace(b, base, 0, 0.2, -D / 2); b.box(W, 1.8, T, KIND.ROCK, { bottom: true });
+      localPlace(b, base, 0, 2.55, -D / 2); b.box(W, H - 2.55, T, KIND.ROCK, { bottom: true });
+      let px = -W / 2;
+      for (const sx of [-8, -4, 0, 4, 8]) { const w0 = sx - 0.6; localPlace(b, base, (px + w0) / 2, 2.0, -D / 2); b.box(w0 - px, 0.55, T, KIND.ROCK, { bottom: true }); px = sx + 0.6; }
+      localPlace(b, base, (px + W / 2) / 2, 2.0, -D / 2); b.box(W / 2 - px, 0.55, T, KIND.ROCK, { bottom: true });
+      // south wall: solid spans + gate lintels
+      for (const [a, c] of spans) { localPlace(b, base, (a + c) / 2, 0.2, D / 2); b.box(c - a, H, T, KIND.ROCK, { bottom: true }); }
+      for (const gx of gates) { localPlace(b, base, gx, GH, D / 2); b.box(GW, H - GH, T, KIND.ROCK, { bottom: true }); }
+      // west end solid; east end with the door gap
+      localPlace(b, base, -W / 2, 0.2, 0); b.box(T, H, D, KIND.ROCK, { bottom: true });
+      localPlace(b, base, W / 2, 0.2, (-D / 2 + doorZ - DW / 2) / 2); b.box(T, H, doorZ - DW / 2 + D / 2, KIND.ROCK, { bottom: true });
+      localPlace(b, base, W / 2, 0.2, (doorZ + DW / 2 + D / 2) / 2); b.box(T, H, D / 2 - doorZ - DW / 2, KIND.ROCK, { bottom: true });
+      localPlace(b, base, W / 2, 2.1, doorZ); b.box(T, H - 2.1, DW, KIND.ROCK, { bottom: true });
+      // roof: two slopes + gables, inside faces too (you stand under it)
+      const A = [-W / 2 - ov, H, D / 2 + ov], B = [W / 2 + ov, H, D / 2 + ov], C = [W / 2 + ov, ridge, 0], E = [-W / 2 - ov, ridge, 0];
+      const A2 = [W / 2 + ov, H, -D / 2 - ov], B2 = [-W / 2 - ov, H, -D / 2 - ov];
+      localPlace(b, base, 0, 0, 0);
+      b.quadN(A, B, C, E, [0, 2, 1.2], KIND.WOOD); b.quadN(E, C, B, A, [0, -2, -1.2], KIND.WOOD);
+      b.quadN(A2, B2, E, C, [0, 2, -1.2], KIND.WOOD); b.quadN(C, E, B2, A2, [0, -2, 1.2], KIND.WOOD);
+      b.triN([-W / 2, H, -D / 2], [-W / 2, H, D / 2], [-W / 2, ridge, 0], [-1, 0, 0], KIND.ROCK);
+      b.triN([W / 2, H, D / 2], [W / 2, H, -D / 2], [W / 2, ridge, 0], [1, 0, 0], KIND.ROCK);
+      for (const beamX of [-8, -4, 0, 4, 8]) { localPlace(b, base, beamX, H - 0.2, 0); b.box(0.16, 0.2, D, KIND.WOOD, { bottom: true }); }
+      // stalls, a trough per bay (gaps at the partitions are how you get in), chains, hay
+      for (const sx of stalls) { localPlace(b, base, sx, 0.2, -D / 2 + T / 2 + 1.15); b.box(0.12, 1.15, 2.3, KIND.WOOD, { bottom: true }); }
+      for (let i = 0; i < stalls.length - 1; i++) {
+        const cx = (stalls[i] + stalls[i + 1]) / 2;
+        localPlace(b, base, cx, 0.2, -D / 2 + 2.62); b.box(1.9, 0.5, 0.55, KIND.METAL, { bottom: true });
+        localPlace(b, base, cx, 1.02, -D / 2 + 2.32); b.box(1.9, 0.09, 0.09, KIND.WOOD, { bottom: true });
+      }
+      for (const cx of [-8.375, -2.875, 2.625]) { localPlace(b, base, cx, 1.75, -D / 2 + 2.32); b.cylinder(5, 0.03, 0.03, 1.25, KIND.METAL, { capTop: false }); }
+      for (const [hx, hz, ha] of bales) { localPlace(b, base, hx, 0.2, hz, 0, ha, 0); b.box(1.15, 0.75, 0.7, KIND.WOOD, { bottom: true }); }
+    });
+    const segB = (ax, az, bx, bz, r, h, kind) => seg(BX + ax, BZ + az, BX + bx, BZ + bz, r, h, kind);
+    segB(-W / 2, -D / 2, W / 2, -D / 2, 0.16, H, CAP.ROCK);
+    for (const [a, c] of spans) segB(a, D / 2, c, D / 2, 0.16, H, CAP.ROCK);
+    segB(-W / 2, -D / 2, -W / 2, D / 2, 0.16, H, CAP.ROCK);
+    segB(W / 2, -D / 2, W / 2, doorZ - DW / 2, 0.16, H, CAP.ROCK);
+    segB(W / 2, doorZ + DW / 2, W / 2, D / 2, 0.16, H, CAP.ROCK);
+    for (const sx of stalls) segB(sx, -D / 2 + 0.1, sx, -D / 2 + 2.35, 0.08, 1.2, CAP.WOOD);
+    for (let i = 0; i < stalls.length - 1; i++) { const cx = (stalls[i] + stalls[i + 1]) / 2; segB(cx - 0.95, -D / 2 + 2.62, cx + 0.95, -D / 2 + 2.62, 0.28, 0.6, CAP.METAL); }
+    for (const [hx, hz] of bales) circ(BX + hx, BZ + hz, 0.55, 0.9, CAP.WOOD);
+
+    // ---- the silo tower: a 12-sided hollow ring, one doorway, a grain pile inside
+    const SX = 11, SZ = -5, SR = 2.6, SH = 11, SN = 12, dAng = Math.PI * 2 / SN;
+    const doorDir = Math.atan2(BZ - SZ, BX - SX); // doorway faces the cowshed
+    const doorI = Math.floor((((doorDir % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2)) / dAng);
+    const chord = 2 * SR * Math.sin(dAng / 2), apothem = SR * Math.cos(dAng / 2);
+    const la = doorDir + 2.2; // the ladder's angle on the outside wall
+    this.addProp(L.x, L.z, (b) => {
+      const [sx, sz] = toW(SX, SZ);
+      const base = makeBase(sx, y, sz, ry);
+      localPlace(b, base, 0, 0, 0); b.cylinder(12, SR + 0.15, SR + 0.15, 0.2, KIND.ROCK, { capBottom: true }); // floor
+      for (let i = 0; i < SN; i++) {
+        const tm = (i + 0.5) * dAng, mx = Math.cos(tm) * apothem, mz = Math.sin(tm) * apothem, a = -tm - Math.PI / 2;
+        localPlace(b, base, mx, i === doorI ? 2.3 : 0.15, mz, 0, a, 0);
+        b.box(chord + 0.05, i === doorI ? SH - 2.3 : SH, 0.22, KIND.ROCK, { bottom: true });
+      }
+      localPlace(b, base, 0, SH, 0); b.cone(12, SR + 0.45, 2.1, KIND.METAL); // cap
+      localPlace(b, base, 0.2, 0.2, -1.4); b.cone(9, 1.1, 0.85, KIND.GROUND); // what is left of the grain (clear of the doorway: the monsters' grid must get in too)
+      // a ladder to a hatch nobody opens any more
+      const lx = Math.cos(la) * (SR + 0.25), lz = Math.sin(la) * (SR + 0.25), tx = Math.cos(la + Math.PI / 2), tz = Math.sin(la + Math.PI / 2);
+      for (const s of [-0.24, 0.24]) { localPlace(b, base, lx + tx * s, 0.2, lz + tz * s, 0, -la - Math.PI / 2, 0); b.box(0.07, SH - 0.4, 0.07, KIND.METAL, { bottom: true }); }
+      for (let i = 0; i < 18; i++) { localPlace(b, base, lx, 0.6 + i * 0.55, lz, 0, -la - Math.PI / 2, 0); b.box(0.55, 0.05, 0.05, KIND.METAL, { bottom: true }); }
+    });
+    for (let i = 0; i < SN; i++) {
+      if (i === doorI) continue;
+      const a0 = i * dAng, a1 = (i + 1) * dAng;
+      let p0 = [SX + Math.cos(a0) * SR, SZ + Math.sin(a0) * SR], p1 = [SX + Math.cos(a1) * SR, SZ + Math.sin(a1) * SR];
+      // the chords beside the doorway stop a little short: a 1.35 m gap with fat capsule ends
+      // would thread a player but seal the monsters' A* out — and the silo must not be a safe room
+      const trim = (from, to) => { const d = Math.hypot(to[0] - from[0], to[1] - from[1]), t = 0.28 / d; return [to[0] + (from[0] - to[0]) * t, to[1] + (from[1] - to[1]) * t]; };
+      if (i === (doorI + SN - 1) % SN) p1 = trim(p0, p1);
+      if (i === (doorI + 1) % SN) p0 = trim(p1, p0);
+      seg(p0[0], p0[1], p1[0], p1[1], 0.14, SH, CAP.ROCK);
+    }
+    circ(SX + 0.2, SZ - 1.4, 0.9, 0.9, CAP.ROCK);
+    // one narrow door: give the monsters a portal through it, like the camp buildings
+    const tmD = (doorI + 0.5) * dAng;
+    const [dcx, dcz] = toW(SX, SZ);
+    const [ndx, ndz] = rot(Math.cos(tmD), Math.sin(tmD), ry);
+    if (this.navBuildings) this.navBuildings.push({ id: 'sovkhoz:silo', x: dcx, z: dcz, W: SR * 2, D: SR * 2, ry: Math.atan2(ndx, ndz), gap: [-0.65, 0.65] });
+
+    // ---- the yard: a paddock fence, a trough, slabs between the gate and the silo door
+    const fence = [[BX - 9, 4.8, BX - 9, 14], [BX - 9, 14, BX + 6.5, 14], [BX + 9, 14, BX + 9, 8]];
+    this.addProp(L.x, L.z, (b) => {
+      const base = makeBase(L.x, y, L.z, ry);
+      for (const [ax, az, bx, bz] of fence) {
+        const len = Math.hypot(bx - ax, bz - az), n = Math.max(1, Math.round(len / 2.4));
+        const yaw = Math.atan2(bx - ax, bz - az);
+        for (let k = 0; k <= n; k++) { localPlace(b, base, ax + (bx - ax) * k / n, -0.05, az + (bz - az) * k / n); b.box(0.14, 1.25, 0.14, KIND.WOOD, { bottom: true }); }
+        for (const railY of [0.45, 0.95]) { localPlace(b, base, (ax + bx) / 2, railY, (az + bz) / 2, 0, yaw, 0); b.box(0.06, 0.09, len, KIND.WOOD, { bottom: true }); }
+      }
+      localPlace(b, base, BX + 6.8, 0, 11.2, 0, 0.3, 0); b.box(2.2, 0.5, 0.7, KIND.METAL, { bottom: true }); // the outside trough
+      const gx = BX + gates[1], gz = D / 2 + 1.2, dx = SX + Math.cos(tmD) * (SR + 1.1), dz = SZ + Math.sin(tmD) * (SR + 1.1);
+      for (let i = 1; i <= 3; i++) { const t = i / 4; localPlace(b, base, gx + (dx - gx) * t, 0.02, gz + (dz - gz) * t, 0, t * 2.2, 0); b.box(1.7, 0.09, 1.25, KIND.ROCK, { bottom: true }); }
+    });
+    for (const [ax, az, bx, bz] of fence) seg(ax, az, bx, bz, 0.1, 1.15, CAP.WOOD);
+    circ(BX + 6.8, 11.2, 0.85, 0.6, CAP.METAL);
+
+    // ---- cupboards: a wardrobe in the barn, a cupboard in a stall, a locker in the silo
+    if (this.cabinets) {
+      const [wx, wz] = toW(BX - W / 2 + T / 2 + 0.29, BZ - 2.2);
+      this.addCabinet(L.id + ':wardrobe', 'wardrobe', wx, y + 0.24, wz, ry + Math.PI / 2, true);
+      const [cx2, cz2] = toW(BX + 5.375, BZ - D / 2 + T / 2 + 0.26);
+      this.addCabinet(L.id + ':stall', 'cupboard', cx2, y + 0.24, cz2, ry);
+      const [lx2, lz2] = toW(SX + SR - 0.55, SZ);
+      this.addCabinet(L.id + ':silo', 'locker', lx2, y + 0.2, lz2, ry - Math.PI / 2);
+    }
   }
 
   // ---------------- generators ----------------

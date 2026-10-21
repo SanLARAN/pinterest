@@ -7,6 +7,21 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v:'2.1p',date:'2026-10-21',
+    ru:{title:'Совхоз',items:[
+      'Новая локация к западу от лагеря: длинный коровник со стойлами и полая силосная башня. Генератора там нет — есть добыча и сквозняк',
+      'Три новых шкафа: гардероб в коровнике (может оказаться не шкафом), шкафчик в стойле и железный шкафчик в башне',
+      'В атласе — страница «Совхоз» (глава III): что там было, как там не умереть и сколько раз ты там уже был',
+      'Исправлено: громкость музыки больше не слетает после обновления страницы, если ты вошёл в аккаунт',
+    ]},
+    en:{title:'The Sovkhoz',items:[
+      'A new location west of the camp: a long cowshed with stalls and a hollow silo tower. No generator there — just loot and a draught',
+      'Three new cabinets: a wardrobe in the cowshed (it may not be a wardrobe), a cupboard in a stall and an iron locker in the tower',
+      'The atlas has a Sovkhoz page now (chapter III): what it was, how not to die there, and how often you have been',
+      'Fixed: the music volume no longer resets after a page refresh when you are signed in',
+    ]}
+  },
+  {
     v:'2.1o',date:'2026-10-21',
     ru:{title:'Человек с фонарём',items:[
       'С третьей ночи в лесу ходит Удильщик: большой, с фонарём и тесаком. Он берёт того, кто ушёл от остальных',

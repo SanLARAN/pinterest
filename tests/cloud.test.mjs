@@ -1,7 +1,9 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 class MemoryStorage{constructor(){this.map=new Map();}get length(){return this.map.size;}key(i){return[...this.map.keys()][i]??null;}getItem(k){return this.map.get(k)??null;}setItem(k,v){this.map.set(k,String(v));}removeItem(k){this.map.delete(k);}clear(){this.map.clear();}}
 globalThis.localStorage=new MemoryStorage();
-const{getScope,setScope,readJSON,writeJSON,readMeta}=await import('../src/core/persistence.js');
+const{getScope,setScope,readJSON,writeJSON,readMeta,DEVICE_KEYS}=await import('../src/core/persistence.js');
+const{defaultSettings}=await import('../src/core/storage.js');
+const{cleanSettings}=await import('../src/cloud/snapshot.js');
 const{settings,saveSettings}=await import('../src/core/storage.js');
 const{wardrobe,saveWardrobe}=await import('../src/game/outfit.js');
 const{wallet,buyProduct}=await import('../src/game/wallet.js');
@@ -82,4 +84,15 @@ test('an invalid cache owner can never fall through into the guest save',()=>{
 });
 test('blocked browser storage keeps the current cloud snapshot in memory without crashing guest play',()=>{
  reset();const previous=globalThis.localStorage;globalThis.localStorage={getItem(){throw new Error('blocked')},setItem(){throw new Error('blocked')},removeItem(){throw new Error('blocked')}};try{const owner=uid();activateSnapshot(owner,cleanPayload({settings:{name:'Memory'},outfit:{head:'screen'}}),{shards:23,total:23,owned:[],version:2});assert.equal(settings.name,'Memory');assert.equal(wallet.shards,23);assert.equal(wardrobe.head,'screen');}finally{globalThis.localStorage=previous;setScope('guest');}
+});
+
+test('the sound and music sliders survive the cloud cleaner (music used to reset on every refresh)',()=>{
+ reset();settings.volume=0.31;settings.music=0.17;saveSettings();
+ const snap=scopeSnapshot('guest');
+ assert.equal(snap.payload.settings.volume,0.31);assert.equal(snap.payload.settings.music,0.17);
+ activateSnapshot('guest',snap.payload,snap.wallet); // what a page refresh with a session does to you
+ assert.equal(settings.volume,0.31);assert.equal(settings.music,0.17,'music must not fall back to the 0.55 default');
+ // and no future setting may die the same silent death: every default key either crosses or is device-local
+ const carried=new Set(Object.keys(cleanSettings({})));
+ for(const k of Object.keys(defaultSettings()))assert.ok(carried.has(k)||DEVICE_KEYS.includes(k),`${k}: whitelist it in cleanSettings or declare it device-local`);
 });
