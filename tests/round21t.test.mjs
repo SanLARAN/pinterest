@@ -110,7 +110,8 @@ test('the shift length is asked after ОДНОМУ, and the title screen no long
 test('the title screen never opens the gates: only the lobby does', () => {
   const garage = readFileSync(new URL('../src/ui/garage.js', import.meta.url), 'utf8');
   assert.match(garage, /pointer\(clientX, clientY, on = true, gates = true\)/);
-  assert.match(garage, /const over = this\.gatesLive && on/);
+  assert.match(garage, /const over = this\.gateDoorOpen\(\) && on/);
+  assert.match(garage, /gateDoorOpen\(\) \{\n    return this\.gatesLive === true && this\.view === 'room'/);
   assert.match(garage, /_refreshGateHover\(\)/);
   const home = readFileSync(new URL('../src/ui/garageHome.js', import.meta.url), 'utf8');
   assert.match(home, /\.pointer\(e\.clientX,e\.clientY,true,false\)/, 'the menu passes gates: false');
@@ -125,6 +126,7 @@ function bareGarage() {
   const g = Object.create(Garage.prototype);
   g.w = 800; g.h = 600;
   g.ptr = { x: 0, y: 0, on: true, cx: 400, cy: 300 };
+  g.view = 'room';
   g.gatesLive = true;
   g.depart = null; g.cut = null;
   g.gateHover = 0; g.gateWasOver = false; g.overGate = false;
@@ -162,4 +164,29 @@ test('a muted gate stays muted even when the pointer rests on it, and the lobby 
   assert.equal(home.overGate, false);
   home._refreshGateHover();
   assert.equal(home.overGate, false);
+});
+
+// the second half of the same bug: the title screen is the same garage scene, so a caller that forgets to
+// say "no gates" (or a lobby that never got to close) must still not ring the latch outside the room
+test('the gates are a door only in the lobby room — the menu cannot ring them even when told to', () => {
+  const g = bareGarage();
+  g.gatesLive = true; // the worst case: something woke the gates
+  g.view = 'menu'; // ...but the camera is on the title screen
+  for (let i = 0; i < 30; i++) {
+    g.pointer(300 + i * 8, 280 + (i % 3) * 6, true); // sweeping across the gate leaves
+    g._refreshGateHover();
+    g._gateOver(true); // even a caller that insists
+  }
+  assert.equal(g.overGate, false, 'no light on the title screen');
+  assert.equal(g.clanks, 0, 'and no latch');
+  for (const view of ['home', 'dressing', undefined]) {
+    g.view = view;
+    g._gateOver(true);
+    assert.equal(g.overGate, false, String(view));
+  }
+  g.view = 'room'; // in the room it is a door again
+  g.pointer(400, 300, true);
+  assert.equal(g.overGate, true);
+  assert.equal(g.clanks, 1);
+  assert.equal(g.gateDoorOpen(), true);
 });

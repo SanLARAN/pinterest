@@ -2283,7 +2283,7 @@ export class Garage {
     // the gates: the pointer resting on them lights them and eases them off the latch, with a soft latch
     // click the first moment it lands there (only where they answer at all: see gatesAnswer)
     this.ptr.cx = clientX; this.ptr.cy = clientY;
-    const over = this.gatesLive && on && !this.depart && !this.cut && this.hitGate(clientX, clientY);
+    const over = this.gateDoorOpen() && on && !this.depart && !this.cut && this.hitGate(clientX, clientY);
     this._gateOver(over);
     this.hoverSlot = on ? this.hit(clientX, clientY) : -1;
     return this.hoverSlot;
@@ -2298,11 +2298,21 @@ export class Garage {
   // the pointer can rest still on the gates for a while: re-check them now and then so their light does not
   // fade out from under the cursor (the lobby asks). Where gates are mute, this only ever clears them.
   _refreshGateHover() {
-    if (this.gatesLive === false) { this._gateOver(false); return; }
+    if (!this.gateDoorOpen()) { this._gateOver(false); return; }
     this._gateOver(!this.depart && !this.cut && this.hitGate(this.ptr.cx, this.ptr.cy));
   }
 
+  // The one question that decides whether the gates are a door at all: you have to be in the room, and the
+  // room has to have woken them (the lobby does; the title screen never does). Both halves matter — the
+  // title screen is the same garage scene, so a caller that forgot to say "no gates" must not ring the latch.
+  // 2.1t: the latch clank came back in the menu because the frame loop re-checks the gates under a resting
+  // pointer, and that path did not know it was the menu.
+  gateDoorOpen() {
+    return this.gatesLive === true && this.view === 'room';
+  }
+
   _gateOver(over) {
+    if (over && !this.gateDoorOpen()) over = false; // the choke point: no door here, no light and no latch
     if (over && !this.gateWasOver && this.audio?.ready) this.audio.clank(ROOM.X0, 1.2, GATE.mid, 0.28);
     this.gateWasOver = over;
     this.overGate = over;
