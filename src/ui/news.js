@@ -7,6 +7,21 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v:'2.1m',date:'2026-10-21',
+    ru:{title:'Вернули чёткость без HDR-MSAA',items:[
+      'В 2.1l мы слишком урезали разрешение. Высокая снова использует Retina до 2×, а на обычном экране — рендер 1.5× с уменьшением для сглаживания',
+      'FXAA на высокой выключен: мелкие детали не размываются. Высокая больше не снижает разрешение молча — адаптация остаётся в режиме «авто»',
+      'HDR-MSAA остаётся отключённым; сцена и выходной canvas ограничены бюджетом пикселей и пределами GPU',
+      'Рабочий портрет и исправленные движения у костра и палатки сохранены',
+    ]},
+    en:{title:'Sharpness restored without HDR-MSAA',items:[
+      '2.1l cut resolution too far. High again uses up to 2× Retina; on a standard display it renders at 1.5× and downsamples for spatial antialiasing',
+      'High no longer uses FXAA or silently lowers resolution: fine details stay sharp, while adaptive scaling remains in auto',
+      'HDR-MSAA stays off; both the scene and the output canvas respect pixel budgets and GPU size limits',
+      'The working portrait and corrected campfire and tent movement are preserved',
+    ]},
+  },
+  {
     v:'2.1l',date:'2026-10-21',
     ru:{title:'Лицом к огню, рабочий портрет, без HDR-MSAA',items:[
       'Из высокой графики убраны HDR-MSAA и Retina: вместо проблемного мультисэмплированного буфера используется FXAA',

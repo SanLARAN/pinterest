@@ -20,6 +20,7 @@ import { World } from './world/world.js';
 import { shared, createWorldMaterial, createMotes, createSky } from './render/sonar.js';
 import { Pulses } from './render/pulses.js';
 import { Post } from './render/post.js';
+import { qualityPlan } from './render/quality.js';
 import { OmniShadows } from './render/shadows.js';
 import { Ghosts } from './render/ghosts.js';
 import { Eyes } from './render/eyes.js';
@@ -166,22 +167,24 @@ let menuTime = 0;
 const perf = { acc: 0, n: 0, scale: 1, cool: 3, ceiling: 9, ceilT: 0, fpsEl: null, fps: 60 };
 
 // ---------------- resolution ----------------
-// 2.1l: native-resolution, single-sample HDR. Small MSAA targets still made black tiles on real
-// drivers; a pixel budget cannot make that resolve reliable. FXAA handles edges without a resolve.
-const PIX_BUDGET = { high: 2.4e6, auto: 1.8e6, low: 1.2e6 };
+// 2.1m: restore detail without restoring HDR MSAA. High uses a fixed high-resolution scene;
+// auto alone trades pixels for frame time. Bound both the scene and the output canvas by pixel/GL limits.
+const maxTargetSize = Math.min(renderer.capabilities.maxTextureSize,
+  renderer.getContext().getParameter(renderer.getContext().MAX_RENDERBUFFER_SIZE));
+function renderPlan() {
+  return qualityPlan(settings.quality, innerWidth, innerHeight, window.devicePixelRatio, maxTargetSize, !!perf.recovery);
+}
 function scaleBounds() {
-  const budget = Math.sqrt((PIX_BUDGET[settings.quality] || PIX_BUDGET.auto) / Math.max(1, innerWidth * innerHeight));
-  const hi = Math.min(1, budget);
-  if (settings.quality === 'high') return [Math.min(0.85, hi), hi];
-  if (settings.quality === 'low') return [Math.min(0.55, hi), Math.min(0.55, hi)];
-  return [Math.min(0.5, hi), hi];
+  const p = renderPlan();
+  return [p.minScale, p.maxScale];
 }
 function applyAntialias() {
-  post.setAntialias(settings.quality !== 'low');
+  post.setAntialias(renderPlan().fxaa);
 }
 function applyQuality() {
-  const [lo, hi] = scaleBounds();
-  perf.scale = Math.min(hi, Math.max(lo, settings.quality === 'auto' ? Math.min(1, hi) : hi));
+  perf.recovery = false; // an explicit preset choice retries full quality after a context fallback
+  const p = renderPlan();
+  perf.scale = p.adaptive ? Math.min(1, p.maxScale) : p.maxScale;
   perf.ceiling = 9; // a new preset starts with a clean slate (no ceiling from the old one)
   perf.ceilT = 0;
   perf.cool = 3;
@@ -191,8 +194,14 @@ function applyQuality() {
 }
 function resize() {
   const w = innerWidth, h = innerHeight;
-  renderer.setPixelRatio(1); // UI remains native DOM; the GPU canvas no longer allocates retina buffers
-  renderer.setSize(w, h, false);
+  const p = renderPlan();
+  perf.scale = Math.min(p.maxScale, Math.max(p.minScale, perf.scale));
+  // Dynamic scene scaling must not reallocate the default framebuffer on every adjustment.
+  if (perf.outputW !== w || perf.outputH !== h || perf.outputScale !== p.outputScale) {
+    renderer.setPixelRatio(p.outputScale);
+    renderer.setSize(w, h, false);
+    perf.outputW = w; perf.outputH = h; perf.outputScale = p.outputScale;
+  }
   camera.aspect = w / h;
   camera.fov = fovFor(camera.aspect);
   camera.updateProjectionMatrix();
@@ -202,11 +211,12 @@ function resize() {
   if (garage) garage.resize(w, h);
 }
 window.addEventListener('resize', resize);
-// Keep the native-resolution cap on context recovery too; never re-enable HDR multisampling.
+// A context loss is a real fallback, not a reason to lower quality on every healthy machine.
+// Keep that fallback through restoration; only an explicit quality choice retries the larger buffers.
 canvas.addEventListener('webglcontextlost', (e) => {
   e.preventDefault();
   post.dropSamples();
-  perf.scale = Math.max(0.55, Math.min(perf.scale, 1));
+  perf.recovery = true;
 });
 canvas.addEventListener('webglcontextrestored', () => {
   resize();
@@ -228,18 +238,17 @@ function perfTick(dt) {
   perf.fps = 1 / avg;
   perf.acc = 0;
   perf.n = 0;
-  // auto and high both give pixels back when the frames are not there; high starts at native resolution and gives
-  // them up more reluctantly (two slow seconds, small steps), so a fast machine keeps the sharp picture
-  if (settings.quality !== 'low' && (state === 'playing' || state === 'menu')) {
+  // High stays high. Only auto may quietly reduce resolution to recover frame rate.
+  if (renderPlan().adaptive && (state === 'playing' || state === 'menu')) {
     const [lo, hi] = scaleBounds();
-    const slow = settings.quality === 'auto' ? avg > 1 / 50 : avg > 1 / 45;
+    const slow = avg > 1 / 50;
     perf.slow = slow ? perf.slow + 1 : 0;
-    if (slow && perf.slow >= (settings.quality === 'auto' ? 1 : 2) && perf.scale > lo + 0.001) {
+    if (slow && perf.slow >= 1 && perf.scale > lo + 0.001) {
       perf.ceiling = perf.scale - 0.05;
       perf.ceilT = 30;
       // a device that is far from 60 takes a bigger first step, so the first seconds on a weak phone
       // stop stuttering instead of walking down one notch per second
-      perf.scale = Math.max(lo, perf.scale - (avg > 1 / 35 ? 0.2 : settings.quality === 'auto' ? 0.12 : 0.08));
+      perf.scale = Math.max(lo, perf.scale - (avg > 1 / 35 ? 0.2 : 0.12));
       perf.cool = 4;
       perf.slow = 0;
       resize();
