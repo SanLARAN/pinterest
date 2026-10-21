@@ -7,6 +7,23 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v:'2.1o',date:'2026-10-21',
+    ru:{title:'Человек с фонарём',items:[
+      'С третьей ночи в лесу ходит Удильщик: большой, с фонарём и тесаком. Он берёт того, кто ушёл от остальных',
+      'Он волочит жертву по земле к дереву: вырывайся (A/D по очереди), но не кричи — вырубит. У дерева — пять минут на спасение, потом он вернётся и закончит навсегда',
+      'Развязал друга — +750. Одинокий может сам перегрызть верёвку, но это слышно. Рассвет верёвку не снимает: часы идут и днём',
+      'Старт из гаража — теперь фильм: все садятся в УАЗ, кроме одного. Тот спотыкается, бежит следом и хватает борт на ходу',
+      'Новый бесплатный комплект «Киану»: волосы с пробором, борода, чёрный костюм. В полном комплекте — гитара в гараже и раздевалке',
+    ]},
+    en:{title:'The man with the lantern',items:[
+      'From the third night the Angler walks the forest: a big man with a lantern and a cleaver. He takes whoever strayed from the others',
+      'He drags his catch along the ground to a tree: tear free (alternate A/D), but do not scream — he will knock you out. At the tree there are five minutes to be found in; then he comes back and finishes it, for good',
+      'Untie a friend for +750. Alone, you can chew through the rope yourself, but it makes noise. Dawn does not untie you: his clock keeps running in daylight',
+      'Leaving the garage is a film now: everyone boards the UAZ but one. He trips, runs after it and grabs the side at a crawl',
+      'A new free set, Keanu: centre-parted hair, a beard, a black suit. Worn whole, a guitar comes out now and then in the garage and the wardrobe',
+    ]},
+  },
+  {
     v:'2.1n',date:'2026-10-21',
     ru:{title:'Большое отделение графики',items:[
       'В настройках появилась кнопка «Расширенные настройки графики»: четыре блока, 14 параметров с пояснениями и реальными показаниями рендерера',

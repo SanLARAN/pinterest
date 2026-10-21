@@ -18,6 +18,7 @@ import {
   buildRoom, buildCeiling, buildWicket, buildProps, buildBulb, buildBulb2, buildSteering, CAR_MODELS, GPAL_GLSL,
   buildItems, buildPack, buildPackFlap, buildCigarette, buildCup, buildLighter, buildFlame, buildPasser, buildGateLeaf,
 } from './garageSet.js';
+import { DEPART, DOORS, GRAB_POINT, departPlan } from './departure.js';
 
 const PI = Math.PI;
 const VERT = /* glsl */ `
@@ -1011,6 +1012,24 @@ export class Garage {
     this.cut = null;
     this._stopEngine(0.2);
     this.depart = { t: 0, onDone, fired: false, clanked: false, keyed: false, gate: 0, drive: 0, walk: 0 };
+    // who boards, who lingers: derived from occupancy alone, so the whole room stages the same film
+    const plan = departPlan(this.figs.map((f) => !!(f && !f.leaving)));
+    this.depart.plan = plan;
+    this.depart.stragglerSeated = plan.solo;
+    for (const s of [...plan.boarders, ...(plan.straggler > 0 ? [plan.straggler] : [])]) {
+      const f = this.figs[s];
+      if (!f) continue;
+      f.dep = {
+        role: s === plan.straggler ? 'straggler' : 'board',
+        seat: plan.seats[s], door: DOORS[s],
+        from: { x: SPOTS[s].pos[0], z: SPOTS[s].pos[2] },
+        attached: false, grabbed: false, grabT: 0, trip: null,
+      };
+      if (f.dep.role === 'straggler') {
+        const gp = this._carPoint(GRAB_POINT, _w);
+        f.dep.trip = { x: lerp(f.dep.from.x, gp.x, 0.55), z: lerp(f.dep.from.z, gp.z, 0.55) }; // down he goes, most of the way there
+      }
+    }
     this.wheelSpin = 0;
     for (const w of this.wheelMeshes) w.rotation.z = 0;
     this.carRoot.position.set(CAR.x, 0, CAR.z);
@@ -1103,15 +1122,13 @@ export class Garage {
     if (t >= 2.9) this.idle = 1;
     this.u.uHeadI.value = t >= 2.9 ? Math.min(1, (t - 2.9) * 3) : 0;
     this.u.uTail.value.w = t >= 2.9 ? 0.7 : 0;
-    // the team walks to the car (the driver is already there)
-    if (t >= 2.6 && t < 5.2) {
-      c.walk = Math.min(1, (t - 2.6) / 1.9);
-      this._walkToCar(c.walk);
-    } else if (t >= 5.2) this._walkToCar(1);
-    // and the car rolls out through the gates
-    if (t >= 3.4) {
-      c.drive = Math.min(1, (t - 3.4) / 2.4);
-      const v = 0.4 + 2.6 * c.drive * c.drive;
+    // the team boards (see _depPose, driven from _figures): everybody but one is seated before this
+    const plan = c.plan || { solo: true, driveAt: DEPART.solo.driveAt, fadeAt: DEPART.solo.fadeAt, doneAt: DEPART.solo.doneAt };
+    // and the car rolls out through the gates — creeping, while the straggler is still behind it
+    if (t >= plan.driveAt) {
+      c.drive = Math.min(1, (t - plan.driveAt) / 2.4);
+      let v = 0.4 + 2.6 * c.drive * c.drive;
+      if (!plan.solo && !c.stragglerSeated) v = Math.min(v, DEPART.crawlV);
       this.carRoot.position.x -= v * dt;
       this.wheelSpin += (v / this.CP.wheelR) * dt; // the tyres roll with the road, not the body
       for (const w of this.wheelMeshes) w.rotation.z = this.wheelSpin;
@@ -1119,9 +1136,9 @@ export class Garage {
       if (Math.random() < dt * 18) this.smoke.emit(ex.x + 0.05, ex.y, ex.z, rnd(0.6, 1.4), rnd(0, 0.4), rnd(-0.3, 0.3), { life: 2.4, s0: 0.1, s1: 0.8, a: 0.3, rise: 0.22, drag: 1.6, col: [0.42, 0.42, 0.44], jitter: 0.5 });
       this.shake.vy += dt * 0.4 * c.drive;
     }
-    // into the night
-    if (t > 5.9) this.fade = Math.max(0, 1 - (t - 5.9) / 0.7);
-    if (!c.fired && t >= 6.7) {
+    // into the night (nobody is left standing in the yard: the film waits for its straggler, briefly)
+    if (t > plan.fadeAt && (plan.solo || c.stragglerSeated)) this.fade = Math.max(0, 1 - (t - plan.fadeAt) / 0.7);
+    if (!c.fired && t >= plan.doneAt && (plan.solo || c.stragglerSeated || t > plan.doneAt + 2.5)) {
       c.fired = true;
       const fn = c.onDone;
       this._endDepart();
@@ -1131,27 +1148,131 @@ export class Garage {
     }
   }
 
-  // the passengers leave their spots and file into the car (k: 0 at their places, 1 at the doors)
-  _walkToCar(k) {
-    const ease = k * k * (3 - 2 * k);
-    for (let s = 1; s < 4; s++) {
-      const f = this.figs[s];
-      if (!f || f.leaving) continue;
-      const spot = SPOTS[s];
-      const door = _w.set(s === 1 ? 0.1 : s === 2 ? -0.4 : 0.1, 0, s === 3 ? 1.1 : 0.85); // car-local
-      this.carMesh.localToWorld(door);
-      f.rig.root.position.x = lerp(spot.pos[0], door.x, ease);
-      f.rig.root.position.z = lerp(spot.pos[2], door.z, ease);
-      f.rig.root.rotation.y = Math.atan2(door.x - f.rig.root.position.x, door.z - f.rig.root.position.z) + Math.PI;
-      const n = f.rig.nodes;
-      const ph = f.t * 7 + s;
-      n.thL.rotation.x = Math.sin(ph) * 0.55 * (ease > 0.02 ? 1 : 0);
-      n.thR.rotation.x = -Math.sin(ph) * 0.55 * (ease > 0.02 ? 1 : 0);
-      n.knL.rotation.x = Math.max(0, -Math.sin(ph)) * 0.7;
-      n.knR.rotation.x = Math.max(0, Math.sin(ph)) * 0.7;
-      n.shL.rotation.x = -Math.sin(ph) * 0.3;
-      n.shR.rotation.x = Math.sin(ph) * 0.3;
-      if (ease >= 1 && !f.leaving) { f.leaving = true; f.leaveT = 0; }
+  // a walk (or a run) in the legs and shoulders, on top of the clean base _figures just set
+  _depGait(f, run) {
+    const n = f.rig.nodes;
+    const ph = f.t * (run ? 11 : 7.5) + f.slot;
+    const a = run ? 0.75 : 0.55;
+    n.thL.rotation.x = Math.sin(ph) * a;
+    n.thR.rotation.x = -Math.sin(ph) * a;
+    n.knL.rotation.x = Math.max(0, -Math.sin(ph)) * (run ? 1.0 : 0.7);
+    n.knR.rotation.x = Math.max(0, Math.sin(ph)) * (run ? 1.0 : 0.7);
+    n.shL.rotation.x = -Math.sin(ph) * (run ? 0.55 : 0.3);
+    n.shR.rotation.x = Math.sin(ph) * (run ? 0.55 : 0.3);
+    if (run) { n.elL.rotation.x = -0.9; n.elR.rotation.x = -0.9; n.chest.rotation.x = 0.28; }
+    n.hips.position.y = 0.94 - Math.abs(Math.cos(ph)) * (run ? 0.05 : 0.03);
+  }
+
+  // sitting in the car like the driver does, without the wheel to hold
+  _depSeatPose(f) {
+    const n = f.rig.nodes;
+    const D = this.model.driver;
+    n.hips.position.set(0, D.hips, 0);
+    n.hips.rotation.x = D.recline;
+    n.chest.rotation.x = -0.02 + Math.sin(this.t * 1.6 + f.slot) * 0.012;
+    n.head.rotation.y = Math.sin(this.t * 0.4 + f.slot * 2) * 0.18;
+    for (const [A, s] of [['L', -1], ['R', 1]]) {
+      n['th' + A].rotation.set(D.thigh, 0, s * 0.07);
+      n['kn' + A].rotation.x = D.knee;
+      n['sh' + A].rotation.set(-0.32, 0, s * 0.14);
+      n['el' + A].rotation.x = -0.85;
+    }
+  }
+
+  _depAttach(f) {
+    f.dep.attached = true;
+    this.carMesh.add(f.rig.root); // from here the car carries them, like the driver
+    f.rig.root.position.set(f.dep.seat[0], f.dep.seat[1], f.dep.seat[2]);
+    f.rig.root.rotation.set(0, -Math.PI / 2, 0);
+    if (f.dep.role === 'straggler' && this.depart) this.depart.stragglerSeated = true;
+  }
+
+  // one figure's part in the departure film (called from _figures in place of its lobby spot, once
+  // its moment comes: the boarders file in and sit; the straggler runs late, trips, and chases)
+  _depPose(f, dt) {
+    const c = this.depart, dep = f.dep, n = f.rig.nodes, root = f.rig.root;
+    if (!c || !dep) return;
+    const t = c.t, T = DEPART;
+    if (dep.attached) { this._depSeatPose(f); return; }
+    const faceTo = (x, z) => { root.rotation.y = Math.atan2(x - root.position.x, z - root.position.z) + Math.PI; };
+    if (dep.role === 'board') {
+      const door = this._carPoint(dep.door, _w);
+      if (t < T.boardTo) {
+        const k = clamp((t - T.boardFrom) / (T.boardTo - T.boardFrom), 0, 1);
+        const e = k * k * (3 - 2 * k);
+        root.position.x = lerp(dep.from.x, door.x, e);
+        root.position.z = lerp(dep.from.z, door.z, e);
+        faceTo(door.x, door.z);
+        this._depGait(f, false);
+      } else {
+        const k = clamp((t - T.boardTo) / T.climbFor, 0, 1);
+        const seat = this._carPoint(dep.seat, _w2);
+        root.position.x = lerp(door.x, seat.x, k);
+        root.position.z = lerp(door.z, seat.z, k);
+        root.position.y = Math.sin(k * Math.PI) * 0.18;
+        root.rotation.y = lerp(root.rotation.y, -Math.PI / 2 + (this.carRoot.rotation.y || 0), k);
+        n.thL.rotation.x = lerp(0, this.model.driver.thigh, k);
+        n.thR.rotation.x = n.thL.rotation.x;
+        n.knL.rotation.x = n.knR.rotation.x = lerp(0.2, this.model.driver.knee, k);
+        if (k >= 1) { root.position.y = 0; this._depAttach(f); this._depSeatPose(f); }
+      }
+      return;
+    }
+    // the straggler
+    if (t < T.tripAt) {
+      const k = clamp((t - T.runAt) / (T.tripAt - T.runAt), 0, 1);
+      const e = k * (2 - k); // off like a shot
+      root.position.x = lerp(dep.from.x, dep.trip.x, e);
+      root.position.z = lerp(dep.from.z, dep.trip.z, e);
+      faceTo(dep.trip.x, dep.trip.z);
+      this._depGait(f, true);
+    } else if (t < T.upBy) {
+      // down: the concrete, a breath, then up on one knee and away
+      const fall = clamp((t - T.tripAt) / 0.28, 0, 1);
+      const rise = clamp((t - T.downUntil) / (T.upBy - T.downUntil), 0, 1);
+      const down = fall * (1 - rise * rise * (3 - 2 * rise));
+      root.position.set(dep.trip.x, lerp(0, -0.02, down), dep.trip.z);
+      root.rotation.x = 1.32 * down;
+      n.hips.position.y = lerp(0.94, 0.3, down);
+      n.shL.rotation.x = lerp(0, -1.7, down); // hands thrown out in front
+      n.shR.rotation.x = lerp(0, -1.45, down);
+      n.elL.rotation.x = n.elR.rotation.x = lerp(-0.2, -0.5, down);
+      n.thL.rotation.x = lerp(0, -1.5 * rise * (1 - rise) * 4 * 0.4, 1); // the knee that gets him up
+      n.knL.rotation.x = Math.sin(rise * Math.PI) * 1.6;
+      n.head.rotation.x = lerp(0, -0.7, down); // chin up off the concrete, looking for the car
+      if (t >= T.upBy - 0.01) root.rotation.x = 0;
+    } else if (!dep.grabbed) {
+      const gp = this._carPoint(GRAB_POINT, _w);
+      const dx = gp.x - root.position.x, dz = gp.z - root.position.z;
+      const d = Math.hypot(dx, dz);
+      const step = Math.min(d, 4.5 * dt);
+      if (d > 0.01) { root.position.x += (dx / d) * step; root.position.z += (dz / d) * step; }
+      faceTo(gp.x, gp.z);
+      this._depGait(f, true);
+      n.shR.rotation.x = -1.9; // reaching for it
+      if (d < 0.55 || t > T.catchAt + 2.5) { dep.grabbed = true; dep.grabT = t; }
+    } else {
+      const gp = this._carPoint(GRAB_POINT, _w);
+      const since = t - dep.grabT;
+      if (since < 0.55) {
+        // alongside, one hand on the car, legs still going
+        root.position.x = gp.x; root.position.z = gp.z;
+        root.rotation.y = Math.atan2(-1, 0) + Math.PI; // with the car, toward the gates
+        this._depGait(f, true);
+        n.shL.rotation.x = -1.15; n.shL.rotation.z = -0.5; // holding on
+        dep.climbFrom = { x: gp.x, z: gp.z };
+      } else {
+        const k = clamp((since - 0.55) / 0.65, 0, 1);
+        const seat = this._carPoint(dep.seat, _w2);
+        const from = dep.climbFrom || { x: gp.x, z: gp.z };
+        root.position.x = lerp(from.x, seat.x, k);
+        root.position.z = lerp(from.z, seat.z, k);
+        root.position.y = Math.sin(k * Math.PI) * 0.42; // over the side and in
+        n.thL.rotation.x = lerp(-0.4, this.model.driver.thigh, k);
+        n.thR.rotation.x = n.thL.rotation.x;
+        n.knL.rotation.x = n.knR.rotation.x = lerp(0.6, this.model.driver.knee, k);
+        if (k >= 1) { root.position.y = 0; this._depAttach(f); this._depSeatPose(f); }
+      }
     }
   }
 
@@ -1451,7 +1572,11 @@ export class Garage {
       n.shL.rotation.z = -0.07;
       n.shR.rotation.z = 0.07;
       n.elL.rotation.x = n.elR.rotation.x = -0.2;
-      if (s === 0) this._driver(f, dt);
+      // in the departure film a figure keeps its lobby life until its moment (that's why one of them
+      // is late), then the film owns it outright — root, legs and all
+      const depLive = f.dep && this.depart && this.depart.t >= (f.dep.role === 'board' ? DEPART.boardFrom : DEPART.runAt);
+      if (depLive) this._depPose(f, dt);
+      else if (s === 0) this._driver(f, dt);
       else if (s === 1) this._chair(f, dt);
       else if (s === 2) this._smoker(f, dt);
       else this._packer(f, dt);

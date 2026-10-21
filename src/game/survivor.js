@@ -498,6 +498,40 @@ const BODY = {
     });
     hands(R, BB, 0.058, 0.074);
   },
+
+  // Keanu (2.1o): a black two-piece that has seen worse forests — white shirt, the tie loosened
+  // two nights ago, polished shoes. The suit is the main dye, the shirt the accent.
+  keanusuit(R) {
+    const n = R.nodes;
+    part(R, n.hips, (b) => {
+      b.place(0, -0.06, 0); b.box(0.3, 0.17, 0.19, BA); // trousers at the waist
+      b.place(0, -0.17, -0.085, 0.1, 0, 0); b.box(0.28, 0.2, 0.055, BA); // jacket tails at the back
+    });
+    part(R, n.chest, (b) => {
+      b.place(0, -0.075, 0); b.taper(0.32, 0.19, 0.41, 0.23, 0.635, BA); // the jacket, down over the belt
+      // the shirt: a V of white opening up the chest, the collar above it
+      b.place(0, 0.3, 0.098); b.taper(0.045, 0.045, 0.16, 0.055, 0.32, BB);
+      b.place(0, 0.545, 0.01); b.taper(0.2, 0.14, 0.16, 0.12, 0.055, BB);
+      // lapels flanking the V, standing a little proud so the edge light finds them
+      for (const s of [-1, 1]) { b.place(s * 0.082, 0.44, 0.108, 0.06, -s * 0.18, s * 0.42); b.box(0.055, 0.24, 0.018, BA); }
+      // the tie: knot under the chin, the blade loose down the shirt
+      b.place(0, 0.525, 0.115); b.octa(0.024, 0.03, KIND.ROCK);
+      b.place(0.004, 0.36, 0.128, 0.04, 0, 0.05); b.box(0.038, 0.3, 0.01, KIND.ROCK);
+    });
+    limbs(R, {
+      upper: (b, s) => { b.identity(); b.limb([0, 0, 0], [s * 0.04, -0.3, 0.02], 0.056, 0.047, BA, 5); },
+      fore: (b) => {
+        b.identity(); b.limb([0, 0, 0], [0, -0.225, 0.052], 0.047, 0.042, BA, 5);
+        b.limb([0, -0.215, 0.05], [0, -0.26, 0.058], 0.046, 0.044, BB, 5); // a white cuff past the sleeve
+      },
+      thigh: (b) => { b.identity(); b.limb([0, 0, 0], THIGH, 0.07, 0.056, BA, 5); },
+      shin: (b) => {
+        b.identity(); b.limb([0, 0, 0], SHIN, 0.056, 0.045, BA, 5);
+        b.place(0, -0.45, 0.055); b.box(0.105, 0.065, 0.26, KIND.ROCK); // dress shoes, still polished
+      },
+    });
+    hands(R);
+  },
 };
 
 // ---------------- headwear ----------------
@@ -746,6 +780,33 @@ const HEAD = {
       }
     });
   },
+
+  // Keanu: shoulder-length dark hair with a centre parting, and the beard of a man who has been
+  // awake since Tuesday. The hair falls behind whatever is worn (reach() keeps it off a backpack).
+  keanuhair(R) {
+    face(R);
+    const n = R.nodes;
+    part(R, n.head, (b) => {
+      // the crown, flatter than the anime one and parted: two falls left and right of the middle
+      b.place(0, 0.01, -0.008);
+      lathe(b, [[0.122, -0.01], [0.132, 0.045], [0.126, 0.1], [0.1, 0.142], [0.055, 0.166], [0, 0.172]], 10, HA, { phase: PI / 10 });
+      for (const s of [-1, 1]) { // the two curtains off the parting, back over the ears
+        b.identity();
+        b.limb([s * 0.02, 0.155, 0.07], [s * 0.115, 0.06, 0.055], 0.035, 0.03, HA, 4);
+        b.limb([s * 0.115, 0.06, 0.055], [s * 0.128, -0.08, 0.01], 0.03, 0.024, HA, 4);
+      }
+      // down the back to the shoulders, clear of the chest's load
+      const bz = -(Math.max(0.13, reach(R, n.chest, 0.1, 0.6, -1)) + 0.015) + 0.02;
+      b.place(0, -0.16, bz + 0.05, 0.06, 0, 0); b.taper(0.21, 0.07, 0.17, 0.055, 0.3, HA);
+      for (const s of [-1, 1]) { // ends, a little ragged
+        spike(b, s * 0.07, -0.3, bz + 0.055, PI + s * 0.2, PI - 0.1, 0.026, 0.07, HA, 4);
+      }
+      // the beard: jaw and chin, kept short (accent dye)
+      b.place(0, -0.115, 0.045, 0.25, 0, 0); b.taper(0.15, 0.1, 0.11, 0.07, 0.075, HB);
+      for (const s of [-1, 1]) { b.place(s * 0.085, -0.075, 0.035, 0, s * 0.4, s * 0.15); b.box(0.035, 0.085, 0.09, HB); }
+      b.place(0, -0.062, 0.1); b.box(0.085, 0.018, 0.02, HB); // the moustache shading the mouth
+    });
+  },
 };
 
 // ---------------- dyes ----------------
@@ -776,8 +837,73 @@ export function buildSurvivor(fitIn = null) {
   }
   BODY[fit.body](R);
   HEAD[fit.head](R);
+  // the full Keanu set travels with a guitar (see poseGuitar): built scale-0 under the chest, so the
+  // echo ghosts — which bake every part by its node's matrix — see nothing of it until it's taken out
+  if (fit.head === 'keanuhair' && fit.body === 'keanusuit') {
+    const gt = node(R, 'guitar', R.nodes.chest, 0.15, 0.1, 0.26);
+    gt.rotation.set(0.12, -0.22, -0.5);
+    gt.scale.setScalar(0.0001);
+    part(R, gt, (b) => {
+      // body: two bouts and the waist between them, sound hole, bridge (front is +z)
+      b.place(0, -0.05, 0, PI / 2, 0, 0); b.cylinder(9, 0.155, 0.155, 0.085, KIND.WOOD, { capTop: true, capBottom: true });
+      b.place(0, 0.105, 0, PI / 2, 0, 0); b.cylinder(9, 0.117, 0.117, 0.082, KIND.WOOD, { capTop: true, capBottom: true });
+      b.place(0, 0.045, 0.046, PI / 2, 0, 0); b.cylinder(8, 0.045, 0.045, 0.006, KIND.ROCK);
+      b.place(0, -0.055, 0.047); b.box(0.09, 0.018, 0.008, KIND.ROCK);
+      // neck up to the left, headstock, three-a-side stubs for tuners
+      b.identity(); b.limb([0, 0.17, 0.01], [-0.3, 0.47, 0.015], 0.021, 0.017, KIND.BARK, 4);
+      b.place(-0.325, 0.495, 0.015, 0, 0, 0.86); b.box(0.035, 0.11, 0.02, KIND.BARK);
+      for (let i = 0; i < 3; i++) { b.place(-0.36 + i * 0.012, 0.46 + i * 0.028, 0.015); b.octa(0.008, 0.008, KIND.METAL); }
+    });
+  }
   R.dyes = dyeColors(fit);
   return R;
+}
+
+// the Keanu set's idle: every so often the guitar comes out and a few quiet bars get played, then it
+// goes away again. A 26 s cycle on the rig's own clock (rest · raise · play · lower), blending over
+// whatever base pose the caller just set — so call it last, like poseFur, and only where a man would
+// actually sit and play: the menu and the wardrobe, never the forest. Strums bump rig.guitarBeat;
+// whoever owns the speakers turns that into notes (Audio.guitarPluck).
+export function poseGuitar(rig, dt) {
+  const n = rig.nodes;
+  const gt = n.guitar;
+  if (!gt) return;
+  const G = rig.gtr || (rig.gtr = { t: Math.random() * 6, beat: 0, next: 0, chord: 0 });
+  G.t += dt;
+  const CYCLE = 26, t = G.t % CYCLE;
+  const ss = (a, b, x) => { const k = clamp((x - a) / (b - a), 0, 1); return k * k * (3 - 2 * k); };
+  const k = ss(7, 8.6, t) * (1 - ss(21, 22.6, t)); // out at 7 s, away again by 22.6 s
+  gt.scale.setScalar(Math.max(0.0001, k));
+  if (k <= 0.001) return;
+  const playing = t >= 8.6 && t < 21;
+  if (playing) {
+    G.next -= dt;
+    if (G.next <= 0) {
+      G.next = 0.48;
+      rig.guitarBeat = (rig.guitarBeat || 0) + 1;
+      if ((rig.guitarBeat & 3) === 0) G.chord = (G.chord + 1) % 3; // the left hand walks the neck
+    }
+  }
+  const strum = playing ? Math.sin((t - 8.6) * (Math.PI * 2 / 0.48)) : 0;
+  const bob = playing ? Math.sin((t - 8.6) * (Math.PI * 2 / 0.96)) : 0;
+  const mix = (node, prop, v) => { node.rotation[prop] = lerp(node.rotation[prop], v, k); };
+  // left arm out along the neck, right over the sound hole; a slight lean into the instrument
+  mix(n.chest, 'x', 0.16 + bob * 0.02);
+  mix(n.chest, 'y', -0.12);
+  mix(n.head, 'x', 0.24 + bob * 0.035);
+  mix(n.head, 'y', -0.18);
+  n.shL.rotation.set(
+    lerp(n.shL.rotation.x, -0.95 - G.chord * 0.07, k),
+    lerp(n.shL.rotation.y, 0.35, k),
+    lerp(n.shL.rotation.z, -0.55 - G.chord * 0.05, k),
+  );
+  mix(n.elL, 'x', -0.55 - G.chord * 0.12);
+  n.shR.rotation.set(
+    lerp(n.shR.rotation.x, -0.5 + strum * 0.06, k),
+    lerp(n.shR.rotation.y, 0, k),
+    lerp(n.shR.rotation.z, 0.3, k),
+  );
+  mix(n.elR, 'x', -0.85 + strum * 0.38);
 }
 
 // fur with a life of its own (the boykisser): the tail sways — and now and then wags in fits — the ears
@@ -1009,6 +1135,44 @@ export function poseSprawled(rig, k = 1) {
     n['kn' + A].rotation.x = lerp(0.4, 0.35, k);
     n['sh' + A].rotation.set(lerp(-1.3, 0.75, k), 0, s * lerp(0.1, 0.35, k));
     n['el' + A].rotation.x = lerp(-0.12, -0.35, k);
+  }
+}
+
+// hauled by one wrist behind the Angler: half on your back, the taken arm up toward his fist, the
+// other clawing at the ground, heels kicking for purchase. struggle 0..1 — how hard you're fighting
+// (0 also when he's knocked you out: then it's just dead weight). The caller tips the root back.
+export function poseDragged(rig, t = 0, struggle = 0.5) {
+  const n = rig.nodes;
+  rig.root.rotation.x = 0;
+  const k = clamp(struggle, 0, 1);
+  n.hips.position.set(0, 0.34, 0);
+  n.hips.rotation.set(0, Math.sin(t * 3.1) * 0.12 * k, Math.sin(t * 2.3) * 0.08);
+  n.chest.rotation.set(-0.35 + Math.sin(t * 5.2) * 0.08 * k, -0.3, 0.12);
+  n.head.rotation.set(-0.5, 0.25 + Math.sin(t * 1.7) * 0.2 * k, 0.1);
+  n.shL.rotation.set(-2.55 + Math.sin(t * 6.1) * 0.1 * k, 0, -0.25); // the wrist he has, up over your head toward him
+  n.elL.rotation.x = -0.25 - Math.max(0, Math.sin(t * 6.1)) * 0.3 * k;
+  n.shR.rotation.set(0.55 + Math.sin(t * 4.3 + 1) * 0.5 * k, 0, 0.55); // the free one, raking at roots and stones
+  n.elR.rotation.x = -0.5 + Math.sin(t * 5.7) * 0.35 * k;
+  for (const [A, s] of [['L', -1], ['R', 1]]) {
+    n['th' + A].rotation.set(-0.55 + Math.sin(t * 5.4 + s * 2.4) * 0.4 * k, 0, s * 0.14);
+    n['kn' + A].rotation.x = 0.75 + Math.max(0, Math.sin(t * 5.4 + s * 2.4 + 1)) * 0.6 * k;
+  }
+}
+
+// tied sitting against the Angler's tree: back to the trunk, wrists behind it, heels dug in.
+// dread 0..1 — he's back and standing over you: the chest works and the head comes up.
+export function poseBound(rig, t = 0, dread = 0) {
+  const n = rig.nodes;
+  rig.root.rotation.x = 0;
+  n.hips.position.set(0, 0.42, -0.04);
+  n.hips.rotation.set(0, 0, 0);
+  n.chest.rotation.set(-0.14 + Math.sin(t * (1.4 + dread * 2.2)) * (0.015 + dread * 0.03), Math.sin(t * 0.9) * 0.05, 0);
+  n.head.rotation.set(lerp(0.28, -0.3, dread) + Math.sin(t * 1.3) * 0.04, Math.sin(t * 0.6) * 0.18 * (1 - dread), 0.06);
+  for (const [A, s] of [['L', -1], ['R', 1]]) {
+    n['th' + A].rotation.set(-1.45, 0, s * 0.1);
+    n['kn' + A].rotation.x = 1.5;
+    n['sh' + A].rotation.set(0.62 + Math.sin(t * 2.7 + s) * 0.05, 0, s * -0.28); // shoulders rolled back round the trunk
+    n['el' + A].rotation.x = -1.05 + Math.sin(t * 3.4 + s * 2) * 0.08; // wrists working at the rope, out of sight
   }
 }
 

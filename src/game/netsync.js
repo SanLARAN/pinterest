@@ -94,7 +94,7 @@ export class NetSync {
       this.snT -= dt;
       if (this.snT <= 0) {
         this.snT = 1 / SNAP_HZ;
-        this.send('sn', { t: r2(g.time), m: g.monsters.map((m) => this.packMonster(m)) });
+        this.send('sn', { t: r2(g.time), m: g.monsters.map((m) => this.packMonster(m)), a: g.angler.netState() });
       }
     }
     // objectives: when they change (throttled), plus a slow heartbeat that heals anything lost
@@ -166,6 +166,12 @@ export class NetSync {
         break;
       case 'ad': // a guest's adrenaline syringe went in
         if (this.host && typeof d === 'string') g.rescue.hostAdrenaline(d, pid);
+        break;
+      case 'as': // a guest in the Angler's hands: how full the struggle meter is
+        if (this.host && Number.isFinite(d)) g.angler.hostStruggle(pid, d);
+        break;
+      case 'au': // a guest at the rope: untie them (the host measures the distance)
+        if (this.host && typeof d === 'string') g.angler.hostUntie(d, pid);
         break;
       case 'rr': // a guest finished working on someone on the cot
         if (this.host && typeof d === 'string') g.rescue.hostRevive(d, pid);
@@ -331,6 +337,12 @@ export class NetSync {
           case 'zb': g.cabinets.netBeat(a, b, c, e); break;
           case 'zr': g.cabinets.netEnd(a, 'rescued'); break;
           case 'zd': g.cabinets.netEnd(a, 'died'); break;
+          case 'ag': g.angler.netGrab(a); break;
+          case 'ako': g.angler.netKO(a); break;
+          case 'ab': g.angler.netBound(a); break;
+          case 'afin': g.angler.netFinish(a); break;
+          case 'ak': g.angler.netKill(a, +b, +c); break;
+          case 'afr': g.angler.netFreed(a, b, c); break;
           case 'en': g.endOnline(false); break;
         }
       }
@@ -341,6 +353,7 @@ export class NetSync {
     const g = this.g;
     const now = performance.now();
     g.netT = +d.t || 0;
+    if (g.angler) g.angler.netMerge(d.a); // the Angler's rope, healed ten times a second
     const seen = new Set();
     for (const a of d.m) {
       if (!Array.isArray(a)) continue;

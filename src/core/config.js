@@ -83,7 +83,44 @@ export const CFG = {
     watcher: { stalk: 3.5, hearing: 0, lock: 0, radius: 0.4, litThreshold: 0.13, arrive: 240, arriveGens: 2 },
     // the Howler: half-deaf brute that "sees" with its howl — anything moving when it howls gets charged
     howler: { wander: 1.25, investigate: 2.6, hunt: 6.4, hearing: 0.6, minLoud: 0.4, lock: 6.5, radius: 0.6, arrive: 480, arriveGens: 3, howlR: 46 },
+    // the Angler's body rides the monster list (snapshots, echo imprints), but its brain is its own
+    // (see ANGLER below and game/angler.js): these numbers only keep the shared shell happy
+    angler: { wander: 0, investigate: 0, hunt: 0, hearing: 0, lock: 0, radius: 0.55 },
     killDist: 1.35,
+  },
+
+  // the Angler (Удильщик): a big man with a lantern who works the third and fourth nights. He does not
+  // hunt noise like the others — he takes whoever has wandered off alone, hauls them by the arm to a
+  // tree and ties them to it. Struggle (A/D) on the way and you may tear free; shout and he knocks you
+  // out. Tied up, you have five minutes for a friend to find you (alone in the shift you can chew
+  // through the rope yourself, slowly and loudly). Then he comes back, and what he takes stays taken:
+  // no cot, no syringe, no dawn raises you — gone for the rest of the run.
+  ANGLER: {
+    fromDay: 3, // the first night he works
+    after: 75, // s into the night before the first hunt (the forest wakes at 45)
+    isolateR: 32, // m from every other free living player: alone enough to take
+    regroupR: 24, // m: get this close to a friend while he stalks you and he loses interest...
+    regroupT: 4, // ...after this many seconds of it
+    approach: 3.8, // m/s coming for you (you walk 3.1, sprint 5.7 — for a while)
+    haul: 1.65, // m/s with you dragging behind him
+    grabR: 1.7, // m: his hand closes
+    treeMin: 30, treeMax: 60, // m: how far the tree he picks can be from where he took you
+    dragGiveUp: 100, // s of hauling without reaching it: he drops you and goes
+    tie: 1.6, // s with the rope at the tree
+    boundFor: 300, // s tied before he comes back to finish it
+    untie: 3, // s a friend holds E at the rope
+    untieR: 2.4, // m from the bound player
+    voiceLoud: 0.52, // louder than this on the drag and he gets annoyed
+    irritate: 2.2, // ∫(loud − voiceLoud)dt that earns a fist: blackout
+    irritateDecay: 0.25, // /s he calms down while you're quiet
+    ko: 8, // s blacked out (no look, no struggle)
+    struggleHit: 0.085, // meter per alternating A/D press on the drag
+    struggleDecay: 0.055, // meter/s leaking away
+    selfHit: 0.022, // meter per press chewing the rope alone (solo / nobody left to come)
+    selfDecay: 0.01,
+    cooldown: [50, 85], // s between hunts (after a loss, a drop, a rescue — or a finish)
+    finishT: 3.8, // s of the last scene at the tree, from the captive's eyes
+    lamp: { I: 1.3, R: 13, c: [1.0, 0.6, 0.28] }, // his lantern: a real small light (see GlowSticks)
   },
 
   // the five generators, in the order the chain leads you to them.
@@ -162,6 +199,7 @@ export const CFG = {
     generator: 2000,
     revive: 1500, // you brought someone back on the cot
     adrenaline: 750, // you raised them with the syringe: fast, but they'll limp
+    untie: 750, // you cut someone off the Angler's tree
     night: 3000, // each dawn the whole team lived to see
     win: 25000, // the shift survived (the fourth night's dawn)
     speedBonus: 10, // per second still left in the shift, if you drive out early

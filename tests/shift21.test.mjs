@@ -41,6 +41,7 @@ function bare(shift = {}) {
   g.objectives = { closeNote() {}, setMorning() {}, startNight() {}, update() {}, campFail() {} };
   g.doors = { update() {} };
   g.cabinets = { update() {} };
+  g.angler = { myCap: () => null, heldLocal: () => false, update() {}, reset() {}, netState: () => 0 }; // 2.1o: nobody is in his hands here
   g.medhut = { update() {}, cot: { x: 0, y: 0, z: 0 } };
   g.torch = { update() {} };
   g.glows = { update() {} };
@@ -65,7 +66,7 @@ test('the shift is four days: 8-minute nights, 1:45 mornings, no 45-minute limit
   assert.equal(S.NIGHT, 480);
   assert.equal(S.MORNING, 105);
   assert.equal('RUN_SECONDS' in CFG, false);
-  assert.equal(PROTOCOL, 14);
+  assert.equal(PROTOCOL, 15); // 2.1o: the Angler rides the snapshots (was 14 for the four-day shift itself)
 });
 
 test('danger steps every four minutes of a night and again with each dawn survived', () => {

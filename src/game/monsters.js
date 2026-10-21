@@ -340,6 +340,76 @@ export function buildHowler() {
   return R;
 }
 
+// ---------------- the Angler: a big man, a lantern, a cleaver ----------------
+// Not a beast like the others — a butcher. Two metres of him, most of it belly under a canvas apron,
+// a storm lantern in his left hand and the cleaver loose in his right. He is built like the monsters
+// (so the echo and the lamp-ghosts take him the same way) but he walks like a man who is in no hurry.
+export function buildAngler() {
+  const R = makeRig('angler');
+  const N = (name, parent, x, y, z) => node(R, name, parent, x, y, z);
+  const hips = N('hips', null, 0, 0.94, 0);
+  part(R, hips, (b) => { b.place(0, -0.05, 0); b.box(0.52, 0.26, 0.34, KIND.BARK); }); // broad canvas trousers
+  const spine = N('spine', hips, 0, 0.05, 0);
+  part(R, spine, (b) => {
+    b.identity();
+    b.taper(0.56, 0.4, 0.66, 0.46, 0.52, KIND.FLESH, -0.02); // the belly, in a sweat-dark shirt
+    b.place(0, 0.14, 0.235, 0.1, 0, 0); b.box(0.5, 0.62, 0.045, KIND.WOOD); // the apron, stiff with old weather
+    b.place(0, 0.47, 0.05); b.box(0.6, 0.05, 0.42, KIND.BARK); // its strap over the shoulders
+  });
+  const chest = N('chest', spine, 0, 0.52, 0.01);
+  part(R, chest, (b) => {
+    b.identity();
+    b.taper(0.66, 0.44, 0.5, 0.34, 0.34, KIND.FLESH, -0.04); // chest and shoulders
+    b.place(0, 0.08, 0.2, 0.12, 0, 0); b.box(0.44, 0.3, 0.04, KIND.WOOD); // the apron's bib
+  });
+  const neck = N('neck', chest, 0, 0.3, 0.02);
+  part(R, neck, (b) => { b.identity(); b.limb([0, -0.02, 0], [0, 0.12, 0.02], 0.11, 0.09, KIND.FLESH); }); // no neck to speak of
+  const head = N('head', neck, 0, 0.14, 0.02);
+  part(R, head, (b) => {
+    b.place(0, 0.02, -0.01); b.rock(0.155, mulberry(7), KIND.FLESH, 0.06, 1.05); // bald, heavy-browed
+    b.place(0, 0.1, 0.1); b.box(0.21, 0.045, 0.05, KIND.FLESH); // the brow ridge
+    for (const s of [-1, 1]) { b.place(s * 0.055, 0.035, 0.125); b.octa(0.016, 0.014, KIND.EYE); } // small, deep, wet
+    b.place(0, -0.03, 0.14, 0.3, 0, 0); b.box(0.045, 0.09, 0.04, KIND.FLESH); // a broken nose
+  });
+  const jaw = N('jaw', head, 0, -0.085, 0.015);
+  part(R, jaw, (b) => { b.place(0, -0.02, 0.03); b.box(0.15, 0.07, 0.13, KIND.FLESH); }); // a jaw that works while he thinks
+  for (const s of [-1, 1]) {
+    const side = s < 0 ? 'L' : 'R';
+    const sh = N('shoulder' + side, chest, s * 0.36, 0.22, 0);
+    part(R, sh, (b) => { b.identity(); b.limb([0, 0.02, 0], [s * 0.05, -0.42, 0.01], 0.105, 0.085, KIND.FLESH, 5); });
+    const el = N('elbow' + side, sh, s * 0.05, -0.42, 0.01);
+    part(R, el, (b) => { b.identity(); b.limb([0, 0, 0], [s * 0.02, -0.4, 0.03], 0.085, 0.065, KIND.FLESH, 5); });
+    const hand = N('hand' + side, el, s * 0.02, -0.4, 0.03);
+    part(R, hand, (b) => { b.place(0, -0.045, 0.01); b.box(0.1, 0.13, 0.05, KIND.FLESH); }); // a hand like a spade
+    const th = N('thigh' + side, hips, s * 0.17, -0.1, 0);
+    part(R, th, (b) => { b.identity(); b.limb([0, 0, 0], [s * 0.02, -0.44, 0.03], 0.13, 0.1, KIND.BARK, 5); });
+    const kn = N('knee' + side, th, s * 0.02, -0.44, 0.03);
+    part(R, kn, (b) => { b.identity(); b.limb([0, 0, 0], [0, -0.42, -0.02], 0.095, 0.07, KIND.BARK, 5); });
+    const ft = N('foot' + side, kn, 0, -0.42, -0.02);
+    part(R, ft, (b) => { b.place(0, -0.035, 0.07); b.box(0.13, 0.09, 0.3, KIND.ROCK); }); // boots
+  }
+  // the lantern, swinging from his left fist: cage, cap and a coal of light inside
+  const lamp = N('lantern', R.nodes.handL, -0.01, -0.16, 0.03);
+  part(R, lamp, (b) => {
+    b.place(0, 0.075, 0); b.cylinder(6, 0.05, 0.075, 0.035, KIND.METAL, { capBottom: true });
+    b.place(0, -0.085, 0); b.cylinder(6, 0.075, 0.06, 0.03, KIND.METAL, { capTop: true });
+    for (let i = 0; i < 3; i++) {
+      const a = (i / 3) * Math.PI * 2 + 0.5;
+      b.place(Math.cos(a) * 0.062, 0, Math.sin(a) * 0.062); b.box(0.012, 0.15, 0.012, KIND.METAL);
+    }
+    b.place(0, -0.01, 0); b.octa(0.038, 0.05, KIND.EYE); // the flame, drawn as a coal: the light itself is a shader slot
+    b.identity(); b.limb([0, 0.09, 0], [0, 0.17, 0], 0.008, 0.008, KIND.METAL, 3); // the bail into his fist
+  });
+  // the cleaver in his right: a wide blade on a short handle, edge down
+  const cleaver = N('cleaver', R.nodes.handR, 0.01, -0.1, 0.02);
+  part(R, cleaver, (b) => {
+    b.place(0, 0.02, 0); b.box(0.035, 0.13, 0.045, KIND.WOOD);
+    b.place(0, -0.13, 0.035); b.box(0.016, 0.17, 0.21, KIND.METAL);
+    b.place(0, -0.215, 0.035); b.box(0.02, 0.012, 0.2, KIND.BONE); // the edge catches what light there is
+  });
+  return R;
+}
+
 function mulberry(seed) {
   let a = seed;
   return () => {
@@ -467,8 +537,58 @@ function animHowler(m, dt, t) {
   n.kneeR.rotation.x = Math.max(0, -s) * 0.6 * amp;
 }
 
+// the Angler walks like a man: short heavy strides, the lantern held up and steady in front of him,
+// the cleaver loose. Hauling, he leans into it with the dragging arm trailing back; at the tree he
+// goes down on one knee to the rope; and at the end the cleaver goes up — and comes down once.
+function animAngler(m, dt, t) {
+  const n = m.rig.nodes;
+  const amp = clamp(m.speedCur / 2.2, 0, 1.2);
+  const p = m.phase, s = Math.sin(p);
+  const st = m.state;
+  const haul = st === 'haul', tie = st === 'tie', fin = st === 'finish';
+  n.thighL.rotation.x = s * 0.5 * amp + (tie ? -1.5 : 0);
+  n.thighR.rotation.x = -s * 0.5 * amp + (tie ? -0.25 : 0);
+  n.kneeL.rotation.x = Math.max(0, -s) * 0.65 * amp + 0.06 + (tie ? 1.9 : 0);
+  n.kneeR.rotation.x = Math.max(0, s) * 0.65 * amp + 0.06 + (tie ? 0.5 : 0);
+  n.hips.position.y = 0.94 - Math.abs(Math.cos(p)) * 0.035 * amp - (haul ? 0.05 : 0) - (tie ? 0.42 : 0);
+  n.hips.rotation.z = Math.sin(p) * 0.045 * amp; // a big man's roll, hip to hip
+  n.spine.rotation.x = (haul ? 0.34 : tie ? 0.55 : 0.14) + Math.sin(t * 1.1 + m.seed) * 0.015;
+  n.chest.rotation.y = Math.sin(p) * 0.06 * amp - (haul ? 0.3 : 0);
+  n.neck.rotation.x = haul ? -0.18 : tie ? 0.22 : -0.05;
+  n.head.rotation.y = clamp(m.headYaw, -0.8, 0.8);
+  n.head.rotation.x = tie ? 0.3 : fin ? 0.18 : 0.02;
+  n.jaw.rotation.x = 0.08 + Math.max(0, Math.sin(t * 0.7 + m.seed)) * 0.07; // chewing nothing, thinking
+  // the lantern arm: up and forward, always — it is how you know him in the dark
+  n.shoulderL.rotation.x = -0.85 + Math.sin(t * 0.9) * 0.03 - (tie ? -0.35 : 0);
+  n.shoulderL.rotation.z = -0.22;
+  n.elbowL.rotation.x = -0.35 + Math.sin(p * 2) * 0.04 * amp;
+  n.lantern.rotation.x = Math.sin(p) * 0.14 * amp + Math.sin(t * 1.7) * 0.05;
+  n.lantern.rotation.z = Math.cos(p) * 0.1 * amp;
+  // the cleaver arm: swings a little as he walks; hauling, it is the one that has you
+  if (fin) {
+    const k = clamp(m.finishK || 0, 0, 1); // 0..1 across the last scene (the controller drives it)
+    const raise = clamp(k / 0.72, 0, 1), chop = clamp((k - 0.78) / 0.1, 0, 1);
+    n.shoulderR.rotation.x = -0.4 - raise * 1.9 + chop * 2.3;
+    n.elbowR.rotation.x = -0.3 - raise * 0.5 + chop * 0.65;
+    n.shoulderR.rotation.z = 0.15;
+    n.spine.rotation.x += chop * 0.3;
+  } else if (haul) {
+    n.shoulderR.rotation.x = 0.85 + Math.sin(p * 2) * 0.05; // trailing back, fist closed on a wrist
+    n.shoulderR.rotation.z = 0.3;
+    n.elbowR.rotation.x = -0.15;
+  } else if (tie) {
+    n.shoulderR.rotation.x = -0.7 + Math.sin(t * 7) * 0.14; // working the rope
+    n.shoulderL.rotation.x = -0.65 + Math.cos(t * 7) * 0.12;
+    n.elbowR.rotation.x = -0.7 + Math.sin(t * 7 + 1) * 0.2;
+  } else {
+    n.shoulderR.rotation.x = -s * 0.32 * amp + Math.sin(t * 0.8 + 2) * 0.03;
+    n.shoulderR.rotation.z = 0.12;
+    n.elbowR.rotation.x = -0.22 - amp * 0.12;
+  }
+}
+
 // the atlas animates its portraits with the very same code (a stand-in `m`: rig, state, stateT, speedCur, phase, seed, headYaw...)
-export const ANIMS = { listener: animListener, crawler: animCrawler, watcher: animWatcher, howler: animHowler };
+export const ANIMS = { listener: animListener, crawler: animCrawler, watcher: animWatcher, howler: animHowler, angler: animAngler };
 
 // (the survivor — a teammate in co-op, you in the wardrobe — lives in survivor.js)
 
@@ -478,15 +598,15 @@ export const ANIMS = { listener: animListener, crawler: animCrawler, watcher: an
 //  • puppet (co-op guest): follow() replays the host's snapshots, slightly delayed and interpolated
 // Either way present() animates it and makes it sound like itself, relative to whoever listens here.
 let _id = 0;
-const RIGS = { listener: buildListener, crawler: buildCrawler, watcher: buildWatcher, howler: buildHowler };
+const RIGS = { listener: buildListener, crawler: buildCrawler, watcher: buildWatcher, howler: buildHowler, angler: buildAngler };
 export function buildRig(type) {
   return RIGS[type]();
 }
 // stand-in "player" when nobody is alive: far away, still
 const FAR = { x: 1e5, z: 1e5, y: 0, speed: 0, alive: false, charging: false, forward: () => ({ x: 0, z: -1 }) };
 const INTERP_DELAY = 140; // ms behind the newest snapshot: hides network jitter
-export const STATES = ['idle', 'wander', 'investigate', 'search', 'hunt', 'flee', 'feed', 'lurk', 'stalk', 'frozen', 'inhale', 'howl'];
-export const TYPES = ['listener', 'crawler', 'watcher', 'howler'];
+export const STATES = ['idle', 'wander', 'investigate', 'search', 'hunt', 'flee', 'feed', 'lurk', 'stalk', 'frozen', 'inhale', 'howl', 'haul', 'tie', 'finish'];
+export const TYPES = ['listener', 'crawler', 'watcher', 'howler', 'angler'];
 
 function lerpAngle(a, b, k) {
   return a + angleDiff(a, b) * k;
@@ -582,6 +702,7 @@ export class Monster {
   nearestTo(x, z) {
     let best = null, bd = 1e9;
     for (const q of this.game.livePlayers()) {
+      if (q.held) continue; // the Angler's armful is his: nothing else hunts what he is already carrying
       const d = Math.hypot(q.x - x, q.z - z);
       if (d < bd) {
         bd = d;
@@ -594,7 +715,7 @@ export class Monster {
   // whoever it is chasing; otherwise whoever is nearest
   pickTarget() {
     const g = this.game;
-    if (!(this.state === 'hunt' && this.tgt && this.tgt.alive && g.isPlayer(this.tgt))) this.tgt = this.nearestTo(this.x, this.z);
+    if (!(this.state === 'hunt' && this.tgt && this.tgt.alive && !this.tgt.held && g.isPlayer(this.tgt))) this.tgt = this.nearestTo(this.x, this.z);
     this.tgtDist = this.tgt ? Math.hypot(this.tgt.x - this.x, this.tgt.z - this.z) : 1e4;
     return this.tgt;
   }
@@ -842,10 +963,11 @@ export class Monster {
         if (this.stateT > 0.35) {
           // whoever it reaches: the one it chases first, else whoever is nearest in its way
           const kd = CFG.MONSTER.killDist;
-          let victim = p.alive && pd < kd ? p : null;
+          let victim = p.alive && !p.held && pd < kd ? p : null;
           if (!victim) {
             let vd = kd;
             for (const q of g.livePlayers()) {
+              if (q.held) continue;
               const d = Math.hypot(q.x - this.x, q.z - this.z);
               if (d < vd) {
                 vd = d;
@@ -1288,9 +1410,99 @@ export class Howler extends Monster {
   }
 }
 
+// ---------------- the Angler's body ----------------
+// The brain lives in game/angler.js (it owns the hunt, the rope and the clock); this is just the man
+// himself on the monster list, so snapshots, echo imprints and lamp-ghosts treat him like the others.
+// He takes orders as `mode` and walks: he does not hear the forest's noises and never "hunts" — when
+// he reaches you, the controller closes his hand.
+export class AnglerBody extends Monster {
+  constructor(game, id) {
+    super('angler', game, id);
+    this.ghostColor = 0xffb347; // lantern-amber in the echo: a man, not a beast
+    this.noEyes = true; // no eyes shine in the dark for him — the lantern does
+    this.headY = 1.9;
+    this.stepGain = 1.7;
+    this.stepPitch = 0.68;
+    this.strideHz = 1.3;
+    this.strideRef = 2.1;
+    this.mode = 'idle'; // stalk | haul | tie | leave | return | finish | idle (the controller's word)
+    this.finishK = 0;
+  }
+
+  animate(dt, t) {
+    animAngler(this, dt, t);
+  }
+
+  danger() {
+    const d = this.playerDist;
+    if (this.mode === 'stalk' || this.mode === 'haul' || this.mode === 'finish' || this.mode === 'return') return 0.5 + 0.5 * clamp(1 - d / 32, 0, 1);
+    return 0.45 * clamp(1 - d / 18, 0, 1);
+  }
+
+  hear() {
+    return null; // he is not listening for the forest — he already knows who is alone
+  }
+
+  present(dt, t) {
+    if (this.state === 'finish') this.finishK = clamp(this.stateT / CFG.ANGLER.finishT, 0, 1);
+    super.present(dt, t);
+  }
+
+  think(dt, t) {
+    const g = this.game;
+    const A = CFG.ANGLER;
+    const ctl = g.angler;
+    this.stateT += dt;
+    let speed = 0, tx = this.x, tz = this.z, net = 'idle', face = null;
+    const cap = ctl && ctl.cap;
+    switch (this.mode) {
+      case 'stalk': {
+        const v = ctl && ctl.huntTarget;
+        if (v) { tx = v.x; tz = v.z; speed = A.approach; net = 'stalk'; this.tgt = v; }
+        break;
+      }
+      case 'haul':
+        if (cap) { tx = cap.tree.x; tz = cap.tree.z; speed = A.haul; net = 'haul'; }
+        break;
+      case 'tie':
+        net = 'tie';
+        if (cap) face = cap.tree;
+        break;
+      case 'return':
+        if (cap) { tx = cap.tree.fx; tz = cap.tree.fz; speed = A.approach * 0.92; net = 'stalk'; }
+        break;
+      case 'finish':
+        net = 'finish';
+        if (cap) face = cap.tree;
+        break;
+      case 'leave':
+        tx = this.tx; tz = this.tz; speed = A.approach * 0.85; net = 'wander';
+        break;
+      default:
+        break;
+    }
+    if (this.state !== net) this.setState(net);
+    if (face) {
+      // stand over the tree and look at what's tied to it
+      const want = Math.atan2(face.x - this.x, face.z - this.z);
+      this.yaw += clamp(angleDiff(this.yaw, want), -2.2 * dt, 2.2 * dt);
+      this.headYaw = lerp(this.headYaw, 0, 1 - Math.exp(-4 * dt));
+      this.speedCur = lerp(this.speedCur, 0, 1 - Math.exp(-6 * dt));
+    } else {
+      this._steer(dt, tx, tz, speed, 3.2);
+      const v = this.tgt;
+      const want = v && (this.mode === 'stalk') ? clamp(angleDiff(this.yaw, Math.atan2(v.x - this.x, v.z - this.z)), -0.7, 0.7) : 0;
+      this.headYaw = lerp(this.headYaw, want, 1 - Math.exp(-4 * dt));
+    }
+    this.tgtDist = this.tgt ? Math.hypot(this.tgt.x - this.x, this.tgt.z - this.z) : 1e4;
+    this.phase += dt * Math.PI * 2 * this.strideHz * clamp(this.speedCur / this.strideRef, 0, 2.2);
+  }
+}
+
 export function createMonster(type, game, id) {
   if (type === 'watcher') return new Watcher(game, id);
   if (type === 'howler') return new Howler(game, id);
+  if (type === 'angler') return new AnglerBody(game, id);
   return new Monster(type, game, id);
 }
 

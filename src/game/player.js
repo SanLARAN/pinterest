@@ -45,6 +45,7 @@ export class Player {
     this.moved = 0;
     this.distFromSpawn = 0;
     this.carrying = null; // co-op: the id of a friend on your shoulder (see Rescue)
+    this.held = false; // the Angler has this one (see angler.js): dragged, tied — not to be hunted by the rest
   }
 
   forward() {

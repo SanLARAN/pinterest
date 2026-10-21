@@ -439,6 +439,7 @@ export class GlowSticks {
     }
     if (this.g.torch) this.g.torch.lightSources(out); // (flashlights: small lights with a direction)
     if (this.g.fire) this.g.fire.lightSource(out); // the camp fire (only while there is one — see campfire.js)
+    if (this.g.angler) this.g.angler.lightSource(out); // the Angler's storm lantern, from the third night
     return out;
   }
 

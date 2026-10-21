@@ -2068,6 +2068,78 @@ export class AudioEngine {
     this._noiseBurst(t, { buf: this.pink, type: 'lowpass', f: 700, a: 0.08, d: 0.4, hold: 0.2, gain: 0.25, dest: pn });
   }
 
+  // ---------- the Angler (the man with the lantern) ----------
+  // no beast-voice for him: cloth, rope, weight and one piece of steel. He is a man at work.
+
+  anglerGrab(x, y, z, I = 1) {
+    if (!this.ready) return;
+    const t = this.now;
+    const pn = this._panner(x, y, z, 2.5, 1.2);
+    pn.connect(this.sfx);
+    // a fistful of coat, then the whole weight of him arrives
+    this._noiseBurst(t, { type: 'highpass', f: 1800, a: 0.001, d: 0.09, gain: 0.8 * I, dest: pn });
+    this._noiseBurst(t + 0.03, { buf: this.brown, type: 'lowpass', f: 300, a: 0.004, d: 0.22, gain: 1.3 * I, dest: pn });
+    this._tone(t + 0.02, { f: 95, fEnd: 42, a: 0.004, d: 0.3, gain: 0.9 * I, dest: pn });
+    // his grunt: a low voice through a closed throat, no hurry in it
+    this._tone(t + 0.05, { type: 'sawtooth', f: 82, fEnd: 64, a: 0.03, d: 0.32, gain: 0.16 * I, dest: pn });
+    this._noiseBurst(t + 0.05, { type: 'bandpass', f: 420, q: 2.2, a: 0.03, d: 0.3, gain: 0.22 * I, dest: pn });
+  }
+
+  dragScrape(x, y, z, I = 0.8) {
+    if (!this.ready) return;
+    const t = this.now;
+    const pn = this._panner(x, y, z, 2.5, 1.2);
+    pn.connect(this.sfx);
+    // cloth and heels over roots and needle-litter, a stone turned now and then
+    this._noiseBurst(t, { buf: this.brown, type: 'lowpass', f: 520, a: 0.03, d: 0.26, gain: 0.5 * I, dest: pn });
+    if (Math.random() < 0.4) this._tone(t + Math.random() * 0.12, { f: 300 + Math.random() * 500, a: 0.001, d: 0.03, gain: 0.12 * I, dest: pn });
+  }
+
+  ropeTie(x, y, z, I = 1) {
+    if (!this.ready) return;
+    const t = this.now;
+    const pn = this._panner(x, y, z, 2.5, 1.2);
+    pn.connect(this.sfx);
+    for (let i = 0; i < 3; i++) {
+      const tt = t + i * (0.16 + Math.random() * 0.06);
+      this._noiseBurst(tt, { type: 'bandpass', f: 280 + i * 140, q: 4, a: 0.01, d: 0.14, gain: 0.4 * I, dest: pn }); // hemp taking the strain
+    }
+    this._noiseBurst(t + 0.55, { type: 'bandpass', f: 900, q: 3, a: 0.005, d: 0.07, gain: 0.35 * I, dest: pn }); // the knot pulled home
+  }
+
+  ropeRub(x, y, z) {
+    if (!this.ready) return;
+    const pn = this._panner(x, y, z, 2, 1.3);
+    pn.connect(this.sfx);
+    this._noiseBurst(this.now, { type: 'bandpass', f: 500 + Math.random() * 400, q: 3, a: 0.008, d: 0.09, gain: 0.18, dest: pn });
+  }
+
+  koThud(x, y, z, I = 1) {
+    if (!this.ready) return;
+    const t = this.now;
+    const pn = this._panner(x, y, z, 2.5, 1.2);
+    pn.connect(this.sfx);
+    this._tone(t, { f: 110, fEnd: 36, a: 0.002, d: 0.42, gain: 1.1 * I, dest: pn });
+    this._noiseBurst(t, { type: 'highpass', f: 2600, a: 0.0005, d: 0.025, gain: 0.5 * I, dest: pn });
+    if (I > 1) { // yours: felt in the teeth, on the body bus past the duck
+      this._tone(t, { f: 70, fEnd: 30, a: 0.002, d: 0.6, gain: 0.9, dest: this.body });
+      this._tone(t + 0.01, { f: 4200, fEnd: 2600, a: 0.002, d: 0.8, gain: 0.06, dest: this.body }); // the ring as the lights go
+    }
+  }
+
+  cleaverStrike(x, y, z, I = 1) {
+    if (!this.ready) return;
+    const t = this.now;
+    const pn = this._panner(x, y, z, 2.5, 1.2);
+    pn.connect(this.sfx);
+    // the steel sings first, then the weight of it lands
+    [[1, 0.5, 0.16], [2.93, 0.3, 0.09], [6.1, 0.16, 0.05]].forEach(([m, d, gn]) => {
+      this._tone(t, { f: 660 * m, a: 0.001, d, gain: gn * I * 1.6, dest: pn });
+    });
+    this._noiseBurst(t + 0.012, { buf: this.brown, type: 'lowpass', f: 420, a: 0.002, d: 0.3, gain: 1.4 * I, dest: pn });
+    this._tone(t + 0.01, { f: 85, fEnd: 34, a: 0.002, d: 0.5, gain: 1.0 * I, dest: pn });
+  }
+
   spark(x, y, z) {
     if (!this.ready) return;
     const t = this.now;
@@ -3202,6 +3274,30 @@ export class AudioEngine {
     this.gRevSend.connect(this.gRev);
     this.gRev.connect(out);
     out.connect(this.gSfx);
+  }
+
+  // a guitar taken down in the garage (the Keanu set's idle): plucked strings, synthesized — three
+  // partials and a pick transient per note, through the music setting on the garage bus. The phrase
+  // is a slow minor walk; `step` walks it, call by call, and the caller keeps the beat.
+  guitarPluck(step = 0, I = 1) {
+    if (!this.ctx) return;
+    this._gbus();
+    if (!this.gSfx) return;
+    const PHRASE = [0, null, 7, null, 5, 3, null, 5, 0, null, -4, null, 0, 3, null, 2]; // semitones over A2; null: a rest
+    const semi = PHRASE[((step % PHRASE.length) + PHRASE.length) % PHRASE.length];
+    if (semi === null) return;
+    const f0 = 110 * Math.pow(2, semi / 12);
+    const t = this.now;
+    const g = Math.pow(settings.music ?? 0.55, 1.15) * 0.55 * I;
+    if (g <= 0.001) return;
+    const dest = this._gain(g);
+    dest.connect(this.gSfx);
+    if (this.gRevSend) dest.connect(this.gRevSend);
+    this._noiseBurst(t, { type: 'bandpass', f: f0 * 6, q: 1.2, a: 0.001, d: 0.03, gain: 0.35, dest }); // the pick
+    this._tone(t, { type: 'triangle', f: f0, a: 0.002, d: 1.9, gain: 0.5, dest });
+    this._tone(t, { f: f0 * 2, a: 0.002, d: 1.2, gain: 0.22, dest });
+    this._tone(t, { f: f0 * 3.01, a: 0.002, d: 0.7, gain: 0.1, dest });
+    this._tone(t, { f: f0 * 0.5, a: 0.004, d: 0.9, gain: 0.12, dest }); // the body's thump under the string
   }
 
   // rain on the tin roof, wind in the gap of the wicket door, the bulb's hum, now and then a drip

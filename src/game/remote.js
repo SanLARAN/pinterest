@@ -158,6 +158,7 @@ export class RemotePlayer {
     const es = this.game.escape;
     const cb = this.game.cabinets;
     if (cb && cb.poseRemote(this)) return; // caught by the шкафандр — or pulling someone out of it
+    if (this.game.angler && this.game.angler.poseRemote(this)) return; // the Angler's: hauled behind him, or tied to his tree
     if (this.alive) {
       if (es && es.poseRemote(this)) return; // in a seat of the УАЗ (or: a part in their arms, posed there)
       if (this.carrying) poseCarrier(this.rig);
