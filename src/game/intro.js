@@ -610,7 +610,7 @@ export class IntroCutscene {
   }
 
   // the day ends with the fire: the same stutter as the dusk in game (a bulb dying), but slow, and only
-  // once the first flame is under water. The sky goes with uDawn, so the stars come out on their own.
+  // once the first flame is under water. The sky goes with uDawn, all the way down to black.
   _sky(tt, silent) {
     const span = Math.max(1.8, this.tDuskEnd - this.tDusk);
     const k = clamp((tt - this.tDusk) / span, 0, 1);

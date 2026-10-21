@@ -17,6 +17,7 @@ export const NEWS = [
       'В атласе — страница Удильщика: привычки, цифры и как пережить встречу. Он там ходит с фонарём и даже подходит ближе',
       'У Удильщика свой звук появления: услышал издалека — собирайтесь вместе, он уже идёт за кем-то одним',
       'Вдогонку: отставший в фильме отъезда больше не бежит задом наперёд, а у головы-экрана есть силуэт Удильщика',
+      'Звёзд на небе больше нет. Ночью над лесом — только тьма',
     ]},
     en:{title:'The man with the lantern',items:[
       'From the third night the Angler walks the forest: a big man with a lantern and a cleaver. He takes whoever strayed from the others',
@@ -27,6 +28,7 @@ export const NEWS = [
       'The atlas has his page now: habits, numbers and how to survive him. He walks there with his lantern — and comes closer',
       'The Angler has an entrance sound now: hear it far off — get together, he is already coming for someone alone',
       'Follow-ups: the straggler in the departure film no longer runs backwards, and the screen head has an Angler silhouette',
+      'The stars are gone from the sky. At night there is only dark over the forest',
     ]},
   },
   {
