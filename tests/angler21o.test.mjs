@@ -12,6 +12,8 @@ import { buildAngler, createMonster, TYPES, STATES } from '../src/game/monsters.
 import { buildSurvivor, poseGuitar, rigVerts } from '../src/game/survivor.js';
 import { cleanFit, fullSet, ITEMS, THEMES } from '../src/game/outfit.js';
 import { DEPART, departPlan } from '../src/ui/departure.js';
+import { AudioEngine } from '../src/audio/audio.js';
+import { statSync, readFileSync } from 'node:fs';
 import { CHAPTERS, ENTRIES, atlasText, pageList } from '../src/ui/atlasData.js';
 import { buildModel } from '../src/ui/atlasModels.js';
 import * as THREE from 'three';
@@ -324,4 +326,15 @@ test('the atlas has his page: entry, both languages, and a plate that stands, wa
   for (const pose of model.poses || []) pose();
   model.root.traverse((o) => { if (o.geometry) { assert.ok(o.geometry.attributes.position.array.every(Number.isFinite)); o.geometry.dispose(); } });
   mat.dispose();
+});
+
+// ---------- the borrowed sting ----------
+test('his entrance is a recording the forest borrowed — filed, loadable and wired to his appearing', () => {
+  const url = new URL('../public/audio/angler-found.mp3', import.meta.url);
+  const st = statSync(url);
+  assert.ok(st.size > 50_000, `the file is really carried (${st.size} B)`);
+  const head = readFileSync(url).subarray(0, 3);
+  assert.ok(head.toString('latin1') === 'ID3' || (head[0] === 0xff && (head[1] & 0xe0) === 0xe0), 'and it is an MP3');
+  assert.equal(typeof AudioEngine.prototype.anglerFound, 'function', 'the engine can play it');
+  assert.equal(typeof AudioEngine.prototype.prefetchAnglerFound, 'function', 'and fetch it before the third night');
 });

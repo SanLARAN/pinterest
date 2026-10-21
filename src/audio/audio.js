@@ -125,6 +125,9 @@ export class AudioEngine {
     this._meadowState = 'idle'; // 'idle' | 'loading' | 'ok' | 'fail'
     this._meadowBuf = null;
     this._meadowNorm = 1; // (how far the quiet field recording is lifted — see meadowGain)
+    this._anglerFoundState = 'idle'; // the Angler's entrance: a borrowed recording (see anglerFound)
+    this._anglerFoundBuf = null;
+    this._anglerFoundNorm = 1;
   }
 
   get ready() {
@@ -2071,6 +2074,24 @@ export class AudioEngine {
   // ---------- the Angler (the man with the lantern) ----------
   // no beast-voice for him: cloth, rope, weight and one piece of steel. He is a man at work.
 
+  // he has found his loner and is on his way: the borrowed sting (angler-found.mp3), from
+  // where he stepped out of the trees — far off, but everyone in earshot should feel it.
+  // Until the recording lands (or if it never does) a plain synthesized sting stands in.
+  anglerFound(x, y, z, I = 1) {
+    if (!this.ready) return;
+    this._loadAnglerFound();
+    const buf = this._anglerFoundBuf;
+    if (!buf) { this.sting(0.5 * I); return; }
+    const pn = this._panner(x, y, z, 7, 1.15); // it carries across the forest
+    pn.connect(this.sfx);
+    const g = this._gain(0.9 * I * (this._anglerFoundNorm || 1));
+    g.connect(pn);
+    const src = this.ctx.createBufferSource();
+    src.buffer = buf;
+    src.connect(g);
+    src.start(this.now);
+  }
+
   anglerGrab(x, y, z, I = 1) {
     if (!this.ready) return;
     const t = this.now;
@@ -2386,6 +2407,23 @@ export class AudioEngine {
   prefetchMeadow() {
     if (!this.ready) return;
     this._loadMeadow();
+  }
+
+  // the Angler's entrance is a recording too (public/audio/angler-found.mp3 — the
+  // the-rake-remastered-found sting): fetched and decoded once, like the meadow
+  _loadAnglerFound() {
+    if (this._anglerFoundState !== 'idle') return;
+    this._anglerFoundState = 'loading';
+    this._sample('audio/angler-found.mp3').then((buf) => {
+      this._anglerFoundBuf = buf || null;
+      this._anglerFoundNorm = meadowGain(buf, -16, 5); // a floor lift only — mastered material stays put
+      this._anglerFoundState = buf ? 'ok' : 'fail';
+    });
+  }
+
+  prefetchAnglerFound() {
+    if (!this.ready) return;
+    this._loadAnglerFound();
   }
 
   _meadowVoice(x, y, z, { dur = 0, gain = 0.34, dest = null } = {}) {

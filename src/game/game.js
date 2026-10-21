@@ -255,6 +255,7 @@ export class Game {
     this.rescue.resetPlayer(this.player);
     for (const r of this.remotes.values()) this.rescue.resetPlayer(r);
     this.angler.reset(); // the rope, the hunt, the clock — a new night owes him nothing
+    this.audio.prefetchAnglerFound?.(); // his entrance sting, fetched long before the third night
     this.glows.reset();
     this.fire.reset();
     this.pulses.clear();

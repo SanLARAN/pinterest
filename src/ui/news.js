@@ -15,6 +15,7 @@ export const NEWS = [
       'Старт из гаража — теперь фильм: все садятся в УАЗ, кроме одного. Тот спотыкается, бежит следом и хватает борт на ходу',
       'Новый бесплатный комплект «Киану»: волосы с пробором, борода, чёрный костюм. В полном комплекте — гитара в гараже и раздевалке',
       'В атласе — страница Удильщика: привычки, цифры и как пережить встречу. Он там ходит с фонарём и даже подходит ближе',
+      'У Удильщика свой звук появления: услышал издалека — собирайтесь вместе, он уже идёт за кем-то одним',
     ]},
     en:{title:'The man with the lantern',items:[
       'From the third night the Angler walks the forest: a big man with a lantern and a cleaver. He takes whoever strayed from the others',
@@ -23,6 +24,7 @@ export const NEWS = [
       'Leaving the garage is a film now: everyone boards the UAZ but one. He trips, runs after it and grabs the side at a crawl',
       'A new free set, Keanu: centre-parted hair, a beard, a black suit. Worn whole, a guitar comes out now and then in the garage and the wardrobe',
       'The atlas has his page now: habits, numbers and how to survive him. He walks there with his lantern — and comes closer',
+      'The Angler has an entrance sound now: hear it far off — get together, he is already coming for someone alone',
     ]},
   },
   {

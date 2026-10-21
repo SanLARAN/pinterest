@@ -371,6 +371,7 @@ export class NetSync {
         m.state = STATES[si] || 'wander';
         if (Math.abs(x) < 2000) m.y = g.world.terrain.height(x, z);
         g.monsters.push(m);
+        if (type === 'angler' && g.audio) g.audio.anglerFound(m.x, (m.y || 0) + 1.7, m.z); // he just stepped out, somewhere
       }
       m.pushSnap(now, { x, z, yaw, hy, spd, st: STATES[si] || 'wander', lit: !!(fl & 1), intro: !!(fl & 2), scr: !!(fl & 4) });
     }

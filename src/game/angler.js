@@ -286,6 +286,7 @@ export class Angler {
       m.spawn(x, z);
       g.monsters.push(m);
       this.body = m;
+      if (g.audio) g.audio.anglerFound(m.x, m.y + 1.7, m.z); // he has his loner: let the forest hear it
       return true;
     }
     return false;

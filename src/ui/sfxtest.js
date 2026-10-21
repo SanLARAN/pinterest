@@ -38,6 +38,7 @@ export function mountSfxPanel(audio) {
     ['вдали: стук', () => amb('knocks')],
     ['вдали: крик', () => amb('scream')],
     ['вдали: шаги', () => amb('steps')],
+    ['Удильщик: нашёл (запись)', () => audio.anglerFound(...at(8, 0, 0.5), 1)],
     ['Удильщик: схватил', () => audio.anglerGrab(...at(3, 1, 1.2), 1)],
     ['Удильщик: волочит по земле', () => audio.dragScrape(...at(2, 0, 0.2), 1)],
     ['Удильщик: верёвка и узел', () => audio.ropeTie(...at(2, 0, 1), 1)],
