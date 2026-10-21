@@ -4,7 +4,7 @@
 > Он написан для человека и для агента: любой новый чат начинается с чтения `AGENTS.md`, а тот отправляет
 > сюда. Если код и этот файл расходятся — прав код, а файл надо поправить в том же коммите.
 >
-> Последнее обновление: раунд **2.1t**.
+> Последнее обновление: раунд **2.1u**.
 
 ---
 
@@ -199,6 +199,11 @@
   (`_refreshGateHover`, иначе лязг возвращался через 0,15 с) и в самой точке звука `_gateOver()`.
   `gatesLive` пишет `Garage.pointer(x,y,on,gates)`, `GarageHome` гасит его (`gatesAnswer(false)`),
   лобби включает при `open()` и гасит при `close()`; `view='room'` ставится лобби в комнате.
+- **Сборник смены 2.1u**: `game/highlights.js` (режиссёр: окно `pre 3,4 / post 2,4`, 7 к/с, шесть клипов,
+  веса в `HL_WEIGHT`, склейка соседних), `ui/reel.js` (проигрывание, подписи через `captionFor`, запись
+  `.webm` в отдельном canvas 960×540 + `MediaRecorder`, запасной PNG). Игра сообщает о моментах через
+  `Game.hlNote(kind)`, main.js кормит режиссёра кадрами после `post.render` и закрывает его в `onEnd`.
+  Кадры — JPEG-блоки 320×180, декодируются лениво (createImageBitmap, запасной `<img>`).
 - **Голубь-доктор 2.1t**: тема `pigeon` в `outfit.js` (`pigeonhead` + `doctorcoat` в `survivor.js`),
   бесплатная. Голова висит на своей кости `phead` (кивает против тела на шаге, доворачивается на месте),
   глаза — на `eyes` (мигают тем же кодом, что у бойкиссера), хвост на `ptail0/1`, перья рукавов на
@@ -230,15 +235,16 @@ src/
                    objectives / escape / uaz / cabinets / doors / flares / glowsticks / torch / tools /
                    tapeCodec / toolModels / medhut / rescue / inventory / backpackData / partMap / shards /
                    stones / monsters / dread / mimics / player / remote / survivor / outfit / selfbody /
-                   fieldView / moto / training / expedition / campPower / campfire / intro / netsync / wallet
+                   fieldView / moto / training / expedition / campPower / campfire / intro / netsync / wallet /
+                   highlights (2.1u: the highlight director; frames are opaque tokens, so it is testable)
   audio/           audio.js (весь синтез), mic.js, music.js, phrases.js
   net/             net.js (Trystero), coop.js (комната/рассадка/старт), netsync.js (протокол), ice.js, lobbyRules.js
   cloud/           client.js (Supabase), controller.js (снимки/ревизии), rewards.js, snapshot.js, words.js
   input/           input.js (клавиатура по e.code, мышь+pointer lock, тач-кнопки)
   ui/              hud.js, menus.js, graphics.js (расширенная графика), garage*.js (3D-гараж), lobby.js, wardrobe.js, mannequin.js, atlas*.js,
                    bag3d.js, touchButtons.js, radar.js, news.js, miccal.js, socialDock/Toasts/Words, account.js,
-                   beyond.js, voicemix.js, sfxtest.js
-tests/             node:test, 18 файлов / 161 тест
+                   beyond.js, voicemix.js, sfxtest.js, reel.js (2.1u: plays the shift's highlights, writes .webm)
+tests/             node:test, 28 файлов / 250 тестов
 play/              собранная игра для GitHub Pages (артефакт сборки, коммитится)
 ```
 
@@ -291,7 +297,7 @@ await page.evaluate(() => window.__hush.startRun());
 
 ## 7. Конвенции работы (это и есть «как в первом чате»)
 
-- **Раунды буквами**: 2.1a, 2.1b … 2.1t. Каждый раунд = отдельный коммит + запись в README + запись в
+- **Раунды буквами**: 2.1a, 2.1b … 2.1u. Каждый раунд = отдельный коммит + запись в README + запись в
   `ui/news.js` (ru **и** en). Без этого раунд не считается закрытым.
 - **README**: одна строка «**Обновление 2.1X:**» сверху списка обновлений + раздел `### … (2.1X)` с тем, *что*
   сделано, *почему* и *какими числами* проверено.
@@ -317,7 +323,7 @@ await page.evaluate(() => window.__hush.startRun());
 
 ---
 
-## 9. Открытые хвосты (на момент 2.1t)
+## 9. Открытые хвосты (на момент 2.1u)
 
 - Тени ламп: плитка 192 px — на «высокой» можно 256.
 - Контактные пятна под предметами в гараже (`uDisc` уже есть на лугу).
@@ -343,6 +349,9 @@ await page.evaluate(() => window.__hush.startRun());
 - 2.1r: утреннее спасение (плечо/койка/шприц при свете, тело упавшего утром в кадре его самого) и строку
   координат на ЖК проверить на живом 60 fps вдвоём; в headless проверены часы кровотечения, `dawnPeace`
   и утренний E.
+- 2.1u: сборник проверить в настоящем браузере — запись `.webm` (MediaRecorder в Safari особенно),
+  цену съёмки 7 к/с на слабом телефоне, автозапуск после итогов и поведение при `document.hidden`
+  (там кадры не берутся: `step` не рисует). В headless проверены окно, склейка, отбор, подписи и часы.
 - 2.1t: голубя на живом 60 fps — посадку головы на воротник халата (в headless проверены узлы, бюджет
   вершин и все четыре анимации, но не то, как это читается в кадре) и панель длины смены на узком экране.
   Ворота в меню: убедиться, что ни свет, ни защёлка не возвращаются при неподвижном курсоре над ними

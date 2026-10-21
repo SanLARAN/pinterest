@@ -1446,3 +1446,78 @@ body.touch .bino-time { bottom: auto; top: 48px; font-size: 12px; }
 #coopGateHint { position: fixed; left: 50%; bottom: calc(150px + var(--safe-b, 0px)); z-index: 4; transform: translateX(-50%); padding: 7px 16px; border: 1px solid #9fc4d366; border-radius: 2px; background: #08131af0; color: #cfe6ef; font-size: 10px; letter-spacing: .14em; text-transform: uppercase; pointer-events: none; box-shadow: 0 10px 40px #000a, 0 0 22px #7fc3dd22; }
 #coopPanel.over-gate { cursor: pointer; }
 @media (max-height: 640px) { #coopGateHint { bottom: calc(120px + var(--safe-b, 0px)); } }
+
+/* ---------------- the shift's highlights (2.1u) ---------------- */
+/* the way in, on the results screen: a screen-record button, not a fourth menu choice */
+.hl-open {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  border-color: rgba(214, 160, 76, 0.5);
+  color: var(--bone);
+  letter-spacing: 0.18em;
+}
+.hl-open-ico { color: var(--amber); font-size: 11px; letter-spacing: 0; }
+.hl-open b { color: var(--amber); font-weight: 400; letter-spacing: 0.06em; }
+.hl-open b:empty { display: none; }
+.hl-open:hover { background: rgba(214, 160, 76, 0.1); }
+.hl-open.dim { opacity: 0.55; }
+#reelPanel { padding: 24px; }
+.reel-panel {
+  width: min(880px, 100%);
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: rgba(4, 6, 7, 0.94);
+  border: 1px solid var(--ash-faint);
+}
+.reel-head h2 { margin: 0; font-size: 15px; letter-spacing: 0.42em; text-indent: 0.42em; color: var(--bone); font-weight: 400; }
+.reel-head .reel-sub { margin: 6px 0 0; font-size: 11px; letter-spacing: 0.06em; color: var(--ash-dim); }
+.reel-stage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #05070a;
+  border: 1px solid rgba(167, 180, 182, 0.22);
+  overflow: hidden;
+}
+.reel-stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; display: block; }
+.reel-cap {
+  position: absolute; left: 0; right: 0; bottom: 12px;
+  text-align: center; font-size: 12px; letter-spacing: 0.22em; text-transform: uppercase;
+  color: var(--bone); text-shadow: 0 2px 10px #000, 0 0 2px #000;
+  pointer-events: none;
+}
+.reel-empty {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  padding: 10% 12%; text-align: center; font-size: 12px; line-height: 1.8; color: var(--ash-dim);
+  background: #05070a;
+}
+.reel-empty[hidden] { display: none; }
+.reel-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: rgba(255, 255, 255, 0.08); }
+.reel-bar i { display: block; height: 100%; width: 0; background: var(--amber); box-shadow: 0 0 8px rgba(214, 160, 76, 0.6); }
+.reel-strip { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: thin; }
+.reel-chip {
+  flex: 0 0 auto; display: inline-flex; align-items: center; gap: 8px; max-width: 210px;
+  padding: 7px 10px; border: 1px solid var(--ash-faint); background: rgba(10, 14, 15, 0.8);
+  color: var(--ash-dim); font: inherit; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;
+  cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.reel-chip b { color: var(--amber); font-weight: 400; }
+.reel-chip span { overflow: hidden; text-overflow: ellipsis; }
+.reel-chip.on { color: var(--bone); border-color: rgba(214, 160, 76, 0.6); background: rgba(214, 160, 76, 0.1); }
+.reel-chip:focus-visible { outline: 1px solid var(--amber); outline-offset: 2px; }
+.reel-btns { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin: 0; }
+.reel-btns .btn { flex: 1 1 auto; min-width: 92px; letter-spacing: 0.14em; font-size: 11px; }
+.reel-step { flex: 0 0 auto; min-width: 52px; }
+.reel-save-state { min-height: 14px; text-align: center; font-size: 10px; letter-spacing: 0.08em; color: var(--amber); word-break: break-all; }
+body.reel-open .panel.over-panel { filter: blur(1px) brightness(0.5); }
+@media (max-width: 620px) {
+  #reelPanel { padding: 10px; }
+  .reel-panel { gap: 8px; }
+  .reel-head h2 { font-size: 12px; letter-spacing: 0.28em; }
+  .reel-btns .btn { font-size: 9px; min-width: 72px; }
+  .reel-cap { font-size: 9px; letter-spacing: 0.12em; }
+}

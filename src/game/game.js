@@ -57,6 +57,7 @@ const escHtml = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<'
 export class Game {
   constructor(deps) {
     Object.assign(this, deps); // scene, camera, world, pulses, ghosts, eyes, particles, audio, mic, input, hud, radar, post
+    this.hl = null; // the shift's highlight director (src/game/highlights.js), attached by main.js
     this.player = new Player(this.world);
     this.dread = new Dread(this, this.eyes);
     this.shards = new Shards(this.scene);
@@ -818,6 +819,7 @@ export class Game {
   }
 
   onScream() {
+    this.hlNote('scream');
     if (this.time - this.lastScreamAlert > 3) {
       this.hud.flashAlert(t('aDontScream'), 'danger', 1.2);
       this.lastScreamAlert = this.time;
@@ -1271,6 +1273,7 @@ export class Game {
   }
 
   onGeneratorStarted(g, count, by = null) {
+    this.hlNote('genStart');
     this.stats.gens = count;
     const pts = g.paid ? 0 : CFG.SCORE.generator * this.mult; // (2.1q: cranking a beaten engine back earns the light, not the points twice)
     g.paid = true;
@@ -1293,6 +1296,7 @@ export class Game {
 
   // a thing beat a running generator until it stopped (2.1q): the count falls and the task points back
   onGenBroken(g, remote = false) {
+    this.hlNote('genBroken');
     this.stats.gens = this.objectives.count;
     if (!remote && this.sab && this.sab.day === this.day) this.sab.done++;
     this.hud.flashAlert(t('aGenBroken').replace('{site}', this.objectives.siteAt(g.site)), 'danger', 3);
@@ -1306,9 +1310,16 @@ export class Game {
   onSeized(on) {
     this.seizedByWatcher = !!on;
     if (on) {
+      this.hlNote('seize');
       this.fx.glitch = Math.max(this.fx.glitch, 0.85);
       this.addTrauma(0.4);
     }
+  }
+
+  // a moment worth seeing again (2.1u). The director keeps the seconds around it, so the reel shows how it
+  // happened, not only that it did.
+  hlNote(kind, meta) {
+    this.hl?.note(kind, meta);
   }
 
   kill(m, victim = this.player) {
@@ -1316,6 +1327,7 @@ export class Game {
     // A thing on the ground cannot reach someone sixteen metres up the lookout. It can wait below.
     if (victim.y - m.y > 3.1) return;
     const cause = m.huntCause === 'scream' && (m.huntCausePid == null || m.huntCausePid === victim.id) ? 'scream' : m.type;
+    this.hlNote('death', { cause });
     if (victim !== this.player) {
       // co-op host: one of the others was caught. it stays with the body; the rest can get away.
       // (down, not dead: they bleed out slowly — unless someone gets them onto the hut's cot. see Rescue)
@@ -1358,6 +1370,7 @@ export class Game {
     }
     const r = this.remotes.get(pid);
     if (!r || !r.alive) return;
+    this.hlNote('death', { cause: cause || 'listener' });
     r.die(x, z);
     r.cause = cause;
     this.rescue.down(r, Number.isFinite(bleed) ? bleed : this.rescue.bleedFor(r));
@@ -1394,6 +1407,7 @@ export class Game {
     this.audio.heartbeat(0.8);
     this.timeline.push({ at: this.time + 0.9, fn: () => this.audio.heartbeat(0.55) });
     this.hud.flashAlert(t('aRevived'), 'dawn', 2.6);
+    this.hlNote('revive');
   }
 
   // the шкафандр kept you (every machine: the host said so). Yours: the doors shut in front of your face
@@ -1477,6 +1491,7 @@ export class Game {
   }
 
   fxMateDied(r, m) {
+    this.hlNote('down');
     const near = this.distToEars(r.x, r.z) < 30;
     if (this.player.alive && !this.hinted.downed) {
       // the first time: they can still be saved

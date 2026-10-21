@@ -38,6 +38,8 @@ import { Game } from './game/game.js';
 import { buildListener } from './game/monsters.js';
 import { PLAYER_COLORS } from './game/remote.js';
 import { EARN, wallet, onWallet, pendingRewards } from './game/wallet.js';
+import { Highlights } from './game/highlights.js';
+import { Reel } from './ui/reel.js';
 import {myFit} from './game/outfit.js';
 import {beginRewards,endRewards} from './cloud/rewards.js';
 import {CloudController} from './cloud/controller.js';
@@ -323,6 +325,7 @@ const menus = new Menus({
       hud.cache = {};
       atlas.applyI18n();
       wardrobe.applyI18n();
+      reel.applyI18n();
       news.render();
       account.render();social.update();syncIdentityFields();
       updateMicUI();
@@ -370,6 +373,16 @@ const lobby = new Lobby({
     else audio.uiClick();
   },
 });
+// 2.1u: the shift's highlight reel — the director watches for the stupid moments, the reel plays them back
+const highlights = new Highlights();
+const reel = new Reel({ audio });
+let reelAutoT = 0, overTouched = false; // (a reel opens by itself once, unless you are already clicking things)
+$('over').addEventListener('pointerdown', () => { overTouched = true; });
+$('btnReel').addEventListener('click', () => {
+  if (!audio.ready) audio.init();
+  audio.uiClick();
+  reel.open(highlights.list());
+});
 const home=new GarageHome({ensureGarage,atlas,onWardrobe:()=>wardrobe.open()});
 // No account gate on play, and no cloud request in the frame loop.
 const canApplyAccount=()=>state==='menu'&&!coop.active&&!lobby.starting&&!wardrobe.isOpen()&&!atlas.isOpen()&&!micCal.isOpen()&&!['settingsPanel','howPanel','scoresPanel','soloPanel'].some(id=>menus.isOpen(id));
@@ -389,6 +402,17 @@ const notifications=new SocialToasts({cloud,account});
 lobby.onInvite=()=>account.open('invite');
 cloud.on(()=>syncIdentityFields());
 let overReward=null;
+// the way into the reel, on the results screen: a count when there is something to see
+function paintReelButton() {
+  const btn = $('btnReel');
+  if (!btn) return;
+  const n = highlights.count;
+  const count = $('reelCount');
+  if (count) count.textContent = n ? String(n) : '';
+  btn.classList.toggle('dim', !n);
+  btn.title = n ? t('hlOpenHint').replace('{n}', n) : t('hlEmpty');
+}
+
 function renderOverWallet(){const el=$('overWallet');if(!el||!overReward)return;const{earned,escBonus}=overReward;el.textContent=earned>0?t('walletNight').replace('{n}',earned).replace('{escape}',escBonus?t('walletEscape').replace('{n}',escBonus):'').replace('{total}',wallet.shards):'';if(pendingRewards()>0)el.textContent+=' · '+cloudWords().pending;}
 onWallet(()=>{if(state==='over')renderOverWallet();});cloud.on(()=>{if(state==='over')renderOverWallet();});
 
@@ -616,6 +640,10 @@ function startRun(opts = {}) {
   const training = !!(opts.training || opts.coop?.tr); // the departure film's destination
   if (!online && state === 'over' && performance.now() - overAt < 450) return;
   if (!online && coop.active) coop.leave(); // a solo night: you leave the room
+  clearTimeout(reelAutoT);
+  highlights.reset(); // a shift, a new reel
+  reel.close();
+  if (!game.hl) game.hl = highlights;
   if (runOnline && game.online) game.teardownOnline();
   atlas.close(); // a co-op host can start the night while you're reading
   wardrobe.close(); // ...or trying on a hat
@@ -750,6 +778,7 @@ function resume() {
 
 // keepRoom: co-op "to the lobby" — stay in the room with your friends
 function toMenu(keepRoom = false) {
+  reel.close();
   account.close();endRewards({reason:'menu',time:game?.time,score:game?.score,gens:game?.objectives.count});overReward=null;
   const wasOnline = runOnline;
   // walking away from a night still leaves it in the atlas (what you met, what you started)
@@ -864,7 +893,20 @@ function onEnd(res) {
   game.tools.silence(true); // stop lures and discard this night's recorded voice
   game.expedition.silence();
   game.flares.clear(); // (a burning flare would hiss on behind the end screen)
+  // the reel's last shot: how the night ended is a moment too
+  const hlEnd = res.escaped ? (res.won ? 'escape' : 'left') : (res.won ? 'win' : 'death');
+  highlights.note(hlEnd, { cause: res.cause });
+  highlights.stop();
   menus.showOver(res, stats, rank, list, team);
+  paintReelButton();
+  // the night's own trailer: solo, a few moments to speak of, and you have not touched the results yet
+  overTouched = false;
+  clearTimeout(reelAutoT);
+  if (!online && game && !game.training && highlights.count >= 3) {
+    reelAutoT = setTimeout(() => {
+      if (state === 'over' && !reel.isOpen && !overTouched) reel.open(highlights.list());
+    }, 1700);
+  }
   overReward={earned:stats.earned,escBonus};renderOverWallet();
   menus.renderScores();
   if (online) {
@@ -1053,7 +1095,39 @@ function step(now, render) {
   renderer.info.reset();
   shadows.update(camera);
   post.render(scene, camera);
+  // 2.1u: the highlight director's eye — only while the night is actually running
+  if (state === 'playing' && game && game.state !== 'idle') highlights.update(game.time, highlightFrame);
   if (state === 'menu' && !MENU_COVERS.some((id) => menus.isOpen(id))) wardrobe.menuFrame(rawDt);
+}
+
+// ---------------- the highlight reel's eye (2.1u) ----------------
+// A small JPEG of what is on screen right now. The director asks for one at ~7 a second; drawing a WebGL
+// canvas into a 320×180 2D canvas is cheap, and the encode is asynchronous, so the night does not hitch.
+// (Called right after post.render, in the same frame: the drawing buffer is still there.)
+const HL_W = 320, HL_H = 180;
+let hlGrabber = null;
+function highlightFrame(t) {
+  try {
+    if (!hlGrabber) {
+      const cv = document.createElement('canvas');
+      cv.width = HL_W; cv.height = HL_H;
+      const ctx = cv.getContext('2d', { alpha: false });
+      if (!ctx) return null;
+      hlGrabber = { cv, ctx };
+    }
+    const src = renderer.domElement;
+    const { cv, ctx } = hlGrabber;
+    const sw = src.width || 1, sh = src.height || 1;
+    const k = Math.max(HL_W / sw, HL_H / sh); // cover: no black bars in the reel
+    const w = sw * k, h = sh * k;
+    ctx.drawImage(src, (HL_W - w) / 2, (HL_H - h) / 2, w, h);
+    const blob = new Promise((res) => {
+      try { cv.toBlob((b) => res(b), 'image/jpeg', 0.62); } catch { res(null); }
+    });
+    return { t, blob };
+  } catch {
+    return null; // (no canvas / a lost context: the reel simply has nothing to keep)
+  }
 }
 
 // ---------------- boot ----------------
@@ -1080,7 +1154,7 @@ function boot() {
     wardrobe.init(); // the live survivor now belongs to the shared garage scene
     // warm up shaders so the first ping doesn't hitch
     renderer.compile(scene, camera);
-    window.__hush = { world, game, shared, pulses, ghosts, eyes, renderer, perf, mic, audio, music: menuMusic, input, hud, post, shadows, coop, lobby, atlas, wardrobe, micCal, news, home, debug: DEBUG, startRun, pause, resume, toMenu, get opening() { return game && game.opening; }, ensureGarage, cloud, account, social, notifications, get garage() { return garage; }, get state() { return state; } };
+    window.__hush = { world, game, shared, pulses, ghosts, eyes, renderer, perf, mic, audio, music: menuMusic, input, hud, post, shadows, coop, lobby, atlas, wardrobe, micCal, news, home, debug: DEBUG, startRun, pause, resume, toMenu, highlights, reel, get opening() { return game && game.opening; }, ensureGarage, cloud, account, social, notifications, get garage() { return garage; }, get state() { return state; } };
     state = 'menu';
     menuTime = 0;
     post.u.uFade.value = 0;

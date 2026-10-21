@@ -7,6 +7,21 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v:'2.1u',date:'2026-10-22',
+    ru:{title:'Сборник смены',items:[
+      'В конце смены — сборник хайлайтов: самые глупые моменты ночи, с разбегом и последствиями. Режиссёр сам следит за смертями, хваткой Наблюдателя, Удильщиком, упавшими друзьями, звенящими цепями, разбитыми и заведёнными генераторами и криками в темноте',
+      'Клип начинается за три секунды до момента, поэтому видно, ЧТО к нему привело, и тянется пару секунд после. Соседние моменты склеиваются в один дубль, а на смену остаётся шесть лучших',
+      'Сборник открывается сам, если есть на что смотреть (и открывается кнопкой на экране итогов): эпизоды, пауза, стрелки, полоса. Каждый эпизод подписан — включая имя того, кто вас достал',
+      'Видео можно сохранить: кнопка пишет .webm с титрами, подписями и финальной карточкой. Если браузер не умеет писать видео — сохраняется лучший кадр картинкой',
+    ]},
+    en:{title:"The shift's highlights",items:[
+      'At the end of a shift — a highlight reel: the night’s stupidest moments, with the run-up and the fallout. The director watches for deaths, the Watcher’s grip, the Angler, friends going down, ringing stall chains, generators dying and starting, and screams in the dark',
+      'A clip starts three seconds before the moment, so you can see what led to it, and runs a couple of seconds past. Neighbours in time join into one take, and six of the best stay on the reel',
+      'The reel opens by itself when there is something to watch (and from a button on the results screen): episodes, pause, arrows, a bar. Every episode is captioned — including the name of whatever got you',
+      'The video can be saved: the button writes a .webm with titles, captions and an end card. If the browser will not write video, the best still is saved as a picture instead',
+    ]}
+  },
+  {
     v:'2.1t',date:'2026-10-22',
     ru:{title:'Голубь-доктор',items:[
       'Длина смены теперь спрашивается после кнопки «Одному»: три карточки — 2, 4 или 6 ночей, и та, что нажал, запоминается. С главного экрана ряд кнопок убран',

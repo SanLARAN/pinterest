@@ -379,6 +379,7 @@ export class Angler {
     };
     if (this.body) this.body.mode = 'haul';
     this._syncHeld();
+    g.hlNote?.('grab');
     if (g.sync) g.sync.ev('ag', target.id);
     this.netGrab(target.id); // the host's own machine hears it too
   }

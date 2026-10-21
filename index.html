@@ -173,6 +173,11 @@
         <div id="overWallet"></div>
         <div id="overTeam" class="team-table"></div>
         <div id="overTable" class="score-table compact"></div>
+        <button class="btn hl-open" id="btnReel" type="button">
+          <span class="hl-open-ico" aria-hidden="true">▶</span>
+          <span data-i18n="hlOpen">СБОРНИК СМЕНЫ</span>
+          <b id="reelCount"></b>
+        </button>
         <div class="btn-row">
           <button class="btn primary" id="btnRestart"><span data-i18n="restart"></span></button>
           <button class="btn" id="btnLobby"><span data-i18n="toLobby"></span></button>
@@ -270,6 +275,32 @@
         <h2 data-i18n="howto"></h2>
         <div id="howBody"></div>
         <button class="btn primary" id="btnHowBack"><span data-i18n="back"></span></button>
+      </div>
+    </div>
+
+    <!-- the shift's highlights: the night's stupidest moments, played back and saved as a file -->
+    <div id="reelPanel" class="screen modal reel" role="dialog" aria-modal="true" aria-hidden="true" aria-label="highlight reel">
+      <div class="panel reel-panel">
+        <div class="reel-head">
+          <h2 data-i18n="hlTitle">СБОРНИК СМЕНЫ</h2>
+          <p class="reel-sub" data-i18n="hlSub"></p>
+        </div>
+        <div class="reel-stage">
+          <canvas id="reelCanvas" width="320" height="180"></canvas>
+          <div id="reelCap" class="reel-cap"></div>
+          <div id="reelEmpty" class="reel-empty" hidden></div>
+          <div class="reel-bar"><i id="reelProg"></i></div>
+        </div>
+        <div class="reel-strip" id="reelStrip" role="tablist"></div>
+        <div class="btn-row reel-btns">
+          <button class="btn" id="btnReelPlay" type="button"></button>
+          <button class="btn reel-step" id="btnReelPrev" type="button" aria-label="previous">&larr;</button>
+          <button class="btn reel-step" id="btnReelNext" type="button" aria-label="next">&rarr;</button>
+          <button class="btn primary" id="btnReelSave" type="button"><span data-i18n="hlSave">СОХРАНИТЬ ВИДЕО</span></button>
+          <button class="btn" id="btnReelClose" type="button"><span data-i18n="hlClose">ЗАКРЫТЬ</span></button>
+        </div>
+        <div class="restart-hint" id="reelHint" data-i18n="hlHint"></div>
+        <div id="reelSaveState" class="reel-save-state" role="status"></div>
       </div>
     </div>
 

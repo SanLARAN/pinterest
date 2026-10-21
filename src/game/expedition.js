@@ -198,6 +198,7 @@ export class Expedition {
     if (!c) return;
     c.swayV += (Math.random() < 0.5 ? -1 : 1) * (2.0 + Math.random() * 1.2);
     c.heardT = 0.7; // our own echo of the host's word about this ring is not a second one
+    g.hlNote?.('chain');
     if (g.audio.ready) g.audio.chain(c.x, c.y - 0.4, c.z);
     g.pulses.emit(c.x, c.y - 0.4, c.z, g.time, { radius: 8, strength: 0.55, decay: 1.5, color: [0.8, 0.83, 0.9], kind: 'chain' });
   }
