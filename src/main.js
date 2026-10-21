@@ -23,6 +23,7 @@ import { Post } from './render/post.js';
 import { qualityPlan } from './render/quality.js';
 import { effectiveGraphics } from './render/graphicsSettings.js';
 import './graphics.css';
+import './angler.css';
 import { OmniShadows } from './render/shadows.js';
 import { Ghosts } from './render/ghosts.js';
 import { Eyes } from './render/eyes.js';
@@ -773,6 +774,7 @@ function toMenu(keepRoom = false) {
       game.training = false;
     }
     game.state = 'idle';
+    game.angler.reset();
     game.objectives.silence();
     game.escape.silence();
     game.cabinets.silence();
@@ -830,6 +832,7 @@ function teamSummary() {
 }
 
 function onEnd(res) {
+  game.angler.hide();
   const online = runOnline;
   const stats = {
     ...game.stats,

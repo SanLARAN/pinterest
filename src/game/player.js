@@ -22,6 +22,7 @@ export class Player {
     this.z = pos.z;
     this.yaw = s.yaw;
     this.alive = true;
+    this.anglerHold = false;
     this.pitch = -0.04;
     this.roll = 0;
     this.vx = 0;
@@ -54,6 +55,8 @@ export class Player {
   // returns events: { step: {loud, intensity, mode} | null, bump: {nx,nz} | null, breath: bool }
   // load: a part of the УАЗ in your arms ({ walk, step }: see game/uaz.js) — slow, no running
   update(dt, input, look, frozen = false, load = null) {
+    frozen = frozen || !!this.anglerHold || this.alive === false;
+    if (this.anglerHold || this.alive === false) this.vx = this.vz = 0;
     const P = CFG.PLAYER;
     const ev = { step: null, bump: null, breath: false };
     this.yaw -= look.dx;

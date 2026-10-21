@@ -185,6 +185,7 @@ export class World {
 
   // ---------------- trees ----------------
   genTrees(rng) {
+    this.anglerTrees = [];
     const step = 5.4;
     const half = this.half - 4;
     const noise = this.terrain.noise;
@@ -204,6 +205,7 @@ export class World {
         else if (roll < 0.84) this.deadTree(x, y, z, s, rng);
         else if (roll < 0.95) this.birch(x, y, z, s, rng);
         else this.stump(x, y, z, rng);
+        if (roll < .95) this.anglerTrees.push({ x, y, z });
         count++;
       }
     }

@@ -527,6 +527,7 @@ export class Objectives {
 
   _interact(dt, doorsOnly = false) {
     const game = this.g;
+    if (game.angler?.busy || game.player?.alive === false) { this.target=null; this.working=null; game.hud.setUse(null); return; }
     // the page you just found lies over everything: while it is open nothing asks for your hands
     // (the prompt used to keep searching for a target under it and stayed after it closed)
     if (this.note) {

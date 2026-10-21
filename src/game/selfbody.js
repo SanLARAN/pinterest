@@ -92,6 +92,9 @@ export class SelfBody {
     const rig = this.rig;
     if (!rig) return;
     const root = rig.root;
+    if (this.game.angler?.busy && this.game.player.alive) {
+      root.visible=true;this.game.angler.poseVictim({ ...this.game.player, rig });this._arms(true,true);return;
+    }
     if (!show) {
       root.visible = false;
       return;

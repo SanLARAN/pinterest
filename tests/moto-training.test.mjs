@@ -289,7 +289,7 @@ test('the departure film: it starts once, plays its beats, and fires exactly onc
     assert.equal(garage.startDepart(() => fired++), false, 'not twice');
     assert.ok(garage.gateLeaves && garage.gateLeaves.length === 2, 'the leaves ride their own meshes');
     // the whole film, in frame-sized steps
-    for (let i = 0; i < 60 * 8; i++) garage._departure(1 / 60);
+    for (let i = 0; i < 60 * 12; i++) garage._departure(1 / 60);
     assert.equal(fired, 1, 'the destination is called exactly once');
     assert.equal(garage.depart, null);
     assert.ok(garage.gateLeaves.every((m) => Math.abs(m.rotation.y) < 1e-6), 'the gates swing shut again');

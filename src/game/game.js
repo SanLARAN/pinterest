@@ -1,3 +1,4 @@
+import { Angler } from './angler.js';
 // One run of the game: rules, scoring, director, scares, juice.
 import * as THREE from 'three';
 import { CFG, dangerMultiplier, monsterTargets, fovFor } from '../core/config.js';
@@ -107,6 +108,7 @@ export class Game {
     this.voiceMimic = new VoiceMimic(this);
     this.fire = new Campfire(this); // the camp's fire: lit for the last evening, out for the night
     this.opening = new IntroCutscene(this); // the opening cut scene (2.1j) — (this.intro is the monster reveal)
+    this.angler = new Angler(this);
     this.fadeIn = 0; // s of fade-in after the cut scene hands over to the night
   }
 
@@ -207,6 +209,7 @@ export class Game {
   removeRemote(id) {
     const r = this.remotes.get(id);
     if (!r) return;
+    if (this.angler.holds(id)) this.angler.release();
     this.rescue.left(r);
     this.glows.dropFor(r.id, r.x, r.z);
     this.escape.dropFor(r.id, r.x, r.z);
@@ -249,6 +252,7 @@ export class Game {
     this.inputMuted = false;
     this.teamOverAt = 0;
     this.netT = 0;
+    this.angler.reset();
     this.rescue.reset();
     this.rescue.resetPlayer(this.player);
     for (const r of this.remotes.values()) this.rescue.resetPlayer(r);
@@ -557,6 +561,7 @@ export class Game {
       p.pitch = -0.12;
     }
     this.hud.flashAlert(t('nightTag').replace('{n}', this.day).replace('{d}', CFG.SHIFT.DAYS), 'dim', 2.4);
+    if(this.day===CFG.ANGLER.FIRST_NIGHT)this.timeline.push({at:7,fn:()=>this.hud.flashAlert(t('anglerNight'),'warn',5)});
     // nothing is out there yet: the forest sleeps for SPAWN_DELAY seconds (see updateDirector → wake)
     for (const m of this.monsters) m.dispose();
     this.monsters = [];
@@ -691,7 +696,9 @@ export class Game {
 
   // a sound happened in the world (authoritative side: the monsters hear it). pid = who made it
   noise(x, z, loud, source, scream = false, pid = null) {
-    if (loud <= 0 || this.state !== 'play' || !this.auth) return 0;
+    if (loud <= 0 || !this.auth) return 0;
+    if (this.angler.holds(pid)) { this.angler.hear(pid, loud, source); return 0; }
+    if (this.state !== 'play') return 0;
     let n = 0;
     for (const m of this.monsters) {
       const r = m.hear(x, z, loud, source, scream, pid);
@@ -708,7 +715,7 @@ export class Game {
 
   // a sound YOU made: heard here (solo / host) or sent to the host (guest)
   playerNoise(x, z, loud, source, scream = false) {
-    if (loud <= 0 || this.state !== 'play' || !this.player.alive) return;
+    if (loud <= 0 || !this.player.alive || this.state !== 'play' && !this.angler.busy) return;
     if (this.auth) this.noise(x, z, loud, source, scream, this.player.id);
     else if (SRC_SELF.has(source)) this.sync.noise(x, z, loud, source, scream);
   }
@@ -840,6 +847,7 @@ export class Game {
   // ---------------- hands ----------------
   // R: a part in your arms goes down; in the УАЗ, out of your seat; carrying a friend by the car, into the back
   carryKey() {
+    if (this.angler.busy) return;
     if (this.expedition.onTower) return this.expedition.descend();
     const es = this.escape;
     if (es.held) return es.putDown();
@@ -1270,6 +1278,7 @@ export class Game {
 
   // ---------------- death ----------------
   kill(m, victim = this.player) {
+    if (this.angler?.holds(victim.id)) return;
     if (this.state !== 'play') return;
     // A thing on the ground cannot reach someone sixteen metres up the lookout. It can wait below.
     if (victim.y - m.y > 3.1) return;
@@ -1811,6 +1820,9 @@ export class Game {
   update(dt, raw) {
     const fx = this.fx;
     const input = this.input;
+    this.angler.update(dt);
+    if(this.angler.busy && this.state!=='play') { const voice=this.mic.update(dt,this.audio.outputDb());this.playerNoise(this.player.x,this.player.z,voice.loud,'voice',voice.scream); }
+    if (this.angler.busy) raw = { look: this.angler.unconscious ? NO_LOOK : raw.look, events: [] };
     this.fire.update(dt); // burns through every state, so the camp never forgets it was there
     if (this.inputMuted) raw = { look: NO_LOOK, events: [] };
     this.inventory.update(dt);
@@ -1969,7 +1981,7 @@ export class Game {
       this.stats.loudest = Math.max(this.stats.loudest, mev.loud);
     }
     if (mev.pulse > 0) this.emitPlayerPulse(mev.pulse, true);
-    if (mev.scream && !this.screamFlag) this.onScream();
+    if (!this.angler.busy && mev.scream && !this.screamFlag) this.onScream();
     this.screamFlag = mev.scream;
     if (this.mic.lostFlag) {
       this.mic.lostFlag = false;
@@ -2230,6 +2242,7 @@ export class Game {
   }
 
   updateIntro(dt) {
+    if (this.angler?.busy) { this.hud.setIntro(null); this.hud.setHint(null); return; }
     const it = this.intro;
     it.t += dt;
     const hud = this.hud;
@@ -2339,6 +2352,7 @@ export class Game {
         camera.updateProjectionMatrix();
       }
     }
+    if (!cutCam && !sp) this.angler.camera(camera);
     camera.updateMatrixWorld();
     camera.getWorldDirection(_v);
     this.audio.setListener(camera.position.x, camera.position.y, camera.position.z, _v.x, _v.y, _v.z);
@@ -2346,7 +2360,7 @@ export class Game {
     this.world.grass?.update(camera);
     // on a bike your hands are on the bars: the first-person arms would be drawn across the cockpit
     const riding = this.motos?.rider >= 0;
-    const hands = !cutCam && !sp && !riding && !this.expedition.onTower && this.player.alive && (this.state === 'play' || this.state === 'dawn' || this.state === 'training');
+    const hands = !this.angler.busy && !cutCam && !sp && !riding && !this.expedition.onTower && this.player.alive && (this.state === 'play' || this.state === 'dawn' || this.state === 'training');
     const gear = hands && !this.partMap.active && !this.cabinets.busy && !this.inventory.active && this.inventory.equipT <= 0 && this.fieldView.watch < 0.1 && !this.escape.held && !this.player.carrying;
     const active = this.inventory.equipped;
     this.glows.placeView(camera, gear && active === 'glow');
@@ -2355,13 +2369,13 @@ export class Game {
     this.torch.placeView(camera, gear && active === 'torch');
     this.tools.placeView(camera, gear && (active === 'tape' || active === 'crowbar'));
     this.partMap.place(camera,hands&&!this.cabinets.busy&&!this.inventory.active);
-    this.fieldView.place(camera, !cutCam && !sp && this.player.alive && !riding && !this.cabinets.busy && !this.expedition.onTower && ['play','morning','dawn','training'].includes(this.state));
+    this.fieldView.place(camera, !this.angler.busy && !cutCam && !sp && this.player.alive && !riding && !this.cabinets.busy && !this.expedition.onTower && ['play','morning','dawn','training'].includes(this.state));
     this.bag3d.place(camera);
     this.fire.placeCamera(camera);
     this.motos.placeCockpit(camera, riding); // the rider's own bars (the arms above are off while riding)
     // your own body, under your eyes
     const st = this.state;
-    this.selfBody.place(!cutCam && !sp && this.player.alive && !this.cabinets.busy && !this.expedition.onTower && (st === 'play' || st === 'dawn' || st === 'morning' || st === 'dusk' || st === 'training'));
+    this.selfBody.place(!this.angler.busy && !cutCam && !sp && this.player.alive && !this.cabinets.busy && !this.expedition.onTower && (st === 'play' || st === 'dawn' || st === 'morning' || st === 'dusk' || st === 'training'));
 
     const u = this.post.u;
     u.uAberr.value = 0.12 + fx.glitch * 0.9 + fx.danger * 0.25 + sh * 0.5;
@@ -2385,6 +2399,7 @@ export class Game {
   hudUpdate(dt) {
     const p = this.player;
     this.hud.update(this, dt, this.input.peekHeld);
+    this.angler.hud();
     this.beyond.update(this, dt);
     const sp = this.spectate;
     const self = this.online ? this.rescue.selfState() : null; // down / carried / cot / gone

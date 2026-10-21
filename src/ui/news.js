@@ -7,6 +7,21 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v:'2.1o',date:'2026-10-21',
+    ru:{title:'Не оставайся один',items:[
+      'С третьей ночи Удильщик ищет тех, кто дальше 32 м от товарищей: хватает, тащит к настоящему дереву и связывает. Пока тащит — только осмотр и голос; долгий громкий голос вырубит тебя',
+      'У друзей пять минут на поиск. У дерева удерживай E / ВЗЯТЬ три секунды, чтобы развязать пленника. Если мясник вернётся и начнёт финальную POV-сцену — в этой смене уже не воскреснуть',
+      'По клику на ворота пассажиры сначала садятся в машину, затем она уезжает. Один опаздывает: спотыкается, встаёт и бежит следом',
+      'Бесплатный стилизованный Киану Ривз: волосы, борода, тёмный костюм и гитарный idle в гараже и гардеробе. Громкость гитары зависит от ползунка музыки',
+    ]},
+    en:{title:'Do not stay behind',items:[
+      'From night three the Angler hunts players over 32 m from their teammates: grabs, drags them to a real tree and ties them up. Look and speak only while dragged; sustained loud speech knocks you out',
+      'Friends have five minutes to find you. Hold E / USE at the tree for three seconds to untie a captive. Once the butcher returns and starts the final POV sequence, there is no revival this run',
+      'Click the garage gates: passengers board first, then the car leaves. One straggler trips, gets up and runs after it',
+      'Free stylised Keanu Reeves: long hair, beard, dark suit and a guitar idle in the garage and wardrobe. Guitar volume follows the music slider',
+    ]},
+  },
+  {
     v:'2.1n',date:'2026-10-21',
     ru:{title:'Большое отделение графики',items:[
       'В настройках появилась кнопка «Расширенные настройки графики»: четыре блока, 14 параметров с пояснениями и реальными показаниями рендерера',

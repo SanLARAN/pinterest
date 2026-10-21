@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import { EDGE_GLSL } from '../render/sonar.js';
 import { MeshBuilder, KIND } from '../world/builder.js';
 import { RNG, clamp, lerp, damp } from '../core/rng.js';
-import { buildSurvivor, poseSurvivor, poseFur, dyeColors } from '../game/survivor.js';
+import { buildSurvivor, poseSurvivor, poseFur, poseKeanu, dyeColors } from '../game/survivor.js';
 import { cleanFit, shapeKey, item } from '../game/outfit.js';
 import { CAR_MODELS, GPAL_GLSL, buildSteering } from './garageSet.js';
 
@@ -606,6 +606,7 @@ export class Mannequin {
       if (x >= 1) this.gesture = null;
       else this._gesture(g.type, x, n);
     }
+    poseKeanu(rig,t,!this.gesture);
     this._crow(dt);
     this._hearts(dt);
   }

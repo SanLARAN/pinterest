@@ -8,6 +8,11 @@ export const CFG = {
   // the shift: four days instead of a single endless night. Each day is a short morning around the
   // camp and an eight-minute night; the fourth night ends the shift in a win — but four minutes into
   // it the forest wakes up for good, and everything comes looking. Escaping in the УАЗ ends it earlier.
+  ANGLER: {
+    FIRST_NIGHT: 3, SPAWN_AFTER: 45, ISOLATION: 32, HUNT_SPEED: 3.8, DRAG_SPEED: 1.65,
+    TREE_MIN: 32, TREE_MAX: 65, RESCUE_SECONDS: 300, RESCUE_REACH: 2.4, RESCUE_HOLD: 3,
+    VOICE_LIMIT: 2.2, KNOCKOUT: 8, MAX_DRAG: 100, FINISH_SECONDS: 3.8, COOLDOWN: 50,
+  },
   SHIFT: {
     DAYS: 4,
     NIGHT: 8 * 60, // one night

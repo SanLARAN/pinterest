@@ -3491,6 +3491,13 @@ export class AudioEngine {
   }
 
   // someone takes their place: a step, a breath of the echo
+  guitarNote(beat) {
+    if(!this.ready)return;
+    const volume=Math.max(0,Math.min(1,Number(settings.music)||0));if(!volume)return;
+    const notes=[82.41,110,123.47,98,82.41,146.83,110,98],f=notes[((beat%8)+8)%8];
+    this._tone(this.now,{type:'triangle',f,a:.003,d:.55,gain:.035*volume,dest:this.gSfx,rev:.1});
+    this._tone(this.now,{f:f*2,a:.002,d:.2,gain:.008*volume,dest:this.gSfx});
+  }
   garageArrive() {
     if (!this.ready) return;
     this._gbus();

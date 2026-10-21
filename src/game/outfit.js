@@ -15,12 +15,13 @@ export const SLOTS = ['head', 'body', 'car'];
 export const WEAR = ['head', 'body']; // what a survivor wears (the car stays in the garage)
 
 // themes: base = the kit you came with
-export const THEMES = ['base', 'taiga', 'zone', 'halloween', 'anime', 'furry', 'leshy', 'plague', 'cosmos', 'tuning', 'signal'];
+export const THEMES = ['base', 'taiga', 'zone', 'halloween', 'anime', 'furry', 'leshy', 'plague', 'cosmos', 'tuning', 'signal', 'keanu'];
 
 // c: default colours [main, accent]. glow: the accent is a light (carving, lenses) rather than a fabric
 export const ITEMS = {
   head: [
     { id: 'hood', theme: 'base', c: ['#b5462a', '#e9e1d2'] },
+    { id: 'keanuhair', theme: 'keanu', c: ['#232527', '#4a5560'] },
     { id: 'ushanka', theme: 'taiga', c: ['#6b4a33', '#d4a63a'] },
     { id: 'gasmask', theme: 'zone', c: ['#4e6b3c', '#9cff6a'], glow: true },
     { id: 'pumpkin', theme: 'halloween', c: ['#e8731c', '#ffc94a'], glow: true },
@@ -33,6 +34,7 @@ export const ITEMS = {
   ],
   body: [
     { id: 'jacket', theme: 'base', c: ['#b5462a', '#4a5560'] },
+    { id: 'keanusuit', theme: 'keanu', c: ['#232527', '#e9e1d2'] },
     { id: 'tulup', theme: 'taiga', c: ['#8a6a48', '#e9e1d2'] },
     { id: 'hazmat', theme: 'zone', c: ['#d4a63a', '#232527'] },
     { id: 'scarecrow', theme: 'halloween', c: ['#a3170f', '#d4a63a'] },
@@ -204,7 +206,7 @@ const TEXT = {
     title: 'ГАРДЕРОБ',
     sub: 'Таким тебя увидят друзья — в эхе и под рабочими лампами.',
     slot: { head: 'Голова', body: 'Костюм', car: 'Машина', shop: 'Магазин' },
-    theme: { base: 'Штатное', taiga: 'Тайга', zone: 'Зона', halloween: 'Хэллоуин', anime: 'Аниме', furry: 'Фурри', leshy: 'Леший', plague: 'Чума', cosmos: 'Космос', tuning: 'Тюнинг', signal:'Сигнал' },
+    theme: { base: 'Штатное', taiga: 'Тайга', zone: 'Зона', halloween: 'Хэллоуин', anime: 'Аниме', furry: 'Фурри', leshy: 'Леший', plague: 'Чума', cosmos: 'Космос', tuning: 'Тюнинг', signal:'Сигнал', keanu:'Киану Ривз' },
     set: 'комплект',
     color: 'Цвет',
     custom: 'свой цвет',
@@ -240,6 +242,8 @@ const TEXT = {
     },
     items: {
       screen:{name:'Голова-экран',parts:['Корпус','Люминофор'],desc:'Старый ЭЛТ. Рисуй, пиши или выводи пиксельные портреты лесных тварей. Бесплатно; друзья видят то же изображение.'},
+      keanuhair: {name:'Киану Ривз',parts:['Волосы','Борода'],desc:'Стилизованный Киану: длинные тёмные волосы, борода и спокойный взгляд. Бесплатный косметический образ.'},
+      keanusuit: {name:'Костюм Киану',parts:['Костюм','Рубашка'],desc:'Тёмный костюм и гитара. В гараже и гардеробе достаёт инструмент, перебирает струны и убирает его за спину. На правила игры не влияет.'},
       hood: { name: 'Капюшон', parts: ['Ткань', 'Шнурки'], desc: 'Штатный, от штормовки. Шнурки затянуты до упора — так почти не слышно собственного дыхания.' },
       ushanka: { name: 'Ушанка', parts: ['Мех', 'Кокарда'], desc: 'Кроличий мех и кокарда с чужой фуражки. Уши можно опустить — но в этом лесу лучше слушать.' },
       gasmask: { name: 'Противогаз', parts: ['Резина', 'Стёкла'], desc: 'Шлем-маска со склада у вышки. Стёкла светятся в темноте. Никто не знает почему.' },
@@ -266,7 +270,7 @@ const TEXT = {
     title: 'WARDROBE',
     sub: 'This is how your friends will see you — in the echoes and under the work lamps.',
     slot: { head: 'Head', body: 'Outfit', car: 'Car', shop: 'Shop' },
-    theme: { base: 'Standard issue', taiga: 'Taiga', zone: 'The Zone', halloween: 'Halloween', anime: 'Anime', furry: 'Furry', leshy: 'Leshy', plague: 'Plague', cosmos: 'Cosmos', tuning: 'Tuning', signal:'Signal' },
+    theme: { base: 'Standard issue', taiga: 'Taiga', zone: 'The Zone', halloween: 'Halloween', anime: 'Anime', furry: 'Furry', leshy: 'Leshy', plague: 'Plague', cosmos: 'Cosmos', tuning: 'Tuning', signal:'Signal', keanu:'Keanu Reeves' },
     set: 'full set',
     color: 'Colour',
     custom: 'custom colour',
@@ -302,6 +306,8 @@ const TEXT = {
     },
     items: {
       screen:{name:'Screen head',parts:['Case','Phosphor'],desc:'A battered CRT. Draw, type a caption or stamp pixel portraits of the forest’s monsters. Free; your friends see the same display.'},
+      keanuhair: {name:'Keanu Reeves',parts:['Hair','Beard'],desc:'A stylised Keanu: long dark hair, beard and a calm gaze. A free cosmetic likeness.'},
+      keanusuit: {name:'Keanu’s suit',parts:['Suit','Shirt'],desc:'A dark suit and a guitar. Takes it out, plays and stows it in the garage and wardrobe. Cosmetic only; no gameplay advantage.'},
       hood: { name: 'Hood', parts: ['Fabric', 'Drawstrings'], desc: 'Standard, off the windbreaker. Drawstrings pulled all the way — you barely hear your own breathing.' },
       ushanka: { name: 'Ushanka', parts: ['Fur', 'Badge'], desc: "Rabbit fur and a badge off somebody else's cap. The flaps come down — but in this forest you'd better listen." },
       gasmask: { name: 'Gas mask', parts: ['Rubber', 'Lenses'], desc: 'A helmet-mask from the depot by the tower. The lenses glow in the dark. Nobody knows why.' },

@@ -1,3 +1,4 @@
+import { DEPARTURE, departureBeat, latePassenger } from './departure.js';
 // The co-op lobby, in 3D: a garage at night. Everyone who joins the room takes their place — the host at the
 // wheel of the УАЗ, the next on a chair with a thermos cup, the next leaning by the wicket door with a smoke,
 // the last on one knee packing a rucksack (again). When the host presses START the engine turns over, catches,
@@ -11,7 +12,7 @@ import { EDGE_GLSL } from '../render/sonar.js';
 import { Particles } from '../render/particles.js';
 import { clamp, lerp, damp, smoothstep } from '../core/rng.js';
 import { t } from '../core/i18n.js';
-import { buildSurvivor, dyeColors, poseFur } from '../game/survivor.js';
+import { buildSurvivor, dyeColors, poseSurvivor, poseFur, poseKeanu } from '../game/survivor.js';
 import { cleanFit, shapeKey, item } from '../game/outfit.js';
 import {
   ROOM, GATE, WIN, CAR, BULB, BULB_LOCAL, BULB2, BULB2_LOCAL, CARP, SPOTS, LANTERN_AT, DRUM_AT, ITEM_SPOTS, PACK,
@@ -1010,18 +1011,21 @@ export class Garage {
     if ((this.cut && !this.cut.done) || this.depart) return false;
     this.cut = null;
     this._stopEngine(0.2);
-    this.depart = { t: 0, onDone, fired: false, clanked: false, keyed: false, gate: 0, drive: 0, walk: 0 };
+    this.depart = { t: 0, onDone, fired: false, clanked: false, keyed: false, gate: 0, drive: 0, walk: 0, laggard: latePassenger(this.figs.flatMap((f,i)=>f&&!f.leaving?[i]:[])), boarded: new Set(), rests: this.figs.map(f=>f?{parent:f.rig.root.parent,pos:f.rig.root.position.clone(),rot:f.rig.root.rotation.clone()}:null) };
     this.wheelSpin = 0;
     for (const w of this.wheelMeshes) w.rotation.z = 0;
     this.carRoot.position.set(CAR.x, 0, CAR.z);
     this.gateHover = 0; // the film takes the gates from here
-    this.open(this.view === 'home' ? 'room' : this.view);
+    this.open('room');
     return true;
   }
 
   // the gates are shut and the room is whole again (the film ended, or was cancelled)
   _endDepart() {
     if (!this.depart) return;
+    const film=this.depart;
+    for(let s=0;s<4;s++){const f=this.figs[s],rest=film.rests[s];if(f&&rest){rest.parent.add(f.rig.root);f.rig.root.position.copy(rest.pos);f.rig.root.rotation.copy(rest.rot);f.rig.root.visible=true;poseSurvivor(f.rig,0,0,false,false);}}
+    this.cup.visible=true;
     this.depart = null;
     // the leaves swing shut and the wicket hangs on the near one again
     if (this.gateLeaves) for (const m of this.gateLeaves) m.rotation.y = 0;
@@ -1103,14 +1107,13 @@ export class Garage {
     if (t >= 2.9) this.idle = 1;
     this.u.uHeadI.value = t >= 2.9 ? Math.min(1, (t - 2.9) * 3) : 0;
     this.u.uTail.value.w = t >= 2.9 ? 0.7 : 0;
-    // the team walks to the car (the driver is already there)
-    if (t >= 2.6 && t < 5.2) {
-      c.walk = Math.min(1, (t - 2.6) / 1.9);
-      this._walkToCar(c.walk);
-    } else if (t >= 5.2) this._walkToCar(1);
-    // and the car rolls out through the gates
-    if (t >= 3.4) {
-      c.drive = Math.min(1, (t - 3.4) / 2.4);
+    // Everyone except one late passenger boards before the wheels move.
+    const beat=departureBeat(t);
+    c.walk=beat.board;
+    this._walkToCar(beat.board);
+    const ready=this.figs.every((f,s)=>!f||f.leaving||s===0||s===c.laggard||c.boarded.has(s));
+    if (t >= DEPARTURE.driveStart && ready) {
+      c.drive = beat.drive;
       const v = 0.4 + 2.6 * c.drive * c.drive;
       this.carRoot.position.x -= v * dt;
       this.wheelSpin += (v / this.CP.wheelR) * dt; // the tyres roll with the road, not the body
@@ -1120,8 +1123,8 @@ export class Garage {
       this.shake.vy += dt * 0.4 * c.drive;
     }
     // into the night
-    if (t > 5.9) this.fade = Math.max(0, 1 - (t - 5.9) / 0.7);
-    if (!c.fired && t >= 6.7) {
+    if (t > DEPARTURE.fadeStart) this.fade = beat.fade;
+    if (!c.fired && beat.done) {
       c.fired = true;
       const fn = c.onDone;
       this._endDepart();
@@ -1133,26 +1136,38 @@ export class Garage {
 
   // the passengers leave their spots and file into the car (k: 0 at their places, 1 at the doors)
   _walkToCar(k) {
-    const ease = k * k * (3 - 2 * k);
-    for (let s = 1; s < 4; s++) {
-      const f = this.figs[s];
-      if (!f || f.leaving) continue;
-      const spot = SPOTS[s];
-      const door = _w.set(s === 1 ? 0.1 : s === 2 ? -0.4 : 0.1, 0, s === 3 ? 1.1 : 0.85); // car-local
-      this.carMesh.localToWorld(door);
-      f.rig.root.position.x = lerp(spot.pos[0], door.x, ease);
-      f.rig.root.position.z = lerp(spot.pos[2], door.z, ease);
-      f.rig.root.rotation.y = Math.atan2(door.x - f.rig.root.position.x, door.z - f.rig.root.position.z) + Math.PI;
-      const n = f.rig.nodes;
-      const ph = f.t * 7 + s;
-      n.thL.rotation.x = Math.sin(ph) * 0.55 * (ease > 0.02 ? 1 : 0);
-      n.thR.rotation.x = -Math.sin(ph) * 0.55 * (ease > 0.02 ? 1 : 0);
-      n.knL.rotation.x = Math.max(0, -Math.sin(ph)) * 0.7;
-      n.knR.rotation.x = Math.max(0, Math.sin(ph)) * 0.7;
-      n.shL.rotation.x = -Math.sin(ph) * 0.3;
-      n.shR.rotation.x = Math.sin(ph) * 0.3;
-      if (ease >= 1 && !f.leaving) { f.leaving = true; f.leaveT = 0; }
+    const c=this.depart,beat=departureBeat(c.t),ease=k*k*(3-2*k);
+    for(let s=0;s<4;s++) {
+      const f=this.figs[s];if(!f||f.leaving)continue;
+      const r=f.rig.root,n=f.rig.nodes;poseKeanu(f.rig,0,false);
+      if(s===0){this._driver(f,0);continue;}
+      n.hips.rotation.set(0,0,0);
+      if(c.boarded.has(s)) {this._passengerPose(f);continue;}
+      const start=c.rests[s]?.pos || new THREE.Vector3(...SPOTS[s].pos);
+      const door=_w.set(s===1?.1:1,0,s===2?-.95:.95);this.carMesh.localToWorld(door);
+      if(s===c.laggard) {
+        poseSurvivor(f.rig,this.t*10,beat.chase?4:1.8,false,false);
+        if(beat.chase) {
+          // He gets back up only after the car has pulled away, then chases its rear bumper.
+          const goal={x:this.carRoot.position.x+3.0,z:this.carRoot.position.z+.8},dx=goal.x-r.position.x,dz=goal.z-r.position.z,d=Math.hypot(dx,dz);
+          const dt=Math.min(.1,Math.max(0,c.t-(c.lateLast||c.t)));c.lateLast=c.t;
+          if(d>.05){const v=Math.min(d,dt*4);r.position.x+=dx/d*v;r.position.z+=dz/d*v;r.rotation.y=Math.atan2(dx,dz);}
+          r.rotation.z=0;r.position.y=Math.abs(Math.sin(this.t*10))*.07;n.chest.rotation.x=.35;n.shR.rotation.x-=.65;
+        } else {
+          const walk=smoothstep(1,3.4,c.t),lateX=CAR.x+3.1,lateZ=CAR.z+1.3;r.position.set(lerp(start.x,lateX,walk),0,lerp(start.z,lateZ,walk));r.rotation.y=Math.atan2(lateX-start.x,lateZ-start.z);
+          if(beat.stumble){n.hips.position.y=.94-beat.fall*.55;n.chest.rotation.x=beat.fall*1.2;n.knL.rotation.x=beat.fall*1.9;n.knR.rotation.x=beat.fall*.9;n.shL.rotation.x=-beat.fall*1.6;n.shR.rotation.x=-beat.fall*1.6;r.rotation.z=beat.fall*.22;}
+        }
+        continue;
+      }
+      poseSurvivor(f.rig,this.t*7+s,k>0?2.4:0,false,false);
+      r.position.set(lerp(start.x,door.x,ease),0,lerp(start.z,door.z,ease));r.rotation.y=Math.atan2(door.x-r.position.x,door.z-r.position.z);
+      if(k>=1){this.carMesh.add(r);r.position.set(s===1?.1:1,0,s===2?-.42:.42);r.rotation.set(0,-Math.PI/2,0);c.boarded.add(s);this._passengerPose(f);}
     }
+  }
+  _passengerPose(f) {
+    const n=f.rig.nodes,D=this.model.driver;
+    poseSurvivor(f.rig,0,0,false,false);n.hips.position.y=D.hips;n.hips.rotation.set(D.recline,0,0);
+    for(const side of['L','R']){n['th'+side].rotation.x=D.thigh;n['kn'+side].rotation.x=D.knee;n['sh'+side].rotation.x=-.4;n['el'+side].rotation.x=-1;}
   }
 
   _stopEngine(fade) {
@@ -1441,6 +1456,7 @@ export class Garage {
       } else f.appear = Math.min(1, f.appear + dt / 1.1);
       f.mat.uniforms.uAppear.value = f.appear >= 1 ? 1 : f.appear;
       f.mat.uniforms.uHover.value = damp(f.mat.uniforms.uHover.value, s === this.hoverSlot && f.self ? 1 : 0, 10, dt);
+      if(this.depart){f.rig.root.visible=true;continue;}
       if(this.studio&&(this.view==='menu'||this.view==='dressing')){f.rig.root.visible=false;continue;}
       f.st.t += dt;
       this._lookAround(f, dt);
@@ -1457,6 +1473,9 @@ export class Garage {
       else this._packer(f, dt);
       this._glow(f);
       poseFur(f.rig, dt);
+      const playing=poseKeanu(f.rig,this.t+s*2,!this.cut&&s!==0);
+      if(s===1)this.cup.visible=!f.rig.nodes.guitar?.visible;
+      if(playing&&this.audio?.ready&&Math.floor(this.t*3)!==f.guitarBeat){f.guitarBeat=Math.floor(this.t*3);this.audio.guitarNote?.(f.guitarBeat);}
       if (n.crow) this._crow(f, dt);
     }
   }

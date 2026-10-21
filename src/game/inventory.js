@@ -212,7 +212,7 @@ export class Backpack {
     this.meshes = new Map();
   }
   get active() { return this.opened || this.progress > .01; }
-  get blocked() { return this.active || this.pending.size > 0; }
+  get blocked() { return !!this.g.angler?.busy || this.active || this.pending.size > 0; }
   owns(k) {
     const g=this.g;
     return k==='stones' ? g.player.stones>0 : k==='glow' ? g.glows.count>0 || !!g.glows.held : k==='torch' ? g.torch.has : k==='flare' ? !!g.player.hasFlare || g.player.flares>0 : k==='battery' ? this.cells>0 : k==='tape' ? !!g.tools.tapeHeld : k==='crowbar' ? g.tools.hasCrowbar : k==='map'?!!g.partMap?.has:k==='syringe'?this.syringes>0:false;
@@ -278,6 +278,7 @@ export class Backpack {
   // on a desktop the pack opens in the round (see ui/bag3d.js); the flat grid is the touch fallback
   get round() { return !!this.g.bag3d && (!this.g.input.touch || innerWidth >= 720); } // a narrow phone keeps the flat grid; landscape and tablets get the real pack
   open() {
+    if (this.g.angler?.busy) return;
     const g=this.g;
     if(!g.player.alive || !['play','morning','dawn','training'].includes(g.state) || g.inputMuted) return false;
     if(g.player.carrying || g.escape.held || g.escape.mySeat>=0 || g.cabinets.busy || g.expedition.onTower) { g.handsFull(); return false; }

@@ -90,11 +90,11 @@ export class NetSync {
       }
     }
     // monsters (host)
-    if (this.host && (g.state === 'play' || g.state === 'dawn')) {
+    if (this.host && (['play','dawn','morning','dusk'].includes(g.state))) {
       this.snT -= dt;
       if (this.snT <= 0) {
         this.snT = 1 / SNAP_HZ;
-        this.send('sn', { t: r2(g.time), m: g.monsters.map((m) => this.packMonster(m)) });
+        this.send('sn', { t: r2(g.time), m: g.monsters.map((m) => this.packMonster(m)), a: g.angler?.snapshot() });
       }
     }
     // objectives: when they change (throttled), plus a slow heartbeat that heals anything lost
@@ -133,6 +133,7 @@ export class NetSync {
   handle(type, d, pid) {
     const g = this.g;
     const isHostMsg = pid === this.coop.hostId;
+    if (this.host && g.angler?.holds(pid) && !['ps','nz','_left'].includes(type)) return;
     switch (type) {
       case 'ps': {
         const r = g.remotes.get(pid);
@@ -154,7 +155,7 @@ export class NetSync {
       case 'nz': {
         if (!this.host || !Array.isArray(d)) break;
         const r = g.remotes.get(pid);
-        if (!r || !r.alive || g.state !== 'play') break;
+        if (!r || !r.alive || g.state !== 'play' && !g.angler?.holds(pid)) break;
         g.noise(+d[0], +d[1], Math.min(1, +d[2]), NOISE_SRC[d[3]] || 'voice', !!d[4], pid);
         break;
       }
@@ -301,6 +302,7 @@ export class NetSync {
         if (!isHostMsg || this.host) break;
         const m = typeof a === 'number' ? g.monsterById(a) : null;
         switch (name) {
+          case 'ag': g.angler?.apply(a); break;
           case 'zsh': if(Number.isInteger(a)&&typeof b==='string')g.cabinets.netSpring(b,a);break;
           case 'ix': g.tools.apply(a); break;
           case 'itape': g.tools.setClip(a, b); break;
@@ -341,6 +343,7 @@ export class NetSync {
     const g = this.g;
     const now = performance.now();
     g.netT = +d.t || 0;
+    g.angler?.apply(d.a);
     const seen = new Set();
     for (const a of d.m) {
       if (!Array.isArray(a)) continue;

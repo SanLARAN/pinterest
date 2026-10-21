@@ -4,7 +4,7 @@ import { MeshBuilder } from '../world/builder.js';
 import { clamp, damp, RNG } from '../core/rng.js';
 import { t } from '../core/i18n.js';
 import { myFit, cleanFit, fitKey } from '../game/outfit.js';
-import { poseSurvivor, poseFur } from '../game/survivor.js';
+import { poseSurvivor, poseFur, poseKeanu } from '../game/survivor.js';
 import { GET_UP_SECONDS, teaSeatMotion } from './teaSeat.js';
 import { Mannequin } from './mannequin.js'; // only lazily used for the small, cached catalogue stills
 
@@ -124,6 +124,9 @@ export class GarageStudio {
         if(gesture.t>1.2)this.adapter.gesture=null;
       }
       poseFur(f.rig,dt);g._glow(f);
+      const playing=poseKeanu(f.rig,g.t,!gesture);
+      g.cup.visible=!f.rig.nodes.guitar?.visible;
+      if(playing && g.audio?.ready && Math.floor(g.t*3)!==this.guitarBeat){this.guitarBeat=Math.floor(g.t*3);g.audio.guitarNote?.(this.guitarBeat);}
     } else if(this.ownsCup) {
       // The visible lobby chair owns the real mug again; never overwrite a friend's sip.
       if(!g.figs[1]||g.figs[1].leaving){g.cup.position.copy(g.cupHome);g.cup.rotation.set(0,0,0);}

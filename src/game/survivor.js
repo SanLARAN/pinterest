@@ -116,6 +116,37 @@ const SHIN = [0, -0.42, -0.02];
 
 // ---------------- outfits ----------------
 const BODY = {
+  keanusuit(R) {
+    const n=R.nodes;
+    part(R,n.chest,b=>{
+      b.place(0,-.07,0);b.taper(.34,.21,.43,.26,.64,BA);
+      b.place(0,.37,.135);b.box(.16,.29,.018,BB);
+      for(const side of[-1,1]){b.place(side*.1,.37,.15,0,0,side*-.35);b.box(.075,.3,.025,BA);}
+      b.place(0,.36,.16);b.taper(.035,.02,.06,.025,.2,BA);
+      b.place(0,.52,.03);b.box(.27,.055,.22,BB);
+    });
+    part(R,n.hips,b=>{b.place(0,-.08,0);b.box(.33,.19,.22,BA);});
+    limbs(R,{
+      upper:(b,side)=>{b.identity();b.limb([0,0,0],[side*.04,-.3,.02],.062,.05,BA,6);},
+      fore:b=>{b.identity();b.limb([0,0,0],FORE,.05,.038,BA,6);},
+      thigh:b=>{b.identity();b.limb([0,0,0],THIGH,.073,.058,BA,6);},
+      shin:b=>{b.identity();b.limb([0,0,0],SHIN,.058,.044,BA,6);b.place(0,-.43,.06);b.box(.12,.08,.25,KIND.ROCK);},
+    });hands(R);
+    const guitar=node(R,'guitar',n.chest,0,.2,-.27);guitar.visible=false;
+    part(R,guitar,b=>{
+      const outline=[[-.12,-.25],[.08,-.27],[.21,-.19],[.22,-.08],[.14,.02],[.12,.1],[.16,.17],[.13,.27],[.05,.3],[-.07,.27],[-.14,.18],[-.1,.08],[-.16,0],[-.23,-.08],[-.23,-.18]];
+      b.identity();
+      for(let i=0;i<outline.length;i++){const a=outline[i],c=outline[(i+1)%outline.length];
+        b.tri([0,.02,.055],[...a,.055],[...c,.055],KIND.BARK);
+        b.tri([0,.02,-.045],[...c,-.045],[...a,-.045],KIND.BARK);
+        b.quad([...a,-.045],[...c,-.045],[...c,.055],[...a,.055],KIND.BARK);
+      }
+      b.identity();b.limb([-.08,.13,0],[-.38,.68,0],.035,.026,KIND.ROCK,4);
+      b.limb([-.38,.68,0],[-.44,.8,0],.05,.045,KIND.BARK,4);
+      b.place(0,.06,.057,Math.PI/2);b.cylinder(10,.047,.047,.008,KIND.ROCK);
+      for(let i=0;i<4;i++){const dx=(i-1.5)*.009;b.identity();b.limb([dx,-.14,.065],[-.41+dx,.74,.035],.0015,.0015,KIND.METAL,3);b.place(-.44+(i%2)*.09,.7+Math.floor(i/2)*.07,0);b.box(.03,.02,.04,KIND.METAL);}
+    });
+  },
   // the kit you came with: windbreaker, backpack, bedroll
   jacket(R) {
     const n = R.nodes;
@@ -502,6 +533,16 @@ const BODY = {
 
 // ---------------- headwear ----------------
 const HEAD = {
+  keanuhair(R) {
+    face(R);
+    part(R,R.nodes.head,b=>{
+      b.place(0,.1,-.01);b.box(.24,.13,.2,HA);
+      for(const side of[-1,1])for(let i=0;i<4;i++){b.place(side*(.105+i*.009),-.03,-.075+i*.035,0,0,side*-.06);b.box(.035,.32+(i%2)*.04,.055,HA);}
+      b.place(0,-.105,.063,0,0,0,1,1,.65);b.octa(.09,.065,HA);
+      b.place(0,-.046,.102);b.box(.08,.025,.025,HA);
+      b.place(0,-.008,.106,0,0,0,.65,1,.6);b.octa(.03,.045,KIND.FLESH);
+    });
+  },
   screen(R) {
     part(R,R.nodes.head,b=>{
       b.place(0,.02,-.025);b.box(.44,.35,.30,HA);
@@ -1031,4 +1072,20 @@ export function rigVerts(rig) {
   let n = 0;
   for (const p of rig.parts) n += p.arr.count;
   return n;
+}
+
+// Cosmetic idle only: draw → finger the neck and strum → stow. Never runs while walking or driving.
+export function poseKeanu(rig, time, enabled=true) {
+  const n=rig.nodes, prop=n.guitar;if(!prop)return false;
+  const phase=((time%24)+24)%24;
+  const visible=enabled && phase>=2 && phase<13;
+  prop.visible=visible;if(!visible)return false;
+  const k=Math.min(1,(phase-2)/1.5,(13-phase)/1.5),play=phase>=3.5&&phase<11.5;
+  prop.position.set(.1+Math.sin(k*Math.PI)*.34,.16,-.28+.64*k);
+  prop.rotation.set(-.1*k,Math.PI*(1-k),-.1*k);
+  n.shL.rotation.set(-1.25*k,.2*k,-.25*k);n.elL.rotation.set(-1.6*k,0,-.3*k);
+  n.shR.rotation.set((-.65+(play?Math.sin(time*9)*.13:0))*k,0,.12*k);
+  n.elR.rotation.set((-1.25+(play?Math.sin(time*9)*.22:0))*k,0,0);
+  n.head.rotation.x=-.2*k;n.chest.rotation.z=Math.sin(time*1.4)*.018*k;
+  return play;
 }

@@ -100,6 +100,7 @@ export class RemotePlayer {
   }
 
   update(dt) {
+    if (this.game.angler?.holds(this.id)) { this.game.angler.placeVictim(this,dt); this.game.angler.poseVictim(this); return; }
     const B = this.buf;
     if (B.length) {
       const now = performance.now() - DELAY;
