@@ -12,7 +12,9 @@ import { ForestNavigation } from './navigation.js';
 import { buildYard, buildOutside, inYard } from './yard.js';
 import { FIRETOWER, ZARYA, buildFiretower, buildZarya, buildWaymarks } from './expedition.js';
 
-export const CAP = { TREE: 0, ROCK: 1, WOOD: 2, METAL: 3, WATER: 4, EFFIGY: 5, FENCE: 6 }; // FENCE: chain-link (you see and light through it)
+export { CAP } from './caps.js'; // (re-exported: everything that imported it from here keeps working)
+import { CAP } from './caps.js';
+import { BOG, buildBog } from './bog.js';
 
 // the cupboards in the buildings (game/cabinets.js opens them): body size and, for a wall cabinet, how high it hangs
 export const CABINET_DIMS = {
@@ -108,13 +110,10 @@ function segSeg(ax, az, bx, bz, cx, cz, dx, dz) {
 }
 
 export class World {
-  constructor(scene, material) {
+  constructor(scene, material, mapId = 'forest') {
     this.scene = scene;
     this.material = material;
-    this.seed = CFG.WORLD_SEED;
-    this.half = CFG.WORLD_HALF;
-    this.terrain = new Terrain(this.seed);
-    this.col = new Collision(this.half, 8);
+    this.setMap(mapId);
     this.meshes = [];
     this.props = []; // { cx, cz, build(b) }
     this.lake = null;
@@ -127,13 +126,69 @@ export class World {
     this.sovkhoz = null; // the farm (2.1p): where its middle is, for the arrival toast
   }
 
+  // Which piece of ground this World is. Swapping it changes the terrain, the colliders and the list of
+  // places; `generate()` then builds the map itself (the forest here, the peat bog in world/bog.js).
+  setMap(id = 'forest') {
+    this.mapId = id === 'bog' ? 'bog' : 'forest';
+    this.map = this.mapId === 'bog' ? BOG : null;
+    this.seed = this.map ? this.map.seed : CFG.WORLD_SEED;
+    this.half = this.map ? this.map.half : CFG.WORLD_HALF;
+    this.terrain = this.map ? this.map.terrain(this.seed) : new Terrain(this.seed);
+    this.col = new Collision(this.half, 8);
+    this.landmarks = this.map ? this.map.landmarks : LANDMARKS;
+    this.lake = null;
+    this.spawn = { x: 0, z: 0, yaw: 0 };
+    this.effigies = [];
+    this.navBuildings = [];
+    this.doors = [];
+    this.cabinets = [];
+    this.medhut = null;
+    this.sovkhoz = null;
+    this.yard = null;
+    this.sites = [];
+    this.walks = []; // plank roads (the bog): { ax, az, bx, bz, w, y } — see onWalk
+    this.water = null; // a map with water fills this in (world/bog.js), the game only asks it questions
+    this.props = []; // { cx, cz, build(b) }
+    this.meshes = [];
+    this.occluders = [];
+    this.outside = null;
+    this.grass = null;
+    this.trails = null;
+    this.navigation = null;
+    return this;
+  }
+
+  // take the previous map off the scene: its meshes, the ground past the edge, the grass
+  clear() {
+    for (const m of this.meshes) {
+      this.scene.remove(m);
+      m.geometry?.dispose();
+    }
+    this.meshes = [];
+    if (this.outside) {
+      for (const m of this.outside.meshes) {
+        this.scene.remove(m);
+        m.geometry?.dispose();
+      }
+      this.outside = null;
+    }
+    // the meadow keeps its tufts in an array of its own, not in `meshes`
+    for (const m of this.grass?.meshes || []) {
+      this.scene.remove(m);
+      m.geometry?.dispose();
+    }
+    this.grass = null;
+    this.occluders = [];
+  }
+
   generate() {
     const t0 = performance.now();
+    if (this.mapId === 'bog') return buildBog(this, t0);
     const rng = new RNG(this.seed);
     const rnd = () => rng.next();
     const terr = this.terrain;
 
-    for (const L of LANDMARKS) {
+    for (const L of this.landmarks) {
       if (L.id === 'lake') {
         terr.addFlat(L.x, L.z, L.r + 8);
         terr.addBasin(L.x, L.z, L.r * 0.95, 3.6);
@@ -142,7 +197,7 @@ export class World {
     }
     terr.finalize();
 
-    for (const L of LANDMARKS) {
+    for (const L of this.landmarks) {
       const kind = L.id.replace(/\d+$/, '');
       const fn = this['lm_' + kind];
       if (fn) fn.call(this, L, rng);
@@ -150,7 +205,7 @@ export class World {
     this.genSites(); // own RNG: the forest stays exactly the same
     buildWaymarks(this);
 
-    this.trails = new ForestTrails(this).generate(LANDMARKS);
+    this.trails = new ForestTrails(this).generate(this.landmarks);
     this.trails.build();
     this.genTrees(rng);
     this.genScatter(rng);
@@ -178,8 +233,22 @@ export class World {
     this.col.add(x - rx * half, z - rz * half, x + rx * half, z + rz * half, D.d / 2, D.h, CAP.WOOD);
   }
 
+  // is this point on a plank road? (the bog's decks stand over water; a player walking them is dry)
+  onWalk(x, z, pad = 0) {
+    for (const w of this.walks) {
+      const dx = w.bx - w.ax, dz = w.bz - w.az;
+      const len2 = dx * dx + dz * dz;
+      if (len2 < 1e-6) continue;
+      let t = ((x - w.ax) * dx + (z - w.az) * dz) / len2;
+      t = t < 0 ? 0 : t > 1 ? 1 : t;
+      const px = w.ax + dx * t, pz = w.az + dz * t;
+      if (Math.hypot(x - px, z - pz) < w.w / 2 + pad) return w;
+    }
+    return null;
+  }
+
   inLandmark(x, z, pad = 0) {
-    for (const L of LANDMARKS) {
+    for (const L of this.landmarks) {
       const dx = x - L.x, dz = z - L.z;
       if (dx * dx + dz * dz < (L.r + pad) * (L.r + pad)) return L;
     }
@@ -1084,7 +1153,7 @@ export class World {
     this.sites = [];
     const ids = ['camp', ...CFG.GEN_SITES, 'sovkhoz'];
     for (const id of ids) {
-      const L = LANDMARKS.find((l) => l.id === id);
+      const L = this.landmarks.find((l) => l.id === id);
       let gx, gz, cx, cz;
       if (id === 'camp') {
         // in plain view from where you wake up; the body lies between you and it
