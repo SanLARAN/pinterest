@@ -30,10 +30,14 @@ function bake(model) {
   return out;
 }
 
-test('her body is dense and finite: a model, not a hat', () => {
+test('her body sits inside the game\'s own budget: denser than a coat, lighter than a showcase', () => {
   const verts = rig.parts.reduce((a, p) => a + p.arr.count, 0);
-  assert.ok(verts > 9000, `built with some density (${verts})`);
-  assert.ok(verts < 40000, `but a body, not a swamp (${verts})`);
+  assert.ok(verts > 5000, `dense enough for a round silhouette (${verts})`);
+  assert.ok(verts < 10000, `and still in the wardrobe's league, not a sculpt (${verts})`);
+  // the two pieces she is made of, on their own
+  const head = rig.parts.filter((pp) => pp.node === rig.nodes.head || pp.node === rig.nodes.eyes
+    || pp.node === rig.nodes.earL || pp.node === rig.nodes.earR).reduce((a, pp) => a + pp.arr.count, 0);
+  assert.ok(head > 2000 && head < 4500, `a head with a face and hair, at game density (${head})`);
   for (const p of rig.parts) {
     for (const v of p.arr.pos.subarray(0, p.arr.count * 3)) assert.ok(Number.isFinite(v), 'no NaN vertices');
   }

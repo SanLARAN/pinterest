@@ -9,18 +9,18 @@ export const NEWS = [
   {
     v:'2.1w',date:'2026-10-22',
     ru:{title:'Не квадраты',items:[
-      'Найдёныша собрали заново. Череп — одна поверхность, которая от широких скул сужается в подбородок; глаза, нос и губы лежат на этой поверхности, а не висят рядом',
-      'Волосы больше не солома: это гладкая шапка, которая открывает лицо, и пряди-ленты. Одна прядь падает на левый глаз, две идут вдоль щёк, и целая занавеска висит за спиной до колен и качается на шаге',
+      'Найдёныша собрали заново — но в стиле игры, без скульптуры: череп одной поверхностью, от широких скул к узкому подбородку, а глаза, нос и губы лежат на этой поверхности, а не висят рядом',
+      'Волосы больше не солома: гладкая шапка, которая открывает лицо, и пряди-ленты — одна падает на левый глаз, по одной вдоль щёк, и занавеска за спиной до колен',
       'Футболка на два размера больше теперь падает с плеч: узкая талия, мягкий подол, подвёрнутый край, складки. Волчий череп на груди — маркер, как и был',
-      'Руки, ноги, кроссовки: никаких четырёхгранных трубок. Плечи, локти, колени — шары; кисти с четырьмя пальцами и большим; кроссовки с подошвой, рантом, воротом, мыском и шнурками',
-      'Отражение в эхе стало плотнее: тяжёлой модели эхо выделяет свой буфер само, вместо того чтобы обрезать её пополам',
+      'Руки, ноги, кроссовки: никаких четырёхгранных трубок. Плечи, локти, колени — шары; кисти с пальцами; кроссовки с подошвой, рантом и шнурками',
+      'Всё это — на 8,5 тысячи вершин: вдвое плотнее обычного тела, но ровно в бюджете гардероба, так что эхо и слабый телефон не страдают',
     ]},
     en:{title:'Not boxes',items:[
-      'The Stray has been rebuilt. Her skull is one surface that narrows from wide cheekbones into a chin; the eyes, the nose and the lips lie on that surface instead of hanging next to it',
-      'The hair is no longer straw: it is a smooth cap that opens over the face and flat locks of it. One lock falls over her left eye, two run down her cheeks, and a whole curtain hangs behind her to her knees and swings as she walks',
+      'The Stray has been rebuilt — in the game\'s own style, not a sculpture: her skull is one surface that narrows from wide cheekbones into a chin, and the eyes, the nose and the lips lie on it instead of hanging next to it',
+      'The hair is no longer straw: a smooth cap that opens over the face, and flat locks — one over her left eye, one down each cheek, and a curtain behind her to her knees',
       'The tee two sizes too big now falls off her shoulders: a narrow waist, a soft hem, a rolled edge, creases. The wolf skull on her chest is a marker, as it was',
-      'Arms, legs, sneakers: no four-sided tubes. Shoulders, elbows and knees are balls; hands have four fingers and a thumb; the sneakers have a sole, a welt, a collar, a toe box and laces',
-      'Her afterimage got denser: the echo gives a heavy model its own buffer instead of cutting it in half',
+      'Arms, legs, sneakers: no four-sided tubes. Shoulders, elbows and knees are balls, hands have fingers, the sneakers have a sole, a welt and laces',
+      'All of it at 8.5k vertices: twice as dense as a normal body and still inside the wardrobe\'s budget, so the echo and a weak phone do not suffer',
     ]}
   },
   {
