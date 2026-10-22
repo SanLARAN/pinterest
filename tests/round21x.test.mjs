@@ -6,15 +6,21 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync, statSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, relative, isAbsolute } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 
 // the shell's pure part, exercised for real: a test-runner cannot download Chromium, but it can check that `../`
 // is a 403 and that the camera stays off
 const require = createRequire(import.meta.url);
 const { resolveRequest, allowsPermission, isOwnOrigin, mimeType, parseRange, serveBuild } = require('../electron/serve.cjs');
-const DIST = pathResolve('dist');
-function pathResolve(p) { return new URL(`../${p}`, import.meta.url).pathname.replace(/\/$/, ''); }
+// a real, platform-correct path: `new URL(...).pathname` is `/C:/…` on Windows, which no fs call or path
+// comparison here would accept
+const DIST = fileURLToPath(new URL('../dist', import.meta.url));
+const inside = (file) => {
+  const rel = relative(DIST, file);
+  return rel !== '' && !rel.startsWith('..') && !isAbsolute(rel);
+};
 
 const src = (p) => readFileSync(new URL('../' + p, import.meta.url), 'utf8');
 const pkg = JSON.parse(src('package.json'));
@@ -36,17 +42,17 @@ test('the shell loads the built game over its own privileged scheme, not over fi
 
 test('it cannot read the disk: every request is confined to ./dist', () => {
   // real requests, not regexes: the entry, an asset, a page it does not know, and three ways out of the folder
-  assert.equal(resolveRequest('hush://app/', DIST).file, `${DIST}/index.html`, 'the root is the entry');
-  assert.equal(resolveRequest('hush://app/assets/index-x.js', DIST).file, `${DIST}/assets/index-x.js`, 'an asset is itself');
+  assert.equal(resolveRequest('hush://app/', DIST).file, join(DIST, 'index.html'), 'the root is the entry');
+  assert.equal(resolveRequest('hush://app/assets/index-x.js', DIST).file, join(DIST, 'assets', 'index-x.js'), 'an asset is itself');
   const page = resolveRequest('hush://app/kabinet', DIST);
-  assert.equal(page.file, `${DIST}/index.html`);
+  assert.equal(page.file, join(DIST, 'index.html'));
   assert.equal(page.fallback, true, 'an unknown page falls back to the entry, like a single-page app');
   // `hush://app/..\..\windows\win.ini` — the URL parser leaves the backslashes, and on Windows they are separators:
   const escaped = resolveRequest('hush://app/..\\..\\windows\\win.ini', DIST);
   assert.equal(escaped.status, 403, 'backslashes out of the build are refused');
   for (const bad of ['hush://app/../../../../etc/passwd', 'hush://app/%2e%2e/%2e%2e/etc/shadow']) {
     const hit = resolveRequest(bad, DIST);
-    assert.ok(hit.status === 403 || hit.file.startsWith(DIST + '/'), `${bad} stays inside the build: ${JSON.stringify(hit)}`);
+    assert.ok(hit.status === 403 || inside(hit.file), `${bad} stays inside the build: ${JSON.stringify(hit)}`);
   }
   // the handler must go through that function and not re-decide on its own
   assert.match(main, /require\('\.\/serve\.cjs'\)/, 'main.cjs uses the tested handler');
