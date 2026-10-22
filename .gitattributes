@@ -1,3 +1,8 @@
+# One line ending everywhere: LF. Two reasons — a Windows checkout would otherwise hand CRLF to the tests, and
+# several of them read the sources and match across a line break; and the Pages workflow compares a fresh
+# `npm run build:pages` against the committed ./play/, which has to be byte-identical on any runner.
+* text=auto eol=lf
+
 # Preserve minified dependencies byte-for-byte, including whitespace inside template strings.
 # Source files still use normal git whitespace checks.
-play/assets/*.js -whitespace
+play/assets/*.js text eol=lf -whitespace
