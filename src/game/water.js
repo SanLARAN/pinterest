@@ -65,9 +65,12 @@ export function mistScale(world, x, z) {
 
 // what a footstep in this spot is worth: a splash carries, a board creaks, dry peat is quiet
 export function stepOf(world, x, z, loud) {
-  if (onPlanks(world, x, z)) return { loud: Math.max(loud, WATER.plankLoud), plank: true, water: false, ring: 0 };
+  if (onPlanks(world, x, z)) return { loud: Math.max(loud, WATER.plankLoud), plank: true, water: false, ring: 0, depth: 0 };
   if (wet(world, x, z)) {
-    return { loud: Math.min(1, Math.max(loud, 0.1) * WATER.waterStepLoud), plank: false, water: true, ring: WATER.ringRadius };
+    // (3.0k) how deep the foot went: an ankle and a knee do not sound the same, and the sound is the one
+    // thing that tells you what you have walked into before the echo comes back
+    const depth = waterOf(world).depth(x, z);
+    return { loud: Math.min(1, Math.max(loud, 0.1) * WATER.waterStepLoud), plank: false, water: true, ring: WATER.ringRadius, depth };
   }
-  return { loud, plank: false, water: false, ring: 0 };
+  return { loud, plank: false, water: false, ring: 0, depth: 0 };
 }

@@ -247,6 +247,7 @@ export class Angler {
   // ---------------- host: the hunt ----------------
   _host(dt) {
     const g = this.g, a = A();
+    if (g.map === 'bog') return; // (3.0k) the man with the lantern is the forest's, and he stays in it
     if (this.body && !g.monsters.includes(this.body)) this.body = null;
     if (g.state !== 'play') {
       // dawn and morning: he is gone with the other things. A drag ends where it lies;

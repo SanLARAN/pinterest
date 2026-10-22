@@ -88,9 +88,12 @@ export class Game {
     // (3.0i) the bog drizzles. It is scenery, not mechanics: no sound, no effect on the echo, no doused flares
     this.rain = this.map === 'bog' ? new Rain(this.scene) : null;
     // the forestry yard, the УАЗ and its four parts, the way out — the forest's, not the bog's
-    this.escape = this.map === 'forest' ? new Escape(this) : inert(Escape, this, { load: () => null, seatOf: () => -1 });
+    // (3.0k) the stand-ins need the *fields*, not only the methods: the seat index is what every "can you use
+    // your hands" test asks about (a missing one made the wristwatch refuse to come up on the bog — TAB was
+    // dead, and the pack's own checks read it too), and the torch's charge is read as a number.
+    this.escape = this.map === 'forest' ? new Escape(this) : inert(Escape, this, { load: () => null, seatOf: () => -1, mySeat: -1, seats: [], count: 0 });
     this.cabinets = new Cabinets(this); // cupboards in the buildings (and the шкафандр)
-    this.torch = this.map === 'forest' ? new Torches(this) : inert(Torches, this, { hasLight: false }); // flashlights
+    this.torch = this.map === 'forest' ? new Torches(this) : inert(Torches, this, { hasLight: false, has: false, on: false, charge: 0 }); // flashlights
     this.tools = new ForestTools(this);
     this.expedition = this.map === 'forest' ? new Expedition(this) : inert(Expedition, this);
     this.selfBody = new SelfBody(this); // yours, when you look down
@@ -649,9 +652,17 @@ export class Game {
   // the calm is over: the first two of them get up, far off, and the forest lets you know
   wake() {
     this.awake = true;
-    const a = this.spawnMonster('listener', 70, 95);
-    const b = this.spawnMonster('listener', 75, 100);
-    const m = a || b;
+    let m = null;
+    if (this.map === 'bog') {
+      // (3.0k) the bog wakes its own. The forest's listeners and crawlers were never here: what comes up out
+      // of the water is the Дrowned, and the first cloud of the Гнус takes to the air at the same moment.
+      m = this.drowned?.spawnNight?.() || null;
+      this.gnats?.wakeNow?.();
+    } else {
+      const a = this.spawnMonster('listener', 70, 95);
+      const b = this.spawnMonster('listener', 75, 100);
+      m = a || b;
+    }
     if (this.role === 'host') {
       if (m) this.sync.ev('aw', Math.round(m.x), Math.round(m.z));
       else this.sync.ev('aw');
@@ -669,6 +680,19 @@ export class Game {
       const a = this.rng.float(0, Math.PI * 2);
       wx = p.x + Math.cos(a) * 85;
       wz = p.z + Math.sin(a) * 85;
+    }
+    if (this.map === 'bog') {
+      // (3.0k) a bog has no howl in it: the sound of the night starting is water moving where nothing
+      // should be moving. Same warning, the map's own voice.
+      this.audio.splash(0.7);
+      this.audio.sting(0.3);
+      if (this.player.alive || this.spectate) {
+        this.hud.flashAlert(t('aDrowned'), 'warn', 2.8);
+        this.hud.peek(3.5);
+        this.addTrauma(0.12);
+      }
+      this.radar.blip(wx, wz, 'unknown');
+      return;
     }
     this.audio.forestWake(wx, this.world.terrain.height(wx, wz) + 2.5, wz);
     if (this.player.alive || this.spectate) {
@@ -712,6 +736,9 @@ export class Game {
   }
 
   spawnMonster(type, dmin, dmax) {
+    // (3.0k) a belt on the braces: every forest creature goes through here, and none of them belongs on the
+    // bog. (The bog's own — the Дrowned, the Гнус — are not monsters of this kind and do not come through here.)
+    if (this.map === 'bog') return null;
     const p = this._around();
     const w = this.world.wall - 6;
     for (let k = 0; k < 40; k++) {
@@ -1246,6 +1273,7 @@ export class Game {
 
   // the two that come later: one of each, ever
   updateArrivals() {
+    if (this.map === 'bog') return; // (3.0k) the watcher and the howler are the forest's late guests
     const n = this.objectives.count;
     for (const type of ['watcher', 'howler']) {
       if (this.monsters.some((m) => m.type === type)) continue;
@@ -2119,7 +2147,8 @@ export class Game {
       const s = pev.step;
       // (3.0b) a step in the water is a splash and a ring on the surface; on the planks it is a creak
       if (s.water) {
-        this.audio.splash(s.intensity);
+        this.audio.wade(s.intensity, s.depth || 0.3); // 3.0k: water under a foot has its own sound
+
         this.pulses.emitStep(p.x, this.world.water?.level ?? p.y, p.z, this.time, { radius: s.ring || 8, strength: 0.5, speed: 12, decay: 1.6, kind: 'step' });
       } else if (s.plank) {
         this.audio.creak(s.intensity);
@@ -2451,6 +2480,13 @@ export class Game {
     this.dirT = (this.dirT || 0) - dt;
     if (this.dirT > 0) return;
     this.dirT = 1.0;
+    if (this.map === 'bog') {
+      // (3.0k) the bog keeps its own books: the Дrowned is in the water (see game/drowned.js) and the Гнус has
+      // its own clock (see game/gnat.js). Nothing here reads the forest's table of listeners and crawlers.
+      if (this.drowned && !this.drowned.bodyObj()) this.drowned.spawnNight();
+      this._sabotageTick();
+      return;
+    }
     const want = monsterTargets(this.time, this.diffDay());
     let L = 0, C = 0;
     for (const m of this.monsters) {

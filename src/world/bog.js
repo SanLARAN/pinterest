@@ -55,7 +55,7 @@ const WALKS = [
   { id: 'camp-station', w: 2.6, pts: [[-14, 6], [-34, 16], [-56, 30], [-74, 40], [-84, 44]] },
   { id: 'camp-barracks', w: 2.6, pts: [[12, -8], [30, -22], [48, -34], [64, -46]] },
   { id: 'camp-stacks', w: 2.6, pts: [[4, 14], [8, 40], [12, 68], [16, 92]] },
-  { id: 'camp-bridges', w: 2.6, pts: [[14, 8], [40, 22], [70, 36], [92, 50], [102, 62]] },
+  { id: 'camp-bridges', w: 2.6, pts: [[14, 8], [40, 22], [70, 36], [88, 46], [100, 48]] },
 ];
 
 // Water: a read-only question the rest of the game asks of the bog ("how deep is it here?").
@@ -167,61 +167,88 @@ const _e = new THREE.Euler();
 const _q = new THREE.Quaternion();
 const _m = new THREE.Matrix4();
 
-// a plank deck from a to b, 3 m wide, a hand above the water, on posts
-function deck(world, b, ax, az, bx, bz, w, y) {
+// (3.0k) a plank deck from a to b — and it is a *thing you walk on*, not a painted stripe: it follows the
+// peat it crosses, so a boardwalk climbs over an island and stands on posts over the channels, and its
+// handrails are beams with a collider behind them.
+function deck(world, b, ax, az, bx, bz, w, ya, yb = ya) {
   const dx = bx - ax, dz = bz - az;
   const len = Math.hypot(dx, dz);
   if (len < 0.4) return;
   const ux = dx / len, uz = dz / len; // along
   const px = -uz, pz = ux; // across
+  const yAt = (t) => ya + (yb - ya) * t;
+  const hw = w / 2;
   const plank = 1.5;
   const n = Math.max(1, Math.round(len / plank));
   for (let i = 0; i < n; i++) {
     const t0 = i / n, t1 = (i + 1) / n;
     const x0 = ax + dx * t0, z0 = az + dz * t0, x1 = ax + dx * t1, z1 = az + dz * t1;
-    const hw = w / 2;
-    // the walking surface (a quad with its diagonal hidden), a hair above the water
+    const y0 = yAt(t0), y1 = yAt(t1);
+    // the walking surface (a quad with its diagonal hidden)
     b.identity();
     // (3.0i) wound to face UP: the world material culls back faces, and a deck wound the other way is not
     // dark, it is simply not there
-    b.quadN([x0 - px * hw, y, z0 - pz * hw], [x1 - px * hw, y, z1 - pz * hw],
-      [x1 + px * hw, y, z1 + pz * hw], [x0 + px * hw, y, z0 + pz * hw], [0, 1, 0], KIND.WOOD, 15);
+    b.quadN([x0 - px * hw, y0, z0 - pz * hw], [x1 - px * hw, y1, z1 - pz * hw],
+      [x1 + px * hw, y1, z1 + pz * hw], [x0 + px * hw, y0, z0 + pz * hw], [0, 1, 0], KIND.WOOD, 15);
     // the edge board, so the deck reads at a glance from a low echo
     for (const s of [-1, 1]) {
       const ex = px * hw * s, ez = pz * hw * s;
-      b.tri([x0 + ex, y, z0 + ez], [x1 + ex, y, z1 + ez], [x1 + ex, y - 0.11, z1 + ez], KIND.WOOD, 6);
-      b.tri([x0 + ex, y, z0 + ez], [x1 + ex, y - 0.11, z1 + ez], [x0 + ex, y - 0.11, z0 + ez], KIND.WOOD, 5);
+      b.tri([x0 + ex, y0, z0 + ez], [x1 + ex, y1, z1 + ez], [x1 + ex, y1 - 0.11, z1 + ez], KIND.WOOD, 6);
+      b.tri([x0 + ex, y0, z0 + ez], [x1 + ex, y1 - 0.11, z1 + ez], [x0 + ex, y0 - 0.11, z0 + ez], KIND.WOOD, 5);
     }
   }
-  // posts, every four metres, one pair
+  // the handrail: a top beam at a metre and a mid rail under it, on both edges — exactly where the
+  // colliders run, so what you see is what stops you (3.0k)
+  for (const s of [-1, 1]) {
+    const ox = px * (hw - 0.1) * s, oz = pz * (hw - 0.1) * s;
+    b.identity();
+    b.limb([ax + ox, ya + 1.02, az + oz], [bx + ox, yb + 1.02, bz + oz], 0.048, 0.048, KIND.WOOD, 4);
+    b.limb([ax + ox, ya + 0.54, az + oz], [bx + ox, yb + 0.54, bz + oz], 0.032, 0.032, KIND.WOOD, 4);
+    // a post every six metres, so the rail has something to stand on all the way along
+    for (let d = 0; d < len; d += 6) {
+      const x = ax + ux * d, z = az + uz * d, y = yAt(d / len);
+      b.limb([x + ox, y - 0.02, z + oz], [x + ox, y + 1.08, z + oz], 0.05, 0.045, KIND.WOOD, 4);
+    }
+  }
+  // posts down to the peat, every four metres, one pair
   for (let d = 1.2; d < len; d += 4) {
-    const x = ax + ux * d, z = az + uz * d;
+    const x = ax + ux * d, z = az + uz * d, y = yAt(d / len);
     const g = world.terrain.height(x, z);
+    if (y <= g + 0.02) continue; // this stretch lies on the ground: there is nothing to stand on
     for (const s of [-1, 1]) {
-      const ox = px * (w / 2 - 0.16) * s, oz = pz * (w / 2 - 0.16) * s;
+      const ox = px * (hw - 0.16) * s, oz = pz * (hw - 0.16) * s;
       b.identity();
       b.limb([x + ox, y, z + oz], [x + ox, Math.min(g - 0.2, y - 0.3), z + oz], 0.075, 0.075, KIND.WOOD, 4);
     }
   }
-  // and one handrail post every twelve metres, so a bridge looks like a bridge
-  for (let d = 3; d < len; d += 12) {
-    const x = ax + ux * d, z = az + uz * d;
-    for (const s of [-1, 1]) {
-      const ox = px * (w / 2 - 0.1) * s, oz = pz * (w / 2 - 0.1) * s;
-      b.identity();
-      b.limb([x + ox, y, z + oz], [x + ox, y + 1.0, z + oz], 0.05, 0.045, KIND.WOOD, 4);
-    }
+}
+
+// (3.0k) a leg of boardwalk — and it is a thing you walk on, not a painted stripe. Its surface runs from
+// one end to the other (over a channel that is a level deck on posts, between two islands a gentle ramp),
+// its handrails are beams, and behind each handrail is a collider, so the edge of a road is where you stop.
+// Only the two ends of a road are open: that is where you step on and off.
+function deckLeg(world, ax, az, bx, bz, w, openA = true, openB = true) {
+  const len = Math.hypot(bx - ax, bz - az);
+  if (len < 0.4) return;
+  const yOf = (x, z) => Math.max(LEVEL + 0.14, world.terrain.height(x, z) + 0.05); // a hand over the water
+  const ya = yOf(ax, az), yb = yOf(bx, bz);
+  world.addProp((ax + bx) / 2, (az + bz) / 2, (b) => deck(world, b, ax, az, bx, bz, w, ya, yb));
+  world.walks.push({ ax, az, bx, bz, w, y: (ya + yb) / 2, ya, yb });
+  // the rails, as things: a capsule along each edge, stopping short of the ends of the road
+  const ux = (bx - ax) / len, uz = (bz - az) / len, px = -uz, pz = ux;
+  const s0 = openA ? 0.6 : 0, s1 = len - (openB ? 0.6 : 0);
+  if (s1 - s0 < 0.4) return;
+  for (const s of [-1, 1]) {
+    const ox = px * (w / 2) * s, oz = pz * (w / 2) * s;
+    world.col.add(ax + ux * s0 + ox, az + uz * s0 + oz, ax + ux * s1 + ox, az + uz * s1 + oz, 0.08, 1.4, CAP.WOOD);
   }
 }
 
-// a walkable deck is one collider-free ribbon: nothing blocks a player, but the ground under it is water,
-// and the game asks `world.walkAt(x, z)` which surface you are on (see game/water.js)
 function addWalk(world, walk) {
-  const y = LEVEL + 0.16;
-  for (let i = 0; i < walk.pts.length - 1; i++) {
+  const n = walk.pts.length;
+  for (let i = 0; i < n - 1; i++) {
     const [ax, az] = walk.pts[i], [bx, bz] = walk.pts[i + 1];
-    world.addProp((ax + bx) / 2, (az + bz) / 2, (b) => deck(world, b, ax, az, bx, bz, walk.w, y));
-    world.walks.push({ ax, az, bx, bz, w: walk.w, y });
+    deckLeg(world, ax, az, bx, bz, walk.w, i === 0, i === n - 2);
   }
 }
 
@@ -245,6 +272,10 @@ export function buildBog(world, t0) {
   // and the lagoon the camp stands on: the bog has to be *there* when you open your eyes, not fifteen metres of
   // dry peat away (3.0i). You wake facing it — the fire ring is the last dry thing before the shore.
   terr.addBasin(2, 21, 14, 1.6);
+  // (3.0k) and the drowned channel at the bridges place: a long cut across the island (two basins make one
+  // channel), so the three spans cross water instead of lying on the peat
+  terr.addBasin(95, 62, 8.5, 1.3);
+  terr.addBasin(109, 62, 8.5, 1.3);
   terr.finalize();
 
   for (const L of world.landmarks) {
@@ -425,32 +456,11 @@ function placeStacks(world, L, rng) {
   });
 }
 
-// three short bridges over the drowned channel
+// three short bridges over the drowned channel — parallel spans, so each one is a way across (3.0k)
 function placeBridges(world, L, rng) {
-  const y = LEVEL + 0.2;
   for (let i = 0; i < 3; i++) {
-    const a = (i - 1) * 0.5;
-    const cx = L.x + Math.cos(a) * 3.5, cz = L.z + Math.sin(a) * 3.5 - 2;
-    const ry = a + Math.PI / 2;
-    const ux = Math.cos(ry), uz = Math.sin(ry);
-    const len = 9 + i * 2.5;
-    world.addProp(cx, cz, (b) => {
-      b.identity();
-      for (let d = 0; d < len; d += 1.2) {
-        const t0 = d / len, t1 = (d + 1.2) / len;
-        const x0 = cx - ux * len / 2 + ux * len * t0, z0 = cz - uz * len / 2 + uz * len * t0;
-        const x1 = cx - ux * len / 2 + ux * len * t1, z1 = cz - uz * len / 2 + uz * len * t1;
-        b.quadN([x0 + uz, y, z0 - ux], [x1 + uz, y, z1 - ux], [x1 - uz, y, z1 + ux], [x0 - uz, y, z0 + ux], [0, 1, 0], KIND.WOOD, 15);
-      }
-      for (const s of [-1, 1]) {
-        for (let d = 0; d <= len; d += 4) {
-          const x = cx - ux * len / 2 + ux * d, z = cz - uz * len / 2 + uz * d;
-          b.place(x, y, z);
-          b.limb([uz * s, 0, -ux * s], [uz * s, 0.9, -ux * s], 0.05, 0.045, KIND.WOOD, 4);
-        }
-      }
-    });
-    world.walks.push({ ax: cx - ux * len / 2, az: cz - uz * len / 2, bx: cx + ux * len / 2, bz: cz + uz * len / 2, w: 2.0, y });
+    const x = L.x - 8 + i * 8;
+    deckLeg(world, x, L.z - 11, x, L.z + 11, 2.2, true, true);
   }
 }
 
@@ -474,6 +484,9 @@ function genPumps(world, rng) {
     const L = world.landmarks.find((l) => l.id === id);
     let px, pz;
     if (id === 'camp') { px = L.x + 5.6; pz = L.z - 6.0; }
+    // (3.0k) the bridges pump stands on the shore of the channel, not in it: the shed, the flywheel and the
+    // man who came out to start it all have to be on dry ground
+    else if (id === 'bridges') { px = L.x - 12; pz = L.z + 10; }
     else { px = L.x + 2.2; pz = L.z + 2.4; }
     const y = world.terrain.height(px, pz);
     const yaw = Math.atan2(L.x - px, L.z - pz);

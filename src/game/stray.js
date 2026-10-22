@@ -162,6 +162,7 @@ export class Stray {
   // ---------------- the host decides ----------------
   update(dt) {
     const g = this.g;
+    if (g.map === 'bog') return; // (3.0k) she is out there among the pines, not on the peat
     if (!this.rig && !g.auth) return; // a guest makes the body only when the host sends a state
     if (g.state !== 'play') { this._onIdle(dt); return; }
     if (g.auth) this._host(dt);

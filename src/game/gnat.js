@@ -103,6 +103,14 @@ export class Gnats {
     this.nextT = this.g.rng.float(a, b);
   }
 
+  // (3.0k) the night has woken: the first cloud takes to the air now instead of waiting out its gap
+  wakeNow() {
+    if (!this.onBog || this.g.state !== 'play') return null;
+    const s = this._spawn();
+    this.nextT = this.g.rng.float(GNAT.gap[0], GNAT.gap[1]);
+    return s;
+  }
+
   // a sound, from the game's own funnel (every source: voices, steps, engines, screams)
   hear(x, z, loud, source) {
     if (!this.onBog || this.g.state !== 'play') return;

@@ -142,7 +142,11 @@ export class RemotePlayer {
         if (this.stepAcc >= stepLen) {
           this.stepAcc -= stepLen;
           const d = this.game.distToEars(this.x, this.z);
-          if (d < 26 && (!this.crouching || this.carrying)) this.game.audio.mateStep(this.x, this.y + 0.1, this.z, this.carrying ? 0.62 : this.sprinting ? 0.85 : 0.4);
+          if (d < 26 && (!this.crouching || this.carrying)) {
+            const w = this.game.world;
+            const depth = w.water && !w.onWalk(this.x, this.z, 0) ? w.water.depth(this.x, this.z) : 0; // 3.0k
+            this.game.audio.mateStep(this.x, this.y + 0.1, this.z, this.carrying ? 0.62 : this.sprinting ? 0.85 : 0.4, depth);
+          }
         }
       }
     }

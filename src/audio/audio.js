@@ -586,6 +586,20 @@ export class AudioEngine {
     this._tone(t, { f: 180, fEnd: 120, a: 0.004, d: 0.09, gain: 0.05 * intensity, dest: o });
   }
 
+  // (3.0k) a foot going into the water and coming out again: the slap of it, the water closing over the
+  // shin, the wet drag of the lift. Depth (0..1.2 m) is heard as pitch, not as volume: a knee-deep step is
+  // duller and heavier than an ankle, and that is how you can tell the deep from the edge without seeing it.
+  wade(intensity = 0.5, depth = 0.3, dest = null) {
+    if (!this.ready) return;
+    const t = this.now;
+    const o = dest || this.sfx;
+    const d = Math.max(0, Math.min(1.2, depth)) / 1.2; // 0 ankle .. 1 knee and over
+    this._noiseBurst(t, { f: 2300 - 950 * d, q: 0.7, a: 0.003, d: 0.07 + intensity * 0.06, gain: 0.11 + intensity * 0.24, dest: o });
+    this._noiseBurst(t + 0.015, { f: 780 - 300 * d, fEnd: 400 - 120 * d, q: 1.2, a: 0.006, d: 0.2 + 0.18 * d, gain: 0.08 + intensity * 0.16, dest: o, rev: 0.25 });
+    this._tone(t + 0.04, { f: 250 - 90 * d, fEnd: 155 - 45 * d, a: 0.008, d: 0.16, gain: 0.03 + intensity * 0.06, dest: o });
+    this._noiseBurst(t + 0.14, { f: 3300, q: 2.4, a: 0.006, d: 0.22, gain: 0.02 + intensity * 0.05, dest: o }); // the water running off the leg
+  }
+
   // a board taking your weight: a short wooden creak with a knock under it
   creak(intensity = 0.4) {
     if (!this.ready) return;
@@ -598,11 +612,13 @@ export class AudioEngine {
 
   // ---------- co-op: your friends in the forest ----------
   // a teammate's footstep, from where they walk
-  mateStep(x, y, z, intensity = 0.4) {
+  mateStep(x, y, z, intensity = 0.4, waterDepth = 0) {
     if (!this.ready) return;
     const pn = this._panner(x, y, z, 2.5, 1.3);
     pn.connect(this.sfx);
-    this.footstep(intensity * 0.8, pn);
+    // (3.0k) a friend wading sounds like a friend wading, not like a friend on peat
+    if (waterDepth > 0) this.wade(intensity * 0.9, waterDepth, pn);
+    else this.footstep(intensity * 0.8, pn);
   }
 
   // a teammate's click / clap / shout (their mic voice comes through the voice chat instead)

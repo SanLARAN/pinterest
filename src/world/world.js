@@ -238,16 +238,35 @@ export class World {
     return this.half - 14;
   }
 
+  // where along this piece of deck the point falls (0 at a, 1 at b)
+  _walkT(w, x, z) {
+    const dx = w.bx - w.ax, dz = w.bz - w.az;
+    const len2 = dx * dx + dz * dz;
+    if (len2 < 1e-6) return 0;
+    const t = ((x - w.ax) * dx + (z - w.az) * dz) / len2;
+    return t < 0 ? 0 : t > 1 ? 1 : t;
+  }
+
   // is this point on a plank road? (the bog's decks stand over water; a player walking them is dry)
   onWalk(x, z, pad = 0) {
     for (const w of this.walks) {
-      const dx = w.bx - w.ax, dz = w.bz - w.az;
-      const len2 = dx * dx + dz * dz;
-      if (len2 < 1e-6) continue;
-      let t = ((x - w.ax) * dx + (z - w.az) * dz) / len2;
-      t = t < 0 ? 0 : t > 1 ? 1 : t;
-      const px = w.ax + dx * t, pz = w.az + dz * t;
+      const t = this._walkT(w, x, z);
+      const px = w.ax + (w.bx - w.ax) * t, pz = w.az + (w.bz - w.az) * t;
       if (Math.hypot(x - px, z - pz) < w.w / 2 + pad) return w;
+    }
+    return null;
+  }
+
+  // (3.0k) how high the deck is at this point — null off the planks. A road is built in pieces that each
+  // have their own height (world/bog.js), so this is the surface the player actually stands on: a boardwalk
+  // climbs over an island and runs flat over a channel, and the footstep follows it.
+  walkHeight(x, z, pad = 0) {
+    for (const w of this.walks) {
+      const t = this._walkT(w, x, z);
+      const px = w.ax + (w.bx - w.ax) * t, pz = w.az + (w.bz - w.az) * t;
+      if (Math.hypot(x - px, z - pz) >= w.w / 2 + pad) continue;
+      const ya = w.ya ?? w.y, yb = w.yb ?? w.y;
+      return ya + (yb - ya) * t;
     }
     return null;
   }

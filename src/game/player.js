@@ -116,7 +116,11 @@ export class Player {
     this.speed = moved / Math.max(dt, 1e-4);
     this.moved += moved;
     this.distFromSpawn = Math.hypot(this.x - this.world.spawn.x, this.z - this.world.spawn.z);
-    const gy = this.floorY != null ? this.floorY : this.world.terrain.height(this.x, this.z);
+    // (3.0k) the planks are ground too: on a boardwalk the feet are on the deck, not on the peat under it
+    const deckY = this.world.walkHeight ? this.world.walkHeight(this.x, this.z) : null;
+    const gy = this.floorY != null ? this.floorY
+      : deckY != null ? Math.max(deckY, this.world.terrain.height(this.x, this.z))
+      : this.world.terrain.height(this.x, this.z);
     this.y = damp(this.y, gy, 18, dt);
 
     // stamina
@@ -167,6 +171,7 @@ export class Player {
           ev.step.water = g.water;
           ev.step.plank = g.plank;
           ev.step.ring = g.ring;
+          ev.step.depth = g.depth || 0;
           if (g.water) ev.step.intensity = Math.max(0.5, intensity);
           if (g.plank) ev.step.intensity = Math.max(0.35, intensity);
         }

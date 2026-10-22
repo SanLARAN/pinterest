@@ -99,7 +99,8 @@ test('a footstep is worth what the ground makes it worth', () => {
 
   // dry peat is exactly what it always was
   const dry = stepOf(w, 0, 0, 0.085);
-  assert.deepEqual(dry, { loud: 0.085, plank: false, water: false, ring: 0 });
+  // (3.0k) the step now also says how deep the foot went, so the sound can tell an ankle from a knee
+  assert.deepEqual(dry, { loud: 0.085, plank: false, water: false, ring: 0, depth: 0 });
   const run = stepOf(w, 0, 0, 0.24);
   assert.equal(run.loud, 0.24, 'sprinting on dry ground is untouched');
 });
@@ -126,7 +127,7 @@ test('the forest has no water, so none of this happens there', () => {
     assert.equal(mistScale(w, x, z), 1);
     assert.equal(speedScale(w, x, z), 1);
     assert.deepEqual(echoOf(w, x, z), { scale: 1, speed: CFG.PULSE.speed });
-    assert.deepEqual(stepOf(w, x, z, 0.085), { loud: 0.085, plank: false, water: false, ring: 0 });
+    assert.deepEqual(stepOf(w, x, z, 0.085), { loud: 0.085, plank: false, water: false, ring: 0, depth: 0 });
   }
 });
 
@@ -142,10 +143,11 @@ test('the game and the player actually ask those questions', () => {
   // the steps
   assert.match(player, /const wetScale = speedScale\(this\.world, this\.x, this\.z\)/);
   assert.match(player, /const g = stepOf\(this\.world, this\.x, this\.z, ev\.step\.loud\)/);
-  assert.match(game, /this\.audio\.splash\(s\.intensity\)/, 'a step in water sounds like water');
+  // (3.0k) wading has its own sound now, and it is told how deep the water is
+  assert.match(game, /this\.audio\.wade\(s\.intensity, s\.depth \|\| 0\.3\)/, 'a step in water sounds like water');
   assert.match(game, /this\.audio\.creak\(s\.intensity\)/, 'a board sounds like a board');
   assert.match(game, /radius: s\.ring \|\| 8/, 'and the ring is drawn on the surface');
-  assert.match(audio, /splash\(intensity = 0\.5\)/);
+  assert.match(audio, /wade\(intensity = 0\.5, depth = 0\.3, dest = null\)/);
   assert.match(audio, /creak\(intensity = 0\.4\)/);
   // the ring is at the water line, not at the player's boots
   assert.match(game, /this\.world\.water\?\.level/);

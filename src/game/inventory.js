@@ -542,7 +542,7 @@ export class Backpack {
     this.portrait(); // independent of the item-count cache (also retries a renderer not ready at open)
     const g=this.g;
     const lang=getLang();
-    const key=[t('bagTitle'),lang,this.tab,this.sel,this.equipped,this.slots.join(','),...BAG_KINDS.map(k=>this.count(k)),g.torch.charge.toFixed(2),g.tools.tapeHeld?.charges,this.pending.size,!!g.glows.held,!!g.player.hasFlare].join('|');
+    const key=[t('bagTitle'),lang,this.tab,this.sel,this.equipped,this.slots.join(','),...BAG_KINDS.map(k=>this.count(k)),(g.torch.charge || 0).toFixed(2),g.tools.tapeHeld?.charges,this.pending.size,!!g.glows.held,!!g.player.hasFlare].join('|');
     if(key===this.renderKey) return; this.renderKey=key;
     const touch=g.input.touch;
     const tab=BAG_TABS.find(x=>x.id===this.tab)||BAG_TABS[0];
@@ -593,7 +593,7 @@ export class Backpack {
       chips.push([t('bagCount'), limited?`${cnt} / ${BAG_LIMIT[k]}`:`${cnt}`]);
       const i=this.slots.indexOf(k);
       if(i>=0) chips.push([t('bagSlot'), `${i+1} / ${BAG_SIZE}`]);
-      if(k==='torch') chips.push([t('bagCharge'), `${Math.ceil(g.torch.charge*100)}%`]);
+      if(k==='torch') chips.push([t('bagCharge'), `${Math.ceil((g.torch.charge || 0) * 100)}%`]);
       if(k==='tape') chips.push([t('bagCharge'), `${g.tools.tapeHeld?.charges||0} / 2`]);
       if(k==='glow'&&g.glows.held) chips.push([t('bagState'), t('bagLit')]);
       if(this.equipped===k) chips.push([t('bagState'), t('bagInHands')]);
