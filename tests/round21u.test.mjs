@@ -4,7 +4,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { Highlights, HL, HL_WEIGHT, reelPlan, reelDuration, reelFileName, frameAt } from '../src/game/highlights.js';
-import { Reel, captionFor } from '../src/ui/reel.js';
+import { Reel, captionFor, OUT } from '../src/ui/reel.js';
+import { ReelScore, scoreEvents, scoreLength, SCORE } from '../src/audio/reelScore.js';
+import { HL_CAPTURE, frameWindow } from '../src/game/highlights.js';
 import { t, setLang } from '../src/core/i18n.js';
 
 const src = (p) => readFileSync(new URL('../' + p, import.meta.url), 'utf8');
@@ -247,5 +249,106 @@ test('an empty reel says so instead of playing nothing', () => {
     r.frame(1);
     assert.equal(r.playing, false);
     r.close();
+  });
+});
+
+// ---------- the score: a soundtrack, since the night's own sound was never recorded ----------
+test('the score follows the file: a tape start, a sting for every episode, an end card, and nothing after', () => {
+  const clips = [
+    { kind: 'chain', start: 10, end: 13, weight: 5, frames: [] },
+    { kind: 'death', start: 40, end: 45, weight: 10, frames: [], meta: { cause: 'watcher' } },
+    { kind: 'escape', start: 90, end: 94, weight: 11, frames: [] },
+  ];
+  const plan = reelPlan(clips);
+  const { events, total, bedEnd } = scoreEvents(plan);
+  assert.ok(events.some((e) => e.kind === 'tape'));
+  assert.ok(events.some((e) => e.kind === 'title'));
+  const stings = events.filter((e) => e.kind === 'sting');
+  assert.deepEqual(stings.map((e) => e.sting), ['chain', 'death', 'escape'], 'one sting per episode, in order');
+  assert.equal(events.filter((e) => e.kind === 'cut').length, plan.length, 'a shutter at every cut');
+  assert.equal(events.filter((e) => e.kind === 'tick').length, plan.length);
+  assert.equal(events.filter((e) => e.kind === 'end').length, 1);
+  // in time order, all inside the file
+  const times = events.map((e) => e.at);
+  assert.deepEqual(times, [...times].sort((a, b) => a - b));
+  assert.ok(times[0] >= 0);
+  assert.ok(Math.max(...times) <= total);
+  assert.equal(scoreLength(plan), total);
+  assert.ok(total > plan.reduce((a, c) => a + c.duration, 0), 'title card and end card are inside the file');
+  assert.ok(bedEnd < total && bedEnd > total - SCORE.end, 'the bed fades before the tape stops');
+  // a sting per kind: every episode kind the director can produce gets its own sound, not a generic thud
+  const kinds = ['death', 'seize', 'grab', 'down', 'revive', 'genBroken', 'genStart', 'chain', 'scream', 'escape', 'left', 'win'];
+  for (const kind of kinds) {
+    const { events: ev } = scoreEvents(reelPlan([{ kind, start: 5, end: 8, frames: [] }]));
+    assert.ok(ev.some((e) => e.sting === kind), kind);
+  }
+});
+
+test('the export is 720p, 30 fps, with an audio track and a fine-grained capture', () => {
+  assert.equal(OUT.w, 1280);
+  assert.equal(OUT.h, 720);
+  assert.equal(OUT.fps, 30);
+  assert.ok(OUT.bits >= 8_000_000);
+  assert.equal(HL_CAPTURE.w, 640);
+  assert.equal(HL_CAPTURE.h, 360);
+  assert.ok(HL.fps >= 10, 'ten frames a second give the dissolves something to work with');
+  const src = readFileSync(new URL('../src/ui/reel.js', import.meta.url), 'utf8');
+  assert.match(src, /score\.stream\.getAudioTracks\(\)/, 'the score is mixed into the recorded stream');
+  assert.match(src, /video\/webm;codecs=vp9,opus/, 'and the container says so');
+  assert.match(src, /createMediaStreamDestination/);
+});
+
+// a tiny stub of the WebAudio bits the score needs, so its scheduling can be checked without a speaker
+function fakeCtx() {
+  const created = [];
+  const node = (extra = {}) => {
+    const n = {
+      gain: { value: 1, setValueAtTime() {}, exponentialRampToValueAtTime() {}, linearRampToValueAtTime() {}, cancelScheduledValues() {} },
+      frequency: { value: 440, setValueAtTime() {}, exponentialRampToValueAtTime() {} },
+      Q: { value: 1 }, detune: { value: 0 }, type: '', buffer: null, loop: false,
+      connect(n2) { created.push(n2); return n2; }, disconnect() {}, start() {}, stop() {}, ...extra,
+    };
+    return n;
+  };
+  return {
+    sampleRate: 8000, currentTime: 12.5,
+    createGain: () => node(), createOscillator: () => node(), createBiquadFilter: () => node(),
+    createBufferSource: () => node(), createBuffer: (c, n) => ({ getChannelData: () => new Float32Array(n) }),
+    createMediaStreamDestination: () => ({ stream: { getAudioTracks: () => [{ kind: 'audio' }] }, disconnect() {} }),
+    created,
+  };
+}
+
+test('the score can be scheduled against a real-looking AudioContext and stopped without throwing', () => {
+  const ctx = fakeCtx();
+  const score = new ReelScore(ctx);
+  assert.equal(score.stream.getAudioTracks().length, 1, 'one audio track for the recorder');
+  const plan = reelPlan([{ kind: 'death', start: 2, end: 6, frames: [] }]);
+  const total = score.schedule(plan);
+  assert.ok(total > 6);
+  assert.ok(score.nodes.length > 4, 'the bed and the stings made nodes');
+  score.stop();
+  assert.equal(score.nodes.length, 0);
+});
+
+test('the frame window keeps the one behind the playhead, the one ahead, and forgets the rest', () => {
+  const frames = Array.from({ length: 60 }, (_, i) => ({ t: i * 0.1 }));
+  const win = frameWindow(frames, 3.0, 2, 3);
+  assert.ok(win.some((f) => f.t < 3.0), 'the frame behind (the tail of the dissolve)');
+  assert.ok(win.some((f) => f.t > 3.0), 'and the one ahead');
+  assert.ok(win.length <= 6, 'not the whole shift');
+  assert.equal(frameWindow(frames, 99, 2, 3).length, 1, 'past the end: the last frame');
+  assert.equal(frameWindow([], 1).length, 0);
+  // and the cache really lets go: everything outside the window is closed
+  withDom(() => {
+    const r = new Reel();
+    const closedAt = new Set();
+    for (const f of frames) r.cache.set(f, { close() { closedAt.add(f.t); } });
+    r._pump({ frames, start: 0, end: 6 }, 3.0, 3);
+    assert.ok(closedAt.has(0) && closedAt.has(0.9), 'the far past is closed');
+    assert.equal(closedAt.has(3.0), false, 'the playhead frame is not');
+    assert.equal(closedAt.has(3.2), false, 'nor the one ahead');
+    assert.ok(r.cache.has(frames[30]), 'the decoded frame under the playhead stays cached');
+    assert.ok(closedAt.size >= 8 && closedAt.size < frames.length, `closed ${closedAt.size} of ${frames.length}`);
   });
 });

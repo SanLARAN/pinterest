@@ -38,7 +38,7 @@ import { Game } from './game/game.js';
 import { buildListener } from './game/monsters.js';
 import { PLAYER_COLORS } from './game/remote.js';
 import { EARN, wallet, onWallet, pendingRewards } from './game/wallet.js';
-import { Highlights } from './game/highlights.js';
+import { Highlights, HL_CAPTURE } from './game/highlights.js';
 import { Reel } from './ui/reel.js';
 import {myFit} from './game/outfit.js';
 import {beginRewards,endRewards} from './cloud/rewards.js';
@@ -1101,10 +1101,10 @@ function step(now, render) {
 }
 
 // ---------------- the highlight reel's eye (2.1u) ----------------
-// A small JPEG of what is on screen right now. The director asks for one at ~7 a second; drawing a WebGL
-// canvas into a 320×180 2D canvas is cheap, and the encode is asynchronous, so the night does not hitch.
+// A small JPEG of what is on screen right now. The director asks for one at ~10 a second; drawing a WebGL
+// canvas into a 640×360 2D canvas is cheap, and the encode is asynchronous, so the night does not hitch.
 // (Called right after post.render, in the same frame: the drawing buffer is still there.)
-const HL_W = 320, HL_H = 180;
+const HL_W = HL_CAPTURE.w, HL_H = HL_CAPTURE.h;
 let hlGrabber = null;
 function highlightFrame(t) {
   try {
@@ -1122,7 +1122,7 @@ function highlightFrame(t) {
     const w = sw * k, h = sh * k;
     ctx.drawImage(src, (HL_W - w) / 2, (HL_H - h) / 2, w, h);
     const blob = new Promise((res) => {
-      try { cv.toBlob((b) => res(b), 'image/jpeg', 0.62); } catch { res(null); }
+      try { cv.toBlob((b) => res(b), 'image/jpeg', HL_CAPTURE.q); } catch { res(null); }
     });
     return { t, blob };
   } catch {

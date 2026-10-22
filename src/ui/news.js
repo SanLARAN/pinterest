@@ -12,13 +12,13 @@ export const NEWS = [
       'В конце смены — сборник хайлайтов: самые глупые моменты ночи, с разбегом и последствиями. Режиссёр сам следит за смертями, хваткой Наблюдателя, Удильщиком, упавшими друзьями, звенящими цепями, разбитыми и заведёнными генераторами и криками в темноте',
       'Клип начинается за три секунды до момента, поэтому видно, ЧТО к нему привело, и тянется пару секунд после. Соседние моменты склеиваются в один дубль, а на смену остаётся шесть лучших',
       'Сборник открывается сам, если есть на что смотреть (и открывается кнопкой на экране итогов): эпизоды, пауза, стрелки, полоса. Каждый эпизод подписан — включая имя того, кто вас достал',
-      'Видео можно сохранить: кнопка пишет .webm с титрами, подписями и финальной карточкой. Если браузер не умеет писать видео — сохраняется лучший кадр картинкой',
+      'Видео можно сохранить: кнопка пишет .webm 720p с титрами, подписями, финальной карточкой — и со звуком. Ночь свою музыку не записывала, поэтому сборник получает собственную: низкий гул, щелчок проектора на каждой склейке и свой удар под каждый эпизод — смерть падает низко, цепь звенит, генератор заводится. Если браузер не умеет писать видео — сохраняется лучший кадр картинкой',
     ]},
     en:{title:"The shift's highlights",items:[
       'At the end of a shift — a highlight reel: the night’s stupidest moments, with the run-up and the fallout. The director watches for deaths, the Watcher’s grip, the Angler, friends going down, ringing stall chains, generators dying and starting, and screams in the dark',
       'A clip starts three seconds before the moment, so you can see what led to it, and runs a couple of seconds past. Neighbours in time join into one take, and six of the best stay on the reel',
       'The reel opens by itself when there is something to watch (and from a button on the results screen): episodes, pause, arrows, a bar. Every episode is captioned — including the name of whatever got you',
-      'The video can be saved: the button writes a .webm with titles, captions and an end card. If the browser will not write video, the best still is saved as a picture instead',
+      'The video can be saved: the button writes a 720p .webm with titles, captions, an end card — and sound. The night never recorded its own music, so the reel gets its own: a low drone, the projector\'s shutter on every cut and a hit under each episode — a death lands low, a chain rings, an engine comes back up. If the browser will not write video, the best still is saved as a picture instead',
     ]}
   },
   {

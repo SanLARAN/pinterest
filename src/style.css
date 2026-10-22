@@ -1483,7 +1483,7 @@ body.touch .bino-time { bottom: auto; top: 48px; font-size: 12px; }
   border: 1px solid rgba(167, 180, 182, 0.22);
   overflow: hidden;
 }
-.reel-stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; display: block; }
+.reel-stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .reel-cap {
   position: absolute; left: 0; right: 0; bottom: 12px;
   text-align: center; font-size: 12px; letter-spacing: 0.22em; text-transform: uppercase;

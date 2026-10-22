@@ -11,7 +11,7 @@
 // that lands inside the open one merges too, so a grab that becomes a death is one continuous shot rather
 // than the same second twice.
 export const HL = {
-  fps: 7, // frames a second while recording (the reel is found-footage, 7 is plenty)
+  fps: 10, // frames a second while recording (smooth enough to dissolve between, cheap enough to keep)
   pre: 3.4, // how much of the run-up a moment keeps
   post: 2.4, // ...and of the aftermath
   max: 6, // clips kept per shift
@@ -19,6 +19,10 @@ export const HL = {
   minFrames: 3, // fewer than this and the take is a blink, not a moment
   mergeGap: 0.45, // s: takes this close to an earlier clip join it instead of starting a second one
 };
+
+// What a frame is worth keeping as: a JPEG of the composited canvas, cropped 16:9. Big enough that the
+// exported 720p file has something to dissolve between, small enough that a shift's reel is ~10 MB of blobs.
+export const HL_CAPTURE = { w: 640, h: 360, q: 0.78 };
 
 // what makes the reel, and how much it is worth when the reel has to drop something
 export const HL_WEIGHT = {
@@ -197,6 +201,24 @@ export function reelDuration(plan) {
 export function reelFileName(date = new Date(), ext = 'webm') {
   const p = (n) => String(n).padStart(2, '0');
   return `hush-highlights-${date.getFullYear()}-${p(date.getMonth() + 1)}-${p(date.getDate())}.${ext}`;
+}
+
+// Which frames of a clip a player should keep decoded around the playhead: the one behind it (the tail of
+// the dissolve), the one ahead, and a couple on either side. Everything else can be closed — a 640×360
+// bitmap is ~0.9 MB, and a full shift is a few hundred frames.
+export function frameWindow(frames, at, back = 2, ahead = 3) {
+  if (!frames || !frames.length) return [];
+  const out = [];
+  for (let i = 0; i < frames.length; i++) {
+    const t = frames[i].t;
+    if (t < at) continue;
+    for (let k = Math.max(0, i - back); k < Math.min(frames.length, i + ahead); k++) {
+      if (!out.includes(frames[k])) out.push(frames[k]);
+    }
+    break;
+  }
+  if (!out.length) out.push(frames[frames.length - 1]);
+  return out;
 }
 
 // the frame under the playhead: the last one at or before `at`
