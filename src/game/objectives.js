@@ -603,6 +603,7 @@ export class Objectives {
     // sitting in the car and driving off still belong to the night)
     if (es && !riding) es.consider(doorsOnly ? (o, x, z, r, k) => { if (k === 'part' || k === 'carFit') consider(o, x, z, r, k); } : consider);
     if (game.doors && !seated && !riding) game.doors.consider(consider);
+    if (game.winch && !seated && !riding) game.winch.consider(consider); // 3.0f: the drum, and the car
     // cupboards (in the morning too: the first-aid hut is right by the camp) — and someone caught in one
     if (game.cabinets && !seated && !riding) game.cabinets.consider(consider, !p.carrying && !(es && es.held));
     // (2.1r: and in the morning, a friend on the ground or on the cot — dawn raised nobody, so hands do it)
@@ -632,6 +633,11 @@ export class Objectives {
     }
     const o = best.obj;
     if (best.kind === 'bagDrop') { this.searchT = 0; game.inventory.interact(o, pressed, T); return; }
+    if (best.kind === 'winch' || best.kind === 'bogCar' || best.kind === 'bogCarNote') {
+      this.searchT = 0;
+      game.winch.interact(best, dt, held, still, T);
+      return;
+    }
     if (best.kind === 'rack') { this.searchT = 0; game.train.interact(best, dt, held, still, T); return; }
     if (best.kind === 'moto') { this.searchT = 0; game.motos.interact(best, dt, held, still, T); return; }
     if (best.kind === 'bodyGun') {

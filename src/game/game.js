@@ -46,6 +46,8 @@ import { echoOf, mistScale } from './water.js'; // 3.0b: what water does to a so
 import { inert } from '../core/inert.js'; // 3.0: a system the current map does not have
 import { syncPumps } from '../world/bog.js'; // 3.0c: a running pump drains its sector
 import { Drowned } from './drowned.js'; // 3.0d: the one in the water
+import { Gnats } from './gnat.js'; // 3.0e: the swarm that eats your echo
+import { Winch } from './winch.js'; // 3.0f: the way out of the bog
 
 const RED = [1.0, 0.13, 0.08];
 const CUT_FADE = 13.9; // s into the fly-by when the screen starts going dark
@@ -80,6 +82,8 @@ export class Game {
     this.angler = new Angler(this); // the man with the lantern, from the third night (see CFG.ANGLER)
     this.stray = new Stray(this); // the fourth night's girl: walk past her, never run (see CFG.STRAY)
     this.drowned = new Drowned(this); // 3.0d: the bog's own — it waits in the water (see game/drowned.js)
+    this.gnats = new Gnats(this); // 3.0e: the swarm that eats your echo (see game/gnat.js)
+    this.winch = new Winch(this); // 3.0f: the УАЗ in the bog, the cable and the drum (see game/winch.js)
     // the forestry yard, the УАЗ and its four parts, the way out — the forest's, not the bog's
     this.escape = this.map === 'forest' ? new Escape(this) : inert(Escape, this, { load: () => null, seatOf: () => -1 });
     this.cabinets = new Cabinets(this); // cupboards in the buildings (and the шкафандр)
@@ -272,6 +276,10 @@ export class Game {
     this.angler.reset(); // the rope, the hunt, the clock — a new night owes him nothing
     this.stray.reset(); // she is not out there until the night puts her there (2.1v)
     this.drowned.reset(); // ...and neither is the one in the water (3.0d)
+    this.gnats.reset(); // ...nor the midges (3.0e)
+    this.winch.reset(); // ...and the car is back in the water where it went down (3.0f)
+    this.echoMul = 1; // how much longer an echo takes to come back (the Гнус: 2)
+    this.echoMulT = 0;
     this.strayWorn = false;
     this.wornLine = 0;
     this.micDeadByStray = false;
@@ -580,6 +588,7 @@ export class Game {
     this.objectives.setMorning(false);
     this.objectives.startNight(this.day, this.baseSeed);
     if (this.map === 'bog' && this.drowned) this.drowned.spawnNight(); // 3.0d: it is already in the water
+    if (this.map === 'bog' && this.gnats) this.gnats.startNight();
     this._resetNight();
     this.dread.reset();
     this.hud.setSkip(false);
@@ -734,6 +743,7 @@ export class Game {
   // a sound happened in the world (authoritative side: the monsters hear it). pid = who made it
   noise(x, z, loud, source, scream = false, pid = null) {
     if (loud <= 0 || this.state !== 'play' || !this.auth) return 0;
+    if (this.map === 'bog') this.gnats.hear(x, z, loud, source); // 3.0e: the midges come to whatever is loudest
     let n = 0;
     for (const m of this.monsters) {
       const r = m.hear(x, z, loud, source, scream, pid);
@@ -834,7 +844,7 @@ export class Game {
 
   _ping(held) {
     const loud = held < 0.18 ? 0.24 : lerp(0.32, 1.0, clamp((held - 0.18) / 0.95, 0, 1));
-    this.pingCD = this.pingCDMax = CFG.PING_CD + CFG.PING_CD_LOUD * loud;
+    this.pingCD = this.pingCDMax = (CFG.PING_CD + CFG.PING_CD_LOUD * loud) * (this.echoMul || 1);
     if (loud < 0.36) this.audio.click(loud);
     else if (loud < CFG.SCREAM) this.audio.clap(loud);
     else this.audio.shout(loud);
@@ -1769,7 +1779,9 @@ export class Game {
     const noneStanding = this.rescue.dawnPeace(); // dawn raises nobody (2.1q), but rescue goes on in daylight (2.1r)
     if (noneStanding && this.day < this.daysTotal) { this.endOnline(false); return; } // nobody left to come for anyone
     const last = this.day >= this.daysTotal;
-    if (last) {
+    // (3.0f) on the bog the last dawn is not the win: the car is still in the water, and the winch pays for it
+    const bogFinal = last && this.map === 'bog' && !!this.winch && !this.winch.driven;
+    if (last && !bogFinal) {
       this.winBonus = CFG.SCORE.win;
       if (!this.player.alive) this.winBonus = Math.round(this.winBonus * 0.3); // your team made it; you didn't
       this.score += this.winBonus;
@@ -1782,7 +1794,8 @@ export class Game {
     this.audio.setAmbience(0.25, 0);
     this.hud.setHint(null);
     for (const m of this.monsters) m.setState('flee');
-    this.hud.flashAlert(t(last ? 'winTitle' : 'dawnSurvived').replace('{n}', this.day).replace('{d}', this.daysTotal), 'dawn', 3);
+    const line = bogFinal ? t('winchFinale') : t(last ? 'winTitle' : 'dawnSurvived');
+    this.hud.flashAlert(line.replace('{n}', this.day).replace('{d}', this.daysTotal), 'dawn', bogFinal ? 4 : 3);
   }
 
   updateDawn(dt) {
@@ -1801,6 +1814,9 @@ export class Game {
     }
     if (this.dawnT > DAWN_SECONDS && this.state === 'dawn') {
       if (this.day >= this.daysTotal) {
+        // (3.0f) the bog's last dawn is not the end of the shift: the car is. Light, no monsters, and one
+        // machine still in the water — everything the level was about, in one last thing to do by hand
+        if (this.map === 'bog' && this.winch && !this.winch.driven) { this.winch.finale(); return; }
         this.state = 'won';
         if (this.onEnd) this.onEnd({ won: true, coop: this.online, alive: this.player.alive });
       } else this.startMorning(this.day + 1);
@@ -2000,6 +2016,12 @@ export class Game {
     if (this.state === 'dawn') {
       this.netFrame(dt);
       this.updateDawn(dt);
+      if (this.map === 'bog' && this.winch) {
+        // (3.0f) the only dawn you can still work in: the car has to come out of the water, and dawn is light enough
+        this.winch.update(dt);
+        this.objectives.update(dt, false);
+        if (this.player.alive) this.objectives._interact(dt, true);
+      }
       this.doors.update(dt);
       this.flares.update(dt);
       this.medhut.update(dt);
@@ -2069,6 +2091,10 @@ export class Game {
       if (this.charge.t > 2.4) this.pingRelease(); // don't hold forever
     }
     this.pingCD -= dt;
+    if (this.echoMulT > 0) {
+      this.echoMulT = Math.max(0, this.echoMulT - dt);
+      if (this.echoMulT === 0) this.echoMul = 1; // the echo comes back on time again
+    }
     if (this.pingQueue != null && this.pingCD <= 0) {
       const h = this.pingQueue;
       this.pingQueue = null;
@@ -2156,6 +2182,8 @@ export class Game {
     this.angler.update(dt);
     this.stray.update(dt);
     this.drowned.update(dt); // the bog: it drags you out into the deep (3.0d)
+    this.gnats.update(dt); // ...and the midges eat your echo (3.0e)
+    this.winch.update(dt); // ...and the water comes back unless the drum keeps turning (3.0f)
     if (this.state !== 'play') return; // killed this frame
     if (!this.player.alive) return; // co-op: caught this frame — the death plays from the next one
     this.shards.update(dt, this);

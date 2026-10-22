@@ -509,31 +509,37 @@ function genCar(world) {
   const x = L.x + 1.5, z = L.z - 8;
   const y = world.terrain.height(x, z);
   const yaw = 0.12;
-  world.car = { x, z, y, yaw, winch: { x: x + 0.1, z: z + 1.9 }, post: { x: x - 8.5, z: z + 14 } };
-  world.addProp(x, z, (b) => {
-    b.identity();
-    b.place(x, y, z, 0.02, yaw, 0.03);
-    // a boxy 4x4: body, canvas top, bonnet — the forest car's shape, sitting low in the water
-    b.box(1.86, 0.72, 4.3, KIND.METAL, { bottom: true });
-    b.place(0, 0.72, -0.3);
-    b.box(1.7, 0.66, 3.1, KIND.LEAF, { bottom: true }); // canvas
-    b.place(0, 0.6, 1.95, 0.06, 0, 0);
-    b.box(1.7, 0.36, 1.0, KIND.METAL, { bottom: true }); // bonnet
-    for (const [wx, wz] of [[-0.95, 1.35], [0.95, 1.35], [-0.95, -1.35], [0.95, -1.35]]) {
-      b.place(wx, 0.36, wz, 0, 0, Math.PI / 2);
-      b.cylinder(10, 0.36, 0.36, 0.26, KIND.BARK);
-    }
-    // winch drum + cable out to the post
-    b.place(0, 0.45, 2.5, 0, 0, Math.PI / 2);
-    b.cylinder(8, 0.16, 0.16, 0.42, KIND.METAL);
-    const P = world.car.post;
-    b.place(x, y, z, 0, yaw, 0);
-    b.limb([0, 0.5, 2.4], [P.x - x, P.y != null ? P.y - y + 0.3 : 0.9, P.z - z], 0.035, 0.035, KIND.METAL, 3);
-  });
+  const P = { x: x - 8.5, z: z + 14 };
+  P.y = world.terrain.height(P.x, P.z);
+  // (3.0f) the car is the only prop that moves: it is built as its own mesh, not baked into the chunk, so the
+  // winch can lift it out of the water one frame at a time
+  const b = new MeshBuilder(240);
+  b.identity();
+  b.place(0, 0.38, -0.3);
+  b.box(1.86, 0.72, 4.3, KIND.METAL); // body
+  b.place(0, 0.78, 1.15);
+  b.box(1.7, 0.66, 3.1, KIND.LEAF); // canvas top
+  b.place(0, 0.6, -1.85);
+  b.box(1.7, 0.36, 1.0, KIND.METAL); // bonnet
+  for (const [wx, wz] of [[-0.95, 1.35], [0.95, 1.35], [-0.95, -1.35], [0.95, -1.35]]) {
+    b.place(wx, 0.36, wz, 0, 0, Math.PI / 2);
+    b.cylinder(10, 0.36, 0.36, 0.26, KIND.BARK);
+  }
+  // the winch drum on the nose
+  b.place(0, 0.46, -2.5, 0, 0, Math.PI / 2);
+  b.cylinder(8, 0.16, 0.16, 0.42, KIND.METAL);
+  const geo = b.toGeometry();
+  const node = new THREE.Mesh(geo, world.material);
+  node.position.set(x, y, z);
+  node.rotation.y = yaw;
+  node.matrixAutoUpdate = true;
+  node.updateMatrix();
+  node.userData.car = true;
+  world.scene.add(node);
+  world.meshes.push(node);
+  world.car = { x, z, y, baseY: y, yaw, node, post: P };
   world.col.add(x - 1.1, z - 2.2, x + 1.1, z + 2.2, 0.35, 1.6, CAP.METAL);
   // the post the cable is tied to
-  const P = world.car.post;
-  P.y = world.terrain.height(P.x, P.z);
   world.addProp(P.x, P.z, (b) => {
     b.identity();
     b.place(P.x, P.y, P.z, 0.14, 0.6, 0.1);

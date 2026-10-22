@@ -522,6 +522,36 @@ export class AudioEngine {
     if (intensity > 0.6) this._tone(t, { f: 95, fEnd: 55, a: 0.002, d: 0.08, gain: 0.25 * intensity, dest: o });
   }
 
+  // the midges (3.0e): a thin, high cloud of noise, right up against your ears
+  gnatSwarm() {
+    if (!this.ready) return;
+    const t = this.now;
+    const o = this.sfx;
+    for (let i = 0; i < 3; i++) {
+      this._noiseBurst(t + i * 0.06, { f: 3200 + i * 700, q: 6, a: 0.05, d: 0.5, gain: 0.05, dest: o });
+    }
+    this._tone(t, { type: 'sawtooth', f: 186, fEnd: 240, a: 0.12, d: 0.7, gain: 0.02, dest: o, detune: 14 });
+  }
+
+  // 3.0f: the drum takes up the slack, then the chain under the car — three hits of metal, no reverb, gone
+  winchClank() {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    const t0 = ctx.currentTime;
+    for (const [at, f, g0] of [[0, 210, 0.5], [0.09, 130, 0.7], [0.17, 88, 0.45]]) {
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = 'square';
+      o.frequency.setValueAtTime(f, t0 + at);
+      o.frequency.exponentialRampToValueAtTime(f * 0.55, t0 + at + 0.12);
+      g.gain.setValueAtTime(g0 * 0.09, t0 + at);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + at + 0.22);
+      o.connect(g).connect(this.master);
+      o.start(t0 + at);
+      o.stop(t0 + at + 0.26);
+    }
+  }
+
   // ---------- the bog (3.0d): the thing in the water ----------
   // it comes up: water running off a body, a long wet breath
   drownedRise(x, y, z) {
