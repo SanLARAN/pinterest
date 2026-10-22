@@ -7,7 +7,7 @@ import { createGhostMaterial } from './sonar.js';
 export class Ghosts {
   constructor(scene, capacity = 56, maxVerts = 8192) {
     this.list = [];
-    this.maxVerts = maxVerts;
+    this.maxVerts = maxVerts; // the starting size of one ghost; a heavy model grows its own buffer (see _fit)
     for (let i = 0; i < capacity; i++) {
       const geo = new THREE.BufferGeometry();
       const pos = new Float32Array(maxVerts * 3);
@@ -26,8 +26,26 @@ export class Ghosts {
       mesh.matrixAutoUpdate = false;
       mesh.renderOrder = 5;
       scene.add(mesh);
-      this.list.push({ mesh, geo, pos, dat, pa, da, born: -1, life: 0, strength: 0, model: null, sticky: false, count: 0 });
+      this.list.push({ mesh, geo, pos, dat, pa, da, born: -1, life: 0, strength: 0, model: null, sticky: false, count: 0, capacity: maxVerts });
     }
+  }
+
+  // A ghost is a fixed pool of buffers; a model denser than one of them (the Stray's high-detail rig is ~19k
+  // vertices) makes its own slot grow instead of being cut in half. Only the slot that owns a big model grows.
+  _fit(g, need) {
+    if (need <= g.capacity) return;
+    let cap = g.capacity;
+    while (cap < need) cap *= 2;
+    g.capacity = cap;
+    g.pos = new Float32Array(cap * 3);
+    g.dat = new Uint8Array(cap * 4);
+    g.pa = new THREE.BufferAttribute(g.pos, 3);
+    g.pa.setUsage(THREE.DynamicDrawUsage);
+    g.da = new THREE.BufferAttribute(g.dat, 4, true);
+    g.da.setUsage(THREE.DynamicDrawUsage);
+    g.geo.setAttribute('position', g.pa);
+    g.geo.setAttribute('data', g.da);
+    g.geo.setDrawRange(0, 0);
   }
 
   clear() {
@@ -53,12 +71,15 @@ export class Ghosts {
   spawn(model, time, opts = {}) {
     const g = this._take(time);
     model.root.updateMatrixWorld(true);
+    let need = 0;
+    for (const part of model.parts) need += part.arr.count;
+    this._fit(g, need);
     let n = 0;
     const copyDat = g.model !== model.key;
     for (const part of model.parts) {
       const e = part.node.matrixWorld.elements;
       const src = part.arr.pos, sd = part.arr.dat, cnt = part.arr.count;
-      if (n + cnt > this.maxVerts) break;
+      if (n + cnt > g.capacity) break;
       const P = g.pos;
       for (let i = 0; i < cnt; i++) {
         const x = src[i * 3], y = src[i * 3 + 1], z = src[i * 3 + 2];
@@ -105,11 +126,14 @@ export class Ghosts {
   // rewrite an existing (sticky) ghost from the model's current pose
   refresh(g, model) {
     model.root.updateMatrixWorld(true);
+    let need = 0;
+    for (const part of model.parts) need += part.arr.count;
+    this._fit(g, need);
     let n = 0;
     for (const part of model.parts) {
       const e = part.node.matrixWorld.elements;
       const src = part.arr.pos, cnt = part.arr.count;
-      if (n + cnt > this.maxVerts) break;
+      if (n + cnt > g.capacity) break;
       const P = g.pos;
       for (let i = 0; i < cnt; i++) {
         const x = src[i * 3], y = src[i * 3 + 1], z = src[i * 3 + 2];

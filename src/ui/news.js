@@ -7,6 +7,23 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v:'2.1w',date:'2026-10-22',
+    ru:{title:'Не квадраты',items:[
+      'Найдёныша собрали заново. Череп — одна поверхность, которая от широких скул сужается в подбородок; глаза, нос и губы лежат на этой поверхности, а не висят рядом',
+      'Волосы больше не солома: это гладкая шапка, которая открывает лицо, и пряди-ленты. Одна прядь падает на левый глаз, две идут вдоль щёк, и целая занавеска висит за спиной до колен и качается на шаге',
+      'Футболка на два размера больше теперь падает с плеч: узкая талия, мягкий подол, подвёрнутый край, складки. Волчий череп на груди — маркер, как и был',
+      'Руки, ноги, кроссовки: никаких четырёхгранных трубок. Плечи, локти, колени — шары; кисти с четырьмя пальцами и большим; кроссовки с подошвой, рантом, воротом, мыском и шнурками',
+      'Отражение в эхе стало плотнее: тяжёлой модели эхо выделяет свой буфер само, вместо того чтобы обрезать её пополам',
+    ]},
+    en:{title:'Not boxes',items:[
+      'The Stray has been rebuilt. Her skull is one surface that narrows from wide cheekbones into a chin; the eyes, the nose and the lips lie on that surface instead of hanging next to it',
+      'The hair is no longer straw: it is a smooth cap that opens over the face and flat locks of it. One lock falls over her left eye, two run down her cheeks, and a whole curtain hangs behind her to her knees and swings as she walks',
+      'The tee two sizes too big now falls off her shoulders: a narrow waist, a soft hem, a rolled edge, creases. The wolf skull on her chest is a marker, as it was',
+      'Arms, legs, sneakers: no four-sided tubes. Shoulders, elbows and knees are balls; hands have four fingers and a thumb; the sneakers have a sole, a welt, a collar, a toe box and laces',
+      'Her afterimage got denser: the echo gives a heavy model its own buffer instead of cutting it in half',
+    ]}
+  },
+  {
     v:'2.1v',date:'2026-10-22',
     ru:{title:'Найдёныш',items:[
       'Четвёртая ночь приводит её: девочка в футболке на два размера больше, белые волосы до пояса, волчьи уши. Она идёт за тобой медленнее, чем ты ходишь, и ничего не делает, пока ты идёшь. Стоит побежать рядом — просыпается, и тогда догнать тебя ей хватает',
