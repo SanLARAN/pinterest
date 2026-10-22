@@ -39,14 +39,16 @@ jobs:
       - name: Test
         shell: bash
         run: |
-          set -o pipefail
-          npm test 2>&1 | tee test.log
-          status=${PIPESTATUS[0]}
+          node -v
+          npm -v
+          status=0
+          npm test > test.log 2>&1 || status=$?
+          cat test.log
           if [ "$status" -ne 0 ]; then
-            grep -E "^(not ok|# fail)|^ *error:|^ *expected:|^ *actual:|^ *location:" test.log \
-              | tr -d '\r' | head -40 | while IFS= read -r line; do
-                echo "::error title=Test failed::${line}"
-              done
+            # the run's log is the only other place with the detail, and it is not reachable from everywhere
+            tail -n 30 test.log | tr -d '\r' | while IFS= read -r line; do
+              echo "::error title=Test failed::${line}"
+            done
             exit "$status"
           fi
 
