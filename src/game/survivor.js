@@ -114,145 +114,6 @@ const FORE = [0, -0.27, 0.06]; // elbow → wrist
 const THIGH = [0, -0.42, 0.02];
 const SHIN = [0, -0.42, -0.02];
 
-// ---------------- the Stray's own geometry set (2.1v fix) ----------------
-// The forest is drawn as a wireframe, so a body assembled from four-sided limbs reads as a stack of boxes.
-// These four pieces are what make her a body instead: a dense elliptical lathe whose contour lines are
-// chosen rather than every seam, a curved tube that never twists, a smooth ball, and a catmull-rom hair
-// strand that tapers to a point. All MeshBuilder triangles — no textures, no imports.
-//
-// latheS(b, prof, segs, kind, {sx, sz, merid, rings, phase})
-//   prof  = [[radius, y], ...] bottom → top;  sx/sz squash the section into an ellipse
-//   merid = draw every Nth meridian line (0 = all of them); rings = draw the horizontal seams
-function latheS(b, prof, segs, kind, o = {}) {
-  const sx = o.sx ?? 1, sz = o.sz ?? 1, phase = o.phase ?? 0;
-  const merid = o.merid ?? 0, rings = o.rings !== false;
-  const a0 = o.a0 ?? 0, a1 = o.a1 ?? PI * 2;
-  const closed = a1 - a0 > PI * 2 - 1e-6; // an open sweep keeps its two cut edges
-  const P = (r, y, i, kx = 1, kz = 1) => {
-    const a = phase + a0 + (i / segs) * (a1 - a0);
-    return [Math.cos(a) * r * sx * kx, y, Math.sin(a) * r * sz * kz];
-  };
-  for (let j = 0; j < prof.length - 1; j++) {
-    const [r0, y0, x0 = 1, z0 = 1] = prof[j], [r1, y1, x1 = 1, z1 = 1] = prof[j + 1];
-    for (let i = 0; i < segs; i++) {
-      const p0 = P(r0, y0, i, x0, z0), p1 = P(r0, y0, i + 1, x0, z0), q0 = P(r1, y1, i, x1, z1), q1 = P(r1, y1, i + 1, x1, z1);
-      // quad(p1, p0, q0, q1): 1|4 are the two horizontal seams, 2|8 the two meridians
-      const hide = (rings ? 0 : 1 | 4)
-        | (merid && i % merid !== 0 && (closed || i !== 0) ? 2 : 0)
-        | (merid && (i + 1) % merid !== 0 && (closed || i !== segs - 1) ? 8 : 0);
-      if (r0 < 1e-4) b.tri(p1, q0, q1, kind, 7); // (a pole: the fan is hidden, the silhouette does the work)
-      else if (r1 < 1e-4) b.tri(p1, p0, q0, kind, 7);
-      else b.quad(p1, p0, q0, q1, kind, hide);
-    }
-  }
-}
-
-// a tube through points, parallel-transported (it follows the curve instead of flipping), pointed if asked
-function tube(b, pts, r0, r1, kind, segs = 6, o = {}) {
-  const n = pts.length;
-  if (n < 2) return;
-  const rings = [];
-  let up = Math.abs(pts[1][1] - pts[0][1]) > 0.7 ? [0, 0, 1] : [0, 1, 0];
-  for (let k = 0; k < n; k++) {
-    const p = pts[k];
-    const a = pts[Math.max(0, k - 1)], c = pts[Math.min(n - 1, k + 1)];
-    let t = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
-    const tl = Math.hypot(t[0], t[1], t[2]) || 1;
-    t = [t[0] / tl, t[1] / tl, t[2] / tl];
-    const d = up[0] * t[0] + up[1] * t[1] + up[2] * t[2];
-    let nn = [up[0] - t[0] * d, up[1] - t[1] * d, up[2] - t[2] * d];
-    let nl = Math.hypot(nn[0], nn[1], nn[2]);
-    if (nl < 1e-4) { nn = [t[2], 0, -t[0]]; nl = Math.hypot(nn[0], nn[1], nn[2]) || 1; }
-    up = [nn[0] / nl, nn[1] / nl, nn[2] / nl];
-    const bn = [t[1] * up[2] - t[2] * up[1], t[2] * up[0] - t[0] * up[2], t[0] * up[1] - t[1] * up[0]];
-    const f = n === 1 ? 1 : k / (n - 1);
-    const r = r0 + (r1 - r0) * f;
-    const ring = [];
-    for (let i = 0; i < segs; i++) {
-      const ang = (i / segs) * PI * 2, cs = Math.cos(ang), sn = Math.sin(ang);
-      ring.push([
-        p[0] + (up[0] * cs + bn[0] * sn) * r,
-        p[1] + (up[1] * cs + bn[1] * sn) * r,
-        p[2] + (up[2] * cs + bn[2] * sn) * r,
-      ]);
-    }
-    rings.push(ring);
-  }
-  for (let k = 0; k < n - 1; k++) {
-    for (let i = 0; i < segs; i++) {
-      const i2 = (i + 1) % segs;
-      b.quad(rings[k][i], rings[k][i2], rings[k + 1][i2], rings[k + 1][i], kind, o.hide ?? 0);
-    }
-  }
-  if (o.cap !== false) {
-    const tip = pts[n - 1], last = rings[n - 1];
-    for (let i = 0; i < segs; i++) b.tri(last[i], last[(i + 1) % segs], tip, kind, 7);
-  }
-}
-
-// a smooth ball: `segs` around, `rows` rings of latitude
-function ball(b, r, kind, o = {}) {
-  const segs = o.segs ?? 12, rows = o.rows ?? 7;
-  const prof = [];
-  for (let i = 0; i <= rows; i++) {
-    const a = -PI / 2 + (i / rows) * PI;
-    prof.push([Math.cos(a) * r, Math.sin(a) * r]);
-  }
-  latheS(b, prof, segs, kind, { sx: o.sx ?? 1, sz: o.sz ?? 1, rings: o.rings, merid: o.merid ?? 0 });
-}
-
-// a catmull-rom through the control points
-function curve(pts, step = 0.4) {
-  if (pts.length < 3) return pts.slice();
-  const out = [];
-  const P = (i) => pts[Math.max(0, Math.min(pts.length - 1, i))];
-  for (let i = 0; i < pts.length - 1; i++) {
-    const p0 = P(i - 1), p1 = P(i), p2 = P(i + 1), p3 = P(i + 2);
-    const n = Math.max(2, Math.round(1 / step));
-    for (let k = 0; k < n; k++) {
-      const t = k / n, t2 = t * t, t3 = t2 * t;
-      const f = (a, b2, c, d) => 0.5 * (2 * b2 + (-a + c) * t + (2 * a - 5 * b2 + 4 * c - d) * t2 + (-a + 3 * b2 - 3 * c + d) * t3);
-      out.push([f(p0[0], p1[0], p2[0], p3[0]), f(p0[1], p1[1], p2[1], p3[1]), f(p0[2], p1[2], p2[2], p3[2])]);
-    }
-  }
-  out.push(pts[pts.length - 1]);
-  return out;
-}
-
-// one strand of hair: control points in, a tapering tube out, a point at the tip
-function strand(b, pts, r, kind, segs = 5, step = 0.5) {
-  tube(b, curve(pts, step), r, r * 0.1, kind, segs, { cap: true });
-}
-
-// a lock of hair: a flat ribbon that follows a path, `out` the direction its face turns away from (so it lies
-// on the head instead of sticking out of it). Only the two long edges are drawn: in the wireframe a lock is a
-// pair of flowing lines, not a ladder of rings.
-function ribbon(b, pts, w0, w1, kind, out = [0, 0, 1], step = 0.4) {
-  const P = curve(pts, step);
-  const n = P.length;
-  if (n < 2) return;
-  const rings = [];
-  for (let k = 0; k < n; k++) {
-    const a = P[Math.max(0, k - 1)], c = P[Math.min(n - 1, k + 1)];
-    let t = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
-    const tl = Math.hypot(t[0], t[1], t[2]) || 1;
-    t = [t[0] / tl, t[1] / tl, t[2] / tl];
-    const o = typeof out === 'function' ? out(P[k]) : out;
-    let sx = t[1] * o[2] - t[2] * o[1], sy = t[2] * o[0] - t[0] * o[2], sz = t[0] * o[1] - t[1] * o[0];
-    const sl = Math.hypot(sx, sy, sz) || 1;
-    sx /= sl; sy /= sl; sz /= sl;
-    const f = k / (n - 1);
-    const w = (w0 + (w1 - w0) * f) * 0.5;
-    rings.push([
-      [P[k][0] - sx * w, P[k][1] - sy * w, P[k][2] - sz * w],
-      [P[k][0] + sx * w, P[k][1] + sy * w, P[k][2] + sz * w],
-    ]);
-  }
-  for (let k = 0; k < n - 1; k++) {
-    b.quad(rings[k][0], rings[k][1], rings[k + 1][1], rings[k + 1][0], kind, 1 | 4);
-  }
-}
-
 // ---------------- outfits ----------------
 const BODY = {
   // the kit you came with: windbreaker, backpack, bedroll
@@ -279,142 +140,66 @@ const BODY = {
     hands(R);
   },
 
-  // The Stray's own (2.1v, remade in 2.1w): a tee two sizes too big, slipping off one shoulder, hanging
-  // past the shorts, bare arms, socks, sneakers. A dense lathe with drawn contours: the cloth has a shape,
-  // not four sides.
+  // The Stray's own (2.1v): a tee two sizes too big, slipping off one shoulder, hanging past the shorts,
+  // bare arms, socks and sneakers. White, grey and a little too clean for this forest.
   bigtee(R) {
     const n = R.nodes;
-    const TEESEG = 26;
-    // ---- the hem, past the hips, one side lower than the other ----
-    part(R, n.hips, (b) => {
-      b.place(0, -0.06, 0, 0, 0, 0.045);
-      // from under the chest down over the hips, the cloth falls a little wider and ends above the knee
-      latheS(b, [
-        [0.175, -0.34], [0.176, -0.3], [0.172, -0.25], [0.166, -0.2],
-        [0.158, -0.15], [0.153, -0.1], [0.152, -0.06],
-      ], 10, BA, { sx: 1.1, sz: 0.92, merid: 3, rings: false });
-      // the hem itself: a rolled edge, a little darker
-      latheS(b, [[0.176, -0.35], [0.179, -0.335], [0.174, -0.322]], 10, BB, { sx: 1.1, sz: 0.92, merid: 5, rings: false });
-      b.identity();
-      // shorts: baggy, just the cuffs showing under the hem
-      for (const s of [-1, 1]) {
-        b.place(s * 0.088, -0.3, 0.01, 0, 0, s * 0.05);
-        latheS(b, [[0.083, -0.11], [0.092, -0.05], [0.095, 0.03]], 6, BB, { sx: 1.02, sz: 0.95, merid: 3, rings: false });
-        b.identity();
-      }
-    });
-    // ---- the torso: narrow at the waist, wide at the shoulders, sleeves that hang ----
+    // The tee, two sizes too big, in the game's own vocabulary: lathes squeezed front-to-back (place's scale),
+    // five-sided limbs, boxes. It hangs off the shoulders and stops mid-thigh, with a rolled hem and a collar
+    // that keeps slipping — the hem lives on the hips so it follows the walk, the shirt on the chest.
     part(R, n.chest, (b) => {
-      b.place(0, 0, 0);
-      latheS(b, [
-        [0.15, -0.2], [0.139, -0.1], [0.137, 0.0], [0.146, 0.1], [0.16, 0.2],
-        [0.172, 0.3], [0.181, 0.4], [0.182, 0.46], [0.166, 0.51], [0.13, 0.55], [0.094, 0.57],
-      ], 11, BA, { sx: 1.12, sz: 0.78, merid: 3, rings: false });
+      b.place(0, 0, 0, 0, 0, 0, 1.12, 1, 0.78);
+      lathe(b, [
+        [0.156, -0.07], [0.156, 0.02], [0.162, 0.14], [0.17, 0.28], [0.176, 0.4],
+        [0.174, 0.47], [0.16, 0.52], [0.128, 0.552], [0.094, 0.568],
+      ], 9, BA, { phase: PI / 9, hide: 5 });
       b.identity();
-      // the collar: a wide ribbed band, flopping on one side
-      b.place(0, 0.485, 0, 0.05, 0, -0.04);
-      latheS(b, [[0.086, 0], [0.088, 0.016], [0.081, 0.034], [0.066, 0.048]], 7, BA, { sx: 1.05, sz: 0.84, merid: 3, rings: false });
+      // the collar: two rings of ribbing, flopping open at the front
+      b.place(0, 0.515, 0.004, 0.05, 0, 0, 1.1, 1, 0.86);
+      lathe(b, [[0.096, 0], [0.098, 0.028], [0.088, 0.055], [0.074, 0.07]], 8, BA, { phase: PI / 8 });
       b.identity();
-      // folds: pulled from the shoulder toward the waist, and a couple hanging by the belly
-      for (const [x0, y0, x1, y1, r] of [
-        [0.11, 0.36, 0.138, -0.14, 0.008],
-        [-0.112, 0.34, -0.142, -0.16, 0.007],
-      ]) {
-        const p0 = [x0, y0, Math.sqrt(Math.max(0, 0.172 ** 2 - x0 * x0)) * 0.78 + 0.004];
-        const p1 = [x1 * 0.9, (y0 + y1) * 0.5, Math.sqrt(Math.max(0, 0.168 ** 2 - (x1 * 0.9) ** 2)) * 0.78 + 0.004];
-        const p2 = [x1, y1, Math.sqrt(Math.max(0, 0.166 ** 2 - x1 * x1)) * 0.78 + 0.004];
-        tube(b, [p0, p1, p2], r, r * 0.3, BB, 4, { hide: 0, cap: false });
-      }
-      // the shoulders, round under the cloth
+      // the neckline slipping off her left shoulder: one seam, and the bare skin under it
+      b.limb([-0.185, 0.57, 0.03], [-0.232, 0.42, 0.055], 0.009, 0.007, BB, 3);
+      // the print on the chest (the accent colour): a wolf skull in marker, four strokes and two holes
+      b.place(0, 0.298, 0.139); b.box(0.104, 0.1, 0.004, BB);
+      b.place(0, 0.254, 0.143); b.box(0.048, 0.042, 0.004, BA); // the muzzle: the shirt showing through
       for (const s of [-1, 1]) {
-        b.place(s * 0.176, 0.452, 0, 0, 0, -s * 0.2, 1.05, 0.82, 1);
-        ball(b, 0.068, BA, { segs: 6, rows: 2, merid: 3, rings: false });
-        b.identity();
+        b.place(s * 0.035, 0.35, 0.14, 0, 0, s * 0.5); b.box(0.046, 0.019, 0.004, BB); // the ears
+        b.place(s * 0.021, 0.29, 0.142); b.box(0.017, 0.015, 0.004, BA); // the eye sockets
       }
-      // the print on the chest: a wolf skull in marker, a disc with ears and fangs
-      b.place(0, 0.275, 0.148, -PI / 2, 0, 0);
-      latheS(b, [[0.001, 0], [0.038, 0.002], [0.038, 0.014], [0.032, 0.026], [0.001, 0.032]], 7, BB, { sx: 1, sz: 1.15, merid: 3, rings: false });
       b.identity();
-      for (const s of [-1, 1]) {
-        b.place(s * 0.024, 0.3, 0.149, -PI / 2, 0, 0, 1, 1, 1);
-        latheS(b, [[0.001, 0], [0.011, 0.002], [0.001, 0.021]], 5, BB, { merid: 0, rings: false });
-        b.identity();
-        b.place(s * 0.016, 0.281, 0.151, -PI / 2, 0, 0, 1, 1, 1);
-        ball(b, 0.0075, BA, { segs: 4, rows: 2, rings: false }); // the eye socket is the shirt showing through
-        b.identity();
-      }
-      // the neck
-      latheS(b, [[0.049, 0.46], [0.046, 0.54], [0.048, 0.63]], 7, KIND.FLESH, { sx: 1, sz: 0.92, merid: 3, rings: false });
     });
-    // ---- arms: bare, ten-sided, with elbows and real hands ----
-    for (const s of [-1, 1]) {
-      part(R, n['sh' + (s < 0 ? 'L' : 'R')], (b) => {
-        // the sleeve: short, and on her left it has slipped off the shoulder
-        const slip = s < 0 ? 0.028 : 0;
-        b.place(slip, -slip * 0.6, 0, 0, 0, slip * 1.1);
-        latheS(b, [[0.076, 0.03], [0.078, -0.02], [0.073, -0.08], [0.064, -0.145]], 8, BA, { sx: 1, sz: 0.98, merid: 4, rings: false });
-        latheS(b, [[0.0645, -0.15], [0.066, -0.17], [0.062, -0.185]], 8, BB, { sx: 1, sz: 0.98, merid: 3, rings: false });
+    part(R, n.hips, (b) => {
+      b.place(0, 0, 0, 0, 0, 0, 1.12, 1, 0.8);
+      lathe(b, [
+        [0.152, 0.01], [0.15, -0.1], [0.152, -0.2], [0.155, -0.3], [0.156, -0.38],
+      ], 9, BA, { phase: PI / 9, hide: 5 });
+      // the hem, rolled under
+      lathe(b, [[0.157, -0.392], [0.156, -0.368]], 9, BB, { phase: PI / 9, hide: 5 });
+      b.identity();
+      // shorts underneath, just the cuffs showing
+      for (const s of [-1, 1]) { b.place(s * 0.078, -0.315, 0.02); b.cylinder(6, 0.06, 0.057, 0.11, BB); } // the cuffs, inside the hem
+      b.identity();
+    });
+    limbs(R, {
+      // short slack sleeves on their own bones, then the bare arm
+      upper: (b, s) => {
+        b.place(0, 0, 0, 0, 0, 0, 1, 1, 0.96);
+        lathe(b, [[0.001, 0.055], [0.046, 0.05], [0.067, 0.026], [0.07, -0.02], [0.066, -0.062], [0.062, -0.095]], 8, BA, { phase: PI / 8, hide: 5 });
+        lathe(b, [[0.063, -0.105], [0.061, -0.09]], 8, BB, { phase: PI / 8, hide: 5 }); // the cuff
         b.identity();
-        // the upper arm, the elbow, the forearm
-        tube(b, [[0, 0, 0], [s * 0.016, -0.16, 0.008], [s * 0.034, -0.3, 0.018]], 0.055, 0.044, KIND.FLESH, 7);
-        b.place(s * 0.034, -0.3, 0.018, 0, 0, 0, 1, 0.9, 1);
-        ball(b, 0.043, KIND.FLESH, { segs: 7, rows: 2, rings: false });
-        b.identity();
-      });
-      part(R, n['el' + (s < 0 ? 'L' : 'R')], (b) => {
-        tube(b, [[0, 0, 0], [0, -0.13, 0.03], [0, -0.26, 0.058]], 0.043, 0.031, KIND.FLESH, 7);
-        // the wrist and the palm
-        b.place(0, -0.272, 0.062, 0.1, 0, 0, 1, 0.9, 0.6);
-        ball(b, 0.036, KIND.FLESH, { segs: 7, rows: 2, rings: false });
-        b.identity();
-        // four fingers and a thumb, curled a little
-        for (let f = 0; f < 4; f++) {
-          const x = (-0.021 + f * 0.014);
-          const len = 0.045 - Math.abs(f - 1.4) * 0.006;
-          tube(b, [
-            [x, -0.312, 0.072],
-            [x * 1.15, -0.34 - len, 0.07 + len * 0.5],
-          ], 0.0075, 0.0055, KIND.FLESH, 4);
-        }
-        tube(b, [[-0.028, -0.3, 0.07], [-0.046, -0.33, 0.108]], 0.0085, 0.0065, KIND.FLESH, 4);
-      });
-    }
-    // ---- legs, socks, sneakers ----
-    for (const s of [-1, 1]) {
-      part(R, n['th' + (s < 0 ? 'L' : 'R')], (b) => {
-        tube(b, [[0, 0.01, 0], [0, -0.2, 0.008], [0, -0.45, 0.022]], 0.077, 0.058, KIND.FLESH, 7);
-      });
-      part(R, n['kn' + (s < 0 ? 'L' : 'R')], (b) => {
-        b.place(0, -0.012, 0.004, 0, 0, 0, 1, 0.9, 0.82);
-        ball(b, 0.055, KIND.FLESH, { segs: 7, rows: 2, rings: false });
-        b.identity();
-        tube(b, [[0, -0.03, 0.002], [0, -0.2, -0.011], [0, -0.38, -0.01]], 0.057, 0.042, KIND.FLESH, 7);
-        // the sock
-        latheS(b, [[0.048, -0.4], [0.053, -0.3], [0.052, -0.2]], 7, BB, { sx: 1, sz: 1.02, merid: 3, rings: false });
-        // the sneaker: the upper (a long shell), the collar at the ankle, the toe box
-        b.place(0, -0.45, 0.048, 0, 0, 0, 1, 1, 1);
-        latheS(b, [
-          [0.001, -0.03], [0.036, -0.022], [0.047, 0.004], [0.043, 0.036], [0.001, 0.062],
-        ], 8, BA, { sx: 0.84, sz: 1.9, merid: 4, rings: false, phase: PI / 8 });
-        // the collar: a darker lip where the foot goes in
-        latheS(b, [[0.044, 0.052], [0.046, 0.06]], 7, BB, { sx: 0.9, sz: 1.5, merid: 0, rings: false });
-        // the toe box: a cap at the front, a shade darker
-        b.place(0, -0.428, 0.132, 0.1, 0, 0, 1, 1, 1);
-        ball(b, 0.034, BB, { segs: 6, rows: 2, sx: 0.92, sz: 0.55, merid: 3, rings: false });
-        b.identity();
-        // the sole: pale rubber, wider than the upper, with a lip
-        b.place(0, -0.45, 0.048, 0, 0, 0, 1.02, 1, 1.9);
-        latheS(b, [[0.001, -0.05], [0.04, -0.045], [0.048, -0.026]], 8, KIND.BONE, { sx: 0.86, sz: 1.0, merid: 4, rings: false });
-        b.identity();
-        // laces across the tongue
-        for (let i = 0; i < 2; i++) {
-          const y = -0.44 + i * 0.013;
-          ribbon(b, [
-            [-0.024, y, 0.06 + i * 0.009], [0, y + 0.004, 0.066 + i * 0.009], [0.024, y, 0.06 + i * 0.009],
-          ], 0.006, 0.006, BB, (p) => [0, 1, 0], 0.7);
-        }
-      });
-    }
+        b.limb([0, -0.04, 0.004], ARM, 0.052, 0.042, KIND.FLESH, 5);
+      },
+      fore: (b) => { b.identity(); b.limb([0, 0, 0], FORE, 0.041, 0.033, KIND.FLESH, 5); },
+      thigh: (b) => { b.identity(); b.limb([0, 0, 0], THIGH, 0.068, 0.055, KIND.FLESH, 5); },
+      shin: (b) => {
+        b.identity(); b.limb([0, 0, 0], [0, -0.3, 0], 0.052, 0.042, KIND.FLESH, 5);
+        b.identity(); b.limb([0, -0.3, 0], SHIN, 0.048, 0.044, BB, 5); // the sock
+        b.place(0, -0.44, 0.045); b.box(0.1, 0.075, 0.235, BA); // the sneaker
+        b.place(0, -0.46, 0.05); b.box(0.105, 0.02, 0.24, KIND.BONE); // its sole
+      },
+    });
+    hands(R, KIND.FLESH, 0.038, 0.052);
   },
 
   // Taiga: knee-length sheepskin, fleece collar and cuffs, a red sash, felt boots, mittens
@@ -1064,215 +849,52 @@ const HEAD = {
     }
   },
 
-  // The Stray (2.1v, remade in 2.1w). From the reference art: white hair to the hips, a heavy fringe over
-  // one eye, wolf ears on their own bones, one lit pink eye. Built dense on purpose — 26 segments around the
-  // skull, hair as real strands through a curve — so the echo draws a body, not a stack of boxes.
+  // The Stray (2.1v). From the reference: white hair to the hips, one eye behind the fringe, ears on their
+  // own bones. The ears turn toward whatever she is listening to (see poseStrayEars), and the eyes are lit —
+  // HG, not a dye, so they shine in the dark like everything else in this forest.
   strayhead(R) {
     const n = R.nodes;
-    // ---- the skull ----
-    // One surface, but every ring is squeezed on its own: the cranium is wide and deep, the jaw narrows into
-    // a small chin, and no ring steps. `radAt`/`surfZ` give the face surface back, so the eyes, the nose and
-    // the mouth lie ON the head instead of floating in front of it or sinking into it.
-    const PROF = [
-      [0, -0.132, 0.62, 0.86], [0.040, -0.122, 0.68, 0.92], [0.068, -0.102, 0.78, 0.96],
-      [0.090, -0.074, 0.87, 0.99], [0.102, -0.040, 0.95, 1.00], [0.110, 0.004, 1.00, 1.00],
-      [0.106, 0.046, 1.00, 1.00], [0.094, 0.088, 0.99, 1.00], [0.068, 0.126, 0.98, 1.00],
-      [0, 0.156, 0.97, 1.00],
-    ];
-    const SX = 1.0, SZ = 1.03;
-    const at = (y, k) => {
-      if (y <= PROF[0][1]) return PROF[0][k];
-      for (let i = 1; i < PROF.length; i++) {
-        if (y <= PROF[i][1]) {
-          const a = PROF[i - 1], c = PROF[i];
-          const u = (y - a[1]) / (c[1] - a[1]);
-          return a[k] + (c[k] - a[k]) * u;
-        }
-      }
-      return 0;
-    };
-    const radAt = (y) => at(y, 0);
-    // the front of the face at this height and this distance from the midline
-    const surfZ = (x, y) => {
-      const r = radAt(y) * SX, kz = at(y, 3) * SZ;
-      return kz * radAt(y) * Math.sqrt(Math.max(0, 1 - (x * x) / Math.max(1e-6, r * r)));
-    };
     part(R, n.head, (b) => {
-      latheS(b, PROF, 13, KIND.FLESH, { sx: SX, sz: SZ, merid: 4, rings: false, phase: PI / 13 });
-      // the brow ridge: one bar each, laid along the surface and heavier at the inner end
-      for (const s of [-1, 1]) {
-        const pts = [];
-        for (let i = 0; i <= 4; i++) {
-          const x = s * (0.012 + i * 0.016), y = 0.05 - i * 0.006 - (s < 0 ? 0 : 0.002);
-          pts.push([x, y, surfZ(x, y) + 0.002]);
-        }
-        ribbon(b, pts, 0.011, 0.004, KIND.ROCK, (p) => [0, 0, 1], 1.0);
+      // the face: small, pale, still
+      b.place(0, 0, 0.004);
+      lathe(b, [[0, -0.132], [0.048, -0.122], [0.086, -0.09], [0.104, -0.04], [0.112, 0.012], [0.108, 0.066], [0.09, 0.114], [0.052, 0.144], [0, 0.152]], 12, KIND.FLESH, { phase: PI / 12 });
+      b.place(0, -0.086, 0.096); b.box(0.024, 0.0035, 0.005, KIND.ROCK); // a mouth that is not smiling
+      // the crown of the hair, tipped back
+      b.place(0, 0, 0, -0.34, 0, 0);
+      lathe(b, [[0.126, -0.02], [0.138, 0.04], [0.133, 0.1], [0.108, 0.15], [0.062, 0.182], [0, 0.196]], 12, HA, { phase: PI / 12 });
+      b.place(0, -0.13, -0.055); b.taper(0.2, 0.085, 0.245, 0.12, 0.19, HA); // the back of it, close to the nape
+      // a heavy fringe, longer on the right: the left eye is behind it
+      for (const [a, hh] of [[-0.9, 0.135], [-0.55, 0.125], [-0.2, 0.115], [0.16, 0.09], [0.52, 0.075], [0.88, 0.07]]) {
+        spike(b, Math.sin(a) * 0.115, 0.07 - Math.abs(a) * 0.012, Math.cos(a) * 0.115, PI - a, 2.94, 0.045, hh, HA, 4);
       }
-      // the cheekbones, and the hollow under them
+      // locks down past the collarbones, narrowing to points
+      const fz = Math.max(0.112, reach(R, n.chest, 0.3, 0.62, 1)) + 0.01;
       for (const s of [-1, 1]) {
-        b.place(s * 0.062, -0.026, surfZ(0.062, -0.026) - 0.008, 0, s * 0.45, 0, 1, 0.85, 0.42);
-        ball(b, 0.030, KIND.FLESH, { segs: 6, rows: 2, rings: false });
         b.identity();
+        b.limb([s * 0.1, 0.04, 0.045], [s * 0.112, -0.14, fz - 0.006], 0.03, 0.023, HA, 5);
+        b.limb([s * 0.112, -0.14, fz - 0.006], [s * 0.12, -0.33, fz + 0.03], 0.023, 0.011, HA, 5);
+        spike(b, s * 0.12, -0.326, fz + 0.03, PI, PI - 0.1, 0.011, 0.05, HA, 4);
       }
-      // the nose: a bridge that comes forward and turns down into a small tip
-      tube(b, [[0, 0.038, surfZ(0, 0.038) - 0.004], [0, 0.0, surfZ(0, 0.0) + 0.004], [0, -0.02, surfZ(0, -0.02) + 0.009]], 0.0075, 0.0105, KIND.FLESH, 5);
-      b.place(0, -0.024, surfZ(0, -0.024) + 0.008, 0.2, 0, 0, 1, 0.8, 0.9);
-      ball(b, 0.0125, KIND.FLESH, { segs: 6, rows: 2, rings: false });
-      b.identity();
-      for (const s of [-1, 1]) {
-        b.place(s * 0.0085, -0.031, surfZ(0.0085, -0.031) + 0.005, 0, s * 0.5, 0, 1, 0.9, 0.5);
-        ball(b, 0.0045, KIND.ROCK, { segs: 4, rows: 2, rings: false });
-        b.identity();
-      }
-      // the mouth: a thin upper lip, a fuller lower one, closed and not smiling
-      const lip = (y, h, w, kind) => {
-        const pts = [];
-        for (let i = 0; i <= 4; i++) {
-          const x = -w + (i / 4) * w * 2;
-          pts.push([x, y + Math.abs(x) * 0.1, surfZ(Math.abs(x), y) + 0.003]);
-        }
-        ribbon(b, pts, h, h * 0.6, kind, (p) => [0, 0, 1], 1.0);
-      };
-      lip(-0.052, 0.011, 0.024, KIND.FLESH);
-      lip(-0.064, 0.014, 0.022, KIND.FLESH);
-      lip(-0.058, 0.0035, 0.024, KIND.ROCK); // the line between them
-      // the chin
-      b.place(0, -0.1, surfZ(0, -0.1) - 0.006, 0.2, 0, 0, 1, 0.8, 0.7);
-      ball(b, 0.021, KIND.FLESH, { segs: 6, rows: 2, rings: false });
-      b.identity();
     });
-    // ---- the eyes, on their own bone (they blink): a dark socket, a sclera, a lit pink iris, a pupil ----
+    // the one eye you can see: pink, and lit
     const eyes = node(R, 'eyes', n.head, 0, -0.012, 0);
     part(R, eyes, (b) => {
       for (const s of [-1, 1]) {
-        const x = s * 0.046, a = s * 0.3;
-        const zf = surfZ(0.046, -0.012);
-        // the eyeball, sitting in the face
-        b.place(x, 0.004, zf - 0.002, 0, a, 0, 1, 0.84, 0.72);
-        ball(b, 0.0255, KIND.BONE, { segs: 7, rows: 3, merid: 3, rings: false });
-        b.place(x, 0.004, zf + 0.0125, 0, a, 0, 1, 0.92, 0.72);
-        ball(b, 0.0168, HG, { segs: 7, rows: 2, rings: false });
-        b.place(x, 0.004, zf + 0.0195, 0, a, 0, 1, 0.92, 0.62);
-        ball(b, 0.0082, KIND.ROCK, { segs: 5, rows: 2, rings: false });
-        b.place(x + 0.006, 0.012, zf + 0.0225, 0, a, 0, 1, 1, 0.5);
-        ball(b, 0.0042, KIND.BONE, { segs: 4, rows: 2, rings: false });
-        // the upper lid: a heavier line than the lower one, laid on the eyeball's own curve
-        const pts = [];
-        for (let i = 0; i <= 4; i++) {
-          const u = -1 + (i / 2);
-          const dz = Math.sqrt(Math.max(0, 1 - u * u)) * 0.0255 * 0.72;
-          pts.push([x + u * 0.024, 0.0245 - Math.abs(u) * 0.004, zf - 0.002 + dz + 0.003]);
-        }
-        ribbon(b, pts, 0.0075, 0.005, KIND.ROCK, (p) => [0, 0, 1], 1.0);
-        b.identity();
+        const x = s * 0.045, a = s * 0.34;
+        b.place(x, -0.018, 0.095, PI / 2, a, 0, 1, 1, 1.32); b.cylinder(8, 0.023, 0.023, 0.009, KIND.ROCK);
+        b.place(x, -0.018, 0.1, PI / 2, a, 0, 1, 1, 1.08); b.cylinder(8, 0.016, 0.016, 0.01, HG); // the iris, lit
+        b.place(x + 0.007, -0.006, 0.106, 0, a, 0, 1, 1, 0.45); b.octa(0.005, 0.005, KIND.BONE);
       }
     });
-    // ---- the ears: an outer shell, an inner one, fur along the rim, on bones that turn ----
+    // ears on their own bones: they turn (poseStrayEars in stray.js)
     for (const s of [-1, 1]) {
-      const ex = s * (radAt(0.092) * SX - 0.012);
-      const ear = node(R, s < 0 ? 'earL' : 'earR', n.head, ex, 0.088, -0.024);
+      const ear = node(R, s < 0 ? 'earL' : 'earR', n.head, s * 0.082, 0.108, -0.012);
       part(R, ear, (b) => {
-        b.place(0, 0, 0, -0.1, s * 0.16, s * 0.3, 1, 1, 1);
-        latheS(b, [[0, -0.03], [0.048, 0.0], [0.046, 0.045], [0.032, 0.1], [0, 0.15]],
-          6, HA, { sx: 1, sz: 0.62, merid: 3, rings: false });
-        b.place(0, 0.006, 0.018, -0.1, s * 0.16, s * 0.3, 0.68, 1, 1);
-        latheS(b, [[0, -0.01], [0.03, 0.014], [0.026, 0.062], [0, 0.122]],
-          5, HB, { sx: 1, sz: 0.5, merid: 0, rings: false });
-        // fur at the base and along the outer rim
-        spike(b, -0.016, 0.04, 0.01, PI - s * 0.4, 3.1, 0.008, 0.05, HA, 4);
-        b.identity();
+        b.place(0, 0, 0, 0.06, 0, -s * 0.26, 1, 1, 0.62); b.cone(5, 0.072, 0.17, HA, { phase: PI / 5 });
+        b.place(0, 0.014, 0.02, 0.06, 0, -s * 0.26, 0.66, 0.8, 0.3); b.cone(5, 0.072, 0.17, HB, { phase: PI / 5 });
+        for (const [x, y] of [[-s * 0.012, 0.05], [s * 0.012, 0.08]]) spike(b, x, y, 0.026, PI, 0.62, 0.012, 0.05, HA, 3); // fur
       });
     }
-    // ---- the hair ----
-    // A shell that opens over the face, and locks that hang off it. Each lock is a flat ribbon laid along the
-    // skull, so in the wireframe it reads as two flowing lines with the face between them.
-    const GAP = 0.98;                       // half of the opening over the face, in radians from +z
-    const FRONT = PI / 2;
-    const RZ = 1.06;
-    // a point on the head's surface: angle `a` around it (from +x), height `y`, sticking out by `k`
-    const hx_ = (a, y, k = 1) => Math.cos(a) * radAt(y) * SX * k;
-    const hz_ = (a, y, k = 1) => Math.sin(a) * radAt(y) * RZ * k;
-    const radial = (p) => [p[0], 0, p[2]];
-    part(R, n.head, (b) => {
-      const shell = [
-        [0.108, -0.062], [0.116, -0.02], [0.121, 0.026], [0.119, 0.07],
-        [0.11, 0.108], [0.091, 0.14], [0.056, 0.167], [0, 0.182],
-      ];
-      latheS(b, shell, 10, HA, {
-        sx: 0.99, sz: RZ, merid: 3, rings: false, phase: 0,
-        a0: FRONT + GAP, a1: FRONT - GAP + PI * 2,
-      });
-      // the parting: the crown closes over the hairline
-      latheS(b, shell.slice(3), 5, HA, {
-        sx: 0.99, sz: RZ, merid: 3, rings: false, a0: FRONT - GAP, a1: FRONT + GAP,
-      });
-      // ---- the fringe: five wide locks down the forehead, the left one long over her eye ----
-      for (let i = 0; i < 4; i++) {
-        const a = FRONT - GAP + 0.2 + (i / 3) * (GAP * 2 - 0.4);
-        const long = i === 1; // (her left: [-1] is her right, and the sweep runs that way)
-        const y0 = 0.088, y1 = long ? -0.07 : 0.012;
-        ribbon(b, [
-          [hx_(a, y0, 0.98), y0, hz_(a, y0, 0.98)],
-          [hx_(a + 0.02, 0.04, 1.03), 0.04, hz_(a + 0.02, 0.04, 1.03)],
-          [hx_(a + 0.05, y1 + 0.02, 1.02), y1 + 0.02, hz_(a + 0.05, y1 + 0.02, 1.02)],
-          [hx_(a + 0.09, y1, 0.99), y1, hz_(a + 0.09, y1, 0.99)],
-        ], 0.05, 0.024, HA, radial, 0.85);
-      }
-      // the long lock over her left eye: it comes off the parting and crosses the brow
-      ribbon(b, [
-        [hx_(FRONT - 0.36, 0.1, 0.99), 0.1, hz_(FRONT - 0.36, 0.1, 0.99)],
-        [hx_(FRONT - 0.2, 0.055, 1.04), 0.055, hz_(FRONT - 0.2, 0.055, 1.04)],
-        [hx_(FRONT - 0.12, 0.0, 1.05), 0.0, hz_(FRONT - 0.12, 0.0, 1.05)],
-        [hx_(FRONT - 0.16, -0.06, 1.03), -0.06, hz_(FRONT - 0.16, -0.06, 1.03)],
-        [hx_(FRONT - 0.24, -0.1, 1.0), -0.1, hz_(FRONT - 0.24, -0.1, 1.0)],
-      ], 0.054, 0.018, HA, radial, 0.85);
-      // ---- side locks: down past the jaw, in front of the ears ----
-      for (const s of [-1, 1]) {
-        ribbon(b, [
-          [s * 0.104, 0.07, 0.03],
-          [s * 0.118, 0.0, 0.045],
-          [s * 0.122, -0.09, 0.05],
-          [s * 0.118, -0.18, 0.044],
-          [s * 0.106, -0.27, 0.034],
-        ], 0.06, 0.022, HA, (p) => [p[0], 0, p[2]], 0.85);
-        ribbon(b, [
-          [s * 0.09, 0.088, -0.03],
-          [s * 0.112, -0.05, -0.036],
-        ], 0.038, 0.026, HA, (p) => [p[0], 0, p[2]], 0.85);
-      }
-      // ---- two loose ones on the crown that catch the light ----
-      for (const [x, y, z] of [[-0.05, 0.148, 0.028]]) {
-        ribbon(b, [[x, y, z], [x * 1.35, y + 0.014, z + 0.03], [x * 1.7, y - 0.016, z + 0.06]], 0.028, 0.014, HA, (p) => [p[0], 0, p[2]], 0.85);
-      }
-    });
-    // ---- the long fall: a curtain across her back, hung on the chest so it follows the body ----
-    const back = Math.max(0.104, reach(R, n.chest, -0.2, 0.62, -1), reach(R, n.hips, -0.08, 0.7, -1)) + 0.008;
-    part(R, n.chest, (b) => {
-      const zc = -(back + 0.02);
-      b.place(0, 0, zc + 0.062);
-      latheS(b, [
-        [0.162, -0.62], [0.172, -0.44], [0.178, -0.28], [0.18, -0.12],
-        [0.176, 0.04], [0.168, 0.2], [0.154, 0.36], [0.136, 0.5],
-      ], 7, HA, { sx: 1, sz: 0.44, merid: 3, rings: false, a0: -FRONT - 0.8, a1: -FRONT + 0.8 });
-      b.identity();
-      // strands running down the curtain: the ones that catch the light and the ones that don't
-      for (let i = 0; i < 2; i++) {
-        const u = (i / 1) * 2 - 1;
-        const x = u * 0.15;
-        const sway = Math.sin(u * 2.4) * 0.014;
-        strand(b, [
-          [x * 0.5, 0.62, -(0.11 + Math.abs(u) * 0.02)],
-          [x * 0.9, 0.42, zc - 0.006 + sway],
-          [x * 1.05, 0.14, zc - 0.008 + sway * 1.4],
-          [x * 1.1, -0.24, zc - 0.006 + sway],
-          [x * 1.14, -0.56 + Math.abs(u) * 0.05, zc + 0.004 + sway],
-        ], 0.036 + 0.012 * (1 - Math.abs(u)), HA, 4, 0.85);
-      }
-      // one long end that drifts away from the rest
-      strand(b, [
-        [-0.12, 0.5, zc - 0.02], [-0.15, 0.06, zc - 0.05], [-0.185, -0.66, zc - 0.045],
-      ], 0.015, HA, 4, 0.85);
-    });
   },
 
   // Leshy (shop): a lumpy head of moss, antlers of dead branches, green fire for eyes, a beard of moss

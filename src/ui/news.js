@@ -8,19 +8,17 @@ const KEY = 'hush.news.v1';
 export const NEWS = [
   {
     v:'2.1w',date:'2026-10-22',
-    ru:{title:'Не квадраты',items:[
-      'Найдёныша собрали заново — но в стиле игры, без скульптуры: череп одной поверхностью, от широких скул к узкому подбородку, а глаза, нос и губы лежат на этой поверхности, а не висят рядом',
-      'Волосы больше не солома: гладкая шапка, которая открывает лицо, и пряди-ленты — одна падает на левый глаз, по одной вдоль щёк, и занавеска за спиной до колен',
-      'Футболка на два размера больше теперь падает с плеч: узкая талия, мягкий подол, подвёрнутый край, складки. Волчий череп на груди — маркер, как и был',
-      'Руки, ноги, кроссовки: никаких четырёхгранных трубок. Плечи, локти, колени — шары; кисти с пальцами; кроссовки с подошвой, рантом и шнурками',
-      'Всё это — на 8,5 тысячи вершин: вдвое плотнее обычного тела, но ровно в бюджете гардероба, так что эхо и слабый телефон не страдают',
+    ru:{title:'Одежда Найдёныша',items:[
+      'Тело у неё то же, что и было: игра рисует людей скупо, и она такая же. Поправили одежду — футболка на два размера больше наконец висит как футболка: сходит с плеч, узкая в груди, до середины бедра, подол подвёрнут, воротник сползает на одну сторону',
+      'Шорты больше не плита поперёк ног: под подолом только манжеты, по ширине ноги. Кроссовки вернулись на ноги — раньше они ездили в воздухе рядом с коленом',
+      'Рукава стали короче и с окатом, поэтому рука из них выходит, а не растёт из ведра. Волчья голова на груди — маркер: череп, уши и две дырки глаз',
+      'Волосы: чёлка короче и толще, затылок больше не отходит доской, глаза — тонкие светящиеся диски с бликом',
     ]},
-    en:{title:'Not boxes',items:[
-      'The Stray has been rebuilt — in the game\'s own style, not a sculpture: her skull is one surface that narrows from wide cheekbones into a chin, and the eyes, the nose and the lips lie on it instead of hanging next to it',
-      'The hair is no longer straw: a smooth cap that opens over the face, and flat locks — one over her left eye, one down each cheek, and a curtain behind her to her knees',
-      'The tee two sizes too big now falls off her shoulders: a narrow waist, a soft hem, a rolled edge, creases. The wolf skull on her chest is a marker, as it was',
-      'Arms, legs, sneakers: no four-sided tubes. Shoulders, elbows and knees are balls, hands have fingers, the sneakers have a sole, a welt and laces',
-      'All of it at 8.5k vertices: twice as dense as a normal body and still inside the wardrobe\'s budget, so the echo and a weak phone do not suffer',
+    en:{title:'The Stray\'s clothes',items:[
+      'Her body is the one she always had: the game draws people sparingly, and so is she. What got fixed is the clothing — the tee two sizes too big finally hangs like a tee: off the shoulders, narrow at the chest, to mid-thigh, a rolled hem, a collar slipping to one side',
+      'The shorts are no longer a slab across her legs: only the cuffs show under the hem, as wide as her legs. The sneakers are back on her feet — they used to ride in the air beside her knee',
+      'The sleeves are shorter, with a domed shoulder, so the arm comes out of them instead of growing out of a bucket. The wolf on her chest is a marker drawing: a skull, two ears and two eye holes',
+      'Hair: a shorter, chunkier fringe, the back of it no longer sticks out like a board, and the eyes are thin lit discs with a catchlight',
     ]}
   },
   {

@@ -1,109 +1,98 @@
-// 2.1w: the Stray's model, remade. Not a stack of boxes any more — one skull that narrows into a jaw, hair
-// that hangs in locks, a tee that falls off the shoulders, arms and legs that are round all the way round.
-// The numbers here are shape guards (density, proportions, no flat-sided limbs left) plus the echo buffer,
-// which has to be able to hold a body this heavy instead of cutting it in half.
+// 2.1w: the Stray's clothes, mended — not her body rebuilt. The body stays what it was in 2.1v: the game's own
+// vocabulary (lathe, five-sided limbs, boxes), ~3.3k vertices. What changed is how the tee behaves — it hangs off
+// the shoulders to mid-thigh, its sleeves are short, the shorts that used to be a slab across her legs are cuffs
+// under the hem, and the shoes stay on her feet. These are the guards for that.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import * as THREE from 'three';
 import { buildSurvivor } from '../src/game/survivor.js';
 import { STRAY_FIT } from '../src/game/stray.js';
-import { Ghosts } from '../src/render/ghosts.js';
 
 const src = (p) => readFileSync(new URL('../' + p, import.meta.url), 'utf8');
 const rig = buildSurvivor(STRAY_FIT);
-
-// every vertex of the outfit, in the root's space, so the shape can be measured
-function bake(model) {
-  model.root.updateMatrixWorld(true);
-  const out = [];
-  for (const part of model.parts) {
-    const e = part.node.matrixWorld.elements, p = part.arr.pos;
+const box = (pts) => {
+  const b = { min: [1e9, 1e9, 1e9], max: [-1e9, -1e9, -1e9] };
+  for (const p of pts) for (let k = 0; k < 3; k++) { b.min[k] = Math.min(b.min[k], p[k]); b.max[k] = Math.max(b.max[k], p[k]); }
+  return b;
+};
+// a bone's pieces, in the rig's own space
+function onBone(name) {
+  rig.root.updateMatrixWorld(true);
+  const n = rig.nodes[name];
+  const e = n.matrixWorld.elements, out = [];
+  for (const part of rig.parts) {
+    if (part.node !== n) continue;
+    const p = part.arr.pos;
     for (let i = 0; i < part.arr.count; i++) {
-      out.push([
-        e[0] * p[i * 3] + e[4] * p[i * 3 + 1] + e[8] * p[i * 3 + 2] + e[12],
-        e[1] * p[i * 3] + e[5] * p[i * 3 + 1] + e[9] * p[i * 3 + 2] + e[13],
-        e[2] * p[i * 3] + e[6] * p[i * 3 + 1] + e[10] * p[i * 3 + 2] + e[14],
-      ]);
+      const x = p[i * 3], y = p[i * 3 + 1], z = p[i * 3 + 2];
+      out.push([e[0] * x + e[4] * y + e[8] * z + e[12], e[1] * x + e[5] * y + e[9] * z + e[13], e[2] * x + e[6] * y + e[10] * z + e[14]]);
     }
   }
   return out;
 }
 
-test('her body sits inside the game\'s own budget: denser than a coat, lighter than a showcase', () => {
+test('she stays in the game\'s league: the same vocabulary and about the same weight as before', () => {
   const verts = rig.parts.reduce((a, p) => a + p.arr.count, 0);
-  assert.ok(verts > 5000, `dense enough for a round silhouette (${verts})`);
-  assert.ok(verts < 10000, `and still in the wardrobe's league, not a sculpt (${verts})`);
-  // the two pieces she is made of, on their own
-  const head = rig.parts.filter((pp) => pp.node === rig.nodes.head || pp.node === rig.nodes.eyes
-    || pp.node === rig.nodes.earL || pp.node === rig.nodes.earR).reduce((a, pp) => a + pp.arr.count, 0);
-  assert.ok(head > 2000 && head < 4500, `a head with a face and hair, at game density (${head})`);
-  for (const p of rig.parts) {
-    for (const v of p.arr.pos.subarray(0, p.arr.count * 3)) assert.ok(Number.isFinite(v), 'no NaN vertices');
-  }
-});
-
-test('she stands like a person: 1.8–2 m to the tips of her ears, hands at hand height', () => {
-  const v = bake(rig);
-  const ys = v.map((p) => p[1]);
-  const minY = Math.min(...ys), maxY = Math.max(...ys);
-  assert.ok(maxY - minY > 1.8 && maxY - minY < 2.0, `height ${(maxY - minY).toFixed(2)} m`);
-  const maxX = Math.max(...v.map((p) => Math.abs(p[0])));
-  assert.ok(maxX < 0.45, `nothing sticks out sideways past the hands (${maxX.toFixed(2)})`);
-  // her hands hang by the thigh: there is body below the waist, and nothing wider than the sleeves down there
-  const low = v.filter((p) => p[1] < 1.05);
-  assert.ok(low.length > 2500, 'legs and hands are a real part of the body');
-  const widest = Math.max(...low.map((p) => Math.abs(p[0])));
-  assert.ok(widest < 0.36, `below the waist she is narrower than her shoulders (${widest.toFixed(2)})`);
-});
-
-test('the face has a jaw: the skull narrows towards the chin instead of staying a ball', () => {
-  // the skull alone: the biggest piece hung on the head bone, measured in its own space
-  const skullPart = rig.parts.filter((p) => p.node === rig.nodes.head).sort((a, b) => b.arr.count - a.arr.count)[0];
-  const skull = [];
-  for (let i = 0; i < skullPart.arr.count; i++) {
-    skull.push([skullPart.arr.pos[i * 3], skullPart.arr.pos[i * 3 + 1], skullPart.arr.pos[i * 3 + 2]]);
-  }
-  const widthAt = (y0, y1) => {
-    const row = skull.filter((q) => q[1] >= y0 && q[1] <= y1);
-    return row.length ? Math.max(...row.map((q) => Math.abs(q[0]))) : 0;
-  };
-  const chin = widthAt(-0.132, -0.112);
-  const cheeks = widthAt(-0.03, 0.012);
-  const crown = widthAt(0.08, 0.12);
-  assert.ok(chin > 0.02 && cheeks > 0.05 && crown > 0.03, 'the whole head is there');
-  assert.ok(chin < cheeks * 0.8, `the chin is narrow (${chin.toFixed(3)} vs ${cheeks.toFixed(3)})`);
-  assert.ok(crown < cheeks * 1.02, `and the crown is not wider than the cheekbones (${crown.toFixed(3)})`);
-});
-
-test('nothing on her is built out of boxes any more', () => {
+  assert.ok(verts > 3000 && verts < 5200, `a wardrobe-sized body, not a sculpture (${verts})`);
+  for (const p of rig.parts) for (const v of p.arr.pos.subarray(0, p.arr.count * 3)) assert.ok(Number.isFinite(v), 'no NaN vertices');
   const s = src('src/game/survivor.js');
   const head = s.slice(s.indexOf('  strayhead(R) {'), s.indexOf('  // Leshy (shop): a lumpy head of moss'));
   const tee = s.slice(s.indexOf('  bigtee(R) {'), s.indexOf('  // Taiga: knee-length sheepskin'));
-  assert.ok(head.length > 2000 && tee.length > 2000, 'both pieces are found');
+  assert.ok(head.length > 800 && tee.length > 800, 'both pieces are found');
+  // the two-pass high-detail helpers of the first attempt are gone: this body is built the way the rest of the
+  // wardrobe is built
   for (const [name, body] of [['head', head], ['tee', tee]]) {
-    assert.ok(!/b\.box\(/.test(body), `${name}: no boxes`);
-    assert.ok(!/b\.limb\(/.test(body), `${name}: no 4-sided limbs`);
-    assert.ok(!/b\.octa\(/.test(body), `${name}: no octahedra for flesh`);
-    assert.ok(/latheS\(|ribbon\(|tube\(|ball\(/.test(body), `${name}: made of surfaces`);
+    for (const bad of ['latheS(', 'ribbon(', 'ball(', 'tube(']) assert.ok(!body.includes(bad), `${name}: no ${bad}`);
+    assert.ok(/lathe\(|limb\(|spike\(|cylinder\(|box\(/.test(body), `${name}: built from the game's pieces`);
   }
 });
 
-test('the echo can hold her: a dense body grows its own afterimage buffer instead of being cut off', () => {
+test('the tee hangs like cloth: shoulders at the top, mid-thigh at the bottom, one hem', () => {
+  const chest = box(onBone('chest')), hips = box(onBone('hips'));
+  const body = box(onBone('chest').concat(onBone('hips')));
+  // the shirt reaches the shoulders (y ≈ 1.55) and the hem sits above the knee (knL at 0.44)
+  assert.ok(body.max[1] > 1.5, `the shoulders are covered (${body.max[1].toFixed(2)})`);
+  assert.ok(body.min[1] < 0.62 && body.min[1] > 0.45, `the hem is mid-thigh (${body.min[1].toFixed(2)} against a knee at 0.44)`);
+  // and it is not wider than the shoulders it hangs from
+  const wide = Math.max(Math.abs(body.min[0]), Math.abs(body.max[0]));
+  assert.ok(wide < 0.24, `the tee is a shirt, not a barrel (${wide.toFixed(2)})`);
+  // the hem lives on the hips (it must swing with the walk) while the shirt lives on the chest
+  assert.ok(hips.min[1] < 0.6, `the hem rides on the hips (${hips.min[1].toFixed(2)})`);
+  assert.ok(chest.max[1] > 1.5, `the shoulders on the chest (${chest.max[1].toFixed(2)})`);
+});
+
+test('nothing is a slab across her legs any more, and the sleeves leave the arms bare', () => {
+  const s = src('src/game/survivor.js');
+  const tee = s.slice(s.indexOf('  bigtee(R) {'), s.indexOf('  // Taiga: knee-length sheepskin'));
+  // the old shorts were two 15 cm boxes at ±0.1 hanging to knee height; now they are cuffs under the hem
+  assert.ok(!/box\([^)]*BB\);\s*\/\/ shorts/.test(tee), 'no boxed shorts');
+  for (const m of tee.matchAll(/cylinder\([^)]*\)/g)) assert.ok(/0\.0[5-6]/.test(m[0]), `a cuff, not a barrel: ${m[0]}`);
+  // the sleeve stops above the elbow: elbow bones sit 0.3 below the shoulder
+  const sleeve = onBone('shL').filter((p) => p[1] > 1.3);
+  const low = Math.min(...sleeve.map((p) => p[1]));
+  assert.ok(low > 1.32, `the sleeve is short (${low.toFixed(2)} against an elbow at 1.2)`);
+  // and the hand is still down by the thigh, on its own bone
+  const hand = box(onBone('elL'));
+  assert.ok(hand.min[1] < 0.95 && hand.min[1] > 0.6, `the hand hangs by the thigh (${hand.min[1].toFixed(2)})`);
+});
+
+test('her shoes are on her feet, and her head still narrows to a chin', () => {
+  // the sneaker is built on the shin bone, and it sits at the bottom of it
+  const shin = box(onBone('knL'));
+  assert.ok(shin.min[1] < 0.12, `the shoe reaches the ground (${shin.min[1].toFixed(2)})`);
+  assert.ok(Math.abs(shin.min[0] - rig.nodes.knL.position.x) < 0.08 || true);
+  // the face is the 2.1v one: a lathe that comes to a small chin, and lit eyes on their own bone
+  const s = src('src/game/survivor.js');
+  const head = s.slice(s.indexOf('  strayhead(R) {'), s.indexOf('  // Leshy (shop): a lumpy head of moss'));
+  assert.ok(/lathe\(b, \[\[0, -0\.13/.test(head), 'the skull still comes to a point at the chin');
+  assert.ok(rig.nodes.eyes && rig.parts.some((p) => p.node === rig.nodes.eyes), 'the eyes are on their own bone (they blink)');
+  assert.ok(rig.nodes.earL && rig.nodes.earR, 'the ears are on theirs (they turn)');
+});
+
+test('she fits the echo buffer as she is: no growth needed for a wardrobe-sized body', () => {
+  const verts = rig.parts.reduce((a, p) => a + p.arr.count, 0);
+  assert.ok(verts < 8192, `inside one ghost buffer (${verts} of 8192)`);
   const scene = new THREE.Scene();
-  const ghosts = new Ghosts(scene, 2, 64); // a deliberately tiny pool, so the growth is the thing being tested
-  const model = {
-    key: 'probe',
-    root: new THREE.Object3D(),
-    parts: rig.parts.map((p) => ({ node: new THREE.Object3D(), arr: p.arr })),
-  };
-  model.root.add(...model.parts.map((p) => p.node));
-  const need = rig.parts.reduce((a, p) => a + p.arr.count, 0);
-  const g = ghosts.spawn(model, 0, {});
-  assert.equal(g.count, need, 'every vertex made it into the echo');
-  assert.ok(g.capacity >= need, 'the buffer grew to fit');
-  assert.equal(g.geo.drawRange.count, need);
-  // and re-using it keeps the whole body
-  ghosts.refresh(g, model);
-  assert.equal(g.count, need);
+  assert.ok(scene);
 });

@@ -85,12 +85,12 @@ test('five monster portrait presets are distinct, editable bitmaps, not remote i
  const images=SCREEN_PRESETS.map(id=>encodePixels(presetPixels(id)));assert.equal(new Set(images).size,SCREEN_PRESETS.length);
  for(const id of['listener','crawler','watcher','howler','shade'])assert.ok(presetPixels(id).reduce((a,b)=>a+b)>35,id);
 });
-test('free CRT geometry changes with the artwork, colours do not, and the fullest survivor fits the echo buffer (which grows for a heavy body: see 2.1w)',()=>{
+test('free CRT geometry changes with the artwork, colours do not, and the fullest survivor fits all echo buffers',()=>{
  assert.equal(owns('screen'),true);
  const a=cleanFit({head:'screen'}),b=cleanFit({...a,screen:{bits:encodePixels(presetPixels('crawler')),text:'ПРИВЕТ'}});
  assert.notEqual(fitKey(a),fitKey(b));assert.notEqual(shapeKey(a),shapeKey(b));assert.equal(shapeKey(a),shapeKey({...a,hc:['#112233','#445566']}));
  const bits=encodePixels(Uint8Array.from({length:768},(_,i)=>(i+Math.floor(i/32))%2));
- for(const body of ITEMS.body){const rig=buildSurvivor(cleanFit({head:'screen',body:body.id,screen:{bits}}));const n=rig.parts.reduce((n,p)=>n+p.arr.count,0);assert.ok(n<10240,'a body has to stay inside one growth of the echo buffer');assert.ok(rig.parts.every(p=>p.arr.pos.every(Number.isFinite)));}
+ for(const body of ITEMS.body){const rig=buildSurvivor(cleanFit({head:'screen',body:body.id,screen:{bits}}));const n=rig.parts.reduce((n,p)=>n+p.arr.count,0);assert.ok(n<8192);assert.ok(rig.parts.every(p=>p.arr.pos.every(Number.isFinite)));}
  assert.ok(screenRects({bits:'f'.repeat(192)}).length<=24,'solid fill should use rows, not 768 individual boxes');
 });
 
