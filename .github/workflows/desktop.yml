@@ -33,8 +33,31 @@ jobs:
 
       - run: npm ci
 
-      # the same guards as the web deploy: a desktop build of a broken game is not worth shipping
-      - run: npm test
+      # the same guards as the web deploy: a desktop build of a broken game is not worth shipping.
+      # On a failure the run's log is the only place with the detail, and it is not always readable from a
+      # phone or from a proxy — so the failing lines are repeated as annotations and kept as a file.
+      - name: Test
+        shell: bash
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee test.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            grep -E "^(not ok|# fail)|^ *error:|^ *expected:|^ *actual:|^ *location:" test.log \
+              | tr -d '\r' | head -40 | while IFS= read -r line; do
+                echo "::error title=Test failed::${line}"
+              done
+            exit "$status"
+          fi
+
+      - name: Keep the test log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-log-windows
+          path: test.log
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Build the web bundle
         run: npm run build
