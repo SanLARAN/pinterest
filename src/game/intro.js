@@ -21,7 +21,8 @@ import { clamp, lerp, smoothstep } from '../core/rng.js';
 import { t } from '../core/i18n.js';
 import { MeshBuilder, KIND } from '../world/builder.js';
 import { createWorldMaterial, shared } from '../render/sonar.js';
-import { crewCarBody, CAMP_TRACK } from '../world/bog.js';
+import { CAMP_TRACK } from '../world/bog.js';
+import { buildCrewCar } from './uaz.js';
 import { DuskFilm } from './duskFilm.js';
 import { buildSurvivor, poseSurvivor, poseFur } from './survivor.js';
 import { createPersonMaterial, dressPerson, undressPerson } from '../render/people.js';
@@ -223,7 +224,7 @@ export class BogArrival {
   _teardown() {
     if (this.carSnd) { this.carSnd.stop(0.6); this.carSnd = null; }
     if (this.pumpSnd) { this.pumpSnd.stop(0.9); this.pumpSnd = null; }
-    if (this.carNode) { this.g.scene.remove(this.carNode); this.carNode.geometry?.dispose(); this.carNode = null; }
+    if (this.carNode) { this.g.scene.remove(this.carNode); this.carNode = null; }
     const staticCar = this.g.world?.crewCar?.node;
     if (staticCar) staticCar.visible = true; // the car the world keeps: it was here all along
     for (const a of this.cast) {
@@ -304,9 +305,7 @@ export class BogArrival {
     // film is over, and it is standing exactly where the film leaves this one
     // it comes up the road the world left ruts in: the same heading, twenty-four metres back
     this.carStart = { x: car.x + CAMP_TRACK.x * 24, z: car.z + CAMP_TRACK.z * 24 };
-    const b = crewCarBody(new MeshBuilder(320));
-    this.carNode = new THREE.Mesh(b.toGeometry(), this.propMat);
-    this.carNode.frustumCulled = false;
+    this.carNode = buildCrewCar(this.g.world?.material || this.propMat);
     this.g.scene.add(this.carNode);
     const staticCar = this.g.world?.crewCar?.node;
     if (staticCar) staticCar.visible = false;
@@ -346,7 +345,7 @@ export class BogArrival {
           hose: set.hose,
           crank: set.crank,
           prime: set.prime,
-          sign: set.sign,
+          sign: set.marker,
         }[seat.act] || set.crank,
       };
       a.door0 = this._doorPoint(a);
@@ -466,6 +465,9 @@ export class BogArrival {
     const settle = tt > STOP ? Math.exp(-(tt - STOP) * 4) * Math.sin((tt - STOP) * 22) * 0.03 : 0;
     this.carNode.position.set(x, y + settle, z);
     this.carNode.rotation.set(settle * 0.6, this.carYaw, 0);
+    // the wheels go round with the road: the car is 24 m back when the shot opens
+    const rolled = 24 * e / 0.39;
+    for (const w of this.carNode.userData.wheels || []) w.rotation.z = rolled;
     this.carPos = { x, y, z };
     if (silent) return;
 
@@ -533,11 +535,13 @@ export class BogArrival {
   }
 
   // ---------------- the cast, frame by frame ----------------
+  // where they step out: the car's own door lines (nose toward -x, the sills 1.65 m off the centre line), so the
+  // four of them come out of the right two doors instead of out of the middle of the bonnet
   _doorPoint(a) {
     const set = this.set;
     const yaw = this.carYaw;
-    const lx = a.seat.side * 1.6;
-    const lz = a.seat.row ? -1.05 : 0.55;
+    const lx = a.seat.row ? 1.25 : 0.15; // rear bench / front seat
+    const lz = a.seat.side * 1.65;
     const x = set.car.x + lx * Math.cos(yaw) + lz * Math.sin(yaw);
     const z = set.car.z - lx * Math.sin(yaw) + lz * Math.cos(yaw);
     return { x, z, y: this.g.world.terrain.height(x, z) };
@@ -742,7 +746,7 @@ export class BogArrival {
     const mid = { x: lerp(s.car.x, road.x, 0.45), z: lerp(s.car.z, road.z, 0.45) };
     const cross = { x: lerp(s.car.x, s.near.x, 0.4), z: lerp(s.car.z, s.near.z, 0.4) };
     // the four of them work in a loose ring round the pump: the next shot is aimed at the ring, not at the pump
-    const work = { x: (s.hose.x + s.prime.x + s.crank.x + s.sign.x) / 4, z: (s.hose.z + s.prime.z + s.crank.z + s.sign.z) / 4 };
+    const work = { x: (s.hose.x + s.prime.x + s.crank.x + s.marker.x) / 4, z: (s.hose.z + s.prime.z + s.crank.z + s.marker.z) / 4 };
     const k = [
       // 1. the road, the water and the camp: the car is out there in the rain, coming in
       { t: 0, p: at(-4.5, 5.2, 4.3), l: look(mid.x, 1.2, mid.z), fov: 46 },

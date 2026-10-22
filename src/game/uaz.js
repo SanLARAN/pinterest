@@ -185,6 +185,42 @@ export function buildForestCar() {
   return { body: merged, wheel, hood: hb.toArrays(), battery: bat, carb, steering: buildSteering(), glass: buildCarGlass() };
 }
 
+// ---------------- the car the shift came in (3.0l) ----------------
+// The bog's УАЗ is *this* car — the one out of the garage and out of the forestry yard — not a new box with a
+// bonnet: the same body, the same four wheels on their own pivots (so they can turn), the same steering wheel.
+// Complete: no missing wheel, no propped hood, the spare on the tail. Both the world (it stands at the проезд)
+// and the film (it drives up the track) build it here, so the two can never be different cars.
+let _crewWheelGeo = null;
+export function buildCrewCar(mat) {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(geometryOf(buildCarBody()), mat);
+  body.frustumCulled = false;
+  g.add(body);
+  if (!_crewWheelGeo) _crewWheelGeo = geometryOf(buildPart('wheel').toArrays());
+  const wheels = WHEELS.map(([x, y, z]) => {
+    const pivot = new THREE.Object3D(); // the axle is along the car's z: spin the pivot, not the tyre
+    pivot.position.set(x, y, z);
+    const m = new THREE.Mesh(_crewWheelGeo, mat);
+    m.rotation.set(PI / 2, 0, 0);
+    m.frustumCulled = false;
+    pivot.add(m);
+    g.add(pivot);
+    return pivot;
+  });
+  const glass = new THREE.Mesh(geometryOf(buildCarGlass()), mat); // the windscreen: this one has all its glass
+  glass.frustumCulled = false;
+  g.add(glass);
+  const st = new THREE.Mesh(geometryOf(buildSteering()), mat);
+  st.position.set(...CARP_SPOT);
+  st.rotation.set(0, 0, -0.45);
+  st.frustumCulled = false;
+  g.add(st);
+  g.userData.crewCar = true;
+  g.userData.wheels = wheels;
+  return g;
+}
+const CARP_SPOT = [-0.42, 1.24, 0.42]; // the steering wheel's centre, out of the garage's frame
+
 export function mergeArrays(list) {
   let n = 0;
   for (const a of list) n += a.count;

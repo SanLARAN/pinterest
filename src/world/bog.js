@@ -15,6 +15,7 @@ import { MeshBuilder, KIND } from './builder.js';
 import { Terrain } from './terrain.js';
 import { ForestNavigation } from './navigation.js';
 import { CAP } from './caps.js';
+import { buildCrewCar } from '../game/uaz.js'; // (3.0l) the crew's УАЗ is the garage's car, not a new one
 
 const LEVEL = 0.34; // the water line, in world metres
 const HALF = 170;
@@ -652,7 +653,10 @@ function fitCampSet(world) {
   if (!near) near = { x: CAMP_FLOOD.x - 4, z: CAMP_FLOOD.z - 1.5, d: 12 };
   if (!far) far = { x: near.x + 9, z: near.z + 3.3, d: near.d + 9 };
   // the crew's car: on the outer bank, nose to the water — it is as far as the road went
-  const car = { x: far.x + T.x * 3.0, z: far.z + T.z * 3.0, yaw: Math.atan2(T.x, T.z) };
+  const nose = { x: -T.x, z: -T.z };
+  const car = { x: far.x + T.x * 3.4, z: far.z + T.z * 3.4, nose };
+  // (the car is built in the garage's frame — nose toward -x, driver's side +z — so its yaw is not the box's)
+  car.yaw = Math.atan2(nose.z, -nose.x);
   car.y = world.terrain.height(car.x, car.z);
   // the suction hose goes into the water on the camp side of it, where the pump is
   const toWater = (() => {
@@ -677,50 +681,24 @@ function fitCampSet(world) {
     crank: at(-0.75, -0.95),
     prime: at(-0.8, 0.95),
     marker: { x: near.x - toWater.x * 1.1, z: near.z - toWater.z * 1.1 },
-    sign: { x: near.x - toWater.x * 2.1 + side.x * 2.4, z: near.z - toWater.z * 2.1 + side.z * 2.4 },
+    sign: { x: car.x + T.x * 2.4 + side.x * 2.6, z: car.z + T.z * 2.4 + side.z * 2.6 },
     toWater,
     side,
   };
 }
 
-// the body of a УАЗ in local metres: the road car the crew came in, and (in the film) the one that is still
-// moving. Nose along -Z, hubs on 0.36 m wheels, canvas over the back.
-export function crewCarBody(b) {
-  b.identity();
-  b.place(0, 0.38, -0.3);
-  b.box(1.86, 0.72, 4.3, KIND.METAL); // body
-  b.place(0, 0.78, 1.15);
-  b.box(1.7, 0.66, 3.1, KIND.LEAF); // canvas top
-  b.place(0, 0.6, -1.85);
-  b.box(1.7, 0.36, 1.0, KIND.METAL); // bonnet
-  for (const [wx, wz] of [[-0.95, 1.35], [0.95, 1.35], [-0.95, -1.35], [0.95, -1.35]]) {
-    b.place(wx, 0.36, wz, 0, 0, Math.PI / 2);
-    b.cylinder(10, 0.36, 0.36, 0.26, KIND.BARK);
-  }
-  for (const hx of [-0.62, 0.62]) { // headlights, and the bar across the nose
-    b.place(hx, 0.62, -2.36, 0, 0, Math.PI / 2);
-    b.cylinder(8, 0.12, 0.12, 0.08, KIND.BONE);
-  }
-  b.place(0, 0.34, -2.33);
-  b.box(1.5, 0.08, 0.1, KIND.METAL);
-  return b;
-}
-
 function genCrewCar(world) {
   const set = fitCampSet(world);
   world.campSet = set;
-  const { x, z, y, yaw } = set.car;
-  const b = crewCarBody(new MeshBuilder(320));
-  const node = new THREE.Mesh(b.toGeometry(), world.material);
+  const { x, z, y, yaw, nose } = set.car;
+  const node = buildCrewCar(world.material);
   node.position.set(x, y, z);
   node.rotation.y = yaw;
-  node.matrixAutoUpdate = true;
   node.updateMatrix();
-  node.userData.crewCar = true;
   world.scene.add(node);
-  world.meshes.push(node);
-  world.crewCar = { x, z, y, yaw, node };
-  world.col.add(x - 1.1, z - 2.2, x + 1.1, z + 2.2, 0.35, 1.6, CAP.METAL);
+  world.crewCar = { x, z, y, yaw, nose, node };
+  // it is 4.4 m long and 1.8 wide, and it stands across the road: a capsule along its own nose axis
+  world.col.add(x + nose.x * 1.9, z + nose.z * 1.9, x - nose.x * 1.9, z - nose.z * 1.9, 0.95, 1.6, CAP.METAL);
 
   // the suction hose, from the pump's inlet down to the water; the film drags it out, the shift leaves it there
   world.addProp(set.hose.x, set.hose.z, (bb) => {

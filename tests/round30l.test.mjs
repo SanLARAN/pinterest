@@ -133,6 +133,45 @@ test('the film drives in the world\'s own car and puts four people to work on th
     'the film ends exactly where the parked car stands');
 });
 
+// the user's complaint, made un-repeatable: the car at the проезд and the car in the film were a box with a
+// bonnet propped on it. They are now the garage's own УАЗ — the same builder the yard and the shop use.
+test('the car is the real УАЗ: full body, four wheels on the ground, not a box', async () => {
+  const w = bogWorld();
+  const { buildCarBody } = await import('../src/ui/garageSet.js');
+  const { geometryOf } = await import('../src/game/uaz.js');
+  const { IntroCutscene } = await import('../src/game/intro.js');
+  const real = geometryOf(buildCarBody());
+  const parked = w.crewCar.node;
+  const body = parked.children.find((c) => c.geometry && !c.userData.wheel);
+  assert.ok(body, 'the parked car has a body mesh');
+  assert.equal(body.geometry.attributes.position.count, real.attributes.position.count,
+    'the body is the garage car, vertex for vertex');
+  const box = new THREE.Box3().setFromObject(parked);
+  const size = box.max.clone().sub(box.min);
+  assert.ok(size.y > 1.7, `it is a УАЗ tall (${size.y.toFixed(2)} m), not a shoebox`);
+  assert.ok(Math.max(size.x, size.z) > 4.0, 'and 4.4 m long');
+  assert.equal(parked.userData.wheels.length, 4, 'all four wheels, none missing');
+  const g = w.terrain.height(w.crewCar.x, w.crewCar.z);
+  for (const pivot of parked.userData.wheels) {
+    const y = pivot.getWorldPosition(new THREE.Vector3()).y - g;
+    assert.ok(Math.abs(y - 0.39) < 0.03, `the wheel stands on the ground (${y.toFixed(2)} m)`);
+  }
+  // and the film drives this very car, not a second one
+  const game = stubGame(w);
+  Object.assign(game, {
+    fx: { fade: 0 }, input: { requestLock() {} },
+    fire: { reset() {}, douse() {}, out() {}, update() {} },
+    audio: new Proxy({ ready: true }, { get: () => () => null }),
+    hud: { setIntro() {}, setHint() {}, setUse() {}, setSkip() {} },
+  });
+  const film = new IntroCutscene(game);
+  film.begin();
+  film._build();
+  assert.equal(film.carNode.userData.crewCar, true);
+  assert.equal(film.carNode.children.find((c) => c.geometry && c.geometry.attributes.position.count === real.attributes.position.count)?.geometry.attributes.position.count,
+    real.attributes.position.count, 'the film drives the same body');
+});
+
 test('the bog speaks pump, the forest speaks generator — same objectives, different machine', () => {
   const w = bogWorld();
   const b = stubGame(w, 'bog');
