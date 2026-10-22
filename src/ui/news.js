@@ -9,14 +9,14 @@ export const NEWS = [
   {
     v:'2.1w',date:'2026-10-22',
     ru:{title:'Одежда Найдёныша',items:[
-      'Тело у неё то же, что и было: игра рисует людей скупо, и она такая же. Поправили одежду — футболка на два размера больше наконец висит как футболка: сходит с плеч, узкая в груди, до середины бедра, подол подвёрнут, воротник сползает на одну сторону',
-      'Шорты больше не плита поперёк ног: под подолом только манжеты, по ширине ноги. Кроссовки вернулись на ноги — раньше они ездили в воздухе рядом с коленом',
+      'Тело у неё то же, что и было: игра рисует людей скупо, и она такая же. Поправили одежду — футболка на два размера больше наконец висит как футболка: сходит с плеч, узкая в груди, до середины бедра, воротник сползает на одну сторону',
+      'Отдельной юбки больше нет: это одна футболка от плеч до середины бедра, и она сама закрывает низ. Подол подвёрнут внутрь, поэтому под ним видно ткань, а не изнанку',
       'Рукава стали короче и с окатом, поэтому рука из них выходит, а не растёт из ведра. Волчья голова на груди — маркер: череп, уши и две дырки глаз',
       'Волосы: чёлка короче и толще, затылок больше не отходит доской, глаза — тонкие светящиеся диски с бликом',
     ]},
     en:{title:'The Stray\'s clothes',items:[
       'Her body is the one she always had: the game draws people sparingly, and so is she. What got fixed is the clothing — the tee two sizes too big finally hangs like a tee: off the shoulders, narrow at the chest, to mid-thigh, a rolled hem, a collar slipping to one side',
-      'The shorts are no longer a slab across her legs: only the cuffs show under the hem, as wide as her legs. The sneakers are back on her feet — they used to ride in the air beside her knee',
+      'There is no separate skirt any more: it is one tee from the shoulders to mid-thigh, and it covers her lower body by itself. The hem is folded up inside, so under it you see cloth, not the back of a shell',
       'The sleeves are shorter, with a domed shoulder, so the arm comes out of them instead of growing out of a bucket. The wolf on her chest is a marker drawing: a skull, two ears and two eye holes',
       'Hair: a shorter, chunkier fringe, the back of it no longer sticks out like a board, and the eyes are thin lit discs with a catchlight',
     ]}

@@ -48,18 +48,29 @@ test('she stays in the game\'s league: the same vocabulary and about the same we
   }
 });
 
-test('the tee hangs like cloth: shoulders at the top, mid-thigh at the bottom, one hem', () => {
+test('one oversized tee from the shoulders to mid-thigh — no separate skirt under it', () => {
   const chest = box(onBone('chest')), hips = box(onBone('hips'));
-  const body = box(onBone('chest').concat(onBone('hips')));
+  const body = box(onBone('chest'));
   // the shirt reaches the shoulders (y ≈ 1.55) and the hem sits above the knee (knL at 0.44)
   assert.ok(body.max[1] > 1.5, `the shoulders are covered (${body.max[1].toFixed(2)})`);
-  assert.ok(body.min[1] < 0.62 && body.min[1] > 0.45, `the hem is mid-thigh (${body.min[1].toFixed(2)} against a knee at 0.44)`);
+  assert.ok(body.min[1] < 0.62 && body.min[1] > 0.4, `the hem is mid-thigh (${body.min[1].toFixed(2)} against a knee at 0.44)`);
   // and it is not wider than the shoulders it hangs from
   const wide = Math.max(Math.abs(body.min[0]), Math.abs(body.max[0]));
   assert.ok(wide < 0.24, `the tee is a shirt, not a barrel (${wide.toFixed(2)})`);
-  // the hem lives on the hips (it must swing with the walk) while the shirt lives on the chest
-  assert.ok(hips.min[1] < 0.6, `the hem rides on the hips (${hips.min[1].toFixed(2)})`);
-  assert.ok(chest.max[1] > 1.5, `the shoulders on the chest (${chest.max[1].toFixed(2)})`);
+  // the whole garment hangs on the chest and covers the hips: nothing is left on the hip bone, so there is no
+  // second piece around her legs to read as a skirt
+  assert.ok(chest.max[1] > 1.5, `the shoulders are covered (${chest.max[1].toFixed(2)})`);
+  assert.equal(rig.parts.filter((pp) => pp.node === hips).length, 0, 'nothing hangs on the hips: it is one shirt');
+  // and the hem goes below the hip bone (hips sit at 0.94, the hem reaches ~0.44)
+  assert.ok(body.min[1] < 0.55, `the shirt covers the hips (${body.min[1].toFixed(2)})`);
+  // the cloth is one profile, bottom to top: a reversed profile turns the faces inward and the shirt goes
+  // see-through (that is what "the skirt is transparent" was)
+  const s = src('src/game/survivor.js');
+  const tee = s.slice(s.indexOf('  bigtee(R) {'), s.indexOf('  // Taiga: knee-length sheepskin'));
+  const prof = tee.slice(tee.indexOf('lathe(b, ['), tee.indexOf('], SEG, BA'));
+  const ys = [...prof.matchAll(/\[([\d.]+), (-?[\d.]+)\]/g)].map((m) => parseFloat(m[2]));
+  assert.ok(ys.length > 8, 'the shirt has a profile');
+  for (let i = 1; i < ys.length; i++) assert.ok(ys[i] > ys[i - 1], `bottom to top (${ys[i - 1]} then ${ys[i]})`);
 });
 
 test('nothing is a slab across her legs any more, and the sleeves leave the arms bare', () => {
@@ -88,6 +99,15 @@ test('her shoes are on her feet, and her head still narrows to a chin', () => {
   assert.ok(/lathe\(b, \[\[0, -0\.13/.test(head), 'the skull still comes to a point at the chin');
   assert.ok(rig.nodes.eyes && rig.parts.some((p) => p.node === rig.nodes.eyes), 'the eyes are on their own bone (they blink)');
   assert.ok(rig.nodes.earL && rig.nodes.earR, 'the ears are on theirs (they turn)');
+});
+
+test('her clothes cannot turn into glass: both faces of everything she wears are drawn', () => {
+  const s = src('src/game/stray.js');
+  assert.ok(/mat\.side = THREE\.DoubleSide/.test(s), 'her material draws the inside of the cloth too');
+  // and the hem is folded up inside, so looking under it shows cloth, not the inside of a shell
+  const surv = src('src/game/survivor.js');
+  const tee = surv.slice(surv.indexOf('  bigtee(R) {'), surv.indexOf('  // Taiga: knee-length sheepskin'));
+  assert.ok(/turned up inside/.test(tee), 'the hem has a folded edge');
 });
 
 test('she fits the echo buffer as she is: no growth needed for a wardrobe-sized body', () => {

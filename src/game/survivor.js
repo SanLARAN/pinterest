@@ -144,46 +144,54 @@ const BODY = {
   // bare arms, socks and sneakers. White, grey and a little too clean for this forest.
   bigtee(R) {
     const n = R.nodes;
-    // The tee, two sizes too big, in the game's own vocabulary: lathes squeezed front-to-back (place's scale),
-    // five-sided limbs, boxes. It hangs off the shoulders and stops mid-thigh, with a rolled hem and a collar
-    // that keeps slipping — the hem lives on the hips so it follows the walk, the shirt on the chest.
+    // One garment, one piece of cloth: an oversized tee from the shoulders down past the hips to mid-thigh. It all
+    // hangs on the chest, so there is no separate skirt to read as a skirt — the shirt itself covers the lower body.
+    // The profile runs bottom → top (the winding of the lathe depends on it), and the hem is folded up inside, so
+    // looking under it shows cloth instead of the inside of a shell.
+    const SEG = 9;
     part(R, n.chest, (b) => {
-      b.place(0, 0, 0, 0, 0, 0, 1.12, 1, 0.78);
+      b.place(0, 0, 0, 0, 0, 0, 1.1, 1, 0.82);
       lathe(b, [
-        [0.156, -0.07], [0.156, 0.02], [0.162, 0.14], [0.17, 0.28], [0.176, 0.4],
-        [0.174, 0.47], [0.16, 0.52], [0.128, 0.552], [0.094, 0.568],
-      ], 9, BA, { phase: PI / 9, hide: 5 });
+        [0.186, -0.5],   // the hem: mid-thigh, wider than the hips under it
+        [0.188, -0.46],
+        [0.184, -0.38],
+        [0.176, -0.28],
+        [0.168, -0.18],
+        [0.16, -0.08],
+        [0.154, 0.02],
+        [0.158, 0.14],
+        [0.166, 0.26],
+        [0.172, 0.38],
+        [0.171, 0.45],
+        [0.157, 0.51],
+        [0.126, 0.548],
+        [0.094, 0.568],
+      ], SEG, BA, { phase: PI / SEG, hide: 5 });
+      // the hem, turned up inside: two rings, so the edge has thickness and the garment is never see-through
+      lathe(b, [
+        [0.185, -0.496],
+        [0.176, -0.462],
+        [0.166, -0.462],
+      ], SEG, BB, { phase: PI / SEG, hide: 1 | 2 | 4 | 8 });
       b.identity();
-      // the collar: two rings of ribbing, flopping open at the front
-      b.place(0, 0.515, 0.004, 0.05, 0, 0, 1.1, 1, 0.86);
+      // the collar: two rings of ribbing, flopping open to one side
+      b.place(0, 0.518, 0.004, 0.05, 0, 0, 1.1, 1, 0.86);
       lathe(b, [[0.096, 0], [0.098, 0.028], [0.088, 0.055], [0.074, 0.07]], 8, BA, { phase: PI / 8 });
       b.identity();
-      // the neckline slipping off her left shoulder: one seam, and the bare skin under it
+      // the neckline slipping off her left shoulder: one seam
       b.limb([-0.185, 0.57, 0.03], [-0.232, 0.42, 0.055], 0.009, 0.007, BB, 3);
       // the print on the chest (the accent colour): a wolf skull in marker, four strokes and two holes
-      b.place(0, 0.298, 0.139); b.box(0.104, 0.1, 0.004, BB);
-      b.place(0, 0.254, 0.143); b.box(0.048, 0.042, 0.004, BA); // the muzzle: the shirt showing through
+      b.place(0, 0.3, 0.13); b.box(0.104, 0.1, 0.004, BB);
+      b.place(0, 0.256, 0.134); b.box(0.048, 0.042, 0.004, BA); // the muzzle: the shirt showing through
       for (const s of [-1, 1]) {
-        b.place(s * 0.035, 0.35, 0.14, 0, 0, s * 0.5); b.box(0.046, 0.019, 0.004, BB); // the ears
-        b.place(s * 0.021, 0.29, 0.142); b.box(0.017, 0.015, 0.004, BA); // the eye sockets
+        b.place(s * 0.035, 0.352, 0.131, 0, 0, s * 0.5); b.box(0.046, 0.019, 0.004, BB); // the ears
+        b.place(s * 0.021, 0.292, 0.133); b.box(0.017, 0.015, 0.004, BA); // the eye sockets
       }
-      b.identity();
-    });
-    part(R, n.hips, (b) => {
-      b.place(0, 0, 0, 0, 0, 0, 1.12, 1, 0.8);
-      lathe(b, [
-        [0.152, 0.01], [0.15, -0.1], [0.152, -0.2], [0.155, -0.3], [0.156, -0.38],
-      ], 9, BA, { phase: PI / 9, hide: 5 });
-      // the hem, rolled under
-      lathe(b, [[0.157, -0.392], [0.156, -0.368]], 9, BB, { phase: PI / 9, hide: 5 });
-      b.identity();
-      // shorts underneath, just the cuffs showing
-      for (const s of [-1, 1]) { b.place(s * 0.078, -0.315, 0.02); b.cylinder(6, 0.06, 0.057, 0.11, BB); } // the cuffs, inside the hem
       b.identity();
     });
     limbs(R, {
       // short slack sleeves on their own bones, then the bare arm
-      upper: (b, s) => {
+      upper: (b) => {
         b.place(0, 0, 0, 0, 0, 0, 1, 1, 0.96);
         lathe(b, [[0.001, 0.055], [0.046, 0.05], [0.067, 0.026], [0.07, -0.02], [0.066, -0.062], [0.062, -0.095]], 8, BA, { phase: PI / 8, hide: 5 });
         lathe(b, [[0.063, -0.105], [0.061, -0.09]], 8, BB, { phase: PI / 8, hide: 5 }); // the cuff

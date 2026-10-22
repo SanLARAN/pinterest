@@ -126,6 +126,9 @@ export class Stray {
     const g = this.g;
     const rig = buildSurvivor(STRAY_FIT);
     const mat = createPersonMaterial(rig.dyes, 0xe9e6df);
+    // no culling on her: a garment that is a single piece of cloth (a tee over the hips, the hem folded up
+    // inside) must read as solid from any angle, and a reversed triangle must never turn into a hole in her
+    mat.side = THREE.DoubleSide;
     mat.uniforms.uEcho.value = 1; // she is seen the way everything else is: as an echo, and in real light
     const meshes = dressPerson(rig, mat);
     rig.root.position.set(this.x, this.y, this.z);
