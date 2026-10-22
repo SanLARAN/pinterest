@@ -42,6 +42,7 @@ import { Angler } from './angler.js'; // 2.1o: the man with the lantern (see CFG
 import { Stray } from './stray.js'; // 2.1v: the girl who takes the voice (see CFG.STRAY)
 import { buildSurvivor } from './survivor.js'; // 2.1v: her face, for the death close-up
 import { STRAY_FIT } from './stray.js';
+import { echoOf, mistScale } from './water.js'; // 3.0b: what water does to a sound
 
 const RED = [1.0, 0.13, 0.08];
 const CUT_FADE = 13.9; // s into the fly-by when the screen starts going dark
@@ -752,6 +753,9 @@ export class Game {
     const p = this.player;
     const e = this.eyePos();
     let R = fromMic ? CFG.voiceRevealRadius(loud) : CFG.revealRadius(loud);
+    // the участок (3.0b): knee-deep water shortens and slows the wave, vapour swallows its return
+    const echo = echoOf(this.world, e.x, e.z);
+    R *= echo.scale * mistScale(this.world, e.x, e.z);
     const first = this.firstPingT < 0;
     if (first) {
       R = Math.max(R, 52);
@@ -761,7 +765,11 @@ export class Game {
     const strength = 0.8 + loud * 0.7;
     this.lastPulseT = this.time;
     if (this.sync) this.sync.ev('pu', +e.x.toFixed(2), +(e.y - 0.25).toFixed(2), +e.z.toFixed(2), +loud.toFixed(3), fromMic ? 1 : 0);
-    const s = this.pulses.emit(e.x, e.y - 0.25, e.z, this.time, { radius: R, strength, decay: 0.38 + (1 - loud) * 0.22, color: SONAR, kind: 'player' });
+    const s = this.pulses.emit(e.x, e.y - 0.25, e.z, this.time, { radius: R, strength, speed: echo.speed, decay: 0.38 + (1 - loud) * 0.22, color: SONAR, kind: 'player' });
+    if (echo.scale < 1 || echo.speed !== CFG.PULSE.speed) {
+      // a wave that dies in the water: the sound tells you before the picture does
+      this.audio.sonarSweep(loud * 0.6, false);
+    }
     this.echoTicks(s, loud);
     this.fx.shockT = 0;
     this.fx.shockAmp = 0.35 + loud * 0.75;
@@ -1023,12 +1031,14 @@ export class Game {
   remotePulse(r, x, y, z, loud, fromMic) {
     loud = Math.max(0, Math.min(1, loud));
     let R = fromMic ? CFG.voiceRevealRadius(loud) : CFG.revealRadius(loud);
+    const echo = echoOf(this.world, x, z);
+    R *= echo.scale * mistScale(this.world, x, z);
     const first = this.firstPingT < 0;
     if (first) R = Math.max(R, 52);
     const c = r.hex;
     const k = 0.32;
     const color = [SONAR[0] * (1 - k) + (((c >> 16) & 255) / 255) * k, SONAR[1] * (1 - k) + (((c >> 8) & 255) / 255) * k, SONAR[2] * (1 - k) + ((c & 255) / 255) * k];
-    this.pulses.emit(x, y, z, this.time, { radius: R, strength: 0.8 + loud * 0.7, decay: 0.38 + (1 - loud) * 0.22, color, kind: 'player' });
+    this.pulses.emit(x, y, z, this.time, { radius: R, strength: 0.8 + loud * 0.7, speed: echo.speed, decay: 0.38 + (1 - loud) * 0.22, color, kind: 'player' });
     if (!fromMic) this.audio.matePing(x, y + 0.25, z, loud, CFG.SCREAM);
     // whoever made the sound flashes up at the heart of their own wave
     if (!(this.spectate && this.spectate.target === r) && this.distToEars(r.x, r.z) > 1.2) {
@@ -2061,9 +2071,19 @@ export class Game {
     if (this.expedition.walkTop) this.expedition.clampDeck(); // (2.1s: the lookout's rails)
     if (pev.step) {
       const s = pev.step;
-      this.audio.footstep(s.intensity);
+      // (3.0b) a step in the water is a splash and a ring on the surface; on the planks it is a creak
+      if (s.water) {
+        this.audio.splash(s.intensity);
+        this.pulses.emitStep(p.x, this.world.water?.level ?? p.y, p.z, this.time, { radius: s.ring || 8, strength: 0.5, speed: 12, decay: 1.6, kind: 'step' });
+      } else if (s.plank) {
+        this.audio.creak(s.intensity);
+      } else {
+        this.audio.footstep(s.intensity);
+      }
       if (s.mode === 'crouch') {
         this.pulses.emitStep(p.x, p.y + 0.15, p.z, this.time, { radius: 2.6, strength: 0.3, speed: 10, decay: 2.4, kind: 'step' });
+        // ...unless it is a crouched step in the water: that still splashes, quietly
+        if (s.water) this.playerNoise(p.x, p.z, s.loud, 'step');
       } else {
         const sprint = s.mode === 'sprint';
         this.pulses.emitStep(p.x, p.y + 0.2, p.z, this.time, { radius: sprint ? 9 : 5.5, strength: sprint ? 0.6 : 0.42, speed: 16, decay: sprint ? 1.9 : 2.3, kind: 'step' });

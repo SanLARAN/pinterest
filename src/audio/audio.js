@@ -522,6 +522,27 @@ export class AudioEngine {
     if (intensity > 0.6) this._tone(t, { f: 95, fEnd: 55, a: 0.002, d: 0.08, gain: 0.25 * intensity, dest: o });
   }
 
+  // ---------- the bog (3.0b): water under a foot, and planks over it ----------
+  // a step in the water: a short wet slap, a little lower and softer than peat
+  splash(intensity = 0.5) {
+    if (!this.ready) return;
+    const t = this.now;
+    const o = this.sfx;
+    this._noiseBurst(t, { f: 1500 - intensity * 500, q: 0.7, a: 0.004, d: 0.1 + intensity * 0.12, gain: 0.09 + intensity * 0.22, dest: o });
+    this._noiseBurst(t + 0.03, { f: 620, q: 1.6, a: 0.006, d: 0.16, gain: 0.05 + intensity * 0.12, dest: o });
+    this._tone(t, { f: 180, fEnd: 120, a: 0.004, d: 0.09, gain: 0.05 * intensity, dest: o });
+  }
+
+  // a board taking your weight: a short wooden creak with a knock under it
+  creak(intensity = 0.4) {
+    if (!this.ready) return;
+    const t = this.now;
+    const o = this.sfx;
+    this._tone(t, { type: 'triangle', f: 210 + Math.random() * 60, fEnd: 150, a: 0.01, d: 0.13, gain: 0.05 + intensity * 0.09, dest: o });
+    this._noiseBurst(t + 0.01, { f: 900, q: 1.8, a: 0.002, d: 0.05, gain: 0.05 + intensity * 0.1, dest: o });
+    this._tone(t + 0.04, { f: 90, fEnd: 62, a: 0.002, d: 0.07, gain: 0.06 + intensity * 0.1, dest: o });
+  }
+
   // ---------- co-op: your friends in the forest ----------
   // a teammate's footstep, from where they walk
   mateStep(x, y, z, intensity = 0.4) {

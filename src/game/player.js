@@ -1,5 +1,6 @@
 // First-person controller: snappy acceleration, stamina, footsteps, bumps into trees.
 import { CFG } from '../core/config.js';
+import { speedScale, stepOf } from './water.js';
 import { clamp, damp } from '../core/rng.js';
 import { SLOT_OFFSET } from './remote.js';
 
@@ -76,6 +77,10 @@ export class Player {
       this.adrenaline = Math.max(0, this.adrenaline - dt);
       target *= this.sprinting && !heavy ? CFG.SYRINGE.sprint : CFG.SYRINGE.walk;
     }
+
+    // the bog (3.0b): knee-deep water is just over half speed — and it stacks with everything else
+    const wetScale = speedScale(this.world, this.x, this.z);
+    if (wetScale !== 1) target *= wetScale;
 
     const sy = Math.sin(this.yaw), cy = Math.cos(this.yaw);
     // forward = (-sin, -cos), right = (cos, -sin)
@@ -155,6 +160,16 @@ export class Player {
           intensity = this.crouching ? 0.35 : 0.62;
           ev.step = { loud, mode: 'walk', intensity, heavy: true };
         } else ev.step = { loud, mode, intensity };
+        // (3.0b) the ground decides what a step is worth: a splash carries further, a board creaks
+        const g = stepOf(this.world, this.x, this.z, ev.step.loud);
+        if (g.water || g.plank) {
+          ev.step.loud = g.loud;
+          ev.step.water = g.water;
+          ev.step.plank = g.plank;
+          ev.step.ring = g.ring;
+          if (g.water) ev.step.intensity = Math.max(0.5, intensity);
+          if (g.plank) ev.step.intensity = Math.max(0.35, intensity);
+        }
       }
     } else {
       this.stepAcc = Math.min(this.stepAcc, stepLen * 0.6);

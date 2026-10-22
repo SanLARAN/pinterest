@@ -75,6 +75,7 @@ const DEBUG = {
   seats: parseInt(params.get('seats'), 10) || 0, // preview a lobby's four goodnights alone
   nomic: params.has('nomic'),
   fps: params.has('fps'),
+  map: params.get('map') || '', // ?map=bog: walk the peat bog (3.0: the second участок, still being built)
 };
 
 const $ = (id) => document.getElementById(id);
@@ -99,7 +100,7 @@ const shadows = new OmniShadows(renderer); // walls stop light (filled with the 
 
 // ---------------- systems ----------------
 const worldMat = createWorldMaterial();
-const world = new World(scene, worldMat);
+const world = new World(scene, worldMat, DEBUG.map === 'bog' ? 'bog' : 'forest');
 const pulses = new Pulses();
 const ghosts = new Ghosts(scene);
 const eyes = new Eyes(scene);
