@@ -7,6 +7,21 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v:'2.1v',date:'2026-10-22',
+    ru:{title:'Найдёныш',items:[
+      'Четвёртая ночь приводит её: девочка в футболке на два размера больше, белые волосы до пояса, волчьи уши. Она идёт за тобой медленнее, чем ты ходишь, и ничего не делает, пока ты идёшь. Стоит побежать рядом — просыпается, и тогда догнать тебя ей хватает',
+      'Она не рвёт и не ест. Один на один — полторы секунды её руки на горле, и «УБИТ · Дворняжка». В компании страшнее: она надевает тебя — друзья видят твой силуэт, идущий к ним, и слышат твой голос, а твой микрофон для них мёртв на все сорок пять секунд',
+      'Её силуэт человеческий, и в эхе его ни с чем не спутать: уши повёрнуты на тебя, даже когда она стоит спиной. Свет в лицо держит её три секунды и отступает до утра',
+      'Десять встреч — и её вещи твои: белая голова с волчьими ушами (они поворачиваются на звук) и та самая футболка с волчьим черепом. Не за осколки: за десять ночей, в которые ты не побежал',
+    ]},
+    en:{title:'The Stray',items:[
+      'The fourth night brings her: a girl in a tee two sizes too big, white hair to the waist, wolf ears. She walks after you slower than you walk and does nothing at all while you walk. Run near her and she wakes — and then she is fast enough',
+      'She does not tear and does not eat. Alone: a second and a half of her hand on your throat, and "KILLED · The Stray". In company it is worse: she wears you — your friends see your shape walking up to them and hear your voice, while your microphone is dead to them for the whole forty-five seconds',
+      'Her silhouette is human, and in the echo it cannot be mistaken: her ears are turned toward you even when her back is. A light in her face holds her for three seconds and she gives up until morning',
+      'Ten meetings and her things are yours: the white head with the wolf ears (they turn toward a sound) and that tee with the wolf skull. Not for shards: for ten nights in which you did not run',
+    ]}
+  },
+  {
     v:'2.1u',date:'2026-10-22',
     ru:{title:'Сборник смены',items:[
       'В конце смены — сборник хайлайтов: самые глупые моменты ночи, с разбегом и последствиями. Режиссёр сам следит за смертями, хваткой Наблюдателя, Удильщиком, упавшими друзьями, звенящими цепями, разбитыми и заведёнными генераторами и криками в темноте',

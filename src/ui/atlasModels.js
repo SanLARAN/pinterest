@@ -11,6 +11,8 @@ import { MeshBuilder, KIND } from '../world/builder.js';
 import { RNG, clamp, lerp, angleDiff } from '../core/rng.js';
 import { World, LANDMARKS } from '../world/world.js';
 import { buildListener, buildCrawler, buildWatcher, buildHowler, buildAngler, buildShade, ANIMS } from '../game/monsters.js';
+import { buildSurvivor, poseSurvivor } from '../game/survivor.js';
+import { STRAY_FIT } from '../game/stray.js';
 import { placer, buildCorpse, buildToolBag, buildFlareGun } from '../game/objectives.js';
 import { buildDoorLeaf } from '../game/doors.js';
 import { buildForestCar, buildPart, WHEELS, MISSING, HOOD_HINGE, HOOD_OPEN, PARTS } from '../game/uaz.js';
@@ -181,6 +183,30 @@ function angler(mat) {
       if (S.react < 4.2) m.attendT = 1.1; // he heard the page turn
       attend(m, S, 2.4, 4, 0.65);
       ANIMS.angler(m, S.dt, S.t);
+    },
+  };
+}
+
+// The Stray (2.1v): a survivor's rig in her own two pieces, walking her slow round. She turns her head
+// toward the page when it is opened (she heard it), and her ears follow.
+function stray(mat) {
+  const rig = buildSurvivor(STRAY_FIT);
+  const root = rigMeshes(rig, mat);
+  const n = rig.nodes;
+  let speed = 0.55, turn = 0;
+  return {
+    root, base: 0.05, view: { yaw: 0.35, pitch: 0.03 },
+    poses: [() => { poseSurvivor(rig, 1.2, 0.9, false, false); }],
+    tick(S) {
+      // the page turn reaches her: she stops and looks
+      const attend = S.react < 5;
+      speed = lerp(speed, attend ? 0 : 1.05, 1 - Math.exp(-2.2 * S.dt));
+      poseSurvivor(rig, S.t * 1.1, speed, false, false);
+      turn = lerp(turn, attend ? 0.42 : Math.sin(S.t * 0.4) * 0.16, 1 - Math.exp(-3.2 * S.dt));
+      if (n.head) n.head.rotation.y = turn;
+      const tw = Math.sin(S.t * 3.1) > 0.94 ? Math.sin(S.t * 42) * 0.2 : 0;
+      if (n.earL) n.earL.rotation.y = turn - tw;
+      if (n.earR) n.earR.rotation.y = turn + tw;
     },
   };
 }
@@ -698,7 +724,7 @@ function shkaf(mat) {
 
 // ---------------- registry ----------------
 const MODELS = {
-  listener, crawler, watcher, howler, angler, shkaf, shade,
+  listener, crawler, watcher, howler, angler, shkaf, shade, stray,
   generator: (mat) => generator(mat, true),
   corpse, fuel, plug, fuses, belt, battery, shard, stone, flare, glowstick, flashlight,
   syringe,

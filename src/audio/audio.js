@@ -2093,6 +2093,78 @@ export class AudioEngine {
     src.start(this.now);
   }
 
+  // ---------- the Stray (2.1v) ----------
+  // three notes she hums, dry and close, over a bed she never raises: the only thing about her that is gentle
+  strayHum(x, y, z, I = 1) {
+    if (!this.ready) return;
+    const t = this.now;
+    const pn = this._panner(x, y, z, 4, 1.1);
+    pn.connect(this.sfx);
+    const notes = [392, 466.2, 349.2];
+    notes.forEach((f, i) => {
+      this._tone(t + i * 0.42, { type: 'sine', f, a: 0.09, d: 0.5, gain: 0.09 * I, dest: pn, rev: 0.35 });
+      this._tone(t + i * 0.42, { type: 'triangle', f: f * 2, a: 0.12, d: 0.3, gain: 0.018 * I, dest: pn });
+    });
+  }
+
+  // the moment running near her is a mistake: a breath going in, and a growl under it
+  strayAnger(x, y, z, I = 1) {
+    if (!this.ready) return;
+    const t = this.now;
+    const pn = this._panner(x, y, z, 3, 1.2);
+    pn.connect(this.sfx);
+    this._noiseBurst(t, { buf: this.brown, type: 'lowpass', f: 420, fEnd: 180, a: 0.18, d: 0.5, gain: 0.7 * I, dest: pn });
+    this._tone(t, { type: 'sawtooth', f: 68, fEnd: 44, a: 0.12, d: 0.6, gain: 0.22 * I, dest: pn });
+    this._tone(t + 0.1, { type: 'triangle', f: 1300, fEnd: 900, a: 0.05, d: 0.2, gain: 0.05 * I, dest: pn });
+  }
+
+  // her hand: cloth, then the breath leaving you, then the world one step further away
+  strayTake(x, y, z, I = 1) {
+    if (!this.ready) return;
+    const t = this.now;
+    const pn = this._panner(x, y, z, 2.4, 1.15);
+    pn.connect(this.sfx);
+    this._noiseBurst(t, { type: 'highpass', f: 2400, a: 0.001, d: 0.05, gain: 0.5 * I, dest: pn });
+    this._noiseBurst(t + 0.02, { buf: this.brown, type: 'lowpass', f: 320, fEnd: 120, a: 0.01, d: 0.6, gain: 1.1 * I, dest: pn });
+    this._tone(t + 0.05, { type: 'sine', f: 220, fEnd: 55, a: 0.02, d: 1.2, gain: 0.3 * I, dest: pn , rev: 0.4 });
+    this._noiseBurst(t + 0.3, { type: 'bandpass', f: 1600, q: 3, a: 0.2, d: 0.9, gain: 0.06 * I, dest: pn, fEnd: 500 });
+  }
+
+  strayLeave(x, y, z) {
+    if (!this.ready) return;
+    const t = this.now;
+    const pn = this._panner(x, y, z, 5, 1.1);
+    pn.connect(this.sfx);
+    this._noiseBurst(t, { type: 'bandpass', f: 900, q: 1.5, a: 0.3, d: 0.8, gain: 0.12, dest: pn, fEnd: 400 });
+  }
+
+  strayStep(x, y, z, I = 0.6) {
+    if (!this.ready) return;
+    const t = this.now;
+    const pn = this._panner(x, y, z, 2, 1.2);
+    pn.connect(this.sfx);
+    this._noiseBurst(t, { buf: this.pink, type: 'lowpass', f: 700, q: 0.8, a: 0.002, d: 0.08, gain: 0.28 * I, dest: pn });
+    this._tone(t, { type: 'sine', f: 120, fEnd: 70, a: 0.002, d: 0.09, gain: 0.06 * I, dest: pn });
+  }
+
+  // the tenth meeting: her skin is yours now. Three notes, then one more, and a chime of glass
+  strayMet(x, y, z) {
+    if (!this.ready) return;
+    const t = this.now;
+    const pn = this._panner(x, y, z, 4, 1.1);
+    pn.connect(this.sfx);
+    [392, 466.2, 349.2, 587.3].forEach((f, i) => this._tone(t + i * 0.36, { type: 'sine', f, a: 0.08, d: 0.7, gain: 0.1, dest: pn, rev: 0.6 }));
+    this._tone(t + 1.2, { type: 'sine', f: 1760, a: 0.002, d: 0.5, gain: 0.05, dest: this.ui });
+  }
+
+  // her words, in someone else's place: a radio opening on nothing
+  strayRadio() {
+    if (!this.ready) return;
+    const t = this.now;
+    this._noiseBurst(t, { type: 'bandpass', f: 1800, q: 4, a: 0.004, d: 0.09, gain: 0.12, dest: this.ui, fEnd: 900 });
+    this._tone(t + 0.02, { type: 'sine', f: 720, fEnd: 640, a: 0.002, d: 0.06, gain: 0.04, dest: this.ui });
+  }
+
   anglerGrab(x, y, z, I = 1) {
     if (!this.ready) return;
     const t = this.now;
@@ -2873,6 +2945,10 @@ export class AudioEngine {
       const f = 520 + Math.random() * 120;
       this._tone(t, { type: 'sine', f, fEnd: f * 2.5, a: 0.002, d: 0.09, gain: 0.08, dest: out });
       this._tone(t + 0.05, { type: 'sine', f: 1500, fEnd: 2100, a: 0.002, d: 0.05, gain: 0.03, dest: out });
+    } else if (kind === 'deny') {
+      // not yours yet: two flat thuds, no sparkle (the Stray's skin is earned, not bought — 2.1v)
+      this._tone(t, { type: 'triangle', f: 180, fEnd: 120, a: 0.002, d: 0.1, gain: 0.06, dest: out });
+      this._tone(t + 0.11, { type: 'triangle', f: 150, fEnd: 100, a: 0.002, d: 0.12, gain: 0.05, dest: out });
     } else if (kind === 'tap') {
       this._tone(t, { type: 'sine', f: 2300, fEnd: 1500, a: 0.001, d: 0.05, gain: 0.06, dest: out });
       this._tone(t + 0.16, { type: 'sine', f: 1500, fEnd: 1100, a: 0.001, d: 0.08, gain: 0.025, dest: out });

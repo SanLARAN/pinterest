@@ -10,8 +10,10 @@
 //                       'sk'  "skip the morning"
 //                       'rc' / 'rr'  "let me lift them" / "they're breathing" (see Rescue)
 //  host → everyone      'sn'  monster snapshot, 10/s
+//                       'sy'  the Stray's own state, 6/s (2.1v: position, phase)
 //                       'ev'  monster events (hunt, howl, kill...), phase changes (dusk, dawn, end),
-//                             who lifted whom, who is back, who bled out
+//                             who lifted whom, who is back, who bled out, and 'sw' — the Stray
+//                             taking someone's voice ('start' / 'say' / 'end')
 import { createMonster, STATES, TYPES } from './monsters.js';
 import { PF } from './remote.js';
 import { kindIndex } from './backpackData.js';
@@ -28,6 +30,7 @@ export class NetSync {
     this.coop = coop;
     this.psT = 0;
     this.snT = 0;
+    this.syT = 0;
     this.obT = 0;
     this.obBeat = 3;
     this.voiceAcc = 0;
@@ -96,6 +99,12 @@ export class NetSync {
         this.snT = 1 / SNAP_HZ;
         this.send('sn', { t: r2(g.time), m: g.monsters.map((m) => this.packMonster(m)), a: g.angler.netState() });
       }
+      // her, six times a second: she is a controller, not one of the monster list (2.1v)
+      this.syT -= dt;
+      if (this.syT <= 0) {
+        this.syT = 1 / 6;
+        this.send('sy', this.packStray());
+      }
     }
     // objectives: when they change (throttled), plus a slow heartbeat that heals anything lost
     const ob = g.objectives;
@@ -107,6 +116,11 @@ export class NetSync {
       ob.dirty = false;
       this.send('ob', { ...ob.netState(), d: g.doors.netState(), e: g.escape.netState(), k: g.cabinets.netState(), it: g.tools.netState(), ex: g.expedition.netState(), bag: this.host ? g.inventory.netState() : null });
     }
+  }
+
+  packStray() {
+    const st = this.g.stray;
+    return st ? st.netState() : [0, 0, 0, 0];
   }
 
   packMonster(m) {
@@ -141,6 +155,9 @@ export class NetSync {
       }
       case 'sn':
         if (!this.host && isHostMsg && d && Array.isArray(d.m)) this.applySnap(d);
+        break;
+      case 'sy':
+        if (!this.host && isHostMsg && Array.isArray(d)) g.stray?.applyNet(d);
         break;
       case 'ob':
         if (d) {
@@ -226,6 +243,7 @@ export class NetSync {
     switch (name) {
       // ---- from any player ----
       case 've': if (isHostMsg) g.voiceMimic.hear(a); break;
+      case 'sw': if (a != null) g.stray?.netWear(a, b, c); break; // 2.1v: she is wearing someone
       case 'ibp': if (isHostMsg) g.inventory.applyParcel(a); break;
       case 'ibg': if (isHostMsg) g.inventory.applyClaim(a); break;
       case 'gd': if (r && typeof a === 'string') { const s = g.glows.find(a); if (s?.owner === pid && s.state === 'held') g.glows.dropFor(pid, +b, +c); } break;

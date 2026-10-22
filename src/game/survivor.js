@@ -140,6 +140,44 @@ const BODY = {
     hands(R);
   },
 
+  // The Stray's own (2.1v): a tee two sizes too big, slipping off one shoulder, hanging past the shorts,
+  // bare arms, socks and sneakers. White, grey and a little too clean for this forest.
+  bigtee(R) {
+    const n = R.nodes;
+    part(R, n.hips, (b) => {
+      // the hem of the tee, down past the hips, one side lower than the other
+      b.place(0, -0.3, 0, 0, 0, 0.06); b.taper(0.46, 0.3, 0.4, 0.27, 0.6, BA);
+      b.place(0, -0.6, 0, 0, 0, 0.06); b.taper(0.47, 0.31, 0.465, 0.305, 0.03, BB); // the stitched hem
+      // shorts underneath, just the cuffs showing
+      for (const s of [-1, 1]) { b.place(s * 0.1, -0.44, 0.02); b.cylinder(6, 0.075, 0.07, 0.13, BB); }
+    });
+    part(R, n.chest, (b) => {
+      b.place(0, -0.075, 0); b.taper(0.36, 0.24, 0.4, 0.255, 0.63, BA); // the shirt
+      b.place(0, 0.5, 0.005, 0, 0, 0, 1, 1, 0.8); b.cylinder(8, 0.2, 0.17, 0.07, BA); // a collar too wide for her
+      // slipping off the left shoulder: a seam and the bare skin under it
+      b.identity(); b.limb([-0.2, 0.585, 0.02], [-0.25, 0.4, 0.05], 0.012, 0.01, BB, 3);
+      // the print on the chest (the accent colour): a small wolf skull, four strokes of a marker
+      b.place(0, 0.3, 0.101, 0.02, 0, 0); b.box(0.15, 0.15, 0.004, BB);
+      b.place(0, 0.262, 0.108); b.box(0.05, 0.045, 0.004, BA);
+      for (const s of [-1, 1]) {
+        b.place(s * 0.036, 0.336, 0.109, 0, 0, s * 0.5); b.box(0.05, 0.022, 0.004, BB); // the ears of the skull
+        b.place(s * 0.05, 0.28, 0.109); b.box(0.012, 0.05, 0.004, BB); // the fangs
+      }
+    });
+    limbs(R, {
+      upper: (b) => { b.identity(); b.limb([0, 0, 0], [0, -0.19, 0.012], 0.06, 0.055, BA, 5); b.identity(); b.limb([0, -0.19, 0.012], ARM, 0.046, 0.042, KIND.FLESH, 5); },
+      fore: (b) => { b.identity(); b.limb([0, 0, 0], FORE, 0.042, 0.034, KIND.FLESH, 5); },
+      thigh: (b) => { b.identity(); b.limb([0, 0, 0], THIGH, 0.068, 0.055, KIND.FLESH, 5); },
+      shin: (b) => {
+        b.identity(); b.limb([0, 0, 0], [0, -0.3, 0], 0.052, 0.042, KIND.FLESH, 5);
+        b.identity(); b.limb([0, -0.3, 0], SHIN, 0.048, 0.044, BB, 5); // the sock
+        b.place(0, -0.44, 0.045); b.box(0.1, 0.075, 0.235, BA); // the sneaker
+        b.place(0, -0.46, 0.05); b.box(0.105, 0.02, 0.24, KIND.BONE); // its sole
+      },
+    });
+    hands(R, KIND.FLESH, 0.038, 0.052);
+  },
+
   // Taiga: knee-length sheepskin, fleece collar and cuffs, a red sash, felt boots, mittens
   tulup(R) {
     const n = R.nodes;
@@ -783,6 +821,54 @@ const HEAD = {
         b.place(0, 0, 0, 0.1, 0, -s * 0.3, 1, 1, 0.5); b.cone(4, 0.066, 0.15, HA, { phase: PI / 4 });
         b.place(0, 0.012, 0.016, 0.1, 0, -s * 0.3, 0.68, 0.78, 0.28); b.cone(4, 0.066, 0.15, HB, { phase: PI / 4 });
         for (const [x, y] of [[-s * 0.01, 0.05], [s * 0.01, 0.07]]) spike(b, x, y, 0.024, PI, 0.55, 0.012, 0.045, HA, 3); // fur in the ear
+      });
+    }
+  },
+
+  // The Stray (2.1v). From the reference: white hair to the hips, one eye behind the fringe, ears on their
+  // own bones. The ears turn toward whatever she is listening to (see poseStrayEars), and the eyes are lit —
+  // HG, not a dye, so they shine in the dark like everything else in this forest.
+  strayhead(R) {
+    const n = R.nodes;
+    part(R, n.head, (b) => {
+      // the face: small, pale, still
+      b.place(0, 0, 0.004);
+      lathe(b, [[0, -0.132], [0.048, -0.122], [0.086, -0.09], [0.104, -0.04], [0.112, 0.012], [0.108, 0.066], [0.09, 0.114], [0.052, 0.144], [0, 0.152]], 12, KIND.FLESH, { phase: PI / 12 });
+      b.place(0, -0.086, 0.096); b.box(0.024, 0.0035, 0.005, KIND.ROCK); // a mouth that is not smiling
+      // the crown of the hair, tipped back
+      b.place(0, 0, 0, -0.34, 0, 0);
+      lathe(b, [[0.126, -0.02], [0.138, 0.04], [0.133, 0.1], [0.108, 0.15], [0.062, 0.182], [0, 0.196]], 12, HA, { phase: PI / 12 });
+      b.place(0, -0.13, -0.1); b.taper(0.205, 0.09, 0.26, 0.135, 0.2, HA); // the back of it
+      // a heavy fringe, longer on the right: the left eye is behind it
+      for (const [a, hh] of [[-0.95, 0.16], [-0.62, 0.15], [-0.3, 0.135], [0, 0.11], [0.3, 0.075], [0.62, 0.062], [0.95, 0.07]]) {
+        spike(b, Math.sin(a) * 0.12, 0.072 - Math.abs(a) * 0.012, Math.cos(a) * 0.12, PI - a, 2.92, 0.033, hh, HA, 4);
+      }
+      // locks down past the collarbones, narrowing to points
+      const fz = Math.max(0.112, reach(R, n.chest, 0.3, 0.62, 1)) + 0.01;
+      for (const s of [-1, 1]) {
+        b.identity();
+        b.limb([s * 0.108, 0.03, 0.05], [s * 0.126, -0.15, fz + 0.008], 0.036, 0.028, HA, 5);
+        b.limb([s * 0.126, -0.15, fz + 0.008], [s * 0.132, -0.34, fz + 0.04], 0.028, 0.013, HA, 5);
+        spike(b, s * 0.132, -0.336, fz + 0.04, PI, PI - 0.1, 0.013, 0.055, HA, 4);
+      }
+    });
+    // the one eye you can see: pink, and lit
+    const eyes = node(R, 'eyes', n.head, 0, -0.012, 0);
+    part(R, eyes, (b) => {
+      for (const s of [-1, 1]) {
+        const x = s * 0.045, a = s * 0.34;
+        b.place(x, -0.018, 0.098, PI / 2, a, 0, 1, 1, 1.4); b.cylinder(8, 0.024, 0.024, 0.012, KIND.ROCK);
+        b.place(x, -0.018, 0.106, PI / 2, a, 0, 1, 1, 1.1); b.cylinder(8, 0.017, 0.017, 0.012, HG); // the iris, lit
+        b.place(x + 0.008, -0.004, 0.113, 0, a, 0, 1, 1, 0.5); b.octa(0.007, 0.007, KIND.BONE);
+      }
+    });
+    // ears on their own bones: they turn (poseStrayEars in stray.js)
+    for (const s of [-1, 1]) {
+      const ear = node(R, s < 0 ? 'earL' : 'earR', n.head, s * 0.082, 0.108, -0.012);
+      part(R, ear, (b) => {
+        b.place(0, 0, 0, 0.06, 0, -s * 0.26, 1, 1, 0.62); b.cone(5, 0.072, 0.17, HA, { phase: PI / 5 });
+        b.place(0, 0.014, 0.02, 0.06, 0, -s * 0.26, 0.66, 0.8, 0.3); b.cone(5, 0.072, 0.17, HB, { phase: PI / 5 });
+        for (const [x, y] of [[-s * 0.012, 0.05], [s * 0.012, 0.08]]) spike(b, x, y, 0.026, PI, 0.62, 0.012, 0.05, HA, 3); // fur
       });
     }
   },

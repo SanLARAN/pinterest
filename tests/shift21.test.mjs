@@ -67,7 +67,7 @@ test('the shift is four days: 8-minute nights, 1:45 mornings, no 45-minute limit
   assert.equal(S.NIGHT, 480);
   assert.equal(S.MORNING, 105);
   assert.equal('RUN_SECONDS' in CFG, false);
-  assert.equal(PROTOCOL, 17); // 2.1s: shift length in the rules, the sovkhoz in the chain, chains, the Watcher's grip
+  assert.equal(PROTOCOL, 18); // 2.1v: the Stray's state stream and the voice she takes (was 17 in 2.1s)
 });
 
 test('danger steps every four minutes of a night and again with each dawn survived', () => {

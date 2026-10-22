@@ -6,7 +6,7 @@
 // fact values may use {h} (height) and {len} (longest side) — measured from the 3D model itself.
 
 export const CHAPTERS = [
-  { id: 'beasts', num: 'I', entries: ['listener', 'crawler', 'watcher', 'howler', 'shkaf', 'angler', 'shade'] },
+  { id: 'beasts', num: 'I', entries: ['listener', 'crawler', 'watcher', 'howler', 'shkaf', 'angler', 'stray', 'shade'] },
   { id: 'tasks', num: 'II', entries: ['generator', 'corpse', 'fuel', 'plug', 'fuses', 'belt', 'battery', 'shard', 'stone', 'flare', 'glowstick', 'flashlight', 'tape', 'crowbar', 'binoculars', 'syringe'] },
   { id: 'places', num: 'III', entries: ['camp', 'medhut', 'cabin', 'tower', 'stones', 'wreck', 'sovkhoz', 'firetower', 'zarya'] },
   { id: 'way', num: 'IV', entries: ['yard', 'uaz', 'wheel', 'carbattery', 'carb', 'jerrycan'] },
@@ -20,6 +20,7 @@ export const ENTRIES = {
   shkaf: { model: 'shkaf', sound: 'shkaf', kind: 'beast', rate: [0, 1, 0, 5], log: [['seen', 'seen:shkaf'], ['killed', 'kills:shkaf']] },
   angler: { model: 'angler', sound: 'angler', kind: 'beast', rate: [3, 4, 2, 5], log: [['seen', 'seen:angler'], ['killed', 'kills:angler']] },
   shade: { model: 'shade', sound: 'shade', kind: 'beast', rate: [null, null, null, null], log: [['appeared', 'seen:shade']] },
+  stray: { model: 'stray', sound: 'stray', kind: 'beast', rate: [2, 3, 4, 5], log: [['met', 'seen:stray']] }, // 2.1v
   generator: { model: 'generator', sound: 'generator', kind: 'thing', log: [['started', 'gens'], ['wins', 'wins']] },
   corpse: { model: 'corpse', sound: 'corpse', kind: 'thing', log: [['searched', 'bodies']] },
   fuel: { model: 'fuel', sound: 'fuel', kind: 'task', gen: 1, rate: [2, 1], log: [['fitted', 'part:0']] },
@@ -87,7 +88,7 @@ const TEXT = {
     chapters: { beasts: 'Твари', tasks: 'Задачи', places: 'Места', way: 'Путь отсюда' },
     rate: { beast: ['слух', 'чутьё', 'скорость', 'угроза'], task: ['шум', 'время'] },
     log: {
-      seen: 'ночей рядом', killed: 'убил тебя', appeared: 'являлась', started: 'запущено при тебе', wins: 'побед',
+      seen: 'ночей рядом', killed: 'убил тебя', appeared: 'являлась', met: 'встреч', started: 'запущено при тебе', wins: 'побед',
       searched: 'обыскано тел', fitted: 'поставлено', found: 'найдено', thrown: 'брошено', fired: 'выпущено', startedHere: 'запущено здесь',
       visited: 'посещений', surveyed: 'осмотров', pried: 'взломано замков',
       cracked: 'зажжено', revived: 'вернул к жизни', escaped: 'уехал отсюда', fittedCar: 'деталей поставил',
@@ -192,6 +193,22 @@ const TEXT = {
         ],
         facts: [['рост', '{h}'], ['слух', '?'], ['скорость', '?'], ['приходит', 'когда не ждёшь']],
         quote: 'Я видел её у костра. Утром там ничего не было.',
+      },
+      stray: {
+        name: 'Найдёныш', latin: 'Puella errans',
+        text: [
+          'Девочка в футболке на два размера больше, белые волосы до пояса, волчьи уши на макушке. Стоит на краю света и смотрит, как ты идёшь. Человеческий силуэт — в лесу, где всё остальное читается зверем, деревом или тварью.',
+          'Она не охотится на шум и не боится света. Она просто идёт рядом — медленнее, чем ты ходишь. Пока ты идёшь — всё хорошо. Стоит побежать — и она просыпается.',
+          'Она не рвёт и не ест. Она забирает голос. Один на один — её рука на твоём горле, полторы секунды, и всё. В компании — она надевает тебя: твои друзья видят твой силуэт, идущий к ним, и слышат твой голос, который отвечает им. А тебя в это время нет.',
+        ],
+        tips: [
+          'Не беги рядом с ней. Ходи. Обойди. Она ничего не сделает, пока ты идёшь.',
+          'Уши повёрнуты на тебя, даже когда она стоит спиной. Значит, это она, а не друг.',
+          'Свет в лицо — три секунды, и она отступает до утра. Но эти три секунды ты не видишь ничего другого.',
+          'Встретишь её десять раз — её вещи станут твоими. Футболка и уши. Ничего не дают, кроме того, что теперь это ты стоишь на краю света.',
+        ],
+        facts: [['рост', '{h}'], ['приходит', '4-я ночь'], ['идёт', '1.45 м/с'], ['просыпается', 'если бежать в 9 м'], ['хватка', '2.2 м · 1.4 с'], ['в компании', 'надевает · 45 с'], ['встреч до скина', '10']],
+        quote: 'Она спросила моим голосом, где я.',
       },
       generator: {
         name: 'Генератор', latin: 'ГБ-2200 «Луч», переносной',
@@ -686,7 +703,7 @@ const TEXT = {
     chapters: { beasts: 'Creatures', tasks: 'Objectives', places: 'Places', way: 'The way out' },
     rate: { beast: ['hearing', 'senses', 'speed', 'threat'], task: ['noise', 'time'] },
     log: {
-      seen: 'nights near it', killed: 'killed you', appeared: 'appeared', started: 'started with you', wins: 'wins',
+      seen: 'nights near it', killed: 'killed you', appeared: 'appeared', met: 'meetings', started: 'started with you', wins: 'wins',
       searched: 'bodies searched', fitted: 'fitted', found: 'found', thrown: 'thrown', fired: 'fired', startedHere: 'started here',
       visited: 'visits', surveyed: 'surveys', pried: 'locks broken',
       cracked: 'cracked', revived: 'brought back', escaped: 'drove out', fittedCar: 'parts fitted',
@@ -791,6 +808,22 @@ const TEXT = {
         ],
         facts: [['height', '{h}'], ['hearing', '?'], ['speed', '?'], ['arrives', "when you don't expect it"]],
         quote: 'I saw it by the fire. In the morning there was nothing there.',
+      },
+      stray: {
+        name: 'The Stray', latin: 'Puella errans',
+        text: [
+          "A girl in a tee two sizes too big, white hair to the waist, wolf ears on top of her head. She stands at the edge of the light and watches you walk. A human silhouette — in a forest where everything else reads as a beast, a tree or a thing.",
+          'She does not hunt noise and does not fear light. She simply walks along with you — slower than you walk. While you walk, all is well. The moment you run, she wakes.',
+          'She does not tear and does not eat. She takes the voice. Alone: her hand on your throat, a second and a half, and that is all. In company she wears you: your friends see your shape walking up to them and hear your voice answering them. You, meanwhile, are not there.',
+        ],
+        tips: [
+          'Do not run near her. Walk. Go around. She will not touch you while you walk.',
+          'Her ears are turned toward you even when her back is turned. That means it is her, not your friend.',
+          'A light in her face holds her off for three seconds — and for those three seconds you see nothing else.',
+          'Meet her ten times and her things are yours: the tee, the ears. They change nothing except that now it is you standing at the edge of the light.',
+        ],
+        facts: [['height', '{h}'], ['comes', 'the 4th night'], ['walks', '1.45 m/s'], ['wakes', 'if you run within 9 m'], ['the grip', '2.2 m · 1.4 s'], ['in company', 'wears you · 45 s'], ['meetings to the skin', '10']],
+        quote: 'She asked, in my voice, where I was.',
       },
       generator: {
         name: 'Generator', latin: 'GB-2200 "Ray", portable',

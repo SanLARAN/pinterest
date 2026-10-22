@@ -8,8 +8,7 @@ import { ScreenEditor } from './screenEditor.js';
 import { t } from '../core/i18n.js';
 import {
   SLOTS, ITEMS, PALETTE, SHOP, item, product, owns, wardrobe, saveWardrobe, colorsOf, setColor, resetColors, isDefaultColors,
-  myFit, fitWith, fullSet, fitKey, wt,
-} from '../game/outfit.js';
+  myFit, fitWith, fullSet, fitKey, wt, lockProgress } from '../game/outfit.js';
 import { wallet, onWallet, buyProduct, hasProduct } from '../game/wallet.js';
 
 // the tabs: the three slots, and the shop
@@ -255,6 +254,17 @@ export class Wardrobe {
     const it = item(id);
     if (!it) return;
     if (!owns(id)) {
+      const lock = lockProgress(id);
+      if (lock) {
+        // earned, not bought (2.1v): say how far along the ten you are, and do not leave the slot
+        const toast = $('wrToast');
+        if (toast) {
+          toast.textContent = t('wrStrayLock').replace('{n}', lock.met).replace('{need}', lock.need);
+          toast.classList.add('show');
+        }
+        this._sound('deny');
+        return;
+      }
       // not yours yet: the shop, on it
       this.shopSel = it.shop;
       if (this.slot !== 'shop') this.setSlot('shop');
@@ -514,7 +524,9 @@ export class Wardrobe {
       card.setAttribute('aria-selected', String(worn));
       card.innerHTML = `<span class="wr-theme t-${it.theme}">${esc(T.theme[it.theme])}</span>`;
       card.appendChild(this._canvasFor(it.id));
-      card.insertAdjacentHTML('beforeend', `<span class="wr-name">${esc(T.items[it.id].name)}</span><span class="wr-status">${esc(worn?t('wardrobeWorn'):available?t('wardrobeWear'):t('wardrobeTry'))}${!available?' · '+product(it.shop).price+' '+GEM:''}</span>`);
+      const lock = available ? null : lockProgress(it.id);
+      const tail = !available ? (lock ? ` · ${lock.met}/${lock.need}` : it.shop ? ` · ${product(it.shop).price} ${GEM}` : '') : '';
+      card.insertAdjacentHTML('beforeend', `<span class="wr-name">${esc(T.items[it.id].name)}</span><span class="wr-status">${esc(worn?t('wardrobeWorn'):available?t('wardrobeWear'):t('wardrobeTry'))}${esc(tail)}</span>`);
       box.appendChild(card);
     }
   }

@@ -9,13 +9,14 @@ import {readJSON,writeJSON} from '../core/persistence.js';
 // what you had. Shop pieces (shop: product id) can only be worn once bought (see wallet.js).
 import { getLang } from '../core/i18n.js';
 import { hasProduct } from './wallet.js';
+import { straySkinUnlocked, strayMet, STRAY_MEET } from '../core/strayLog.js';
 import { cleanScreen, screenKey, DEFAULT_SCREEN } from './screenFace.js';
 
 export const SLOTS = ['head', 'body', 'car'];
 export const WEAR = ['head', 'body']; // what a survivor wears (the car stays in the garage)
 
 // themes: base = the kit you came with
-export const THEMES = ['base', 'taiga', 'zone', 'halloween', 'anime', 'furry', 'keanu', 'pigeon', 'leshy', 'plague', 'cosmos', 'tuning', 'signal'];
+export const THEMES = ['base', 'taiga', 'zone', 'halloween', 'anime', 'furry', 'keanu', 'pigeon', 'stray', 'leshy', 'plague', 'cosmos', 'tuning', 'signal'];
 
 // c: default colours [main, accent]. glow: the accent is a light (carving, lenses) rather than a fabric
 export const ITEMS = {
@@ -28,6 +29,7 @@ export const ITEMS = {
     { id: 'boykisser', theme: 'furry', c: ['#e9e1d2', '#e86aa0'] },
     { id: 'keanuhair', theme: 'keanu', c: ['#241a12', '#3a2a1a'] }, // 2.1o
     { id: 'pigeonhead', theme: 'pigeon', c: ['#8f97a0', '#7a6fae'] }, // 2.1t
+    { id: 'strayhead', theme: 'stray', c: ['#e9e6df', '#e8a0b4'], unlock: 'stray' }, // 2.1v (ten meetings)
     { id: 'screen', theme: 'signal', c: ['#232527', '#9cffb0'], glow: true },
     { id: 'leshyhead', theme: 'leshy', c: ['#4e6b3c', '#9cff6a'], glow: true, shop: 'leshy' },
     { id: 'plaguemask', theme: 'plague', c: ['#e9e1d2', '#232527'], shop: 'plague' },
@@ -42,6 +44,7 @@ export const ITEMS = {
     { id: 'fluffy', theme: 'furry', c: ['#e9e1d2', '#e86aa0'] },
     { id: 'keanusuit', theme: 'keanu', c: ['#232527', '#e9e1d2'] }, // 2.1o
     { id: 'doctorcoat', theme: 'pigeon', c: ['#e9e1d2', '#4a5560'] }, // 2.1t
+    { id: 'bigtee', theme: 'stray', c: ['#d9d5c8', '#8a8a86'], unlock: 'stray' }, // 2.1v (ten meetings)
     { id: 'ghillie', theme: 'leshy', c: ['#4e6b3c', '#6b4a33'], shop: 'leshy' },
     { id: 'plaguecoat', theme: 'plague', c: ['#232527', '#6b4a33'], shop: 'plague' },
     { id: 'spacesuit', theme: 'cosmos', c: ['#e9e1d2', '#2f4f8f'], shop: 'cosmos' },
@@ -64,10 +67,20 @@ export function product(id) {
   return SHOP.find((p) => p.id === id) || null;
 }
 
-// can you wear it? (everything that isn't in the shop is yours from the start)
+// can you wear it? Everything that is not in the shop is yours from the start — except the two pieces
+// the Stray leaves behind (2.1v): those are earned by meeting her ten times, never bought.
 export function owns(id) {
   const it = byIdOf(id);
-  return !!it && (!it.shop || hasProduct(it.shop));
+  if (!it) return false;
+  if (it.unlock === 'stray' && !straySkinUnlocked()) return false;
+  return !it.shop || hasProduct(it.shop);
+}
+
+// what a locked piece is waiting for, in words the wardrobe can print ('stray': 3 / 10)
+export function lockProgress(id) {
+  const it = byIdOf(id);
+  if (it && it.unlock === 'stray' && !straySkinUnlocked()) return { kind: 'stray', met: strayMet(), need: STRAY_MEET };
+  return null;
 }
 function byIdOf(id) {
   return byId[id] || null;
@@ -208,7 +221,7 @@ const TEXT = {
     title: 'ГАРДЕРОБ',
     sub: 'Таким тебя увидят друзья — в эхе и под рабочими лампами.',
     slot: { head: 'Голова', body: 'Костюм', car: 'Машина', shop: 'Магазин' },
-    theme: { base: 'Штатное', taiga: 'Тайга', zone: 'Зона', halloween: 'Хэллоуин', anime: 'Аниме', furry: 'Фурри', keanu: 'Киану', pigeon: 'Голубь', leshy: 'Леший', plague: 'Чума', cosmos: 'Космос', tuning: 'Тюнинг', signal:'Сигнал' },
+    theme: { base: 'Штатное', taiga: 'Тайга', zone: 'Зона', halloween: 'Хэллоуин', anime: 'Аниме', furry: 'Фурри', keanu: 'Киану', pigeon: 'Голубь', stray: 'Дворняжка', leshy: 'Леший', plague: 'Чума', cosmos: 'Космос', tuning: 'Тюнинг', signal:'Сигнал' },
     set: 'комплект',
     color: 'Цвет',
     custom: 'свой цвет',
@@ -268,13 +281,15 @@ const TEXT = {
       keanusuit: { name: 'Чёрный костюм', parts: ['Костюм', 'Рубашка'], desc: 'Чёрная двойка, белая рубашка, галстук ослаблен две ночи назад. Этот костюм видал леса и похуже.' },
       pigeonhead: { name: 'Голова голубя', parts: ['Оперение', 'Переливы'], desc: 'Сизый голубь: глаз-бусина, восковица над клювом, шея переливается на свету — и лобное зеркальце на ремешке. Он не воркует. Он слушает.' },
       doctorcoat: { name: 'Халат доктора', parts: ['Халат', 'Стетоскоп'], desc: 'Белый халат до колен, накрахмаленный воротник, стетоскоп и ручка в кармане. Под халатом перья, в ботинках — голубиные лапы, в кармане — крошки. Диплом никто не спрашивает.' },
+      strayhead: { name: 'Дворняжка', parts: ['Волосы', 'Уши'], desc: 'Белые волосы до пояса, тяжёлая чёлка на один глаз, волчьи уши на макушке и розовый зрачок, который светится в темноте. Уши поворачиваются на звук раньше, чем ты успеваешь подумать. В этом лесу это единственное, что работает.' },
+      bigtee: { name: 'Футболка не по размеру', parts: ['Ткань', 'Принт'], desc: 'Оверсайз, сползает с одного плеча, подол ниже шорт, на груди — волчий череп, нарисованный маркером. Она была не её. Сними её с себя, когда сможешь.' },
     },
   },
   en: {
     title: 'WARDROBE',
     sub: 'This is how your friends will see you — in the echoes and under the work lamps.',
     slot: { head: 'Head', body: 'Outfit', car: 'Car', shop: 'Shop' },
-    theme: { base: 'Standard issue', taiga: 'Taiga', zone: 'The Zone', halloween: 'Halloween', anime: 'Anime', furry: 'Furry', keanu: 'Keanu', pigeon: 'Pigeon', leshy: 'Leshy', plague: 'Plague', cosmos: 'Cosmos', tuning: 'Tuning', signal:'Signal' },
+    theme: { base: 'Standard issue', taiga: 'Taiga', zone: 'The Zone', halloween: 'Halloween', anime: 'Anime', furry: 'Furry', keanu: 'Keanu', pigeon: 'Pigeon', stray: 'Stray', leshy: 'Leshy', plague: 'Plague', cosmos: 'Cosmos', tuning: 'Tuning', signal:'Signal' },
     set: 'full set',
     color: 'Colour',
     custom: 'custom colour',
@@ -334,6 +349,8 @@ const TEXT = {
       keanusuit: { name: 'Black suit', parts: ['Suit', 'Shirt'], desc: 'A black two-piece, a white shirt, the tie loosened two nights ago. This suit has seen worse forests.' },
       pigeonhead: { name: 'Pigeon head', parts: ['Plumage', 'Iridescence'], desc: "A city pigeon: a bead eye, a cere over the beak, a neck that shifts colour in the light — and the doctor's head mirror on a strap. It doesn't coo. It listens." },
       doctorcoat: { name: "Doctor's coat", parts: ['Coat', 'Stethoscope'], desc: 'A white coat to the knee, a starched collar, a stethoscope and a pen in the pocket. Feathers under the coat, pigeon feet in the shoes, crumbs in the pocket. Nobody asks about the diploma.' },
+      strayhead: { name: 'Stray', parts: ['Hair', 'Ears'], desc: 'White hair to the waist, a heavy fringe over one eye, wolf ears on top and a pink pupil that shines in the dark. The ears turn toward a sound before you have decided anything. In this forest it is the only thing that works.' },
+      bigtee: { name: 'Tee two sizes too big', parts: ['Cotton', 'Print'], desc: 'Oversized, slipping off one shoulder, the hem below the shorts, a wolf skull drawn on the chest in marker. It was never hers. Take it off yourself when you can.' },
     },
   },
 };

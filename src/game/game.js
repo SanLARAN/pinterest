@@ -39,6 +39,9 @@ import { shared } from '../render/sonar.js';
 import { Pulses } from '../render/pulses.js';
 import {PartMap} from './partMap.js';
 import { Angler } from './angler.js'; // 2.1o: the man with the lantern (see CFG.ANGLER)
+import { Stray } from './stray.js'; // 2.1v: the girl who takes the voice (see CFG.STRAY)
+import { buildSurvivor } from './survivor.js'; // 2.1v: her face, for the death close-up
+import { STRAY_FIT } from './stray.js';
 
 const RED = [1.0, 0.13, 0.08];
 const CUT_FADE = 13.9; // s into the fly-by when the screen starts going dark
@@ -70,6 +73,7 @@ export class Game {
     this.medhut = new MedHut(this); // (after the glow sticks: its lantern is one of their small lights)
     this.rescue = new Rescue(this);
     this.angler = new Angler(this); // the man with the lantern, from the third night (see CFG.ANGLER)
+    this.stray = new Stray(this); // the fourth night's girl: walk past her, never run (see CFG.STRAY)
     this.escape = new Escape(this); // the forestry yard, the УАЗ and its four parts, the way out
     this.cabinets = new Cabinets(this); // cupboards in the buildings (and the шкафандр)
     this.torch = new Torches(this); // flashlights: one lies out there each night
@@ -259,6 +263,10 @@ export class Game {
     this.rescue.resetPlayer(this.player);
     for (const r of this.remotes.values()) this.rescue.resetPlayer(r);
     this.angler.reset(); // the rope, the hunt, the clock — a new night owes him nothing
+    this.stray.reset(); // she is not out there until the night puts her there (2.1v)
+    this.strayWorn = false;
+    this.wornLine = 0;
+    this.micDeadByStray = false;
     this.audio.prefetchAnglerFound?.(); // his entrance sting, fetched long before the third night
     this.glows.reset();
     this.fire.reset();
@@ -1531,6 +1539,8 @@ export class Game {
   }
 
   scareRig(type) {
+    // 2.1v: she is not one of the monster rigs — the close-up is her own survivor rig, unposed by any AI
+    if (type === 'stray') return (this.scareRigs.stray ||= buildSurvivor({ ...STRAY_FIT }));
     return (this.scareRigs[type] ||= buildRig(type));
   }
 
@@ -1629,6 +1639,15 @@ export class Game {
       n.jaw.rotation.x = 1.15 + Math.sin(tt * 30) * 0.15;
       n.shoulderL.rotation.x = -1.6; n.shoulderR.rotation.x = -1.6;
       n.shoulderL.rotation.z = -0.9; n.shoulderR.rotation.z = 0.9;
+    } else if (type === 'stray') {
+      // she does not lunge: she leans in, unhurried, and takes the voice out of you
+      n.head.rotation.set(-.1 + Math.sin(tt * 21) * .05, Math.sin(tt * 17) * .1, Math.sin(tt * 29) * .06);
+      if (n.earL) n.earL.rotation.set(-.55, 0, .18);
+      if (n.earR) n.earR.rotation.set(-.55, 0, -.18);
+      n.chest.rotation.x = .16 - .1 * smoothstep(0, .6, tt);
+      n.shL.rotation.x = 1.1; n.shR.rotation.x = 1.1; // both hands up, toward your face
+      n.elL.rotation.x = -.75; n.elR.rotation.x = -.75;
+      n.head.position.y = .66 - .02 * smoothstep(0, .5, tt);
     } else {
       n.head.rotation.set(-.18+Math.sin(tt*38)*.06,Math.sin(tt*23)*.12,Math.sin(tt*50)*.13);
       n.jaw.rotation.x = .95 + Math.sin(tt * 40) * .2;
@@ -1649,7 +1668,7 @@ export class Game {
     const dist = (type === 'listener' ? 1.05 : type === 'howler' ? 1.3 : type === 'watcher' ? 0.9 : 0.95) + lunge * 1.8;
     r.position.set(p.x + fx * dist - _v.x, camY - _v.y + 0.12, p.z + fz * dist - _v.z);
     const strobe = reduced ? 1 : (Math.floor(tt * 14) % 2 === 0 ? 1.6 : 0.35);
-    if (!this.jsGhost) this.jsGhost = this.ghosts.spawn(rig, this.time, { sticky: true, strength: strobe, full: 1, color: type === 'watcher' ? 0xe8eef4 : type === 'howler' ? 0xff5a18 : 0xff3020 });
+    if (!this.jsGhost) this.jsGhost = this.ghosts.spawn(rig, this.time, { sticky: true, strength: strobe, full: 1, color: type === 'watcher' ? 0xe8eef4 : type === 'howler' ? 0xff5a18 : type === 'stray' ? 0xe9e6df : 0xff3020 });
     else {
       this.ghosts.refresh(this.jsGhost, rig);
       this.jsGhost.strength = strobe;
@@ -1884,6 +1903,15 @@ export class Game {
     const watched = this.spectate && this.spectate.target;
     for (const r of this.remotes.values()) {
       r.update(dt);
+      // she is wearing them (2.1v): their shape on this machine walks where she walks, so the watch,
+      // the voices and the echo of them all follow her instead of the body she left standing
+      const wear = this.stray?.wear;
+      if (wear && wear.pid === r.id && this.stray.present) {
+        r.x = this.stray.x;
+        r.z = this.stray.z;
+        r.y = this.stray.y;
+        r.yaw = this.stray.yaw;
+      }
       // the dead are heard only by the dead — and by each other from anywhere: close, everywhere at once
       this.audio.voiceMode(r.id, !meAlive && !r.alive ? 'beyond' : 'forest');
       this.audio.voiceSet(r.id, r.x, r.y + (r.alive ? r.eyeCur : 0.35), r.z, r.alive || !meAlive ? 1 : 0);
@@ -1963,6 +1991,7 @@ export class Game {
       }
       this.time += dt;
       this.angler.update(dt);
+      this.stray.update(dt); // dawn: she is gone with the rest of them
       if (this.player.alive) {
         if (this.angler.myCap()) this.angler.captiveFrame(dt, look);
         else this.player.update(dt, input, look, this.inputMuted);
@@ -1995,8 +2024,9 @@ export class Game {
     const es = this.escape;
     const caught = this.cabinets.busy; // (caught, or pulling someone out: your hands are on that)
     const heldByHim = !!this.angler.myCap(); // 2.1o: in the Angler's hands your keys are for struggling, nothing else
+    const heldByHer = !!this.player.heldByStray || this.strayWorn; // 2.1v: her hand on your throat, or her voice in your mouth
     for (const e of raw.events) {
-      if (heldByHim) continue;
+      if (heldByHim || heldByHer) continue;
       if (caught && e !== 'pingDown' && e !== 'pingUp') continue;
       if (e === 'pingDown') {
         this.charge.active = true;
@@ -2025,8 +2055,9 @@ export class Game {
     // ---- player ----
     const p = this.player;
     // (in the УАЗ you sit still and look about: see Escape._seated)
+    // she is wearing you (2.1v): you stand exactly where you were, and only your head is yours
     const pev = heldByHim ? (this.angler.captiveFrame(dt, this.inputMuted ? NO_LOOK : raw.look), { step: null, bump: null, breath: null })
-      : es.mySeat >= 0 || caught || (this.expedition.onTower && !this.expedition.walkTop) ? this.seatedLook(look) : p.update(dt, input, look, this.inputMuted || this.inventory.active || this.seizedByWatcher, es.load(p.id));
+      : this.strayWorn ? this.seatedLook(look) : es.mySeat >= 0 || caught || (this.expedition.onTower && !this.expedition.walkTop) ? this.seatedLook(look) : p.update(dt, input, look, this.inputMuted || this.inventory.active || this.seizedByWatcher || p.heldByStray, es.load(p.id));
     if (this.expedition.walkTop) this.expedition.clampDeck(); // (2.1s: the lookout's rails)
     if (pev.step) {
       const s = pev.step;
@@ -2089,6 +2120,7 @@ export class Game {
     this.cabinets.update(dt);
     const nearest = this.updateMonsters(dt);
     this.angler.update(dt);
+    this.stray.update(dt);
     if (this.state !== 'play') return; // killed this frame
     if (!this.player.alive) return; // co-op: caught this frame — the death plays from the next one
     this.shards.update(dt, this);
@@ -2243,6 +2275,7 @@ export class Game {
   updateFronts() {
     for (const s of this.pulses.fronts()) {
       this.voiceMimic.reveal(s);
+      this.stray?.reveal(s);
       for (const m of this.monsters) {
         const d = Math.hypot(m.x - s.x, m.y + 1.4 - s.y, m.z - s.z);
         if (d > s.prevR && d <= s.curR && d <= s.radius) {

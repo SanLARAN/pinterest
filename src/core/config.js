@@ -137,6 +137,32 @@ export const CFG = {
     { part: 'belt', mode: 'clank', dur: 10, clank: [0.55, 0.95], clankLoud: 0.3, startLoud: 0.66 },
     { part: 'battery', mode: 'spinup', dur: 8, clank: [1.0, 1.5], clankLoud: 0.15, spin: 9, spinLoud: 0.42, startLoud: 0.72 },
   ],
+  // The Stray (2.1v): a girl in an oversized tee who follows you on the fourth night. Walking beside her
+  // is allowed — she is only curious. Running near her is not: that is what wakes her up. She does not
+  // tear and does not eat. She takes the voice: alone you simply die in her hands; in co-op she wears you,
+  // and your friends spend the next minute listening to a figure with your face answer them in your voice.
+  STRAY: {
+    fromDay: 4, // the finale of any shift: the 4th of 4, the 6th of 6, the 2nd of 2
+    appearAt: 130, // s into the night — late enough that the night already has a shape
+    appearFar: [22, 30], // m from the player when she steps out of the trees
+    keep: 6.5, // m: she closes to this and then just walks along
+    walk: 1.45, // m/s — slower than you walk: she is not following you, she is keeping you company
+    runR: 9, // m: running inside this starts the anger
+    angerT: 0.9, // s of running inside runR before she wakes up (a warning, not a trap)
+    calmT: 2.6, // s of not running before the chase turns back into a walk
+    chase: 4.5, // m/s once angry (you sprint at 5.7 — enough to reach a friend, not enough to outlast her)
+    chaseR: 34, // m: she gives up the chase past this
+    grabR: 2.2,
+    grabT: 1.4, // s of her hand on your throat (solo: that is the end)
+    meetR: 12, // m: a meeting (ten of them unlock her skin)
+    meet: 10,
+    gap: [95, 150], // s before she comes back after a kill/cooldown
+    leaveR: 55, // m: walk this far off and she loses interest for a while
+    wear: 45, // s a friend walks around under your name
+    wearSpeed: 2.1, // m/s the impostor walks toward your friends
+    hushR: 10, // m: the forest goes quiet around her
+  },
+
   GEN_SITES: ['cabin', 'tower', 'stones', 'wreck'], // the camp is always the first one
 
   // generator sabotage (2.1q): from the third night the things have learned what the humming boxes

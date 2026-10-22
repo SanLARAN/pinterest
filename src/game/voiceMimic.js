@@ -51,6 +51,14 @@ export class VoiceMimic {
     list.push({id,pid,clip});while(list.length>2) list.shift();this.bank.set(pid,list);this.rates.set(pid,now);return true;
   }
   get available() { return [...this.bank.values()].some(a=>a.length); }
+  // 2.1v: the Stray wearing someone — her mouth, their recorded voice. Only ever a phrase they actually said.
+  speakAs(pid, x, y, z) {
+    const g=this.g, list=this.bank.get(pid);
+    if(!g || !list || !list.length || g.state!=='play') return false;
+    const phrase=list[list.length-1];
+    const info=g.online?g.coop.players().find(p=>p.id===pid):null;
+    return this.hear({id:phrase.id+'.s', pid, clip:phrase.clip, x, y, z, yaw:0, fit:cleanFit(info?.fit||myFit()), slot:info?.slot||0});
+  }
   replay() {
     const g=this.g;if(!g.auth || g.state!=='play' || this.current || !this.available) return false;
     const live=g.livePlayers();if(!live.length) return false;

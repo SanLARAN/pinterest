@@ -28,7 +28,7 @@ test('the Angler works from the third night, walks faster than you walk and slow
   assert.ok(A.approach > CFG.PLAYER.walk && A.approach < CFG.PLAYER.sprint, 'you can outrun him — for a while');
   assert.ok(A.haul < A.approach, 'hauling a person is slower than coming for one');
   assert.ok(A.after > CFG.SPAWN_DELAY, 'never during the sleeping-forest calm');
-  assert.equal(PROTOCOL, 17); // 2.1s: shift length, the sovkhoz in the chain, chains and the Watcher's grip
+  assert.equal(PROTOCOL, 18); // 2.1v: the Stray's state stream and the voice she takes (was 17 in 2.1s)
   assert.ok(TYPES.includes('angler') && STATES.includes('haul') && STATES.includes('finish'), 'on the wire as a fifth monster');
 });
 
