@@ -1186,6 +1186,9 @@ function boot() {
     menus.only('menu');
     home.enter();
     updateMicUI();
+    // 3.0g: a link that names the ground wins over the remembered one — otherwise ?map=bog would bounce the
+    // player back to the forest the moment the shift started
+    if (DEBUG.map === 'bog') { settings.shiftMap = 'bog'; saveSettings(); }
     if (DEBUG.autostart) startRun();
     if (params.has('sfx')) import('./ui/sfxtest.js').then((m) => m.mountSfxPanel(audio));
     lobby.menuLabel();
