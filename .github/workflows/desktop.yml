@@ -46,8 +46,10 @@ jobs:
           cat test.log
           if [ "$status" -ne 0 ]; then
             # the run's log is the only other place with the detail, and it is not reachable from everywhere
-            # GitHub keeps about ten annotations per step: the last lines are the ones that matter
-            tail -n 8 test.log | tr -d '\r' | while IFS= read -r line; do
+            # GitHub keeps about ten annotations per step, so: which tests, then why
+            { grep -E "^not ok" test.log | head -3
+              grep -E "^ *(error|expected|actual|location):" test.log | head -6
+            } | tr -d '\r' | while IFS= read -r line; do
               echo "::error title=Test failed::${line}"
             done
             exit "$status"
