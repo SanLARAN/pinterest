@@ -87,6 +87,9 @@ export const CFG = {
     // the Angler's body rides the monster list (snapshots, echo imprints), but its brain is its own
     // (see ANGLER below and game/angler.js): these numbers only keep the shared shell happy
     angler: { wander: 0, investigate: 0, hunt: 0, hearing: 0, lock: 0, radius: 0.55 },
+    // the Дrowned (3.0d, the peat bog): its brain is its own too — it is deaf, it stays in the water, and it
+    // takes you by the leg and walks you into the deep (see game/drowned.js for the real numbers)
+    drowned: { wander: 0, investigate: 0, hunt: 0, hearing: 0, lock: 0, radius: 0.45 },
     killDist: 1.35,
   },
 

@@ -516,6 +516,9 @@ const STR = {
     aHowlerArrive: 'что-то огромное проснулось',
     aAwake: 'ЛЕС ПРОСНУЛСЯ',
     aTheyWake: 'ОНИ ПРОСНУЛИСЬ',
+    // Торфяник (3.0d): то, что живёт в воде
+    aDrowned: 'В ВОДЕ ЧТО-ТО ЕСТЬ',
+    aDrownedGrab: 'ОНО ТЯНЕТ ТЕБЯ В ГЛУБИНУ',
     hintCalm: 'лес ещё спит — осмотрись, пока тихо',
     calmLeft: 'тишина ещё {s} с',
     hintWatcher: 'НАБЛЮДАТЕЛЬ — двигается только в темноте. держи его на свету',
@@ -1295,6 +1298,9 @@ const STR = {
     aHowlerArrive: 'something huge has woken up',
     aAwake: 'THE FOREST IS AWAKE',
     aTheyWake: 'THEY ARE AWAKE',
+    // the peat bog (3.0d): what lives in the water
+    aDrowned: 'THERE IS SOMETHING IN THE WATER',
+    aDrownedGrab: 'IT IS PULLING YOU DOWN',
     hintCalm: 'the forest is still asleep — look around while it is quiet',
     calmLeft: 'quiet for {s} s more',
     hintWatcher: 'THE WATCHER — moves only in the dark. keep it lit',

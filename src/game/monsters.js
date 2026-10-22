@@ -6,11 +6,11 @@ import { CFG } from '../core/config.js';
 import { clamp, angleDiff, lerp } from '../core/rng.js';
 
 // ---------------- rig helpers ----------------
-function makeRig(key) {
+export function makeRig(key) {
   const root = new THREE.Object3D();
   return { key, root, nodes: {}, parts: [] };
 }
-function node(rig, name, parent, x, y, z) {
+export function node(rig, name, parent, x, y, z) {
   const n = new THREE.Object3D();
   n.position.set(x, y, z);
   (parent || rig.root).add(n);
@@ -19,7 +19,7 @@ function node(rig, name, parent, x, y, z) {
   return n;
 }
 const _b = new MeshBuilder(512);
-function part(rig, n, build) {
+export function part(rig, n, build) {
   _b.reset();
   build(_b);
   rig.parts.push({ node: n, arr: _b.toArrays() });
@@ -609,6 +609,11 @@ export const ANIMS = { listener: animListener, crawler: animCrawler, watcher: an
 // Either way present() animates it and makes it sound like itself, relative to whoever listens here.
 let _id = 0;
 const RIGS = { listener: buildListener, crawler: buildCrawler, watcher: buildWatcher, howler: buildHowler, angler: buildAngler };
+// a map may bring its own creature (the bog's Дrowned, 3.0d): it registers its body here rather than being
+// imported by this file, so the two modules do not import each other
+export function registerRig(type, build) {
+  RIGS[type] = build;
+}
 export function buildRig(type) {
   return RIGS[type]();
 }

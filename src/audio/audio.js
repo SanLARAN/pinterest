@@ -522,6 +522,29 @@ export class AudioEngine {
     if (intensity > 0.6) this._tone(t, { f: 95, fEnd: 55, a: 0.002, d: 0.08, gain: 0.25 * intensity, dest: o });
   }
 
+  // ---------- the bog (3.0d): the thing in the water ----------
+  // it comes up: water running off a body, a long wet breath
+  drownedRise(x, y, z) {
+    if (!this.ready) return;
+    const t = this.now;
+    const pn = this._panner(x, y, z, 5, 0.9);
+    pn.connect(this.sfx);
+    const o = pn;
+    this._noiseBurst(t, { f: 420, fEnd: 180, q: 0.8, a: 0.05, d: 0.7, gain: 0.16, dest: o, rev: 0.4 });
+    this._noiseBurst(t + 0.12, { f: 1300, q: 1.4, a: 0.02, d: 0.35, gain: 0.07, dest: o });
+    this._tone(t + 0.05, { f: 88, fEnd: 62, a: 0.08, d: 0.8, gain: 0.1, dest: o, rev: 0.5 });
+  }
+
+  // the hand closes on your ankle: a slap of water and a low tug
+  drownedGrab() {
+    if (!this.ready) return;
+    const t = this.now;
+    const o = this.sfx;
+    this._noiseBurst(t, { f: 900, fEnd: 300, q: 0.7, a: 0.004, d: 0.24, gain: 0.34, dest: o });
+    this._tone(t + 0.02, { f: 70, fEnd: 44, a: 0.01, d: 0.5, gain: 0.3, dest: o });
+    this._tone(t + 0.3, { f: 118, fEnd: 96, a: 0.2, d: 1.2, gain: 0.06, dest: o, rev: 0.7 });
+  }
+
   // ---------- the bog (3.0b): water under a foot, and planks over it ----------
   // a step in the water: a short wet slap, a little lower and softer than peat
   splash(intensity = 0.5) {

@@ -45,6 +45,7 @@ import { STRAY_FIT } from './stray.js';
 import { echoOf, mistScale } from './water.js'; // 3.0b: what water does to a sound
 import { inert } from '../core/inert.js'; // 3.0: a system the current map does not have
 import { syncPumps } from '../world/bog.js'; // 3.0c: a running pump drains its sector
+import { Drowned } from './drowned.js'; // 3.0d: the one in the water
 
 const RED = [1.0, 0.13, 0.08];
 const CUT_FADE = 13.9; // s into the fly-by when the screen starts going dark
@@ -78,6 +79,7 @@ export class Game {
     this.rescue = new Rescue(this);
     this.angler = new Angler(this); // the man with the lantern, from the third night (see CFG.ANGLER)
     this.stray = new Stray(this); // the fourth night's girl: walk past her, never run (see CFG.STRAY)
+    this.drowned = new Drowned(this); // 3.0d: the bog's own — it waits in the water (see game/drowned.js)
     // the forestry yard, the УАЗ and its four parts, the way out — the forest's, not the bog's
     this.escape = this.map === 'forest' ? new Escape(this) : inert(Escape, this, { load: () => null, seatOf: () => -1 });
     this.cabinets = new Cabinets(this); // cupboards in the buildings (and the шкафандр)
@@ -269,6 +271,7 @@ export class Game {
     for (const r of this.remotes.values()) this.rescue.resetPlayer(r);
     this.angler.reset(); // the rope, the hunt, the clock — a new night owes him nothing
     this.stray.reset(); // she is not out there until the night puts her there (2.1v)
+    this.drowned.reset(); // ...and neither is the one in the water (3.0d)
     this.strayWorn = false;
     this.wornLine = 0;
     this.micDeadByStray = false;
@@ -576,6 +579,7 @@ export class Game {
     this.audio.setMorning(false);
     this.objectives.setMorning(false);
     this.objectives.startNight(this.day, this.baseSeed);
+    if (this.map === 'bog' && this.drowned) this.drowned.spawnNight(); // 3.0d: it is already in the water
     this._resetNight();
     this.dread.reset();
     this.hud.setSkip(false);
@@ -2043,6 +2047,7 @@ export class Game {
     const caught = this.cabinets.busy; // (caught, or pulling someone out: your hands are on that)
     const heldByHim = !!this.angler.myCap(); // 2.1o: in the Angler's hands your keys are for struggling, nothing else
     const heldByHer = !!this.player.heldByStray || this.strayWorn; // 2.1v: her hand on your throat, or her voice in your mouth
+    const heldByWater = this.drowned.captiveLocal(); // 3.0d: a hand round your ankle, and the water is patient
     for (const e of raw.events) {
       if (heldByHim || heldByHer) continue;
       if (caught && e !== 'pingDown' && e !== 'pingUp') continue;
@@ -2075,6 +2080,7 @@ export class Game {
     // (in the УАЗ you sit still and look about: see Escape._seated)
     // she is wearing you (2.1v): you stand exactly where you were, and only your head is yours
     const pev = heldByHim ? (this.angler.captiveFrame(dt, this.inputMuted ? NO_LOOK : raw.look), { step: null, bump: null, breath: null })
+      : heldByWater ? this.drowned.dragFrame(dt)
       : this.strayWorn ? this.seatedLook(look) : es.mySeat >= 0 || caught || (this.expedition.onTower && !this.expedition.walkTop) ? this.seatedLook(look) : p.update(dt, input, look, this.inputMuted || this.inventory.active || this.seizedByWatcher || p.heldByStray, es.load(p.id));
     if (this.expedition.walkTop) this.expedition.clampDeck(); // (2.1s: the lookout's rails)
     if (pev.step) {
@@ -2149,6 +2155,7 @@ export class Game {
     const nearest = this.updateMonsters(dt);
     this.angler.update(dt);
     this.stray.update(dt);
+    this.drowned.update(dt); // the bog: it drags you out into the deep (3.0d)
     if (this.state !== 'play') return; // killed this frame
     if (!this.player.alive) return; // co-op: caught this frame — the death plays from the next one
     this.shards.update(dt, this);
