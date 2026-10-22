@@ -48,6 +48,7 @@ import { syncPumps } from '../world/bog.js'; // 3.0c: a running pump drains its 
 import { Drowned } from './drowned.js'; // 3.0d: the one in the water
 import { Gnats } from './gnat.js'; // 3.0e: the swarm that eats your echo
 import { Winch } from './winch.js'; // 3.0f: the way out of the bog
+import { Rain } from '../render/rain.js'; // 3.0i: the bog's own weather — a fine drizzle, nothing more
 
 const RED = [1.0, 0.13, 0.08];
 const CUT_FADE = 13.9; // s into the fly-by when the screen starts going dark
@@ -84,6 +85,8 @@ export class Game {
     this.drowned = new Drowned(this); // 3.0d: the bog's own — it waits in the water (see game/drowned.js)
     this.gnats = new Gnats(this); // 3.0e: the swarm that eats your echo (see game/gnat.js)
     this.winch = new Winch(this); // 3.0f: the УАЗ in the bog, the cable and the drum (see game/winch.js)
+    // (3.0i) the bog drizzles. It is scenery, not mechanics: no sound, no effect on the echo, no doused flares
+    this.rain = this.map === 'bog' ? new Rain(this.scene) : null;
     // the forestry yard, the УАЗ and its four parts, the way out — the forest's, not the bog's
     this.escape = this.map === 'forest' ? new Escape(this) : inert(Escape, this, { load: () => null, seatOf: () => -1 });
     this.cabinets = new Cabinets(this); // cupboards in the buildings (and the шкафандр)
@@ -2545,6 +2548,17 @@ export class Game {
       this.fadeIn = Math.max(0, this.fadeIn - dt);
       const k = 1 - this.fadeIn / FADE_IN;
       fx.fade = Math.max(fx.fade, smoothstep(0, 1, k));
+    }
+    // the bog's drizzle: it follows you, it thins at dawn and it stops when the shift does
+    if (this.rain) {
+      const live = this.state === 'play' || this.state === 'morning' || this.state === 'dawn' || this.state === 'dusk' || this.state === 'dying' || this.state === 'escape';
+      this.rain.setVisible(live);
+      if (live) {
+        const p = this.player;
+        // in the morning the drizzle is nearly gone; at night it is the level's own hush of water
+        const strength = this.state === 'morning' ? 0.55 : 1;
+        this.rain.update(dt, p.x, p.y, p.z, strength);
+      }
     }
   }
 

@@ -840,9 +840,37 @@ body.coop .voice-list.show { display: flex; }
 #atlasPanel.show .book { opacity: 1; transform: none; }
 
 /* bookmarks on the top edge */
-.book-top { flex: 0 0 auto; display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; height: 42px; padding: 0 2.4%; }
-.book-tabs { display: flex; align-items: flex-end; gap: 4px; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+.book-top { flex: 0 0 auto; display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; min-height: 42px; padding: 0 2.4%; }
+.book-tabs { display: flex; flex-direction: column; align-items: stretch; gap: 4px; min-width: 0; padding-bottom: 0; }
 .book-tabs::-webkit-scrollbar { display: none; }
+
+/* (3.0i) the shelf: two books — the forestry's journal and the bog's — and, under the open one, its chapters */
+.book-shelf { display: flex; gap: 5px; padding: 0 1px; }
+.book-tab {
+  display: inline-flex; align-items: center; gap: 7px; height: 21px; padding: 0 12px; cursor: pointer;
+  border: 1px solid rgba(167, 180, 182, 0.1); border-bottom: 0; border-radius: 2px 2px 0 0;
+  background: rgba(8, 6, 5, 0.72); color: var(--ash-dim); font-family: var(--mono); font-size: 9px;
+  letter-spacing: 0.24em; text-transform: uppercase; transition: color 0.2s, background 0.2s;
+}
+.book-tab i { width: 5px; height: 5px; border-radius: 50%; background: currentColor; opacity: 0.4; }
+.book-tab:hover, .book-tab:focus-visible { color: var(--bone); outline: none; }
+.book-tab.on { color: var(--bone); background: rgba(28, 18, 14, 0.92); }
+.book-tab.on i { opacity: 1; background: var(--red); box-shadow: 0 0 6px var(--red); }
+.book-tab.ch-bog { color: rgba(120, 160, 175, 0.62); }
+.book-tab.ch-bog.on { color: #d7e7ec; background: rgba(14, 30, 33, 0.92); }
+.book-tab.ch-bog.on i { background: var(--bog-blue); box-shadow: 0 0 7px var(--bog-blue); }
+.book-chapters { display: flex; align-items: flex-end; gap: 4px; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+.book-chapters::-webkit-scrollbar { display: none; }
+/* the contents: the name of the book, and a way into the other one */
+.toc-book { font-family: var(--mono); font-size: 9px; letter-spacing: 0.34em; text-transform: uppercase; color: var(--ash-dim); margin: 0 0 6px; }
+.toc-other {
+  display: flex; align-items: baseline; gap: 8px; width: 100%; margin: 10px 0 2px; padding: 7px 9px; cursor: pointer;
+  border: 1px solid rgba(167, 180, 182, 0.14); background: rgba(0, 0, 0, 0.3); color: var(--ash-dim);
+  font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; text-align: left;
+}
+.toc-other span { font-size: 9px; letter-spacing: 0.26em; text-transform: uppercase; color: var(--ash-dim); }
+.toc-other b { color: var(--bog-blue); font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; margin-left: auto; }
+.toc-other:hover, .toc-other:focus-visible { color: var(--bone); border-color: rgba(167, 180, 182, 0.32); outline: none; }
 .book-tabs .tab {
   position: relative; flex: 0 0 auto; display: inline-flex; align-items: center; gap: 9px; height: 30px; padding: 0 15px; cursor: pointer;
   border: 1px solid rgba(167, 180, 182, 0.13); border-bottom: 0; border-radius: 3px 3px 0 0; white-space: nowrap;
@@ -859,14 +887,14 @@ body.coop .voice-list.show { display: flex; }
 .book-tabs .tab.toc em { display: none; }
 /* (3.0i) chapter V is the bog: it is inked in bog-water blue, not in the forest's red. The rules below are the
    red ones again with a different colour, kept next to them so the shelf stays one object. */
-.book-tabs .tab.ch-bog b { color: rgba(150, 190, 205, 0.7); }
-.book-tabs .tab.ch-bog.on { background: linear-gradient(180deg, #14201f, #0d1414); }
-.book-tabs .tab.ch-bog.on b { color: var(--bog-blue); }
-.book-tabs .tab.ch-bog.on::before { background: var(--bog-blue); box-shadow: 0 0 10px rgba(88, 150, 175, 0.75); }
-.book-tabs .tab.ch-bog.on em { color: #d6e4e8; }
+.book-tabs .tab[data-ch^="bog"] b { color: rgba(150, 190, 205, 0.7); }
+.book-tabs .tab[data-ch^="bog"].on { background: linear-gradient(180deg, #14201f, #0d1414); }
+.book-tabs .tab[data-ch^="bog"].on b { color: var(--bog-blue); }
+.book-tabs .tab[data-ch^="bog"].on::before { background: var(--bog-blue); box-shadow: 0 0 10px rgba(88, 150, 175, 0.75); }
+.book-tabs .tab[data-ch^="bog"].on em { color: #d6e4e8; }
 /* ...and in the contents the same chapter is blue, so a reader can see at a glance which is the second участок */
-.toc-ch[data-ch="bog"] h3 { color: var(--bog-blue); }
-.toc-ch[data-ch="bog"] h3::after { content: ''; display: block; width: 34px; height: 1px; margin-top: 5px; background: var(--bog-blue); opacity: 0.5; }
+.toc-ch[data-ch^="bog"] h3 { color: var(--bog-blue); }
+.toc-ch[data-ch^="bog"] h3::after { content: ''; display: block; width: 34px; height: 1px; margin-top: 5px; background: var(--bog-blue); opacity: 0.5; }
 .book-close {
   flex: 0 0 auto; width: 34px; height: 34px; margin-bottom: 5px; padding: 0; display: grid; place-items: center; cursor: pointer; border-radius: 50%;
   border: 1px solid rgba(167, 180, 182, 0.2); background: rgba(0, 0, 0, 0.45); color: var(--ash); transition: color 0.2s, border-color 0.2s, transform 0.2s;
@@ -1064,8 +1092,9 @@ body.touch .pg-keys { display: none; }
   .plate-cap { min-height: 0; padding-top: 6px; font-size: 10px; }
   .plate-cap.cover { flex-direction: row; justify-content: center; align-items: baseline; gap: 12px; padding-top: 6px; }
   .plate-cap .cap-title { font-size: 26px; }
-  .book-top { height: 38px; padding: 0 2px; }
+  .book-top { min-height: 38px; padding: 0 2px; }
   .book-tabs .tab { padding: 0 11px; gap: 7px; font-size: 10px; letter-spacing: 0.14em; }
+  .book-tab { height: 18px; padding: 0 9px; font-size: 8px; letter-spacing: 0.18em; }
   .ent-name { font-size: 32px; }
   .ent.toc .toc-title { display: none; }
   .spread.swap-r .page-r .page-scroll, .spread.swap-r .plate-cap { animation: swapR 0.34s ease both; }
@@ -1079,7 +1108,9 @@ body.touch .pg-keys { display: none; }
 /* short screens (phones on their side): everything a size down */
 @media (max-height: 520px) {
   #atlasPanel { padding-top: calc(4px + var(--safe-t)); padding-bottom: calc(6px + var(--safe-b)); }
-  .book-top { height: 32px; }
+  .book-top { min-height: 32px; }
+  .book-tab { height: 16px; font-size: 8px; }
+  .book-shelf { gap: 3px; }
   .book-tabs .tab { height: 24px; font-size: 10px; letter-spacing: 0.14em; }
   .book-tabs .tab.on { height: 29px; }
   .book-tabs .tab b { font-size: 10px; }

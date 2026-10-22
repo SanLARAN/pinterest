@@ -5,18 +5,39 @@
 // text:  { name, latin, text: [p...], tips: [...], facts: [[label, value]...], quote? }
 // fact values may use {h} (height) and {len} (longest side) — measured from the 3D model itself.
 
-export const CHAPTERS = [
-  { id: 'beasts', num: 'I', entries: ['listener', 'crawler', 'watcher', 'howler', 'shkaf', 'angler', 'stray', 'shade'] },
-  { id: 'tasks', num: 'II', entries: ['generator', 'corpse', 'fuel', 'plug', 'fuses', 'belt', 'battery', 'shard', 'stone', 'flare', 'glowstick', 'flashlight', 'tape', 'crowbar', 'binoculars', 'syringe'] },
-  { id: 'places', num: 'III', entries: ['camp', 'medhut', 'cabin', 'tower', 'stones', 'wreck', 'sovkhoz', 'firetower', 'zarya'] },
-  { id: 'way', num: 'IV', entries: ['yard', 'uaz', 'wheel', 'carbattery', 'carb', 'jerrycan'] },
-  // V (3.0i): the second участок. Everything the forest never showed you — the bog's own creatures, its ground,
-  // what grows on it, the five pumps and the way the shift ends.
-  { id: 'bog', num: 'V', entries: [
-    'drowned', 'gnat', 'sink', 'plank', 'deadtree', 'dwarfpine', 'willow', 'reeds', 'tussock', 'cottongrass',
-    'pump', 'winch', 'pumpshed', 'barracks', 'peatstacks',
-  ] },
+// Two books on the shelf, not one book with five chapters. (3.0i)
+//
+// The forest's journal is the one the previous owner left in the tent: creatures, objectives, places, the way
+// out. The bog is a *second участок*, so it gets a second book of its own — a tab of its own on the shelf —
+// and inside it the same kind of chapters: Твари, Болото, Задачи, Места. A reader on the bog does not want the
+// forest's eight creatures at the top of the page.
+export const BOOKS = [
+  {
+    id: 'forest', // the forestry, the journal the forest is written in
+    chapters: [
+      { id: 'beasts', num: 'I', entries: ['listener', 'crawler', 'watcher', 'howler', 'shkaf', 'angler', 'stray', 'shade'] },
+      { id: 'tasks', num: 'II', entries: ['generator', 'corpse', 'fuel', 'plug', 'fuses', 'belt', 'battery', 'shard', 'stone', 'flare', 'glowstick', 'flashlight', 'tape', 'crowbar', 'binoculars', 'syringe'] },
+      { id: 'places', num: 'III', entries: ['camp', 'medhut', 'cabin', 'tower', 'stones', 'wreck', 'sovkhoz', 'firetower', 'zarya'] },
+      { id: 'way', num: 'IV', entries: ['yard', 'uaz', 'wheel', 'carbattery', 'carb', 'jerrycan'] },
+    ],
+  },
+  {
+    id: 'bog', // the peat bog: its own creatures, its own ground, its own shift
+    chapters: [
+      { id: 'bogbeasts', num: 'I', entries: ['drowned', 'gnat'] },
+      { id: 'bogland', num: 'II', entries: ['sink', 'plank', 'deadtree', 'dwarfpine', 'willow', 'reeds', 'tussock', 'cottongrass'] },
+      { id: 'bogtasks', num: 'III', entries: ['pump', 'winch'] },
+      { id: 'bogplaces', num: 'IV', entries: ['pumpshed', 'barracks', 'peatstacks'] },
+    ],
+  },
 ];
+
+// every chapter, in shelf order (the pages are built from this)
+export const CHAPTERS = BOOKS.flatMap((b) => b.chapters);
+
+export function bookOf(chapterId) {
+  return BOOKS.find((b) => b.chapters.some((c) => c.id === chapterId)) || BOOKS[0];
+}
 
 export const ENTRIES = {
   listener: { model: 'listener', sound: 'listener', kind: 'beast', rate: [5, 2, 3, 3], log: [['seen', 'seen:listener'], ['killed', 'kills:listener']] },
@@ -107,7 +128,13 @@ const TEXT = {
       cm: 'см',
       mm: 'мм',
     },
-    chapters: { beasts: 'Твари', tasks: 'Задачи', places: 'Места', way: 'Путь отсюда' },
+    chapters: {
+      beasts: 'Твари', tasks: 'Задачи', places: 'Места', way: 'Путь отсюда',
+      // the bog's own four (3.0i) — same kinds of chapter, its own участок
+      bogbeasts: 'Твари', bogland: 'Болото', bogtasks: 'Задачи', bogplaces: 'Места',
+    },
+    books: { forest: 'Лесхоз', bog: 'Торфяник' },
+    bookAnother: 'другая книга',
     rate: { beast: ['слух', 'чутьё', 'скорость', 'угроза'], task: ['шум', 'время'] },
     log: {
       seen: 'ночей рядом', killed: 'убил тебя', appeared: 'являлась', met: 'встреч', started: 'запущено при тебе', wins: 'побед',
@@ -722,7 +749,12 @@ const TEXT = {
       cm: 'cm',
       mm: 'mm',
     },
-    chapters: { beasts: 'Creatures', tasks: 'Objectives', places: 'Places', way: 'The way out' },
+    chapters: {
+      beasts: 'Creatures', tasks: 'Objectives', places: 'Places', way: 'The way out',
+      bogbeasts: 'Creatures', bogland: 'The bog itself', bogtasks: 'Objectives', bogplaces: 'Places',
+    },
+    books: { forest: 'Forestry', bog: 'The bog' },
+    bookAnother: 'the other book',
     rate: { beast: ['hearing', 'senses', 'speed', 'threat'], task: ['noise', 'time'] },
     log: {
       seen: 'nights near it', killed: 'killed you', appeared: 'appeared', met: 'meetings', started: 'started with you', wins: 'wins',
@@ -1618,8 +1650,6 @@ const BOG_TEXT_EN = {
 
 Object.assign(TEXT.ru.entries, BOG_TEXT_RU);
 Object.assign(TEXT.en.entries, BOG_TEXT_EN);
-TEXT.ru.chapters.bog = 'Торфяник';
-TEXT.en.chapters.bog = 'The bog';
 
 export function atlasText(lang) {
   return TEXT[lang] || TEXT.ru;

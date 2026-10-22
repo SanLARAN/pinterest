@@ -3,7 +3,7 @@
 // pages you add yourself (what you've met, what killed you, what you've started).
 import { getLang } from '../core/i18n.js';
 import { atlasLog, saveAtlas } from '../core/storage.js';
-import { CHAPTERS, ENTRIES, atlasText, pageList } from './atlasData.js';
+import { BOOKS, CHAPTERS, ENTRIES, atlasText, bookOf, pageList } from './atlasData.js';
 import { Specimen } from './atlas3d.js';
 import { fmtTime } from './hud.js';
 
@@ -55,6 +55,8 @@ export class Atlas {
     this.el = $('atlasPanel');
     this.pages = pageList();
     this.i = 0;
+    // (3.0i) which of the two books is open: you start in the one written for the участок you are standing on
+    this.bookId = world?.mapId === 'bog' ? 'bog' : 'forest';
     this.shown = false;
     this.spec = null;
     this.busy = 0; // a page is turning
@@ -81,7 +83,9 @@ export class Atlas {
 
   // ---------------- open / close ----------------
   open(id = null) {
-    this.audio.prefetchMeadow?.(); // the sound bus only exists after the first gesture
+    this.audio.prefetchMeadow?.();
+    // (3.0i) the journal opens on the book of the участок you are standing on: the forestry's, or the bog's
+    if (!id && this.world) this.bookId = this.world.mapId === 'bog' ? 'bog' : 'forest'; // the sound bus only exists after the first gesture
     if (!this.spec) {
       try {
         this.spec = new Specimen($('atlasPlate'), { ctx: { world: this.world }, onScale: (s) => this._ruler(s) });
@@ -95,6 +99,8 @@ export class Atlas {
     if (id) {
       const k = this.pages.findIndex((p) => p.id === id);
       if (k >= 0) this.i = k;
+    } else {
+      this.i = 0; // the contents of that book, not the page someone else was reading
     }
     this.shown = true;
     this.el.classList.add('show');
@@ -298,6 +304,28 @@ export class Atlas {
     return this.pages[this.i];
   }
 
+  // the book a page belongs to (the contents belong to whichever book is open)
+  _bookOfPage(p = this._page()) {
+    if (!p || !p.chapter) return BOOKS.find((b) => b.id === this.bookId) || BOOKS[0];
+    const b = bookOf(p.chapter);
+    this.bookId = b.id; // leafing across the shelf moves it: the tabs always name the book you are reading
+    return b;
+  }
+
+  _bookList() {
+    return this._bookOfPage();
+  }
+
+  // switch books: land on that book's contents-opening chapter (its first page), not on a blank cover
+  openBook(id) {
+    const b = BOOKS.find((x) => x.id === id);
+    if (!b) return;
+    this.bookId = b.id;
+    const first = b.chapters[0]?.entries[0];
+    if (first) this.goId(first);
+    else this._renderAll();
+  }
+
   _T() {
     return atlasText(getLang());
   }
@@ -305,12 +333,20 @@ export class Atlas {
   _renderTabs() {
     const T = this._T();
     const p = this._page();
+    const book = this._bookOfPage(p);
     const tabs = $('atlasTabs');
-    let html = `<button class="tab toc${p.id === 'contents' ? ' on' : ''}" data-go="contents" aria-label="${esc(T.ui.contents)}" title="${esc(T.ui.contents)}">${ICON_TOC}<em>${esc(T.ui.contents)}</em></button>`;
-    for (const c of CHAPTERS) {
-      // 3.0i: a chapter may carry its own ink — the bog's is blue (style.css)
+    // (3.0i) the shelf: which book — the forestry's or the bog's. Then that book's own chapters underneath it.
+    let html = '<div class="book-shelf" role="tablist">';
+    for (const b of BOOKS) {
+      html += `<button class="book-tab ch-${b.id}${b.id === book.id ? ' on' : ''}" data-book="${b.id}" role="tab" aria-selected="${b.id === book.id}"><i></i><span>${esc(T.books[b.id])}</span></button>`;
+    }
+    html += '</div><div class="book-chapters">';
+    html += `<button class="tab toc${p.id === 'contents' ? ' on' : ''}" data-go="contents" aria-label="${esc(T.ui.contents)}" title="${esc(T.ui.contents)}">${ICON_TOC}<em>${esc(T.ui.contents)}</em></button>`;
+    for (const c of book.chapters) {
+      // a chapter may carry its own ink — the bog's is blue (style.css)
       html += `<button class="tab ch-${c.id}${p.chapter === c.id ? ' on' : ''}" data-go="${c.entries[0]}" data-ch="${c.id}"><b>${c.num}</b><em>${esc(T.chapters[c.id])}</em></button>`;
     }
+    html += '</div>';
     tabs.innerHTML = html;
     $('atlasClose').setAttribute('aria-label', T.ui.close);
     $('atlasClose').title = T.ui.close;
@@ -444,7 +480,10 @@ export class Atlas {
     const a = atlasLog;
     let h = `<div class="ent-kicker"><span>${esc(T.ui.contents)}</span><span></span></div>`;
     h += `<h2 class="ent-name toc-title">${esc(T.ui.title)}</h2><p class="toc-found">${esc(T.ui.found)}</p>`;
-    for (const c of CHAPTERS) {
+    const book = this._bookOfPage();
+    const other = BOOKS.find((b) => b.id !== book.id);
+    h += `<div class="toc-book">${esc(T.books[book.id])}</div>`;
+    for (const c of book.chapters) {
       h += `<div class="toc-ch" data-ch="${c.id}"><h3>${c.num} · ${esc(T.chapters[c.id])}</h3><ol>`;
       for (const id of c.entries) {
         const k = this.pages.findIndex((p) => p.id === id);
@@ -464,6 +503,9 @@ export class Atlas {
       [T.log.deaths, deaths],
       [T.log.screams, a.kills.scream | 0],
     ];
+    if (other) {
+      h += `<button class="toc-other" data-book="${other.id}"><span>${esc(T.bookAnother)}</span><b>${esc(T.books[other.id])}</b></button>`;
+    }
     h += `<h3 class="jh">${esc(T.ui.journal)}</h3><dl class="ent-log toc-log">${rows.map(([k, v]) => `<div><dt>${esc(k)}</dt><i class="ld"></i><dd>${esc(v)}</dd></div>`).join('')}</dl>`;
     return `<article class="ent toc">${h}</article>`;
   }
@@ -743,6 +785,12 @@ export class Atlas {
   // ---------------- input ----------------
   _bind() {
     this.el.addEventListener('click', (e) => {
+      const bk = e.target.closest('[data-book]');
+      if (bk) {
+        e.preventDefault();
+        this.openBook(bk.dataset.book);
+        return;
+      }
       const go = e.target.closest('[data-go]');
       if (go) {
         e.preventDefault();
@@ -799,8 +847,10 @@ export class Atlas {
           break;
         case 'Digit1':
         case 'Digit2':
-        case 'Digit3': {
-          const c = CHAPTERS[+e.code.slice(5) - 1];
+        case 'Digit3':
+        case 'Digit4': {
+          // the chapters of the book that is open, in order (the shelf moved them: 1..4 now, not 1..5)
+          const c = this._bookOfPage().chapters[+e.code.slice(5) - 1];
           if (c) this.goId(c.entries[0]);
           break;
         }

@@ -139,25 +139,59 @@ test('every water triangle faces up', () => {
   assert.equal(down, 0, 'no water triangle is wound downward');
 });
 
-test('the atlas has a blue chapter for the bog, and it lists what is in it', async () => {
-  const { CHAPTERS, ENTRIES, atlasText } = await import('../src/ui/atlasData.js');
-  const ch = CHAPTERS.find((c) => c.id === 'bog');
-  assert.ok(ch, 'chapter V exists');
-  assert.equal(ch.num, 'V', 'it is the fifth chapter');
-  assert.equal(atlasText('ru').chapters.bog, 'Торфяник');
-  assert.equal(atlasText('en').chapters.bog, 'The bog');
-  for (const id of ch.entries) {
-    assert.ok(ENTRIES[id], `${id} is an entry`);
-    assert.ok(atlasText('ru').entries[id] && atlasText('en').entries[id], `${id} is written in both languages`);
+test('the atlas has a second book — the bog — and it is a tab of its own, inked blue', async () => {
+  const { BOOKS, CHAPTERS, ENTRIES, atlasText } = await import('../src/ui/atlasData.js');
+  assert.equal(BOOKS.length, 2, 'two books on the shelf');
+  assert.deepEqual(BOOKS.map((b) => b.id), ['forest', 'bog']);
+  assert.equal(atlasText('ru').books.bog, 'Торфяник');
+  assert.equal(atlasText('en').books.bog, 'The bog');
+  const bog = BOOKS.find((b) => b.id === 'bog');
+  // it is not one flat chapter: it is a book with the same kind of chapters as the forest's
+  assert.deepEqual(bog.chapters.map((c) => c.id), ['bogbeasts', 'bogland', 'bogtasks', 'bogplaces']);
+  assert.deepEqual(bog.chapters.map((c) => c.num), ['I', 'II', 'III', 'IV']);
+  assert.deepEqual(bog.chapters[0].entries, ['drowned', 'gnat'], 'Твари');
+  assert.deepEqual(bog.chapters[2].entries, ['pump', 'winch'], 'Задачи');
+  assert.deepEqual(bog.chapters[3].entries, ['pumpshed', 'barracks', 'peatstacks'], 'Места');
+  // every page of every book is written in both languages and has its chapter named
+  for (const b of BOOKS) {
+    for (const c of b.chapters) {
+      assert.ok(atlasText('ru').chapters[c.id] && atlasText('en').chapters[c.id], `${c.id} has a name`);
+      for (const id of c.entries) {
+        assert.ok(ENTRIES[id], `${id} is an entry`);
+        assert.ok(atlasText('ru').entries[id] && atlasText('en').entries[id], `${id} is written in both languages`);
+      }
+    }
   }
-  // the bog's own creatures and places are in there, not the forest's
-  for (const id of ['drowned', 'gnat', 'sink', 'plank', 'pump', 'winch', 'pumpshed', 'barracks', 'peatstacks']) {
-    assert.ok(ch.entries.includes(id), `${id} has a page in chapter V`);
-  }
-  // and the chapter is inked blue, not in the forest's red
+  assert.equal(CHAPTERS.length, 8, 'the pages are built from every chapter of both books');
+  // and the bog's ink is blue, not the forest's red
   const css = (await import('node:fs')).readFileSync(new URL('../src/style.css', import.meta.url), 'utf8');
   assert.match(css, /--bog-blue:\s*#6ea6bd/);
-  assert.match(css, /\.book-tabs \.tab\.ch-bog\.on::before \{ background: var\(--bog-blue\)/);
+  assert.match(css, /\.book-tab\.ch-bog\.on i \{ background: var\(--bog-blue\)/);
+  assert.match(css, /\.book-tabs \.tab\[data-ch\^="bog"\]\.on::before \{ background: var\(--bog-blue\)/);
+});
+
+test('the bog has weather: a weak, steady drizzle that follows you', async () => {
+  const THREE = await import('three');
+  const { Rain } = await import('../src/render/rain.js');
+  const scene = new THREE.Scene();
+  const rain = new Rain(scene);
+  assert.equal(rain.points.geometry.getAttribute('position').count, 1600, 'one draw call of fine drops');
+  assert.equal(rain.points.visible, false, 'nothing falls until the shift says so');
+  rain.setVisible(true);
+  const pos = rain.points.geometry.attributes.position.array;
+  const y0 = pos[1];
+  for (let i = 0; i < 60; i++) rain.update(1 / 60, 12, 1.2, -6);
+  assert.ok(pos[1] !== y0, 'the drops fall');
+  // the box travels with the player and never empties
+  assert.ok(Math.abs(rain.points.position.x - 12) < 0.001 && Math.abs(rain.points.position.z + 6) < 0.001);
+  let lo = Infinity, hi = -Infinity, bad = 0;
+  for (let i = 0; i < pos.length; i += 3) {
+    if (!Number.isFinite(pos[i + 1])) bad++;
+    lo = Math.min(lo, pos[i + 1]);
+    hi = Math.max(hi, pos[i + 1]);
+  }
+  assert.equal(bad, 0, 'no NaN in the buffer');
+  assert.ok(lo > -3 && hi < 21, `the column wraps instead of running away: ${lo.toFixed(1)}..${hi.toFixed(1)}`);
 });
 
 test('the printed plate is the level: it was regenerated with the lagoon in it', async () => {

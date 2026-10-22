@@ -49,7 +49,7 @@ const { Game } = await import('../src/game/game.js');
 
 // a headset for the Game: everything it is handed at boot, silenced
 const anyFn = new Proxy(function () {}, { get: () => anyFn, apply: () => undefined });
-function mkGame(mapId) {
+function mkGame(mapId, input = anyFn) {
   const scene = new THREE.Scene();
   const world = new World(scene, new THREE.MeshBasicMaterial(), mapId).generate();
   const camera = new THREE.PerspectiveCamera(70, 1.6, 0.05, 400);
@@ -59,7 +59,7 @@ function mkGame(mapId) {
     ghosts: { clear() {}, spawn() { return { count: 0 }; }, release() {} },
     eyes: { add() {}, clear() {} },
     particles: { burst() {}, clear() {} },
-    audio: anyFn, input: anyFn, hud: anyFn, radar: anyFn, post: anyFn, shadows: anyFn,
+    audio: anyFn, input, hud: anyFn, radar: anyFn, post: anyFn, shadows: anyFn,
     // the mic answers every frame: a mouth that is silent, not a proxy that returns nothing
     mic: { update: () => ({ loud: 0, pulse: 0, scream: false }), state: 'off', inIframe: () => false },
   });
@@ -103,6 +103,27 @@ test('a bog shift starts, runs frames and never touches a missing place', () => 
   const d = game.winch.drum();
   const near = Math.hypot(d.x - game.world.car.x, d.z - game.world.car.z);
   assert.ok(Math.abs(near - 2.6) < 0.01, `the drum is on the nose: ${near}`);
+});
+
+test('the bog does not sit you on the fire tower: you can actually walk', () => {
+  // (3.0i) `inert(Expedition)` left the prototype's getter in place, and `this.tower !== null` on an object with
+  // no tower is *true* — so the bog thought you were standing on the lookout, and the player controller was
+  // replaced by "look around from the deck". Looking worked. Walking did not.
+  const input = { move: { x: 0, y: 0 }, crouch: false, sprint: false, turn: 0, consume: () => [], uiMode: false, events: [] };
+  const { game, world } = mkGame('bog', input);
+  assert.equal(game.expedition.onTower, false, 'the bog has no lookout to stand on');
+  assert.equal(game.expedition.walkTop, false);
+  assert.equal(game.escape.held, false, 'and no car part in your arms');
+  game.setupSolo();
+  game.reset({ days: 4 });
+  game.startNight();
+  const p = game.player;
+  const s = { x: p.x, z: p.z };
+  input.move.y = 1; // forward
+  for (let i = 0; i < 180; i++) frame(game); // three seconds
+  const d = Math.hypot(p.x - s.x, p.z - s.z);
+  assert.ok(d > 4, `walked ${d.toFixed(2)} m in three seconds`);
+  assert.ok(world.col.free(p.x, p.z, 0.34), 'and stands where it got to');
 });
 
 test('the forest still has its own kit and its parts map', () => {
