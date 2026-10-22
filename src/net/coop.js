@@ -35,7 +35,8 @@ export class Coop {
     this.code = null;
     this.hostId = null;
     this.roster = new Map(); // id -> { id, name, slot, host, mic, inRun, self, fit }
-    this.rules = cleanLobbyRules({ hideNames: settings.lobbyHideNames, days: settings.shiftDays });
+    this.mapId = 'forest'; // which участок this machine has loaded (main.js sets it at boot)
+    this.rules = cleanLobbyRules({ hideNames: settings.lobbyHideNames, days: settings.shiftDays, map: this.mapId });
     this.phase = 'lobby'; // lobby | game  (as the host sees it)
     this.status = 'idle'; // idle | joining | waiting | searching | ready | full | version | hostLost | error
     this.joinedAt = 0;
@@ -90,7 +91,7 @@ export class Coop {
     await this.leave();
     this.code = code;
     this.isHost = host;
-    this.rules = cleanLobbyRules(host ? { hideNames: settings.lobbyHideNames, days: settings.shiftDays } : null);
+    this.rules = cleanLobbyRules(host ? { hideNames: settings.lobbyHideNames, days: settings.shiftDays, map: this.mapId } : null);
     this.active = true;
     this.phase = 'lobby';
     this.status = 'joining';

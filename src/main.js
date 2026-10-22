@@ -24,6 +24,7 @@ import { qualityPlan } from './render/quality.js';
 import { effectiveGraphics } from './render/graphicsSettings.js';
 import './graphics.css';
 import { OmniShadows } from './render/shadows.js';
+import { cleanMap, runUrl, needsReload } from './core/maps.js'; // 3.0g: the two участка and how the menu switches
 import { Ghosts } from './render/ghosts.js';
 import { Eyes } from './render/eyes.js';
 import { Particles } from './render/particles.js';
@@ -75,7 +76,8 @@ const DEBUG = {
   seats: parseInt(params.get('seats'), 10) || 0, // preview a lobby's four goodnights alone
   nomic: params.has('nomic'),
   fps: params.has('fps'),
-  map: params.get('map') || '', // ?map=bog: walk the peat bog (3.0: the second участок, still being built)
+  map: params.get('map') || '', // ?map=bog: walk the peat bog (3.0: the second участок)
+  days: +params.get('days') || 0, // ?days=2|4|6: the shift length a pick in the menu asked for
 };
 
 const $ = (id) => document.getElementById(id);
@@ -432,6 +434,16 @@ coop.on('hostLost', () => {
 // A restart from the results screen (no cut) goes straight in, as before.
 function beginCoopRun(d) {
   account.close();
+  // 3.0g: the host's участок is the room's. A guest standing somewhere else gets sent there (with the room code,
+  // so it walks straight back into the lobby) rather than into a forest the others are not in
+  const rmap = cleanMap(d.rules?.map || 'forest');
+  if (needsReload(rmap, world.mapId)) {
+    settings.shiftMap = rmap;
+    saveSettings();
+    const u = runUrl(rmap, d.rules?.days || settings.shiftDays);
+    location.href = coop.code ? `${u}&room=${coop.code}` : u;
+    return;
+  }
   if (d.cut && state === 'menu' && ensureGarage()) {
     if (atlas.isOpen()) atlas.close();
     if (wardrobe.isOpen()) wardrobe.close();
@@ -636,6 +648,16 @@ function setBodyState() {
 // opts.coop = the host's start message ({ seed, players }) for a co-op night
 function startRun(opts = {}) {
   if (!game) return;
+  // 3.0g: the участок is a whole piece of ground, so it is decided before the shift starts — if the menu
+  // picked the one that is not loaded, this is a reload with it in the URL (and the shift starts on arrival)
+  const wantMap = cleanMap(opts.map || opts.coop?.rules?.map || settings.shiftMap);
+  if (needsReload(wantMap, world.mapId)) {
+    settings.shiftMap = wantMap;
+    saveSettings();
+    location.href = runUrl(wantMap, opts.days || settings.shiftDays);
+    return;
+  }
+  if (opts.coop?.rules?.map && needsReload(opts.coop.rules.map, world.mapId)) return; // (a friend on the bog, you in the forest)
   account.close();overReward=null;
   const online = !!opts.coop;
   const training = !!(opts.training || opts.coop?.tr); // the departure film's destination
@@ -673,7 +695,7 @@ function startRun(opts = {}) {
   } else {
     game.setupSolo();
     game.opening.forceSeats = DEBUG.seats;
-    game.reset({ training, days: settings.shiftDays });
+    game.reset({ training, days: DEBUG.days || settings.shiftDays });
     if (DEBUG.night || DEBUG.nointro || DEBUG.t > 0) game.startNight();
     if (DEBUG.t > 0) {
       game.time = DEBUG.t;

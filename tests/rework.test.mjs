@@ -135,7 +135,7 @@ test('clean imitation uses exactly 1x / 0 cents, only gain + the normal spatial 
 test('hidden names cannot be forced back on by TAB/peek',()=>{
  let clears=0;const mates=Object.create(Mates.prototype);mates.clear=()=>clears++;
  mates.update({roomRules:{hideNames:true}},null,true);assert.equal(clears,1);
- assert.deepEqual(cleanLobbyRules({hideNames:true}),{hideNames:true,days:4});for(const v of [null,{}, {hideNames:'true'},{hideNames:1}])assert.deepEqual(cleanLobbyRules(v),{hideNames:false,days:4});
+ assert.deepEqual(cleanLobbyRules({hideNames:true}),{hideNames:true,days:4,map:'forest'});for(const v of [null,{}, {hideNames:'true'},{hideNames:1}])assert.deepEqual(cleanLobbyRules(v),{hideNames:false,days:4,map:'forest'});
 });
 test('the new Crawler has six articulated HUMAN hands and fits the entire echo buffer',()=>{
  const rig=buildCrawler(),count=rig.parts.reduce((n,p)=>n+p.arr.count,0);

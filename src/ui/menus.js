@@ -4,6 +4,7 @@ import { t, setLang, getLang } from '../core/i18n.js';
 import { settings, saveSettings, getScores } from '../core/storage.js';
 import { fmtTime, fmtScore } from './hud.js';
 import {currentIdentity} from '../core/identity.js';
+import { cleanMap } from '../core/maps.js'; // 3.0g: which участок the solo panel is offering
 
 const $ = (id) => document.getElementById(id);
 
@@ -35,9 +36,10 @@ export class Menus {
   isOpen(id) {
     return $(id).classList.contains('show');
   }
-  // the solo shift: length first, then the forest (2.1t)
+  // the solo shift: which участок, then the length (2.1t, 3.0g)
   openSolo() {
     this.paintSoloDays?.();
+    this.paintSoloMap?.();
     this.show('soloPanel', true);
   }
 
@@ -85,8 +87,25 @@ export class Menus {
       this.paintSoloDays = () => {
         for (const b of nights.querySelectorAll('[data-days]')) b.setAttribute('aria-pressed', String((settings.shiftDays || 4) === +b.dataset.days));
       };
+      // 3.0g: which участок. Picking one only picks it — the night cards below still start the shift
+      for (const b of nights.querySelectorAll('[data-map]')) {
+        b.addEventListener('click', (e) => {
+          e.preventDefault();
+          this.h.uiSound && this.h.uiSound('click');
+          settings.shiftMap = cleanMap(b.dataset.map);
+          saveSettings();
+          this.paintSoloMap();
+          this.h.onMap?.(settings.shiftMap);
+        });
+        b.addEventListener('mouseenter', () => this.h.uiSound && this.h.uiSound('hover'));
+      }
+      this.paintSoloMap = () => {
+        const want = cleanMap(settings.shiftMap);
+        for (const b of nights.querySelectorAll('[data-map]')) b.setAttribute('aria-pressed', String(b.dataset.map === want));
+      };
       click('btnSoloBack', () => this.show('soloPanel', false));
       this.paintSoloDays();
+      this.paintSoloMap();
     }
     click('btnCoop', () => this.h.onCoop && this.h.onCoop());
     click('btnLobby', () => this.h.onLobby && this.h.onLobby());

@@ -752,7 +752,8 @@ export class Objectives {
     }
     game.onCorpseSearched(body, k);
     const nextSite = next ? this.siteAt(next.site) : '';
-    const text = t('notes')[k].replace('{next}', nextSite);
+    // 3.0g: the bog has notes of its own — same chain, different ground
+    const text = t(game.map === 'bog' ? 'notesBog' : 'notes')[k].replace('{next}', nextSite);
     this.openNote(`${t('noteKicker')} · ${t('parts')[g.spec.part]}${gun ? ` + ${t('flareGun')}` : ''}`, text);
     if (gun) game.onFlareFound(false, body);
   }

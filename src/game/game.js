@@ -1321,7 +1321,8 @@ export class Game {
     this.hud.popup(pts > 0
       ? (by ? `+${Math.round(pts)} · ${t('mateStarted').replace('{name}', this.nameOf(by))}` : `+${Math.round(pts)}`)
       : t('genRestarted'), 'amber');
-    this.hud.flashAlert(t('aGenOn').replace('{n}', count), 'dawn', 2.6);
+    // (3.0g) on the bog the chain is pumps: same five, different machine
+    this.hud.flashAlert(t(this.map === 'bog' ? 'aPumpOn' : 'aGenOn').replace('{n}', count), 'dawn', 2.6);
     this.hud.peek(4);
     // the light coming back: a warm wave rolls out from the lamp
     const L = g.site.lamp;
