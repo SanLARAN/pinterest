@@ -132,7 +132,7 @@ export class Game {
     this.train = null; // the Training instance, while the shift is a training one
     this.voiceMimic = new VoiceMimic(this);
     this.fire = new Campfire(this); // the camp's fire: lit for the last evening, out for the night
-    this.opening = new IntroCutscene(this); // the opening cut scene (2.1j) — (this.intro is the monster reveal)
+    this.opening = new IntroCutscene(this); // the opening film: 2.1j over the fire, 3.0l on the проезд (this.intro is the monster reveal)
     this.fadeIn = 0; // s of fade-in after the cut scene hands over to the night
   }
 
@@ -353,9 +353,9 @@ export class Game {
       this.train = null;
       this.motos.dispose();
     }
-    // The shift opens in the evening: the camp is still awake around the fire, the camera comes down out of
-    // the sky, and the first night begins when the fire is out (see intro.js). A debug jump into the night
-    // (main.js) calls startNight itself, which puts the film away.
+    // The shift opens in the evening, on the road: a УАЗ comes up the track and stops at the flooded проезд,
+    // four of them get out and start the camp pump, and the first night begins when the picture goes dark (see
+    // intro.js, 3.0l). A debug jump into the night (main.js) calls startNight itself, which puts the film away.
     this.fadeIn = 0;
     if (!this.training) this.opening.begin();
   }

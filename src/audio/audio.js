@@ -2123,6 +2123,117 @@ export class AudioEngine {
     [196, 246.9, 293.7, 370].forEach((f, i) => this._tone(t + 0.75 + i * 0.06, { type: 'triangle', f, a: 0.6, d: 2.6, hold: 0.4, gain: 0.035, dest: this.body, rev: 0.7 }));
   }
 
+  // ---------------- the pumps (3.0l) ----------------
+  // A pump is not a generator, and it must never sound like one: there is no mains hum in it, nothing idles,
+  // nothing beeps. What you hear is a cylinder pulling water — a slow double stroke of air and the valve
+  // knocking shut — and the wash of the water it is moving, running away somewhere out of sight.
+  pumpRun(x, y, z, lvl = 1) {
+    if (!this.ready) return null;
+    const t = this.now;
+    const pn = this._panner(x, y, z, 3, 1.0);
+    pn.connect(this.amb);
+    const out = this._gain(0);
+    out.connect(pn);
+    // the stroke: air in the cylinder, a valve shutting on every half cycle
+    const air = this._noise(this.brown);
+    const airBp = this._filter('bandpass', 260, 1.1);
+    const airAm = this._gain(0.5);
+    const stroke = this._osc('square', 1.9);
+    const strokeG = this._gain(0.42);
+    const airG = this._gain(0.55);
+    stroke.connect(strokeG).connect(airAm.gain);
+    air.connect(airBp).connect(airAm).connect(airG).connect(out);
+    // the body of the machine under it: a knock, not a note
+    const knock = this._osc('sawtooth', 44);
+    const knockLp = this._filter('lowpass', 150, 1.8);
+    const knockAm = this._gain(0.5);
+    const knockG = this._gain(0.09);
+    const kAm = this._osc('square', 1.9);
+    const kAmG = this._gain(0.45);
+    kAm.connect(kAmG).connect(knockAm.gain);
+    knock.connect(knockLp).connect(knockAm).connect(knockG).connect(out);
+    // the water: a wash, and the slap of it going away down the drain
+    const water = this._noise(this.pink);
+    const wBp = this._filter('bandpass', 780, 0.9);
+    const wG = this._gain(0.16);
+    water.connect(wBp).connect(wG).connect(out);
+    const slur = this._osc('sine', 5.3);
+    const slurG = this._gain(0.05);
+    const slurAm = this._gain(0.5);
+    slur.connect(slurG).connect(slurAm.gain);
+    const w2 = this._noise(this.pink);
+    const w2Bp = this._filter('bandpass', 1500, 1.6);
+    const w2G = this._gain(0.1);
+    w2.connect(w2Bp).connect(w2G).connect(slurAm).connect(out);
+    const srcs = [air, stroke, knock, kAm, water, slur, w2];
+    for (const s of srcs) s.start(t);
+    const self = this;
+    const set = (k, tc = 0.3) => {
+      const v = Math.min(1, Math.max(0, k));
+      const now = self.now;
+      const hz = 1.35 + 1.15 * v;
+      stroke.frequency.setTargetAtTime(hz, now, tc);
+      kAm.frequency.setTargetAtTime(hz, now, tc);
+      airBp.frequency.setTargetAtTime(220 + 180 * v, now, tc);
+      wBp.frequency.setTargetAtTime(620 + 260 * v, now, tc);
+      out.gain.setTargetAtTime(0.1 + 0.5 * v, now, tc);
+    };
+    set(lvl, 0.2);
+    let dead = false;
+    return {
+      level(k) { if (!dead) set(k); },
+      // a body of water moves: the suction takes, or the level drops another hand's width
+      glug(pos) {
+        if (dead) return;
+        const now = self.now;
+        const p = pos || null;
+        self._noiseBurst(now, { buf: self.brown, type: 'bandpass', f: 420, q: 1.6, a: 0.01, d: 0.3, gain: 0.9, dest: pn });
+        self._tone(now + 0.02, { f: 120, fEnd: 62, a: 0.01, d: 0.26, gain: 0.16, dest: pn });
+        if (p && pn.positionX) {
+          pn.positionX.setTargetAtTime(p.x, now, 0.2);
+          pn.positionZ.setTargetAtTime(p.z, now, 0.2);
+        }
+      },
+      stop(fade = 0.8) {
+        if (dead) return;
+        dead = true;
+        const now = self.now;
+        out.gain.cancelScheduledValues(now);
+        out.gain.setTargetAtTime(0, now, Math.max(0.05, fade * 0.3));
+        for (const s of srcs) { try { s.stop(now + fade + 0.4); } catch { /* */ } }
+      },
+    };
+  }
+
+  // starting one by hand: the lever, the pin taking the load, three strokes while it primes, and then the
+  // water coming up the suction line — a rush that settles into the running voice.
+  pumpStart(x, y, z) {
+    if (!this.ready) return null;
+    const t = this.now;
+    const pn = this._panner(x, y, z, 3, 1.0);
+    pn.connect(this.sfx);
+    this._tone(t, { f: 240, fEnd: 118, a: 0.002, d: 0.14, gain: 0.5, dest: pn }); // the lever
+    this._noiseBurst(t, { type: 'bandpass', f: 1500, q: 3, a: 0.001, d: 0.05, gain: 0.35, dest: pn });
+    this._noiseBurst(t + 0.07, { type: 'bandpass', f: 900, q: 4, a: 0.001, d: 0.09, gain: 0.3, dest: pn }); // the pin
+    for (let i = 0; i < 3; i++) {
+      const tt = t + 0.24 + i * 0.52;
+      this._noiseBurst(tt, { buf: this.brown, type: 'lowpass', f: 300, a: 0.004, d: 0.17, gain: 1.2, dest: pn });
+      this._noiseBurst(tt + 0.03, { type: 'bandpass', f: 1300, q: 2.5, a: 0.001, d: 0.05, gain: 0.28, dest: pn });
+    }
+    const r = this._noise(this.pink);
+    const bp = this._filter('bandpass', 380, 0.8);
+    const g = this._gain(0);
+    r.connect(bp).connect(g).connect(pn);
+    bp.frequency.setValueAtTime(380, t + 1.2);
+    bp.frequency.linearRampToValueAtTime(1100, t + 2.0);
+    g.gain.setValueAtTime(0.0001, t + 1.2);
+    g.gain.linearRampToValueAtTime(0.42, t + 1.8);
+    g.gain.setTargetAtTime(0.05, t + 2.8, 0.6);
+    r.start(t + 1.2);
+    r.stop(t + 7.5);
+    return { stop() { try { r.stop(); } catch { /* */ } } };
+  }
+
   cordPull(x, y, z, ok = false) {
     if (!this.ready) return;
     const t = this.now;

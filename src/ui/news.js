@@ -7,6 +7,25 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v:'3.0l',date:'2026-10-22',
+    ru:{title:'Торфяник: приехали',items:[
+      'Смена начинается не с неба, а с дороги: УАЗ выезжает из дождя по старой колее и тормозит у воды — проезд затоплен, дальше не проехать. Отсюда и вся ночь: пока не запустишь насосы, машина стоит',
+      'Двери, четверо выходят и идут по затопленному проезду вброд — всплеск на каждом шаге там, где вода на самом деле. Потом склейка, и они уже у насоса: каждый за своим делом — шланг к воде, рычаг, вода в корпус, колышек с красной тряпкой у края',
+      'Рычаг берёт воду — и только тогда день уходит: небо гаснет уже над работающим насосом, а не над костром',
+      'Лагерь переделан в базу у размытой дороги: две палатки на четверых, кольцо камней на самом костре, стол с вахтенным журналом, бочка, ящики. Насос лагеря переехал к проезду, всасывающий шланг лежит в воде, у дороги — табличка с красной тряпкой',
+      'Цель ночи звучит иначе: «проезд затоплен — запусти насос в лагере, он откачает воду». Пять насосов остались, но это уже не «генераторы для ворот»',
+      'У насосов свой голос: ход поршня, стук клапана и вода, уходящая по шлангу. Генераторного гула и писка у них больше нет ни на старте, ни в работе',
+    ]},
+    en:{title:'Peat bog: we made it',items:[
+      'The shift no longer opens with a camera falling out of the sky: a UAZ comes up the old track out of the rain and stops at the water — the проезд is flooded, and that is as far as the road goes. Which is the whole night: until the pumps run, the car stays where it is',
+      'Doors, four of them out, and they wade the flooded stretch on foot — a splash on every boot where the water actually is. Then a cut, and they are at the pump, each at their own job: the suction line to the water, the lever, water into the casing, a stake with a red rag at the edge',
+      'The lever takes water — and only then does the day go: the sky dies over a running pump instead of over a fire',
+      'The camp is a base at a washed-out road now: two ridge tents for four, a ring of stones on the fire itself, a table with the shift log, a fuel drum, crates. The camp pump moved to the проезд, its suction line lies in the water, and there is a board with a red rag at the bank',
+      'The night\'s aim is worded differently: "the проезд is under water — start the camp pump and it drains". The five pumps are still the chain, but they are no longer generators for a gate',
+      'The pumps have their own voice: a piston stroke, a valve knocking, water running away down the line. No generator hum and no beep, at the start or in the running',
+    ]}
+  },
+  {
     v:'2.1x',date:'2026-10-22',
     ru:{title:'На компьютере',items:[
       'Игру можно поставить на компьютер: один портативный .exe для Windows, без установки и без прав администратора. Это тот же самый билд, что на сайте, в своём окне — со своим значком и без адресной строки',

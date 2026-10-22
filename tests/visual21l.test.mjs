@@ -6,6 +6,7 @@ import { CAMP_TENT, tentPoint } from '../src/world/campLayout.js';
 import { Backpack } from '../src/game/inventory.js';
 import { Post } from '../src/render/post.js';
 
+// (no map in the stub: the dispatcher hands back the forestry film, the 2.1j one)
 function film(seats = 4) {
   const o = new IntroCutscene({ scene: new THREE.Scene(), online: false,
     world: { terrain: { height: () => 0 } }, audio: { fire: () => null }, fire: { stream() {} } });
@@ -75,6 +76,144 @@ test('lying pitch is local to the actor heading (YXZ), not a world-axis roll', (
   const up = new THREE.Vector3(0, 1, 0).applyQuaternion(a.rig.root.quaternion);
   near(up.y, 0);
   assert.ok(up.x * -Math.sin(a.yaw) + up.z * -Math.cos(a.yaw) > .999);
+});
+
+// ---------------- the bog's arrival (3.0l) ----------------
+globalThis.document ||= { body: { classList: { add() {}, remove() {} } } };
+
+// (3.0l) the opening is an arrival now: a УАЗ up the track, four people out of it, the проезд under water, and
+// the pump started. The film is driven by real time here, the way Game.updateOpening drives it.
+function bogFilm(seats = 4) {
+  const calls = [];
+  const audio = new Proxy({}, {
+    get: (_, k) => (...args) => {
+      calls.push([k, ...args]);
+      if (k === 'pumpRun') return { level() {}, glug() {}, stop() {} };
+      if (k === 'uazStart') return { rev() {}, stop() {} };
+      if (k === 'fire') return { level() {}, stop() {}, crackle() {} };
+      return null;
+    },
+  });
+  const scene = new THREE.Scene();
+  const g = {
+    scene, map: 'bog', online: false, state: 'intro', fx: { fade: 0 }, input: { requestLock() {} },
+    world: { terrain: { height: () => 0 } },
+    audio,
+    fire: { reset() {}, douse() {}, out() {}, update() {} },
+    hud: { setIntro() {}, setHint() {}, setUse() {}, setSkip() {} },
+  };
+  const o = new IntroCutscene(g);
+  o.forceSeats = seats;
+  o.begin();
+  o._build();
+  return { o, calls, scene, g };
+}
+
+const runFilm = (o, seconds, cam) => {
+  const dt = 1 / 60;
+  for (let i = 0; i < Math.ceil(seconds / dt) && o.state === 'run'; i++) {
+    o.update(dt, []);
+    if (cam) o.applyCamera(cam);
+  }
+  return o;
+};
+
+test('the film opens with the car on the road and ends with it standing at the water', () => {
+  const { o } = bogFilm(4);
+  const set = o.set;
+  const start = Math.hypot(o.carNode.position.x - set.car.x, o.carNode.position.z - set.car.z);
+  assert.ok(start > 15, 'it comes in from the road, not from the camp');
+  runFilm(o, 4.6);
+  near(o.carNode.position.x, set.car.x, 0.01);
+  near(o.carNode.position.z, set.car.z, 0.01);
+  assert.equal(o.carNode.rotation.y, o.carYaw, 'it stops nose to the water, not slewed round');
+});
+
+test('four doors open, four people get out, and only the crank seat starts the pump', () => {
+  const { o, calls } = bogFilm(4);
+  runFilm(o, o.dur + 0.5);
+  const doors = calls.filter((c) => c[0] === 'carDoor');
+  assert.equal(doors.length, 4, 'one door per seat');
+  assert.equal(calls.filter((c) => c[0] === 'pumpStart').length, 1, 'the pump is started once');
+  assert.ok(calls.some((c) => c[0] === 'pumpRun'), 'and then it runs for the rest of the film');
+  assert.ok(!calls.some((c) => c[0] === 'genStart' || c[0] === 'genHum'), 'nothing here sounds like a generator');
+  assert.equal(o.state, 'done');
+  assert.equal(o.cast.length, 0, 'the film is torn down');
+});
+
+test('each of the four has their own job, at their own place, after the cut', () => {
+  const { o } = bogFilm(4);
+  assert.deepEqual(o.cast.map((a) => a.seat.act).sort(), ['crank', 'hose', 'prime', 'sign']);
+  for (const a of o.cast) {
+    const p = a.plan;
+    o._actors(p.tAct + p.dur * 0.5, 1 / 60, true);
+    near(a.x, a.work.x);
+    near(a.z, a.work.z);
+    assert.ok(a.u > 0.3 && a.u < 0.7, `${a.seat.act} is mid-action`);
+  }
+  // the four of them are within a few metres of the pump, and not on top of each other
+  for (let i = 0; i < o.cast.length; i++) {
+    for (let j = i + 1; j < o.cast.length; j++) {
+      const A = o.cast[i].work, B = o.cast[j].work;
+      const d = Math.hypot(A.x - B.x, A.z - B.z);
+      assert.ok(d > 0.5 && d < 7.0, `seats ${i} and ${j} are ${d.toFixed(2)} m apart`);
+      const fromPump = Math.hypot(o.cast[i].work.x - o.set.pump.x, o.cast[i].work.z - o.set.pump.z);
+      assert.ok(fromPump < 6.5, 'nobody is working on the far side of the water');
+    }
+  }
+});
+
+test('the crossing is watched, then cut: one hard cut, and it lands on the pump', () => {
+  const { o } = bogFilm(4);
+  const set = o.set;
+  o._actors(o.tJump - 0.05, 0, true);
+  const before = o.cast.map((a) => ({ x: a.x, z: a.z }));
+  for (const a of o.cast) {
+    const d = Math.hypot(a.x - a.work.x, a.z - a.work.z);
+    assert.ok(d > 1.5, 'they are still in the water at the cut');
+  }
+  o._actors(o.tJump + 0.001, 0, true);
+  for (const [i, a] of o.cast.entries()) {
+    near(a.x, a.work.x);
+    near(a.z, a.work.z);
+    assert.ok(Math.hypot(before[i].x - a.x, before[i].z - a.z) > 1.5, 'the cut moved them');
+  }
+  // the camera snaps at the same moment, and only there
+  const cam = new THREE.PerspectiveCamera(50, 1.6, 0.05, 500);
+  o.t = o.tJump - 0.02; o.active = true; o.applyCamera(cam);
+  const p1 = cam.position.clone();
+  o.t = o.tJump + 0.02; o.applyCamera(cam);
+  assert.ok(cam.position.distanceTo(p1) > 1.0, 'a cut, not a pan');
+  assert.equal(o._camKeys().filter((k) => k.cut).length, 1, 'exactly one cut in the film');
+  assert.ok(set.pump.x < set.car.x, 'the pump is on the camp side of the water');
+});
+
+test('alone it is one person and one job, and the film is shorter without an audience', () => {
+  const { o } = bogFilm(1);
+  assert.equal(o.cast.length, 1);
+  assert.equal(o.cast[0].seat.act, 'crank', 'alone you start the pump yourself');
+  const four = bogFilm(4).o;
+  assert.ok(o.dur < four.dur, 'one door, one walk, one job');
+});
+
+test('the sky only goes once the pump has taken water, and the picture is black at the end', () => {
+  const { o, g } = bogFilm(4);
+  runFilm(o, o.tDusk * 0.5);
+  assert.ok(g.fx.fade > 0.9, 'still light while they work');
+  const duskAt = o.cast.find((a) => a.seat.act === 'crank').plan.tAct + 0.4;
+  assert.ok(o.tDusk >= duskAt, 'the dusk waits for the lever');
+  runFilm(o, 1.0);
+  assert.equal(g.fx.fade, 1);
+  near(o.applyCamera(new THREE.PerspectiveCamera(50, 1.6, 0.05, 500)) ? 1 : 0, 1);
+});
+
+test('a skip ends it at once, and nothing in it ever plays a generator', () => {
+  const { o, calls } = bogFilm(4);
+  o.update(1 / 60, ['confirm']);
+  runFilm(o, 2);
+  assert.equal(o.state, 'done');
+  assert.equal(o.cast.length, 0);
+  assert.deepEqual(calls.filter((c) => /gen/.test(c[0])), []);
 });
 
 function classSet() {

@@ -276,6 +276,11 @@ export function buildBog(world, t0) {
   // channel), so the three spans cross water instead of lying on the peat
   terr.addBasin(95, 62, 8.5, 1.3);
   terr.addBasin(109, 62, 8.5, 1.3);
+  // (3.0l) the old track out of the camp, and the flooded проезд in it. The road itself has to be a road: a
+  // raised strip of peat and gravel across the bog, dry except for the one place the water has taken it. Without
+  // that the "road" would be indistinguishable from the rest of the участок, and the УАЗ would be parked in a pond.
+  for (let d = 14; d <= 62; d += 2.6) terr.addFlat(CAMP_TRACK.x * d, CAMP_TRACK.z * d, 4.0, LEVEL + 0.52);
+  for (const F of CAMP_FLOODS) terr.addBasin(F.x, F.z, F.r, F.depth);
   terr.finalize();
 
   for (const L of world.landmarks) {
@@ -286,6 +291,7 @@ export function buildBog(world, t0) {
 
   genPumps(world, rng);
   genCar(world);
+  genCrewCar(world); // (3.0l) the car they came in: at the bank, and it is not going anywhere
   genGrowth(world, rng);
 
   world.navigation = new ForestNavigation(world);
@@ -296,35 +302,65 @@ export function buildBog(world, t0) {
   return world;
 }
 
-// camp: two tents, a fire ring, crates — the same vocabulary as the forest camp, drier
+// (3.0l) The camp is a base at the end of a washed-out track, not a picnic: two ridge tents for four people,
+// the fire, the day book, and — east of it — the flooded проезд the crew's УАЗ could not get through. It is a
+// place on a shift: you wake here, the pump is here, the road out is here and it is under water.
+export const CAMP_FLOOD = { x: 17.6, z: 6.4, r: 4.0, depth: 1.3 };
+export const CAMP_FLOODS = [CAMP_FLOOD];
+export const CAMP_TRACK = { x: 0.94, z: 0.34 }; // which way the track runs, out of the camp
+const CAMP_PUMP = { x: 12.6, z: 0.9 }; // (3.0l) the pump sits at the проезд, where the water is
+
 function placeCamp(world, L, rng) {
-  const y = world.terrain.height(L.x, L.z);
-  world.addProp(L.x, L.z + 3, (b) => {
-    b.identity();
-    // a ridge tent
-    const bx = L.x - 3.4, bz = L.z - 2.2;
-    b.place(bx, y, bz, 0, 0.3, 0);
+  const gy = (x, z) => world.terrain.height(x, z);
+  const y = gy(L.x, L.z);
+  // a ridge tent: two poles, two slopes, a floor — the same one the forest camp has, twice, for four
+  const tent = (b, tx, tz, ry) => {
+    const ty = gy(tx, tz);
+    b.place(tx, ty, tz, 0, ry, 0);
+    const base = b.m.clone();
     b.limb([-1.6, 0.02, 0], [0, 1.55, 0], 0.05, 0.045, KIND.WOOD, 4);
     b.limb([1.6, 0.02, 0], [0, 1.55, 0], 0.05, 0.045, KIND.WOOD, 4);
     b.tri([-1.75, 0, -1.3], [1.75, 0, -1.3], [0, 1.58, 0], KIND.LEAF, 1);
     b.tri([1.75, 0, 1.3], [-1.75, 0, 1.3], [0, 1.58, 0], KIND.LEAF, 1);
     b.quadN([-1.75, 0, -1.3], [1.75, 0, -1.3], [1.75, 0, 1.3], [-1.75, 0, 1.3], [0, -1, 0], KIND.LEAF);
-    // the fire ring
-    b.place(L.x + 1.6, y, L.z + 1.1, 0, 0, 0);
-    for (let i = 0; i < 7; i++) {
-      const a = (i / 7) * 6.283;
-      b.place(L.x + 1.6 + Math.cos(a) * 0.72, y, L.z + 1.1 + Math.sin(a) * 0.72, 0, a, 0);
+    // a bedroll, rolled up under the flap against the rain
+    sub(b, base, -1.1, 0.12, 1.55, 0, 0.2, Math.PI / 2);
+    b.cylinder(7, 0.16, 0.16, 0.9, KIND.WOOD);
+  };
+  world.addProp(L.x, L.z, (b) => {
+    b.identity();
+    tent(b, L.x - 4.4, L.z - 2.8, 0.34);
+    tent(b, L.x + 3.2, L.z - 4.4, -0.5);
+    // the fire ring, on the fire itself (Campfire stands at the camp's own origin)
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * 6.283;
+      b.place(L.x + Math.cos(a) * 0.72, y, L.z + Math.sin(a) * 0.72, 0, a, 0);
       b.rock(0.22, () => rng.next(), KIND.ROCK, 0.3, 0.6);
     }
-    // crates, a bench, a fuel drum
-    b.place(L.x - 1.2, y, L.z + 2.6, 0, 0.6, 0);
+    // two logs to sit on
+    for (const [lx, lz, ry, len] of [[-2.1, 1.9, 0.5, 1.9], [2.2, 1.5, -0.7, 1.7]]) {
+      b.place(L.x + lx, y, L.z + lz, 0, ry, 0);
+      b.cylinder(7, 0.19, 0.19, len, KIND.BARK);
+    }
+    // crates: the shift's kit, stacked by the first tent
+    b.place(L.x - 6.4, y, L.z - 0.6, 0, 0.6, 0);
     b.box(0.9, 0.55, 0.6, KIND.WOOD, { bottom: true });
-    b.place(L.x + 3.0, y, L.z - 0.6, 0, -0.2, 0);
-    b.box(1.6, 0.14, 0.42, KIND.WOOD, { bottom: true });
-    b.limb([-0.6, 0, 0], [-0.6, 0.44, 0], 0.05, 0.05, KIND.WOOD, 3);
-    b.limb([0.6, 0, 0], [0.6, 0.44, 0], 0.05, 0.05, KIND.WOOD, 3);
-    b.place(L.x + 4.2, y, L.z + 2.2, 0, 0.4, 0);
+    b.place(L.x - 6.2, y + 0.55, L.z - 0.5, 0, 0.15, 0);
+    b.box(0.7, 0.4, 0.5, KIND.WOOD, { bottom: true });
+    // the fuel drum and a hand lamp on it
+    b.place(L.x + 4.2, y, L.z + 2.0, 0, 0.4, 0);
     b.cylinder(8, 0.29, 0.29, 0.88, KIND.METAL, { capTop: true });
+    b.place(L.x + 4.2, y + 0.88, L.z + 2.0);
+    b.box(0.14, 0.2, 0.14, KIND.METAL);
+    // a work table with the day book: the shift's log, one page a night
+    b.place(L.x - 1.4, y + 0.72, L.z + 3.0, 0, 0.2, 0);
+    b.box(1.5, 0.09, 0.8, KIND.WOOD, { bottom: true });
+    b.place(L.x - 1.4, y + 0.8, L.z + 3.0, 0, 0.2, 0);
+    b.box(0.34, 0.02, 0.26, KIND.BONE); // the log book
+    for (const [sx, sz] of [[-0.62, -0.3], [0.62, -0.3], [-0.62, 0.3], [0.62, 0.3]]) {
+      b.place(L.x - 1.4 + sx, y, L.z + 3.0 + sz);
+      b.limb([0, 0, 0], [0, 0.72, 0], 0.04, 0.04, KIND.WOOD, 4);
+    }
   });
 }
 
@@ -483,7 +519,7 @@ function genPumps(world, rng) {
   for (const id of ids) {
     const L = world.landmarks.find((l) => l.id === id);
     let px, pz;
-    if (id === 'camp') { px = L.x + 5.6; pz = L.z - 6.0; }
+    if (id === 'camp') { px = L.x + CAMP_PUMP.x; pz = L.z + CAMP_PUMP.z; }
     // (3.0k) the bridges pump stands on the shore of the channel, not in it: the shed, the flywheel and the
     // man who came out to start it all have to be on dry ground
     else if (id === 'bridges') { px = L.x - 12; pz = L.z + 10; }
@@ -595,6 +631,147 @@ function genCar(world) {
 // (0, 2.4, 0) — the invisible panel over the spawn point in 3.0i. `sub()` maps local coordinates through the
 // prop's own matrix instead. The base is passed in and never re-read from `b`: composing on `b.m` a second time
 // would stack each piece on the last one and walk the clump off its stump.
+// (3.0l) Where the crew's car stopped: the near bank of the flooded проезд, found on the ground itself rather
+// than guessed. The whole opening hangs off these points — the film, the hose, the marker — so they are
+// measured once, here, and read by name.
+function fitCampSet(world) {
+  const site = world.sites.find((s) => s.id === 'camp');
+  const T = CAMP_TRACK;
+  const depth = (x, z) => world.water.depth(x, z);
+  const pump = { x: CAMP_PUMP.x, z: CAMP_PUMP.z };
+  pump.y = world.terrain.height(pump.x, pump.z);
+  pump.yaw = Math.atan2(pump.x, pump.z); // its nose looks back at the camp
+  // the flooded stretch, measured along the track: where the water starts and where the road comes out again
+  let near = null, far = null;
+  for (let d = 1; d < 40; d += 0.1) {
+    const x = T.x * d, z = T.z * d;
+    if (depth(x, z) > 0.06) {
+      if (!near) near = { x, z, d };
+    } else if (near) { far = { x, z, d }; break; }
+  }
+  if (!near) near = { x: CAMP_FLOOD.x - 4, z: CAMP_FLOOD.z - 1.5, d: 12 };
+  if (!far) far = { x: near.x + 9, z: near.z + 3.3, d: near.d + 9 };
+  // the crew's car: on the outer bank, nose to the water — it is as far as the road went
+  const car = { x: far.x + T.x * 3.0, z: far.z + T.z * 3.0, yaw: Math.atan2(T.x, T.z) };
+  car.y = world.terrain.height(car.x, car.z);
+  // the suction hose goes into the water on the camp side of it, where the pump is
+  const toWater = (() => {
+    const dx = CAMP_FLOOD.x - pump.x, dz = CAMP_FLOOD.z - pump.z, l = Math.hypot(dx, dz) || 1;
+    return { x: dx / l, z: dz / l };
+  })();
+  const side = { x: -toWater.z, z: toWater.x };
+  let water = { x: pump.x + toWater.x * 9, z: pump.z + toWater.z * 9 };
+  for (let d = 1; d < 12; d += 0.2) {
+    const x = pump.x + toWater.x * d, z = pump.z + toWater.z * d;
+    if (depth(x, z) > 0.22) { water = { x: x + toWater.x * 0.8, z: z + toWater.z * 0.8 }; break; }
+  }
+  // where each of the four works: all on the camp side of the pump, within arm's reach of each other
+  const at = (f, s) => ({ x: pump.x + toWater.x * f + side.x * s, z: pump.z + toWater.z * f + side.z * s });
+  return {
+    pump: { ...pump, site },
+    car,
+    near,
+    far,
+    water,
+    hose: at(-0.2, 1.35),
+    crank: at(-0.75, -0.95),
+    prime: at(-0.8, 0.95),
+    marker: { x: near.x - toWater.x * 1.1, z: near.z - toWater.z * 1.1 },
+    sign: { x: near.x - toWater.x * 2.1 + side.x * 2.4, z: near.z - toWater.z * 2.1 + side.z * 2.4 },
+    toWater,
+    side,
+  };
+}
+
+// the body of a УАЗ in local metres: the road car the crew came in, and (in the film) the one that is still
+// moving. Nose along -Z, hubs on 0.36 m wheels, canvas over the back.
+export function crewCarBody(b) {
+  b.identity();
+  b.place(0, 0.38, -0.3);
+  b.box(1.86, 0.72, 4.3, KIND.METAL); // body
+  b.place(0, 0.78, 1.15);
+  b.box(1.7, 0.66, 3.1, KIND.LEAF); // canvas top
+  b.place(0, 0.6, -1.85);
+  b.box(1.7, 0.36, 1.0, KIND.METAL); // bonnet
+  for (const [wx, wz] of [[-0.95, 1.35], [0.95, 1.35], [-0.95, -1.35], [0.95, -1.35]]) {
+    b.place(wx, 0.36, wz, 0, 0, Math.PI / 2);
+    b.cylinder(10, 0.36, 0.36, 0.26, KIND.BARK);
+  }
+  for (const hx of [-0.62, 0.62]) { // headlights, and the bar across the nose
+    b.place(hx, 0.62, -2.36, 0, 0, Math.PI / 2);
+    b.cylinder(8, 0.12, 0.12, 0.08, KIND.BONE);
+  }
+  b.place(0, 0.34, -2.33);
+  b.box(1.5, 0.08, 0.1, KIND.METAL);
+  return b;
+}
+
+function genCrewCar(world) {
+  const set = fitCampSet(world);
+  world.campSet = set;
+  const { x, z, y, yaw } = set.car;
+  const b = crewCarBody(new MeshBuilder(320));
+  const node = new THREE.Mesh(b.toGeometry(), world.material);
+  node.position.set(x, y, z);
+  node.rotation.y = yaw;
+  node.matrixAutoUpdate = true;
+  node.updateMatrix();
+  node.userData.crewCar = true;
+  world.scene.add(node);
+  world.meshes.push(node);
+  world.crewCar = { x, z, y, yaw, node };
+  world.col.add(x - 1.1, z - 2.2, x + 1.1, z + 2.2, 0.35, 1.6, CAP.METAL);
+
+  // the suction hose, from the pump's inlet down to the water; the film drags it out, the shift leaves it there
+  world.addProp(set.hose.x, set.hose.z, (bb) => {
+    bb.identity();
+    const pts = [[CAMP_PUMP.x + 0.35, CAMP_PUMP.z + 0.45], [set.hose.x, set.hose.z], [set.water.x, set.water.z]];
+    for (let i = 0; i < pts.length - 1; i++) {
+      const [ax, az] = pts[i], [bx, bz] = pts[i + 1];
+      bb.limb([ax, world.terrain.height(ax, az) + 0.1, az], [bx, world.terrain.height(bx, bz) + 0.1, bz], 0.1, 0.1, KIND.METAL, 5);
+    }
+    const [sx, sz] = pts[pts.length - 1];
+    bb.place(sx, world.terrain.height(sx, sz) + 0.04, sz, Math.PI / 2, 0.7, 0);
+    bb.cylinder(8, 0.19, 0.19, 0.46, KIND.METAL, { capTop: true }); // the strainer, in the water
+  });
+
+  // the sign at the bank: a board on a leaning post, and the red rag on it — «проезд затоплен»
+  const sx = set.sign.x, sz = set.sign.z;
+  const sy = world.terrain.height(sx, sz);
+  world.addProp(sx, sz, (bb) => {
+    bb.identity();
+    bb.place(sx, sy, sz, 0.07, 0.8, 0.11);
+    bb.limb([0, 0, 0], [0, 1.5, 0], 0.06, 0.05, KIND.WOOD, 4);
+    bb.place(sx, sy + 1.32, sz, 0.07, 0.8, 0.11);
+    bb.box(0.9, 0.42, 0.05, KIND.WOOD, { bottom: true });
+    bb.place(sx, sy + 1.5, sz, 0.07, 0.8, 0.11);
+    bb.box(0.2, 0.15, 0.03, KIND.EFFIGY); // the rag
+    bb.place(sx, sy + 0.95, sz, 0.07, 0.8, 0.11);
+    bb.box(0.5, 0.03, 0.03, KIND.BONE); // a scrawled arrow
+  });
+
+  // the two ruts of the old track, in and out of the water, and the stakes that used to mark it
+  world.addProp(CAMP_TRACK.x * 16, CAMP_TRACK.z * 16, (bb) => {
+    bb.identity();
+    for (let t = 26; t <= 56; t++) {
+      for (const off of [-0.55, 0.55]) {
+        const ax = CAMP_TRACK.x * t - CAMP_TRACK.z * off;
+        const az = CAMP_TRACK.z * t + CAMP_TRACK.x * off;
+        if (world.water.depth(ax, az) > 0.1) continue; // (under the water you cannot see it anyway)
+        const ay = world.terrain.height(ax, az) + 0.035;
+        bb.quadN([ax - 0.16, ay, az - 0.16], [ax + 0.16, ay, az - 0.16], [ax + 0.16, ay, az + 0.16], [ax - 0.16, ay, az + 0.16], [0, 1, 0], KIND.TRAIL_RUT, 30);
+      }
+    }
+    for (const t of [25, 57, 59]) {
+      const px = CAMP_TRACK.x * t + 2.2, pz = CAMP_TRACK.z * t - 1.4;
+      const py = world.terrain.height(px, pz);
+      bb.place(px, py, pz, 0.05, 0.4, 0.06);
+      bb.limb([0, 0, 0], [0, 0.85, 0], 0.04, 0.035, KIND.WOOD, 4);
+    }
+  });
+}
+
+
 const _subM = new THREE.Matrix4(), _subQ = new THREE.Quaternion(), _subE = new THREE.Euler(),
   _subV = new THREE.Vector3(), _subS = new THREE.Vector3();
 function sub(b, base, lx, ly, lz, rx = 0, ry = 0, rz = 0, sx = 1, sy = sx, sz = sx) {

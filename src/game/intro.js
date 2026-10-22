@@ -1,94 +1,77 @@
-// The opening cut scene (2.1j). The camera comes down out of the sky over the camp while the last day
-// drains out of the light; around the fire the people of the shift put it out — a different way each:
-//   · seat 1 waters it down with the pot            · seat 2 stamps the coals out with a boot
-//   · seat 3 beats the flames down with a tarp       · seat 4 tips the bucket over it
-// then each goes to bed their own way (on their back, curled up, inside the tent, against the bench).
-// Alone it is one person and their own little ritual: rake the coals apart with a stick, stamp out what
-// is left, and lie down by the fire with a blanket.
+// The bog's opening cut scene (3.0l). The forestry keeps the 2.1j film (see duskFilm.js); which one runs is
+// decided by the map you chose, in the dispatcher at the bottom of this file.
 //
-// It is a film, not a minigame: Enter (or the touch SKIP button) ends it at any moment, the fire is put
-// out for good and the first night starts exactly as it always has (Game.startNight).
+// It used to open on a camera falling out of the sky onto a camp fire, while four people put the fire out
+// and went to bed. That film did not fit the shift any more: nobody arrives at a bog by falling on it. Now it
+// opens the way the night actually began — a УАЗ coming up the old track, out of the rain, and stopping at the
+// проезд because the проезд is under water. That is why the squad is stuck here, and what they are stuck here
+// *to do* is start the pumps.
+//
+// The film is one arrival and one piece of work, in five beats:
+//   1. the drive: the car comes up the road through the water and stops on the far bank, headlights on the flood
+//   2. the doors: four of them get out into the rain, one after another, and stand looking at the water
+//   3. the wade: they cross the flooded stretch on foot — the pump is on the camp side of it
+//   4. the work: each seat has its own job (drag the suction line, prime the pump, crank it, plant the marker)
+//   5. the water: the pump takes, and the shift's first job is running when the picture goes dark
+//
+// Every seat is the player who owns it (their own clothes, their own colour); alone it is one person doing
+// their own part of the same job. Enter (or the touch SKIP button) ends it at any moment.
 import * as THREE from 'three';
 import { clamp, lerp, smoothstep } from '../core/rng.js';
 import { t } from '../core/i18n.js';
 import { MeshBuilder, KIND } from '../world/builder.js';
 import { createWorldMaterial, shared } from '../render/sonar.js';
+import { crewCarBody, CAMP_TRACK } from '../world/bog.js';
+import { DuskFilm } from './duskFilm.js';
 import { buildSurvivor, poseSurvivor, poseFur } from './survivor.js';
 import { createPersonMaterial, dressPerson, undressPerson } from '../render/people.js';
 import { PLAYER_HEX } from './remote.js';
 import { myFit, cleanFit } from './outfit.js';
-import { tentPoint } from '../world/campLayout.js';
 
-const DESCENT = 4.6; // s: the camera's fall from the sky
-const R_SEAT = 2.0; // m: where the four seats sit around the fire
-const FIRE = { x: 0, z: 0 };
+const DRIVE = 4.4; // s: the УАЗ coming up the track to the water
+const STOP = DRIVE; // the wheels stop here
+const DOORS = 0.8; // s after that before the first door opens
+const DOOR_GAP = 0.3; // s between one door and the next
+const STEP_OUT = 0.55; // s: out of the car and onto the road
+const WADE = 3.4; // s of the crossing we actually watch (then the cut takes us to the pump)
+const WALK_SPEED = 1.4; // m/s — hurrying, in the rain
 
-// one seat per lobby slot: which way it looks at the fire, how it puts it out, and where it sleeps
-// (bed.inside: they crawl into the tent and are gone)
+// one seat per lobby slot: which side of the car they get out on, and their part of the job
+//   · 1 drags the suction line down to the water   · 2 cranks the pump
+//   · 3 primes it from a can                       · 4 plants the marker at the edge of the flood
 export const SEATS = [
-  { angle: 292, act: 'pour', sleep: 'back', bed: { x: 2.6, z: 1.5 } },
-  { angle: 248, act: 'stomp', sleep: 'curl', bed: { x: -1.5, z: 3.0 } },
-  { angle: 200, act: 'tarp', sleep: 'tent', bed: tentPoint(0, 2.45), inside: tentPoint(0, 0.05) },
-  { angle: 338, act: 'bucket', sleep: 'slump', bed: { x: 3.2, z: -1.0 } },
+  { side: -1, row: 0, act: 'hose' },
+  { side: 1, row: 1, act: 'crank' },
+  { side: 1, row: 0, act: 'prime' },
+  { side: -1, row: 1, act: 'sign' },
 ];
-export const SOLO_SEAT = { angle: 235, act: 'stick', sleep: 'blanket', bed: { x: -2.7, z: 2.15 } };
+export const SOLO_SEAT = { side: 1, row: 0, act: 'crank' };
 
-const ACT_DUR = { pour: 2.0, stomp: 1.9, tarp: 2.1, bucket: 2.0, stick: 2.4 };
-const SLEEP_DUR = { back: 1.15, curl: 1.25, slump: 1.2, tent: 2.6, blanket: 1.35 };
-
+const ACT_DUR = { hose: 2.6, crank: 2.4, prime: 2.2, sign: 2.2 };
 const POSE_NODES = ['hips', 'chest', 'head', 'shL', 'shR', 'elL', 'elR', 'thL', 'thR', 'knL', 'knR'];
 
-// (?seats=N) four different survivors, so a lobby's four goodnights can be seen alone
-function previewFit(head, body) {
-  return cleanFit({ head, body });
-}
-
-// ---------------- a tiny pose mixer ----------------
-// Pose functions write the rig; a transition is a cross-fade between two of them (stand → sit, sitting →
-// lying down). Only the joints, the hips' height and the root's tilt are blended — where the body is in
-// the world is the schedule's business.
-function capture(rig, out) {
-  for (const name of POSE_NODES) {
-    const n = rig.nodes[name];
-    const o = out[name] || (out[name] = {});
-    o.px = n.position.x; o.py = n.position.y; o.pz = n.position.z;
-    o.rx = n.rotation.x; o.ry = n.rotation.y; o.rz = n.rotation.z;
-  }
-  out.rx = rig.root.rotation.x;
-  out.ry = rig.root.rotation.y;
-  out.rz = rig.root.rotation.z;
-  return out;
-}
-function applyCapture(rig, c) {
-  for (const name of POSE_NODES) {
-    const n = rig.nodes[name];
-    const o = c[name];
-    n.position.set(o.px, o.py, o.pz);
-    n.rotation.set(o.rx, o.ry, o.rz);
-  }
-  rig.root.rotation.set(c.rx, c.ry, c.rz);
-}
-function blendInto(rig, a, b, k) {
-  for (const name of POSE_NODES) {
-    const n = rig.nodes[name];
-    const A = a[name], B = b[name];
-    n.position.set(lerp(A.px, B.px, k), lerp(A.py, B.py, k), lerp(A.pz, B.pz, k));
-    n.rotation.set(lerp(A.rx, B.rx, k), lerp(A.ry, B.ry, k), lerp(A.rz, B.rz, k));
-  }
-  rig.root.rotation.set(lerp(a.rx, b.rx, k), lerp(a.ry, b.ry, k), lerp(a.rz, b.rz, k));
-}
-// write pose A, write pose B, and put the rig k of the way from one to the other
-function poseMix(rig, bufs, poseA, poseB, k, tt) {
-  poseA(rig, tt);
-  capture(rig, bufs.a);
-  poseB(rig, tt);
-  capture(rig, bufs.b);
-  blendInto(rig, bufs.a, bufs.b, k);
+// a fallback staging, so the film (and its tests) can be laid out without a generated bog under it
+function fallbackSet() {
+  const pump = { x: 12.6, z: 0.9, y: 0.9, yaw: 1.5 };
+  return {
+    pump,
+    car: { x: 24.3, z: 8.8, y: 0.8, yaw: 1.22 },
+    near: { x: 13.7, z: 5.0 },
+    far: { x: 21.5, z: 7.8 },
+    water: { x: 15.8, z: 4.5 },
+    hose: { x: 11.5, z: 1.7 },
+    crank: { x: 12.8, z: -0.3 },
+    prime: { x: 11.4, z: 0.9 },
+    marker: { x: 13.0, z: 4.2 },
+    sign: { x: 10.5, z: 5.0 },
+    toWater: { x: 0.673, z: 0.74 },
+    side: { x: -0.74, z: 0.673 },
+  };
 }
 
 // ---------------- poses ----------------
-function breathe(t, amp = 1) {
-  return Math.sin(t * 1.35) * 0.012 * amp;
+function breathe(tt, amp = 1) {
+  return Math.sin(tt * 1.35) * 0.012 * amp;
 }
 
 function pStand(rig, tt) {
@@ -103,217 +86,107 @@ function pStand(rig, tt) {
   n.elR.rotation.x = -0.28;
 }
 
-// k: 0 on their feet, 1 sitting on the ground with their knees around the fire
-function pSit(rig, k, tt) {
-  const n = rig.nodes;
-  rig.root.rotation.set(0, rig.root.rotation.y, 0);
-  n.hips.position.set(0, lerp(0.94, 0.19, k), 0);
-  n.chest.rotation.set(lerp(0.05, 0.14, k) + breathe(tt), 0, 0);
-  n.head.rotation.set(lerp(0, -0.05, k), Math.sin(tt * 0.4) * 0.12, 0);
-  for (const [A, s] of [['L', -1], ['R', 1]]) {
-    n['th' + A].rotation.set(lerp(0, -1.46, k), 0, s * lerp(0.04, 0.6, k));
-    n['kn' + A].rotation.set(lerp(0.06, 2.45, k), 0, s * lerp(0, 0.24, k));
-    n['sh' + A].rotation.set(lerp(-0.12, -0.72, k), 0, s * lerp(0.12, 0.3, k));
-    n['el' + A].rotation.x = lerp(-0.3, -0.92, k);
-  }
-}
-
-// the four ways of putting a fire out (u: 0..1 through the action)
-function pPour(rig, u, tt) {
+// the suction line: bend over it, take it in both hands and haul it hand over hand towards the water
+function pHose(rig, u, tt) {
   pStand(rig, tt);
   const n = rig.nodes;
-  const lift = smoothstep(0.02, 0.24, u) * (1 - smoothstep(0.8, 1, u));
-  const tip = smoothstep(0.24, 0.46, u) * (1 - smoothstep(0.62, 0.84, u));
-  n.chest.rotation.x += tip * 0.6 + lift * 0.03;
-  n.head.rotation.x = -tip * 0.2;
+  const bend = smoothstep(0.02, 0.22, u) * (1 - smoothstep(0.84, 1, u));
+  const pull = Math.sin(u * Math.PI * 6.0);
+  n.hips.position.y = 0.94 - bend * 0.3;
+  n.chest.rotation.set(0.05 + bend * 0.72 + pull * 0.04, 0, 0);
+  n.head.rotation.set(bend * 0.16, 0, 0);
   for (const [A, s] of [['L', -1], ['R', 1]]) {
-    n['sh' + A].rotation.set(-0.25 - lift * 1.02 - tip * 0.1, 0, s * (0.15 + tip * 0.05));
-    n['el' + A].rotation.x = -0.35 - lift * 0.85 + tip * 0.5;
-    n['th' + A].rotation.x = -tip * 0.14;
-    n['kn' + A].rotation.x = 0.06 + tip * 0.2;
+    n['sh' + A].rotation.set(-0.3 - bend * 0.95 + pull * 0.2, 0, s * (0.12 + bend * 0.1));
+    n['el' + A].rotation.x = -0.35 - bend * 0.5 - Math.max(0, pull) * 0.45;
+    n['th' + A].rotation.set(0.08 - bend * 0.5, 0, s * 0.05);
+    n['kn' + A].rotation.x = 0.1 + bend * 0.74;
   }
 }
 
-function pStomp(rig, u, tt) {
+// priming: a can in both hands, up over the filler, tipped, and shaken empty
+function pPrime(rig, u, tt) {
   pStand(rig, tt);
   const n = rig.nodes;
-  const kicks = smoothstep(0.02, 0.12, u) * (1 - smoothstep(0.9, 1, u));
-  const beat = Math.min(1, u / 0.68) * 2; // two stomps, then a kick
-  const ph = beat % 1;
-  const lift = u < 0.68 ? Math.max(0, Math.sin(ph * Math.PI)) * kicks : 0;
-  const kick = u > 0.68 ? Math.sin(((u - 0.68) / 0.32) * Math.PI) : 0;
-  n.thR.rotation.set(-0.18 - lift * 1.35 - kick * 0.85, 0, 0.04);
-  n.knR.rotation.x = 0.12 + lift * 1.5 + kick * 0.5;
-  n.thL.rotation.set(0.1, 0, -0.04);
-  n.knL.rotation.x = 0.2;
-  n.chest.rotation.x = 0.08 + lift * 0.12 + kick * 0.3;
-  n.chest.rotation.z = -lift * 0.08;
-  n.head.rotation.x = 0.12 + lift * 0.1;
-  n.shL.rotation.set(-0.55 - lift * 0.25, 0, -0.3);
-  n.shR.rotation.set(-0.4 - lift * 0.2, 0, 0.26);
-  n.elL.rotation.x = -0.7;
-  n.elR.rotation.x = -0.55;
-  n.hips.position.y = 0.94 - lift * 0.03;
-}
-
-function pTarp(rig, u, tt) {
-  const n = rig.nodes;
-  const crouch = smoothstep(0, 0.24, u) * (1 - smoothstep(0.86, 1, u));
-  const flap = Math.sin(u * Math.PI * 6.2 - 1.2); // three quick beats
-  const swing = Math.max(-1, Math.min(1, flap)) * crouch;
-  pStand(rig, tt);
-  n.hips.position.y = 0.94 - crouch * 0.46;
-  n.chest.rotation.set(0.1 + crouch * 0.4 + swing * 0.12, 0, 0);
-  n.head.rotation.x = 0.08 + crouch * 0.12;
+  const lift = smoothstep(0.04, 0.34, u) * (1 - smoothstep(0.84, 1, u));
+  const tip = smoothstep(0.42, 0.58, u) * (1 - smoothstep(0.7, 0.86, u));
+  const shake = Math.sin(u * Math.PI * 12) * tip * 0.08;
+  n.chest.rotation.set(0.06 + lift * 0.12 + tip * 0.34, 0, shake * 0.4);
+  n.head.rotation.set(-tip * 0.1, 0, 0);
   for (const [A, s] of [['L', -1], ['R', 1]]) {
-    n['th' + A].rotation.set(-crouch * 1.0, 0, s * crouch * 0.16);
-    n['kn' + A].rotation.x = crouch * 1.65;
-    n['sh' + A].rotation.set(-1.15 - swing * 0.95, 0, s * (0.16 + crouch * 0.14));
-    n['el' + A].rotation.x = -0.5 + Math.max(0, swing) * 0.55;
+    n['sh' + A].rotation.set(-0.2 - lift * 1.05 - tip * 0.18, 0, s * (0.16 + tip * 0.05));
+    n['el' + A].rotation.x = -0.4 - lift * 0.9 + tip * 0.55;
+    n['th' + A].rotation.set(0.06 - tip * 0.12, 0, s * 0.04);
+    n['kn' + A].rotation.x = 0.1 + tip * 0.18;
   }
+  n.hips.position.y = 0.94 - lift * 0.03 + shake;
 }
 
-function pBucket(rig, u, tt) {
+// the lever: both hands on the handle, the whole body pulling it down and letting it come back up
+function pCrank(rig, u, tt) {
   pStand(rig, tt);
   const n = rig.nodes;
-  const lift = smoothstep(0.06, 0.4, u) * (1 - smoothstep(0.82, 1, u));
-  const tip = smoothstep(0.48, 0.66, u) * (1 - smoothstep(0.78, 0.95, u));
-  n.chest.rotation.set(0.06 + lift * 0.1 + tip * 0.5, 0, 0);
-  n.head.rotation.x = -tip * 0.18;
+  const lean = smoothstep(0.02, 0.18, u) * (1 - smoothstep(0.88, 1, u));
+  const beat = Math.sin(u * Math.PI * 5.6);
+  n.hips.position.y = 0.94 - lean * 0.09 - Math.max(0, -beat) * 0.05;
+  n.chest.rotation.set(0.06 + lean * 0.22 + beat * 0.13, 0, beat * 0.03);
+  n.head.rotation.set(0.1 + lean * 0.05, 0, 0);
   for (const [A, s] of [['L', -1], ['R', 1]]) {
-    n['sh' + A].rotation.set(0.15 - lift * 1.1 - tip * 0.35, 0, s * (0.14 + tip * 0.06));
-    n['el' + A].rotation.x = -0.35 - lift * 0.75 + tip * 0.35;
-    n['th' + A].rotation.x = -tip * 0.12;
-    n['kn' + A].rotation.x = 0.06 + lift * 0.2 + tip * 0.16;
+    n['sh' + A].rotation.set(-0.5 - lean * 0.5 + beat * 0.5, 0, s * (0.15 + lean * 0.05));
+    n['el' + A].rotation.x = -0.5 - lean * 0.4 + beat * 0.3;
+    n['th' + A].rotation.set(0.1 - lean * 0.32, 0, s * 0.05);
+    n['kn' + A].rotation.x = 0.1 + lean * 0.5;
   }
 }
 
-// alone: rake the coals apart, then stamp out what is left
-function pStick(rig, u, tt) {
+// a stake and a rag: the mallet comes down twice, then a hand presses the stake home
+function pStake(rig, u, tt) {
   pStand(rig, tt);
   const n = rig.nodes;
-  const lean = smoothstep(0.0, 0.16, u) * (1 - smoothstep(0.86, 1, u));
-  const rake = Math.sin(u * Math.PI * 4.4 - 0.6) * lean;
-  const stamp = u > 0.62 ? Math.max(0, Math.sin(((u - 0.62) / 0.3) * Math.PI)) : 0;
-  n.hips.position.y = 0.94 - lean * 0.1 - stamp * 0.03;
-  n.chest.rotation.set(0.08 + lean * 0.5 + rake * 0.06, 0, rake * 0.05);
-  n.head.rotation.set(0.12 + lean * 0.1, -rake * 0.08, 0);
-  n.shL.rotation.set(-0.35 - lean * 0.85, 0, -0.24 - lean * 0.12);
-  n.shR.rotation.set(-0.3 - lean * 0.7, 0, 0.22 + lean * 0.1);
-  n.elL.rotation.x = -0.45 - lean * 0.55;
-  n.elR.rotation.x = -0.5 - lean * 0.4;
-  n.thL.rotation.set(0.12 - lean * 0.16, 0, -0.05);
-  n.knL.rotation.x = 0.16 + lean * 0.24;
-  n.thR.rotation.set(0.1 - stamp * 1.15, 0, 0.05);
-  n.knR.rotation.x = 0.16 + stamp * 1.5;
+  const squat = smoothstep(0.02, 0.2, u) * (1 - smoothstep(0.86, 1, u));
+  const swing = u < 0.62 ? Math.max(0, Math.sin(((u % 0.31) / 0.31) * Math.PI)) : 0;
+  const press = u > 0.7 ? smoothstep(0.7, 0.8, u) * (1 - smoothstep(0.9, 1, u)) : 0;
+  n.hips.position.y = 0.94 - squat * 0.26 - press * 0.1;
+  n.chest.rotation.set(0.06 + squat * 0.3 + swing * 0.1 + press * 0.24, 0, -swing * 0.06);
+  n.head.rotation.set(squat * 0.2, 0, 0);
+  n.shR.rotation.set(-0.3 - swing * 2.1 - press * 0.5, 0, 0.2 + squat * 0.1);
+  n.elR.rotation.x = -0.4 - swing * 0.5;
+  n.shL.rotation.set(-0.25 - squat * 0.75, 0, -0.2 - squat * 0.12);
+  n.elL.rotation.x = -0.45 - squat * 0.5;
+  n.thR.rotation.set(0.06 - squat * 0.25, 0, 0.12);
+  n.knR.rotation.x = 0.12 + squat * 0.4;
+  n.thL.rotation.set(0.02 - squat * 0.15, 0, -0.16);
+  n.knL.rotation.x = 0.1 + squat * 0.32;
 }
 
-// ---------------- sleeping ----------------
-function pLieBack(rig, tt) {
-  poseSurvivor(rig, 0, 0, false, true); // (the dead's flat lie is the base)
-  const n = rig.nodes;
-  n.head.rotation.set(-0.16, 0, 0.12);
-  n.shL.rotation.set(-2.55, 0, -0.5);
-  n.shR.rotation.set(-2.55, 0, 0.5);
-  n.elL.rotation.x = -1.55;
-  n.elR.rotation.x = -1.55;
-  n.thL.rotation.set(0.1 + breathe(tt, 0.3), 0, 0.06);
-  n.thR.rotation.set(-0.02, 0, -0.05);
-  n.knL.rotation.x = 0.12;
-  n.knR.rotation.x = 0.06;
-}
+const POSERS = { hose: pHose, crank: pCrank, prime: pPrime, sign: pStake };
 
-function pCurl(rig, tt) {
-  const n = rig.nodes;
-  rig.root.rotation.set(0, rig.root.rotation.y, 0);
-  n.hips.position.set(0, 0.2, 0.04);
-  n.chest.rotation.set(0.92 + breathe(tt), 0, 0.05);
-  n.head.rotation.set(0.32, 0.1, 0.08);
-  for (const [A, s] of [['L', -1], ['R', 1]]) {
-    n['th' + A].rotation.set(-2.05, 0, s * 0.22);
-    n['kn' + A].rotation.set(2.35, 0, s * 0.1);
-    n['sh' + A].rotation.set(-1.5, 0, s * 0.34);
-    n['el' + A].rotation.x = -1.7;
-  }
-}
-
-function pSlump(rig, tt) {
-  const n = rig.nodes;
-  rig.root.rotation.set(0, rig.root.rotation.y, 0);
-  n.hips.position.set(0, 0.2, 0);
-  n.chest.rotation.set(-0.26 + breathe(tt), 0, 0.06);
-  n.head.rotation.set(0.34, 0.12, 0.16);
-  for (const [A, s] of [['L', -1], ['R', 1]]) {
-    n['th' + A].rotation.set(-1.53, 0, s * 0.1);
-    n['kn' + A].rotation.x = 0.12 + (A === 'L' ? 0.16 : 0.04);
-    n['sh' + A].rotation.set(-0.2, 0, s * 0.24);
-    n['el' + A].rotation.x = -0.28;
-  }
-}
-
-// hands and knees, heading into the tent
-function pCrawl(rig, tt) {
-  const n = rig.nodes;
-  rig.root.rotation.set(0, rig.root.rotation.y, 0);
-  n.hips.position.set(0, 0.30, 0);
-  n.chest.rotation.set(1.3 + breathe(tt, 0.4), 0, 0);
-  n.head.rotation.set(-0.55, 0, 0);
-  for (const [A, s] of [['L', -1], ['R', 1]]) {
-    n['th' + A].rotation.set(-1.42, 0, s * 0.12);
-    n['kn' + A].rotation.x = 1.5;
-    n['sh' + A].rotation.set(-1.5, 0, s * 0.16);
-    n['el' + A].rotation.x = -0.25;
-  }
-}
-
-// on their back with a blanket pulled up to the chest
-function pBlanket(rig, tt, k = 1) {
-  pLieBack(rig, tt);
-  const n = rig.nodes;
-  n.shL.rotation.set(lerp(-2.55, -0.35, k), 0, lerp(-0.5, -0.18, k));
-  n.shR.rotation.set(lerp(-2.55, -0.3, k), 0, lerp(0.5, 0.2, k));
-  n.elL.rotation.x = lerp(-1.55, -0.75, k);
-  n.elR.rotation.x = lerp(-1.55, -0.7, k);
-}
-
-// the shortest way round from one yaw to another, at a rate (rad/s)
-function turnTo(cur, want, dt, rate = 5.5) {
-  let d = (want - cur) % (Math.PI * 2);
-  if (d > Math.PI) d -= Math.PI * 2;
-  if (d < -Math.PI) d += Math.PI * 2;
-  const step = Math.max(-rate * dt, Math.min(rate * dt, d));
-  return cur + step;
-}
-
-export class IntroCutscene {
+export class BogArrival {
   constructor(game) {
     this.g = game;
     this.state = 'idle'; // idle | run | done
     this.t = 0;
     this.active = false;
     this.cast = [];
-    this.bufs = [];
     this.hold = false; // (debug: freeze the clock, keep posing)
     this.cues = {};
-    this.camPath = new THREE.CatmullRomCurve3([
-      new THREE.Vector3(-1.2, 41, 45),
-      new THREE.Vector3(0.4, 27, 34),
-      new THREE.Vector3(2.4, 14, 20.5),
-      new THREE.Vector3(3.4, 6.4, 10.6),
-      new THREE.Vector3(2.7, 2.9, 6.1),
-      new THREE.Vector3(2.35, 1.72, 4.45),
-    ], false, 'catmullrom', 0.32);
     this._cam = new THREE.Vector3();
     this._look = new THREE.Vector3();
     this._tmp = new THREE.Vector3();
-    this.dur = 12;
-    this.tCrane = 9.5;
-    this.tFade = 11.2;
+    this._q = new THREE.Quaternion();
+    this.keyA = new THREE.Vector3();
+    this.keyB = new THREE.Vector3();
+    this.dur = 14;
+    this.tJump = 9;
+    this.tCrane = 12;
+    this.tFade = 12.6;
     this.fireSnd = null;
+    this.carSnd = null;
+    this.pumpSnd = null;
+    this.pumpAt = -1;
     this.propMat = createWorldMaterial();
     this.day0 = 0.95; // the light of the last day (Game.startMorning's MORNING_LIGHT)
-    this.tDusk = 5.2; // when the sky starts to go (set from the plan: as the first flame dies)
-    this.tDuskEnd = 7.8; // ...and when there is nothing left of the day
+    this.tDusk = 9.6; // when the sky starts to go: the pump has just taken water
+    this.tDuskEnd = 12.2;
     this.duskHit = false;
   }
 
@@ -328,8 +201,10 @@ export class IntroCutscene {
     this.skipT = 0;
     this.cues = {};
     this.cast.length = 0;
-    this.bufs.length = 0;
     this.built = false;
+    this.pumpAt = -1;
+    this.carSnd = null;
+    this.pumpSnd = null;
     this.g.state = 'intro';
     this.g.fx.fade = 0; // out of the black
     this.g.hud.setIntro(null);
@@ -344,16 +219,20 @@ export class IntroCutscene {
     shared.uMorning.value = 1; // the last day: a high sun, the warm palette
   }
 
-  // the film is over (or skipped): put everything back and hand over to the first night
+  // the film is over (or skipped): put everything away and hand over to the first night
   _teardown() {
+    if (this.carSnd) { this.carSnd.stop(0.6); this.carSnd = null; }
+    if (this.pumpSnd) { this.pumpSnd.stop(0.9); this.pumpSnd = null; }
+    if (this.carNode) { this.g.scene.remove(this.carNode); this.carNode.geometry?.dispose(); this.carNode = null; }
+    const staticCar = this.g.world?.crewCar?.node;
+    if (staticCar) staticCar.visible = true; // the car the world keeps: it was here all along
     for (const a of this.cast) {
       undressPerson(a.meshes);
       this.g.scene.remove(a.rig.root);
       a.mat.dispose();
-      for (const p of a.props) if (p.mesh.parent) p.mesh.parent.remove(p.mesh);
+      for (const p of a.props) if (p.mesh.parent) p.mesh.parent.remove(p.node || p.mesh);
     }
     this.cast.length = 0;
-    this.bufs.length = 0;
     if (this.fireSnd) { this.fireSnd.stop(1.6); this.fireSnd = null; }
     this.g.fire.out();
     shared.uDawn.value = 0;
@@ -383,16 +262,16 @@ export class IntroCutscene {
   }
 
   // ---------------- the cast ----------------
-  // Every seat of the lobby is the player who owns it (their own clothes, their own colour); alone it is
-  // one person and their own way of saying goodnight.
+  // Every seat of the lobby is the player who owns it (their own clothes, their own colour); alone it is one
+  // person and their own part of the shift.
   _seats() {
-    // (?seats=N in the URL: preview a full lobby's four goodnights alone — nothing else uses this)
+    // (?seats=N in the URL: preview a full lobby's four jobs alone — nothing else uses this)
     if (!this.g.online && this.forceSeats > 1) {
       const heads = ['hood', 'ushanka', 'animehair', 'boykisser'];
       const bodies = ['jacket', 'tulup', 'seifuku', 'fluffy'];
       return SEATS.slice(0, Math.min(4, this.forceSeats | 0)).map((seat, i) => ({
         slot: i,
-        fit: i === 0 ? myFit() : previewFit(heads[i], bodies[i]),
+        fit: i === 0 ? myFit() : cleanFit({ head: heads[i], body: bodies[i] }),
         seat,
       }));
     }
@@ -407,26 +286,42 @@ export class IntroCutscene {
       .map((p) => ({ ...p, seat: SEATS[p.slot] }));
   }
 
+  // the staging: the pump, the road, the water and the car, measured once by the world
+  _set() {
+    const cs = this.g.world?.campSet;
+    return cs || (this._fallback || (this._fallback = fallbackSet()));
+  }
+
   _build() {
     this.built = true;
+    const set = this._set();
+    this.set = set;
     const ground = (x, z) => this.g.world.terrain.height(x, z);
+    const car = set.car;
+    this.carYaw = car.yaw;
+    this.carY = ground(car.x, car.z);
+    // the film drives its own car along the road the world left ruts in; the parked one is put away until the
+    // film is over, and it is standing exactly where the film leaves this one
+    // it comes up the road the world left ruts in: the same heading, twenty-four metres back
+    this.carStart = { x: car.x + CAMP_TRACK.x * 24, z: car.z + CAMP_TRACK.z * 24 };
+    const b = crewCarBody(new MeshBuilder(320));
+    this.carNode = new THREE.Mesh(b.toGeometry(), this.propMat);
+    this.carNode.frustumCulled = false;
+    this.g.scene.add(this.carNode);
+    const staticCar = this.g.world?.crewCar?.node;
+    if (staticCar) staticCar.visible = false;
+
     const list = this._seats();
-    const n = list.length;
     for (const p of list) {
       const seat = p.seat;
-      const a = (seat.angle * Math.PI) / 180;
       const rig = buildSurvivor(p.fit);
-      rig.root.rotation.order = 'YXZ'; // yaw around the world up, THEN lean/lie in that heading
+      rig.root.rotation.order = 'YXZ';
       const mat = createPersonMaterial(rig.dyes, PLAYER_HEX[p.slot % 4]);
       mat.uniforms.uShow.value = 1;
       const meshes = dressPerson(rig, mat);
-      rig.root.visible = true;
+      rig.root.visible = false;
       this.g.scene.add(rig.root);
-      const sx = Math.cos(a) * R_SEAT;
-      const sz = Math.sin(a) * R_SEAT;
-      const fx = Math.cos(a) * 1.7; // where they stand to work on the fire (in from their seat)
-      const fz = Math.sin(a) * 1.7;
-      const actor = {
+      const a = {
         slot: p.slot,
         solo: !!p.solo,
         seat,
@@ -435,127 +330,94 @@ export class IntroCutscene {
         meshes,
         props: [],
         phase: 0,
-        speed: 0,
         hit: {},
-        x: sx,
-        z: sz,
-        y: ground(sx, sz),
-        yaw: Math.atan2(FIRE.x - sx, FIRE.z - sz),
-        yawCur: Math.atan2(FIRE.x - sx, FIRE.z - sz),
-        px: sx,
-        pz: sz,
-        spd: 0,
-        k: 1, // sitting
+        x: car.x,
+        z: car.z,
+        y: this.carY,
+        yaw: car.yaw,
+        yawCur: car.yaw,
+        px: car.x,
+        pz: car.z,
         u: 0,
-        lit: 1,
-        show: 1,
-        sleepK: 0,
+        show: 0,
+        lift: 0,
         done: false,
-        work: { x: fx, z: fz },
+        work: {
+          hose: set.hose,
+          crank: set.crank,
+          prime: set.prime,
+          sign: set.sign,
+        }[seat.act] || set.crank,
       };
-      this._props(actor);
-      this.cast.push(actor);
+      a.door0 = this._doorPoint(a);
+      this._props(a);
+      this.cast.push(a);
     }
     this._plan();
-    this.fireSnd = this.g.audio.fire(FIRE.x, ground(FIRE.x, FIRE.z) + 0.5, FIRE.z);
+    this.fireSnd = this.g.audio.fire(0, ground(0, 0) + 0.5, 0);
   }
 
+  // the thing in their hands: a jerry can for priming, a mallet for the marker
   _props(a) {
-    const make = (build, parent, pos, rot) => {
-      const b = new MeshBuilder(256);
-      build(b);
-      const mesh = new THREE.Mesh(b.toGeometry(), this.propMat);
-      mesh.frustumCulled = false;
-      mesh.position.set(0, 0, 0);
-      if (rot) mesh.rotation.set(rot[0], rot[1], rot[2]);
-      const node = new THREE.Object3D();
-      node.position.set(pos[0], pos[1], pos[2]);
-      node.add(mesh);
-      a.rig.nodes[parent].add(node);
-      node.visible = false;
-      a.props.push({ mesh, node, kind: a.seat.act });
-      return { mesh, node };
-    };
-    if (a.seat.act === 'pour') {
-      make((b) => {
-        b.cylinder(9, 0.1, 0.125, 0.15, KIND.METAL);
-        b.place(0, 0.15, 0, 0, 0, Math.PI / 2);
-        b.box(0.19, 0.018, 0.018, KIND.METAL);
-      }, 'elR', [0, -0.33, 0.08], [0.2, 0, 0]);
-    } else if (a.seat.act === 'bucket') {
-      make((b) => {
-        b.cylinder(9, 0.085, 0.11, 0.17, KIND.METAL, { capBottom: true });
-        b.place(0, 0.17, 0, 0, 0, Math.PI / 2);
-        b.limb([-0.085, 0, 0], [0, 0.1, 0], 0.008, 0.008, KIND.METAL);
-        b.limb([0.085, 0, 0], [0, 0.1, 0], 0.008, 0.008, KIND.METAL);
-      }, 'elR', [0, -0.38, 0.06], [0.15, 0, 0]);
-    } else if (a.seat.act === 'tarp') {
-      make((b) => {
-        b.box(0.4, 0.07, 0.3, KIND.WOOD);
-        b.place(0.02, 0, 0, 0, 0.3, 0);
-        b.box(0.3, 0.05, 0.22, KIND.WOOD);
-      }, 'elR', [0, -0.34, 0.1], [0.4, 0.2, 0]);
-    } else if (a.seat.act === 'stick') {
-      make((b) => {
-        b.limb([0, -0.42, 0], [0, 0.62, 0], 0.022, 0.012, KIND.WOOD, 4);
-      }, 'elR', [0.02, -0.34, 0.09], [0.9, 0, 0.2]);
-    }
-    if (a.seat.sleep === 'blanket') {
-      // a folded blanket: in the hips' frame it is a flat sheet across the chest — and once the body is
-      // lying down that same sheet lies over it, the local z turning into "up"
-      const b = new MeshBuilder(128);
-      b.box(0.9, 0.62, 0.06, KIND.WOOD);
-      const mesh = new THREE.Mesh(b.toGeometry(), this.propMat);
-      mesh.frustumCulled = false;
-      const node = new THREE.Object3D();
-      node.position.set(0, 0.42, 0.16);
-      node.add(mesh);
-      a.rig.nodes.hips.add(node);
-      node.visible = false;
-      a.blanket = { mesh, node };
-    }
+    const build = {
+      prime: (b) => {
+        b.box(0.22, 0.3, 0.13, KIND.METAL, { bottom: true });
+        b.place(0, 0.16, 0, 0, 0, Math.PI / 2);
+        b.limb([0, 0, 0], [0.05, 0, 0.02], 0.018, 0.018, KIND.METAL, 3);
+      },
+      sign: (b) => {
+        b.place(0, 0, 0, 0, 0, 0);
+        b.box(0.1, 0.12, 0.26, KIND.WOOD);
+        b.place(0, -0.19, 0.06, Math.PI / 2 - 0.3, 0, 0);
+        b.limb([0, 0, 0], [0, 0.55, 0], 0.022, 0.022, KIND.WOOD, 4);
+      },
+    }[a.seat.act];
+    if (!build) return;
+    const b = new MeshBuilder(128);
+    build(b);
+    const mesh = new THREE.Mesh(b.toGeometry(), this.propMat);
+    mesh.frustumCulled = false;
+    const node = new THREE.Object3D();
+    if (a.seat.act === 'prime') node.position.set(0, -0.34, 0.1);
+    else node.position.set(0, -0.36, 0.12);
+    node.add(mesh);
+    a.rig.nodes.elR.add(node);
+    node.visible = false;
+    a.props.push({ mesh, node, kind: a.seat.act });
   }
 
-  // the schedule: when each of them stands, works on the fire, walks and lies down
+  // The schedule. Everything after the doors is a pure function of film time, so a seek, a slow phone and 60 fps
+  // all see the same film.
   _plan() {
     const n = Math.max(1, this.cast.length);
+    const lastDoor = STOP + DOORS + (n - 1) * DOOR_GAP;
+    this.tJump = lastDoor + STEP_OUT + WADE; // the cut: we do not watch them climb the whole bank
     let tEnd = 0;
-    this.tEndDouse = 0;
     this.cast.forEach((a, i) => {
-      const seat = a.seat;
-      const solo = a.solo;
-      // they get up once the camera is down (DESCENT): the evening is the film, not the fall
-      const t0 = DESCENT + 0.15 + i * 0.35;
-      const rise = 0.5;
-      const d1 = Math.hypot(a.work.x - a.x, a.work.z - a.z);
-      const walk1 = d1 / 0.95;
-      const tAct = t0 + rise + walk1 + 0.12;
-      const dur = ACT_DUR[seat.act] || 2;
-      const tWalk = tAct + dur + 0.15;
-      const d2 = Math.hypot(seat.bed.x - a.work.x, seat.bed.z - a.work.z);
-      const turn = 0.6; // finish turning on the spot BEFORE taking the first step away
-      const walk2 = Math.max(0.7, d2 / (solo ? 1.6 : 1.5));
-      const tBed = tWalk + turn + walk2;
-      const lie = SLEEP_DUR[seat.sleep] || 1.2;
-      a.plan = { t0, rise, walk1, tAct, dur, tWalk, turn, walk2, tBed, lie };
-      this.tEndDouse = Math.max(this.tEndDouse, tAct + dur * 0.6);
-      a.douseW = 1 / n; // together they put it out; alone one person does it all
-      tEnd = Math.max(tEnd, tBed + lie);
+      const door = STOP + DOORS + i * DOOR_GAP;
+      const dist = Math.hypot(a.work.x - a.door0.x, a.work.z - a.door0.z);
+      const walkFull = Math.max(0.8, dist / WALK_SPEED);
+      const tAct = this.tJump + 0.35 + i * 0.22;
+      const dur = ACT_DUR[a.seat.act] || 2.2;
+      // where along that line the flood is: the boots go in there, and not anywhere else
+      a.splashAt = [];
+      const water = this.g.world?.water;
+      if (water?.depth) {
+        for (let f = 0.08; f < 0.95; f += 0.05) {
+          const x = lerp(a.door0.x, a.work.x, f), z = lerp(a.door0.z, a.work.z, f);
+          if (water.depth(x, z) > 0.1) a.splashAt.push(f);
+        }
+        if (a.splashAt.length > 3) a.splashAt = [a.splashAt[0], a.splashAt[Math.floor(a.splashAt.length / 2)], a.splashAt[a.splashAt.length - 1]];
+      }
+      a.plan = { door, walkFull, tAct, dur, tEnd: tAct + dur };
+      tEnd = Math.max(tEnd, tAct + dur);
     });
-    this.dur = Math.max(10.5, tEnd + 1.3); // never fade out before the last person has got through the door
-    this.tCrane = Math.min(...this.cast.map(a => a.plan.tWalk));
-    this.tFade = this.dur - 1.3;
-    // the light goes out with the fire: from the first flame that dies to just after the last one
-    // (each actor's douse eats 55% of its action — see _fire)
-    let first = Infinity;
-    this.cast.forEach((a) => {
-      const p = a.plan;
-      if (p) first = Math.min(first, p.tAct + p.dur * 0.12);
-    });
-    if (!isFinite(first)) first = DESCENT;
-    this.tDusk = Math.max(DESCENT * 0.9, first - 0.3);
-    this.tDuskEnd = Math.max(this.tDusk + 2.2, this.tEndDouse + 0.7);
-    this.tDuskEnd = Math.min(this.tDuskEnd, this.tCrane - 0.4);
+    this.dur = tEnd + 1.7;
+    this.tFade = this.dur - 1.4;
+    this.tCrane = Math.max(this.tJump + 1.2, tEnd - 0.4);
+    const crank = this.cast.find((a) => a.seat.act === 'crank');
+    this.tDusk = (crank ? crank.plan.tAct + 0.8 : this.tJump + 1.0);
+    this.tDuskEnd = Math.min(this.dur - 1.2, this.tDusk + 2.6);
   }
 
   // ---------------- per frame ----------------
@@ -573,288 +435,361 @@ export class IntroCutscene {
       this.skipping = true;
       this.skipAt = tt;
       this.tFade = tt;
-      this.dur = Math.min(this.dur, tt + (tt < this.tCrane ? 1.1 : 0.9));
+      this.dur = Math.min(this.dur, tt + (tt < this.tJump ? 1.1 : 0.9));
     }
 
-    const lit = this._fire(tt);
-    this.g.fire.douse(lit);
     this._sky(tt, silent);
-    if (this.fireSnd) this.fireSnd.level(Math.min(1, lit * 1.15 + 0.02));
-    if (!silent && lit > 0.15 && Math.random() < dt * (1.6 * lit)) this.fireSnd?.crackle();
-
+    this.g.fire.douse(0.78 + 0.07 * Math.sin(tt * 2.1)); // the camp fire is burning: this is their own camp
+    this.g.fire.update(dt);
+    if (this.fireSnd) this.fireSnd.level(0.5);
+    this._car(tt, silent);
+    this._pump(tt, silent);
     this._actors(tt, dt, silent);
     this._hud(tt);
 
     // the picture: out of the black, and back into it at the end
-    if (tt < 0.9) this.g.fx.fade = smoothstep(0, 0.9, tt);
+    if (tt < 1.0) this.g.fx.fade = smoothstep(0, 1.0, tt);
     else if (tt >= this.tFade) this.g.fx.fade = 1 - smoothstep(this.tFade, this.dur, tt);
     else this.g.fx.fade = 1;
     if (tt >= this.dur) this.finish();
   }
 
-  // the light drains out of the day while the camera comes down (the dusk's stutter, reused)
-  _fire(tt) {
-    const k = tt - 4.9;
-    let lit = 1;
-    for (const a of this.cast) {
-      const p = a.plan;
-      if (!p) continue;
-      const u = (tt - p.tAct) / p.dur;
-      if (u <= 0.16) continue;
-      const killed = smoothstep(0.16, 0.55, Math.min(1, u)) * a.douseW;
-      lit -= killed;
+  // the car: out of the rain on the far road, slowing, and stopping with its nose at the water
+  _car(tt, silent) {
+    const set = this.set;
+    const k = clamp(tt / STOP, 0, 1);
+    const e = 1 - (1 - k) * (1 - k); // it slows down as it comes into the flood
+    const x = lerp(this.carStart.x, set.car.x, e);
+    const z = lerp(this.carStart.z, set.car.z, e);
+    const y = this.g.world.terrain.height(x, z);
+    // a little nose-down as the brakes come on, then a settle on the springs
+    const settle = tt > STOP ? Math.exp(-(tt - STOP) * 4) * Math.sin((tt - STOP) * 22) * 0.03 : 0;
+    this.carNode.position.set(x, y + settle, z);
+    this.carNode.rotation.set(settle * 0.6, this.carYaw, 0);
+    this.carPos = { x, y, z };
+    if (silent) return;
+
+    const hit = (key, at, fn) => {
+      if (tt >= at && !this.cues[key]) { this.cues[key] = true; fn(); }
+    };
+    hit('engine', 0.15, () => {
+      this.carSnd = this.g.audio.uazStart(x, y + 0.7, z);
+      if (this.carSnd) this.carSnd.rev(0.55, { x, y: y + 0.7, z });
+    });
+    if (this.carSnd && tt < STOP) {
+      // pitch follows the speed: high on the road, dropping as it comes into the water
+      this.carSnd.rev(clamp(0.75 - 0.35 * k + 0.05 * Math.sin(tt * 3.1), 0.2, 1), { x, y: y + 0.7, z });
     }
-    // (a fire that nobody has touched yet still eats at itself, slowly)
-    if (k > 3) lit = Math.min(lit, 0.92);
-    return clamp(lit, 0, 1);
+    hit('stop', STOP + 0.35, () => {
+      if (this.carSnd) { this.carSnd.stop(1.4); this.carSnd = null; }
+    });
+    this.cast.forEach((a, i) => {
+      hit('door' + i, a.plan.door, () => {
+        const d = this._doorPoint(a);
+        this.g.audio.carDoor(d.x, d.y + 0.8, d.z, false);
+      });
+    });
   }
 
-  // the day ends with the fire: the same stutter as the dusk in game (a bulb dying), but slow, and only
-  // once the first flame is under water. The sky goes with uDawn, all the way down to black.
-  _sky(tt, silent) {
-    const span = Math.max(1.8, this.tDuskEnd - this.tDusk);
-    const k = clamp((tt - this.tDusk) / span, 0, 1);
-    // ...down to a moonlit dark, not to nothing: the film still has people in it
-    let L = lerp(this.day0, 0.3, smoothstep(0.08, 1, k));
-    // and a last grey breath of moonlight once it is fully dark, so the sleepers are not lost in it
-    L += 0.11 * smoothstep(this.tDuskEnd, this.tDuskEnd + 1.5, tt);
-    // the flicker: two beat frequencies fighting over the last of the light
-    if (k > 0.1 && k < 0.9 && Math.sin(tt * 37) * Math.sin(tt * 13) > 0.45) L *= 0.62;
-    shared.uDawn.value = L;
-    shared.uMorning.value = 1 - smoothstep(0, 0.75, k); // warm evening, then no palette at all
-    if (!this.duskHit && k > 0.06) {
-      this.duskHit = true;
-      if (!silent) {
-        this.g.audio.dusk(); // the roar and the tone: the same cue as a real dusk
-        this.g.fx.glitch = Math.max(this.g.fx.glitch, 0.3);
+  // the pump: the lever bites, the cylinder takes water, and then it is running for the rest of the film
+  _pump(tt, silent) {
+    if (silent) return;
+    const set = this.set;
+    const crank = this.cast.find((a) => a.seat.act === 'crank');
+    if (!crank) {
+      // (a lobby that has no crank seat in it: the pump is still started, just not by anyone we can see)
+      if (this.pumpAt < 0 && tt >= this.tJump + 1.0) {
+        this.pumpAt = tt;
+        this.g.audio.pumpStart(set.pump.x, set.pump.y + 1.0, set.pump.z);
+        this.pumpSnd = this.g.audio.pumpRun(set.pump.x, set.pump.y + 0.6, set.pump.z, 0.5);
       }
+      if (this.pumpSnd) this.pumpSnd.level(0.5 + 0.3 * clamp((tt - this.tJump - 1) / 2, 0, 1));
+      return;
     }
+    const p = crank.plan;
+    const u = (tt - p.tAct) / p.dur;
+    if (this.pumpAt < 0 && u >= 0.22) {
+      this.pumpAt = tt;
+      this.g.audio.pumpStart(set.pump.x, set.pump.y + 1.0, set.pump.z);
+      if (this.carSnd) { this.carSnd.stop(0.8); this.carSnd = null; }
+    }
+    const hit = (key, at, fn) => {
+      if (u >= at && !this.cues[key]) { this.cues[key] = true; fn(); }
+    };
+    hit('lever1', 0.06, () => this.g.audio.clank(set.pump.x, set.pump.y + 1.2, set.pump.z, 0.35));
+    hit('lever2', 0.34, () => this.g.audio.clank(set.pump.x, set.pump.y + 1.2, set.pump.z, 0.3));
+    hit('take', 0.5, () => {
+      this.pumpSnd = this.g.audio.pumpRun(set.pump.x, set.pump.y + 0.6, set.pump.z, 0.35);
+      this.g.hud.setIntro(null);
+    });
+    hit('water', 0.62, () => {
+      this.pumpSnd?.glug({ x: set.water.x, z: set.water.z });
+      this.g.audio.wade(0.35, 0.7);
+    });
+    if (this.pumpSnd) {
+      const k = clamp((tt - p.tAct - p.dur * 0.5) / 2.2, 0, 1);
+      this.pumpSnd.level(0.35 + 0.45 * k);
+    }
+  }
+
+  // ---------------- the cast, frame by frame ----------------
+  _doorPoint(a) {
+    const set = this.set;
+    const yaw = this.carYaw;
+    const lx = a.seat.side * 1.6;
+    const lz = a.seat.row ? -1.05 : 0.55;
+    const x = set.car.x + lx * Math.cos(yaw) + lz * Math.sin(yaw);
+    const z = set.car.z - lx * Math.sin(yaw) + lz * Math.cos(yaw);
+    return { x, z, y: this.g.world.terrain.height(x, z) };
   }
 
   _actors(tt, dt, silent) {
     const ground = (x, z) => this.g.world.terrain.height(x, z);
     this.cast.forEach((a, i) => {
       const p = a.plan;
-      const bufs = this.bufs[i] || (this.bufs[i] = { a: {}, b: {} });
       const n = a.rig.nodes;
-      a.x = Math.cos((a.seat.angle * Math.PI) / 180) * R_SEAT;
-      a.z = Math.sin((a.seat.angle * Math.PI) / 180) * R_SEAT;
-      let visible = true;
-      a.show = 1;
+      const door = a.door0;
+      const poser = POSERS[a.seat.act] || pCrank;
+      const toPump = Math.atan2(this.set.pump.x - a.work.x, this.set.pump.z - a.work.z);
       this._propVis(a, false);
-      if (a.blanket) a.blanket.node.visible = false;
       a.rig.root.rotation.set(0, a.yaw, 0);
-      a.rig.nodes.hips.position.set(0, 0.94, 0);
-      a.rig.nodes.hips.rotation.set(0, 0, 0);
-      pStand(a.rig, tt); // no pose residue when seeking backwards
+      n.hips.position.set(0, 0.94, 0);
+      n.hips.rotation.set(0, 0, 0);
+      pStand(a.rig, tt);
       a.mat.uniforms.uShow.value = 1;
+      let visible = true;
 
-      // --- the same evening, four ways of ending it ---
-      if (tt < p.t0) {
-        // sitting, watching the fire
-        a.k = 1;
-        pSit(a.rig, 1, tt + i * 1.7);
-        a.x = Math.cos((a.seat.angle * Math.PI) / 180) * R_SEAT;
-        a.z = Math.sin((a.seat.angle * Math.PI) / 180) * R_SEAT;
-        a.yaw = Math.atan2(FIRE.x - a.x, FIRE.z - a.z);
-      } else if (tt < p.t0 + p.rise) {
-        const k = smoothstep(0, 1, (tt - p.t0) / p.rise);
-        poseMix(a.rig, bufs, (r, t) => pSit(r, 1, t), pStand, k, tt + i * 1.7);
-        a.yaw = Math.atan2(FIRE.x - a.x, FIRE.z - a.z);
-      } else if (tt < p.tWalk) {
-        const u1 = clamp((tt - p.t0 - p.rise) / p.walk1, 0, 1);
-        const sx = Math.cos((a.seat.angle * Math.PI) / 180) * R_SEAT;
-        const sz = Math.sin((a.seat.angle * Math.PI) / 180) * R_SEAT;
-        a.x = lerp(sx, a.work.x, u1);
-        a.z = lerp(sz, a.work.z, u1);
-        const toFire = Math.atan2(FIRE.x - a.x, FIRE.z - a.z);
-        if (tt < p.tAct) {
-          // the stride follows the ground: a step per 0.62 m, so the feet do not skate
-          const distance = Math.hypot(a.work.x - sx, a.work.z - sz);
-          a.phase = u1 * distance / 0.62 * Math.PI;
-          a.yaw = toFire; // fixed heading even in the settling beat at the end of the step
-          const speed = u1 < 1 ? distance / p.walk1 : 0;
-          poseSurvivor(a.rig, a.phase, speed, false, false);
-          poseFur(a.rig, dt, speed);
-        } else {
-          a.yaw = toFire;
-          const u = clamp((tt - p.tAct) / p.dur, 0, 1);
-          const poser = { pour: pPour, stomp: pStomp, tarp: pTarp, bucket: pBucket, stick: pStick }[a.seat.act] || pPour;
-          const blend = smoothstep(0, 0.12, u) * (1 - smoothstep(0.88, 1, u));
-          poseMix(a.rig, bufs, pStand, (r, t) => poser(r, u, t), blend, tt + i);
-          a.u = u;
-          this._propVis(a, true);
-          this._pivot(a, u);
-          this._actFx(a, tt, u, silent);
+      if (tt < p.door) {
+        // still in the car: not in the shot
+        visible = false;
+        a.x = this.carNode.position.x;
+        a.z = this.carNode.position.z;
+        a.yaw = this.carYaw;
+        a.phase = 0;
+      } else if (tt < this.tJump) {
+        // out of the door and into the water, walking towards the pump
+        const u = clamp((tt - p.door - STEP_OUT) / Math.max(0.2, p.walkFull), 0, 1);
+        a.x = lerp(door.x, a.work.x, u);
+        a.z = lerp(door.z, a.work.z, u);
+        a.yaw = Math.atan2(a.work.x - door.x, a.work.z - door.z);
+        const d = Math.hypot(a.work.x - door.x, a.work.z - door.z);
+        a.phase = u * d / 0.62 * Math.PI;
+        const spd = p.walkFull > 0 ? d / p.walkFull : 0;
+        if (u <= 0.001) { pStand(a.rig, tt); a.phase = 0; }
+        else { poseSurvivor(a.rig, a.phase, spd, false, false); poseFur(a.rig, dt, spd); }
+        a.u = 0;
+        // the splash of a boot going into the flood: three of them, at the water
+        if (!silent && a.splashAt) {
+          a.splashAt.forEach((f, k) => {
+            if (u >= f && !a.hit['w' + k]) {
+              a.hit['w' + k] = true;
+              this.g.audio.wade(0.5 + 0.1 * k, 0.5);
+            }
+          });
         }
-      } else if (tt < p.tBed) {
-        // Turn first, walk second. Position/stride/yaw are functions of film time, not last frame's speed:
-        // seeking, a slow phone and 60 fps all see the same forward walk.
-        const from = this._actEnd(a), to = a.seat.bed;
-        const want = Math.atan2(to.x - from.x, to.z - from.z);
-        const fireYaw = Math.atan2(FIRE.x - from.x, FIRE.z - from.z);
-        const turn = smoothstep(0, p.turn, tt - p.tWalk);
-        a.yaw = turnTo(fireYaw, want, turn, Math.PI);
-        const u = clamp((tt - p.tWalk - p.turn) / p.walk2, 0, 1);
-        const e = smoothstep(0, 1, u);
-        a.x = lerp(from.x, to.x, e);
-        a.z = lerp(from.z, to.z, e);
-        const distance = Math.hypot(to.x - from.x, to.z - from.z);
-        a.phase = e * distance / 0.62 * Math.PI;
-        const speed = distance * 6 * u * (1 - u) / p.walk2;
-        poseSurvivor(a.rig, a.phase, speed, false, false);
-        poseFur(a.rig, dt, speed);
-        this._propVis(a, false);
+      } else if (tt < p.tAct) {
+        // the cut lands on them already at the pump, catching their breath
+        a.x = a.work.x;
+        a.z = a.work.z;
+        a.yaw = toPump;
+        a.phase = 0;
+        pStand(a.rig, tt);
+        poseFur(a.rig, dt, 0);
+        a.u = 0;
+      } else if (tt < p.tEnd) {
+        // their own part of the job
+        const u = clamp((tt - p.tAct) / p.dur, 0, 1);
+        a.x = a.work.x;
+        a.z = a.work.z;
+        a.yaw = toPump;
+        const blend = smoothstep(0, 0.1, u) * (1 - smoothstep(0.9, 1, u));
+        this._mix(a, pStand, (r, t2) => poser(r, u, t2), blend, tt + i);
+        a.u = u;
+        a.phase = 0;
+        poseFur(a.rig, dt, 0);
+        this._propVis(a, true);
+        this._actFx(a, tt, u, silent);
       } else {
-        // the last part: lie down your own way
-        const k = clamp((tt - p.tBed) / p.lie, 0, 1);
-        const sleep = a.seat.sleep;
-        this._propVis(a, false);
-        if (sleep === 'tent') {
-          const inside = a.seat.inside;
-          const from = this._actEnd(a);
-          const approachYaw = Math.atan2(a.seat.bed.x - from.x, a.seat.bed.z - from.z);
-          const crawlYaw = Math.atan2(inside.x - a.seat.bed.x, inside.z - a.seat.bed.z);
-          // Kneel OUTSIDE the low mouth. Only then move through its centre, along the tent's own axis.
-          const kneel = smoothstep(0, 0.32, k);
-          const e = smoothstep(0.32, 1, k);
-          a.x = lerp(a.seat.bed.x, inside.x, e);
-          a.z = lerp(a.seat.bed.z, inside.z, e);
-          a.yaw = turnTo(approachYaw, crawlYaw, kneel, Math.PI);
-          poseMix(a.rig, bufs, pStand, pCrawl, kneel, tt);
-          // The cloth occludes the person: no fading away in front of the entrance.
-          a.show = 1;
-        } else if (sleep === 'blanket') {
-          const e = smoothstep(0, 1, k);
-          // (they walked here already: the last beat is only the body going down)
-          a.x = a.seat.bed.x;
-          a.z = a.seat.bed.z;
-          a.yaw = Math.atan2(a.seat.bed.x - a.work.x, a.seat.bed.z - a.work.z);
-          poseMix(a.rig, bufs, pStand, (r, t2) => pLieBack(r, t2), e, tt);
-          if (a.blanket) {
-            const pull = smoothstep(0.45, 1, k);
-            const bp = a.blanket.node;
-            bp.visible = pull > 0.02;
-            bp.position.set(0, 0.42, lerp(-0.12, 0.17, pull));
-            bp.rotation.set(0, 0, 0);
-          }
-        } else {
-          const e = smoothstep(0, 1, k);
-          // (the walk to bed is over by now — this used to lerp from the fire and they all slid back)
-          a.x = a.seat.bed.x;
-          a.z = a.seat.bed.z;
-          const bedYaw = Math.atan2(a.seat.bed.x - a.work.x, a.seat.bed.z - a.work.z);
-          a.yaw = bedYaw;
-          const target = sleep === 'back' ? pLieBack : sleep === 'curl' ? pCurl : pSlump;
-          poseMix(a.rig, bufs, pStand, target, e, tt + i * 0.9);
-        }
+        // done: stand there and watch the water find its way out
+        a.x = a.work.x;
+        a.z = a.work.z;
+        a.yaw = toPump;
+        pStand(a.rig, tt);
+        poseFur(a.rig, dt, 0);
+        a.u = 1;
+        a.phase = 0;
       }
-      if (tt >= p.tWalk) poseFur(a.rig, 0, 0); // (a furry survivor's tail keeps its own time)
       a.rig.root.visible = visible;
-      // how fast did they actually move this beat (a stander is not walking, and must not look like it)
-      a.spd = dt > 1e-5 ? Math.hypot(a.x - a.px, a.z - a.pz) / dt : 0;
+      a.show = visible ? 1 : 0;
+      a.yawCur = a.yaw;
+      a.rig.root.position.set(a.x, ground(a.x, a.z), a.z);
+      a.rig.root.rotation.y = a.yawCur;
+      // the thing in their hands follows the beat
+      if (a.props[0] && a.seat.act === 'sign') {
+        a.props[0].node.rotation.set(a.u > 0.02 && a.u < 0.66 ? Math.sin(a.u * Math.PI * 3.2) * 0.5 : 0, 0, 0);
+      } else if (a.props[0] && a.seat.act === 'prime') {
+        const tip = smoothstep(0.42, 0.58, a.u) * (1 - smoothstep(0.7, 0.86, a.u));
+        a.props[0].node.rotation.set(0.1 + tip * 1.5, 0, 0);
+      }
       a.px = a.x;
       a.pz = a.z;
-      a.yawCur = a.yaw; // the turn is already scheduled above, with no frame-rate lag
-      a.rig.root.position.set(a.x, ground(a.x, a.z) + (a.seat.sleep && a.rig.root.rotation.x < -0.2 ? 0.18 : 0), a.z);
-      a.rig.root.rotation.y = a.yawCur;
-      void n;
     });
   }
 
-  _actEnd(a) {
-    // where the action left them standing
-    return { x: a.work.x, z: a.work.z };
-  }
-
-  _propVis(a, on) {
-    for (const p of a.props) if (p.kind !== 'blanket') p.node.visible = on;
-  }
-
-  // the pot tips, the tarp swings: the thing in their hands follows the action
-  _pivot(a, u) {
-    const prop = a.props[0];
-    if (!prop) return;
-    const act = a.seat.act;
-    const tip = act === 'pour' ? smoothstep(0.24, 0.48, u) * (1 - smoothstep(0.64, 0.84, u))
-      : act === 'bucket' ? smoothstep(0.46, 0.66, u) * (1 - smoothstep(0.78, 0.92, u))
-        : 0;
-    if (tip > 0) prop.node.rotation.set(0.2 + tip * 2.1, 0, 0);
-    else if (act === 'stick') prop.node.rotation.set(0.9 + Math.sin(u * Math.PI * 4.4) * 0.12, 0, 0.2);
-    else prop.node.rotation.set(0.2, 0, 0);
-    // the water out of the pot / the bucket: from the lip of the thing in their hands into the coals
-    if (tip > 0 && (act === 'pour' || act === 'bucket')) {
-      const p = prop.mesh.getWorldPosition(this._lip || (this._lip = new THREE.Vector3()));
-      this.g.fire.stream(p, tip);
+  // a cross-fade between two poses (a tiny mixer: only the joints and the hips' height)
+  _mix(a, poseA, poseB, k, tt) {
+    const A = this._poseA || (this._poseA = {});
+    const B = this._poseB || (this._poseB = {});
+    if (k >= 1) { poseB(a.rig, tt); return; }
+    if (k <= 0) { poseA(a.rig, tt); return; }
+    poseA(a.rig, tt);
+    this._capture(a.rig, A);
+    poseB(a.rig, tt);
+    this._capture(a.rig, B);
+    for (const name of POSE_NODES) {
+      const na = a.rig.nodes[name];
+      const o1 = A[name], o2 = B[name];
+      na.position.set(lerp(o1.px, o2.px, k), lerp(o1.py, o2.py, k), lerp(o1.pz, o2.pz, k));
+      na.rotation.set(lerp(o1.rx, o2.rx, k), lerp(o1.ry, o2.ry, k), lerp(o1.rz, o2.rz, k));
     }
   }
 
-  // sounds and steam at the exact beat of each action
+  _capture(rig, out) {
+    for (const name of POSE_NODES) {
+      const nd = rig.nodes[name];
+      const o = out[name] || (out[name] = {});
+      o.px = nd.position.x; o.py = nd.position.y; o.pz = nd.position.z;
+      o.rx = nd.rotation.x; o.ry = nd.rotation.y; o.rz = nd.rotation.z;
+    }
+  }
+
+  _propVis(a, on) {
+    for (const p of a.props) p.node.visible = on;
+  }
+
+  // sounds at the exact beat of each action
   _actFx(a, tt, u, silent) {
     if (silent) return;
     const hit = (key, at, fn) => {
       if (u >= at && !a.hit[key]) { a.hit[key] = true; fn(); }
     };
-    const fy = this.g.world.terrain.height(FIRE.x, FIRE.z);
+    const set = this.set;
+    const pumpY = set.pump.y;
     const act = a.seat.act;
-    if (act === 'pour' || act === 'bucket') {
-      hit('tip', 0.5, () => {
-        this.g.audio.steam(FIRE.x, fy + 0.6, FIRE.z, 1);
-        this.g.fire.puff(1);
+    if (act === 'hose') {
+      hit('h1', 0.2, () => this.g.audio.wade(0.4, 0.5));
+      hit('h2', 0.55, () => this.g.audio.wade(0.6, 0.6));
+      hit('h3', 0.82, () => this.pumpSnd?.glug({ x: set.water.x, z: set.water.z }));
+    } else if (act === 'prime') {
+      hit('p1', 0.16, () => this.g.audio.clank(set.pump.x, pumpY + 1.1, set.pump.z, 0.25));
+      hit('p2', 0.5, () => {
+        this.g.audio.splash(0.4);
+        this.g.audio.wade(0.3, 0.2);
       });
-    } else if (act === 'stomp') {
-      hit('s1', 0.28, () => this.g.audio.stomp(FIRE.x, fy + 0.2, FIRE.z, 0.9));
-      hit('s2', 0.95, () => this.g.audio.stomp(FIRE.x, fy + 0.2, FIRE.z, 1));
-      hit('kick', 0.74, () => { this.g.audio.stomp(FIRE.x, fy + 0.2, FIRE.z, 0.7); this.g.fire.puff(0.4); });
-    } else if (act === 'tarp') {
-      hit('w1', 0.22, () => this.g.audio.whump(FIRE.x, fy + 0.6, FIRE.z, 1));
-      hit('w2', 0.5, () => this.g.audio.whump(FIRE.x, fy + 0.6, FIRE.z, 0.9));
-      hit('w3', 0.78, () => this.g.audio.whump(FIRE.x, fy + 0.6, FIRE.z, 0.8));
-    } else if (act === 'stick') {
-      hit('r1', 0.24, () => this.g.audio.whump(FIRE.x, fy + 0.3, FIRE.z, 0.7));
-      hit('r2', 0.5, () => this.g.audio.whump(FIRE.x, fy + 0.3, FIRE.z, 0.8));
-      hit('st', 0.72, () => { this.g.audio.stomp(FIRE.x, fy + 0.2, FIRE.z, 1); this.g.fire.puff(0.5); });
+      hit('p3', 0.86, () => this.g.audio.clank(set.pump.x, pumpY + 1.1, set.pump.z, 0.2));
+    } else if (act === 'crank') {
+      // (the lever and the water are driven by _pump: they have to land on one clock for the whole shot)
+    } else if (act === 'sign') {
+      hit('k1', 0.28, () => this.g.audio.whump(set.marker.x, ground(this.g, set.marker.x, set.marker.z) + 0.4, set.marker.z, 0.9));
+      hit('k2', 0.58, () => this.g.audio.whump(set.marker.x, ground(this.g, set.marker.x, set.marker.z) + 0.4, set.marker.z, 0.7));
+      hit('k3', 0.78, () => this.g.audio.wade(0.2, 0.3));
+    }
+  }
+
+  // the day ends over the work: the same stutter as a real dusk (a bulb dying), slow, and only once the pump
+  // has taken water. The sky goes with uDawn, all the way down to black.
+  _sky(tt, silent) {
+    const span = Math.max(1.8, this.tDuskEnd - this.tDusk);
+    const k = clamp((tt - this.tDusk) / span, 0, 1);
+    let L = lerp(this.day0, 0.3, smoothstep(0.08, 1, k));
+    L += 0.11 * smoothstep(this.tDuskEnd, this.tDuskEnd + 1.5, tt); // a breath of moonlight, so the sleepers show
+    if (k > 0.1 && k < 0.9 && Math.sin(tt * 37) * Math.sin(tt * 13) > 0.45) L *= 0.62;
+    shared.uDawn.value = L;
+    shared.uMorning.value = 1 - smoothstep(0, 0.75, k);
+    if (!this.duskHit && k > 0.06) {
+      this.duskHit = true;
+      if (!silent) {
+        this.g.audio.dusk();
+        this.g.fx.glitch = Math.max(this.g.fx.glitch, 0.3);
+      }
     }
   }
 
   _hud(tt) {
-    // the title over the fall, then the camp and the night (the night tag is startNight's own)
-    if (tt > 0.7 && tt < 4.9 && !this.titleShown) {
+    // the title over the arrival, then the work, then the night (startNight sets its own tag)
+    if (tt > 1.0 && tt < DRIVE + 0.6 && !this.titleShown) {
       this.titleShown = true;
       this.g.hud.setIntro(t('introBig'), t('introSmall'));
     }
-    if (tt > 4.9 && this.titleShown) {
+    if (tt > DRIVE + 0.6 && this.titleShown) {
       this.titleShown = false;
       this.g.hud.setIntro(null);
     }
   }
 
   // ---------------- the camera ----------------
+  // Keys, not a spline: a film is a sequence of shots, and one of them is a cut (at the water, when the crossing
+  // is over). Between keys the camera eases; on a cut it snaps.
+  _camKeys() {
+    if (this._keys) return this._keys;
+    const s = this.set;
+    // the staging, in the set's own vectors: `tw` is towards the water, `sd` along the bank
+    const tw = s.toWater, sd = s.side;
+    const at = (f, side, dy) => [s.pump.x + tw.x * f + sd.x * side, s.pump.y + dy, s.pump.z + tw.z * f + sd.z * side];
+    const look = (x, y, z) => [x, y, z];
+    const carNose = { x: s.car.x - CAMP_TRACK.x * 2.2, z: s.car.z - CAMP_TRACK.z * 2.2 };
+    const road = { x: this.carStart.x, z: this.carStart.z };
+    const mid = { x: lerp(s.car.x, road.x, 0.45), z: lerp(s.car.z, road.z, 0.45) };
+    const cross = { x: lerp(s.car.x, s.near.x, 0.4), z: lerp(s.car.z, s.near.z, 0.4) };
+    // the four of them work in a loose ring round the pump: the next shot is aimed at the ring, not at the pump
+    const work = { x: (s.hose.x + s.prime.x + s.crank.x + s.sign.x) / 4, z: (s.hose.z + s.prime.z + s.crank.z + s.sign.z) / 4 };
+    const k = [
+      // 1. the road, the water and the camp: the car is out there in the rain, coming in
+      { t: 0, p: at(-4.5, 5.2, 4.3), l: look(mid.x, 1.2, mid.z), fov: 46 },
+      { t: DRIVE * 0.72, p: at(-1.2, 2.6, 2.9), l: look(s.car.x, 1.1, s.car.z), fov: 48 },
+      // 2. it stops at the water, and the doors open one after another
+      { t: STOP + 0.25, p: at(-1.3, 4.3, 2.4), l: look(carNose.x, 1.1, carNose.z), fov: 47 },
+      { t: STOP + 2.1, p: at(-2.6, 5.6, 2.5), l: look((s.car.x + carNose.x) / 2, 1.0, (s.car.z + carNose.z) / 2), fov: 46 },
+      // 3. the wade: low, in the water, and they come past the camera on their way to the pump
+      { t: STOP + 3.1, p: at(1.4, 2.3, 1.5), l: look(cross.x, 1.3, cross.z), fov: 50 },
+      // 4. (cut) the work: four of them round the pump, and the lever going
+      { t: this.tJump, cut: true, p: at(-3.8, 1.3, 3.2), l: look(work.x, 1.2, work.z), fov: 52 },
+      { t: this.tJump + 1.5, p: at(-2.7, 2.1, 2.5), l: look(work.x + tw.x * 0.5, 1.1, work.z + tw.z * 0.5), fov: 50 },
+      { t: this.tDusk + 0.4, p: at(-1.4, 3.0, 2.2), l: look(s.pump.x + tw.x * 0.6, 1.1, s.pump.z + tw.z * 0.6), fov: 48 },
+      // 5. the water: pull back and up, and the flood is the last thing in the light
+      { t: this.tDuskEnd, p: at(-5.0, 5.6, 4.4), l: look(s.water.x - 1.4, 1.0, s.water.z), fov: 54 },
+      { t: this.dur, p: at(-12.0, 8.0, 8.5), l: look(s.water.x - 4.0, 0.9, s.water.z + 0.5), fov: 58 },
+    ];
+    k.sort((a, b) => a.t - b.t); // (a lobby with no crank seat at all: the keys still come out in order)
+    this._keys = k;
+    return k;
+  }
+
   applyCamera(camera) {
     if (!this.active) return false;
     const tt = this.t;
-    const k = smoothstep(0, DESCENT, tt);
-    // out of the sky and down: the rail is a curve, the look is a slower one of its own
-    this.camPath.getPointAt(k, this._cam);
-    const crane = smoothstep(this.tCrane, this.tFade - 0.5, tt);
-    if (crane > 0) {
-      this._cam.x = lerp(this._cam.x, 3.3, crane);
-      this._cam.y = lerp(this._cam.y, 4.8, crane);
-      this._cam.z = lerp(this._cam.z, 9.6, crane);
+    const keys = this._camKeys();
+    let i = 0;
+    while (i < keys.length - 1 && tt > keys[i + 1].t) i++;
+    const A = keys[i], B = keys[Math.min(i + 1, keys.length - 1)];
+    if (B === A || A.cut || B.cut) {
+      this._cam.set(A.p[0], A.p[1], A.p[2]);
+      this._look.set(A.l[0], A.l[1], A.l[2]);
+      camera.fov = A.fov;
+    } else {
+      const span = Math.max(1e-3, B.t - A.t);
+      const k = smoothstep(0, 1, clamp((tt - A.t) / span, 0, 1));
+      this._cam.set(lerp(A.p[0], B.p[0], k), lerp(A.p[1], B.p[1], k), lerp(A.p[2], B.p[2], k));
+      this._look.set(lerp(A.l[0], B.l[0], k), lerp(A.l[1], B.l[1], k), lerp(A.l[2], B.l[2], k));
+      camera.fov = lerp(A.fov, B.fov, k);
     }
-    this._look.set(0, lerp(3.2, 0.85, k), 0);
-    if (crane > 0) this._look.lerp(this._tmp.set(-0.7, 0.45, 1.3), crane);
     camera.position.copy(this._cam);
     camera.lookAt(this._look);
-    // a breath of handheld as we come down out of the wind
-    const hh = 0.0035 * k;
+    // a breath of handheld: rain, boots and a camera that is not on a tripod
+    const hh = 0.0032;
     camera.rotateZ(Math.sin(tt * 0.9) * hh + Math.sin(tt * 2.3 + 1) * hh * 0.5);
     camera.rotateX(Math.sin(tt * 0.7 + 2) * hh);
-    const fov = k < 1 ? lerp(44, 58, k) : lerp(58, 62, crane);
-    if (Math.abs(camera.fov - fov) > 0.01) {
-      camera.fov = fov;
-      camera.updateProjectionMatrix();
-    }
+    camera.updateProjectionMatrix();
     return true;
   }
 
@@ -864,3 +799,20 @@ export class IntroCutscene {
     this.seeking = true;
   }
 }
+
+// a small helper the sound cues use: the ground under a point in the world
+function ground(g, x, z) {
+  return g.world.terrain.height(x, z);
+}
+
+// ---------------- which film opens the shift (3.0l) ----------------
+// Two участка, two ways of arriving. The forestry still begins with the last light over the camp fire (2.1j); the
+// bog begins on the road, at the flooded проезд. `new IntroCutscene(game)` returns the right one for the map, so
+// Game keeps talking to a single object with begin/update/applyCamera/cancel/seek on it.
+export class IntroCutscene {
+  constructor(game) {
+    return game.map === 'bog' ? new BogArrival(game) : new DuskFilm(game);
+  }
+}
+
+export { DuskFilm } from './duskFilm.js';

@@ -429,15 +429,32 @@ export class Objectives {
   }
 
   // the line shown on Tab / when the task changes
+  // (3.0l) On the bog the work is not "five generators for the yard": the camp is cut off because the проезд is
+  // under water, and what the shift does about it is start the pumps. Same chain, its own words.
   taskText() {
     const g = this.gens.find((q) => !q.running);
     if (!g) return this.g.escape ? this.g.escape.taskText() : '';
-    if (g.phase === 'spin') return t('taskSpin');
-    if (g.broken) return t('taskRestartGen').replace('{site}', this.siteAt(g.site));
-    if (g.hasPart) return t('taskRepair').replace('{site}', this.siteAt(g.site));
-    if (g.k === 0) return t('taskCamp');
-    if (!g.known) return t('taskFindNext');
-    return t('taskFollow').replace('{site}', this.siteAt(g.site));
+    const bog = this.g.map === 'bog';
+    if (g.phase === 'spin') return t(bog ? 'taskPumpSpin' : 'taskSpin');
+    if (g.broken) return t(bog ? 'taskPumpRestart' : 'taskRestartGen').replace('{site}', this.siteAt(g.site));
+    if (g.hasPart) return t(bog ? 'taskPumpRepair' : 'taskRepair').replace('{site}', this.siteAt(g.site));
+    if (g.k === 0) return t(bog ? 'taskPumpFirst' : 'taskCamp');
+    if (!g.known) return t(bog ? 'taskPumpNext' : 'taskFindNext');
+    return t(bog ? 'taskPumpFollow' : 'taskFollow').replace('{site}', this.siteAt(g.site));
+  }
+
+  // ---------------- which machine is under the chain (3.0l) ----------------
+  // The forest runs generators; the bog runs pumps. Same objectives, same repair, same sabotage — but a pump
+  // has its own voice (a cylinder and moving water) and must never borrow the generator's hum or its beep.
+  _voice(g, spinning = false) {
+    const a = this.g.audio;
+    if (this.g.map === 'bog') return a.pumpRun(g.x, g.y + 0.5, g.z, spinning ? 0.25 : 1);
+    return a.genHum(g.x, g.y + 0.5, g.z, spinning);
+  }
+
+  _voiceLevel(voice, k) {
+    if (voice.spin) voice.spin(k);
+    else if (voice.level) voice.level(0.25 + 0.75 * k);
   }
 
   // ---------------- per frame ----------------
@@ -473,7 +490,7 @@ export class Objectives {
       gl.core.material.opacity = Math.min(1, I * 1.2);
       gl.halo.material.opacity = I * 0.22;
       const wantHum = (g.running || (g.k === 0 && this.morningOn && !g.dying)) && audio.ready;
-      if (wantHum && !g.hum) g.hum = audio.genHum(g.x, g.y + 0.5, g.z);
+      if (wantHum && !g.hum) g.hum = this._voice(g);
       if (!wantHum && g.hum && !g.dying) { g.hum.stop(); g.hum = null; }
     }
     if (!night) {
@@ -512,8 +529,8 @@ export class Objectives {
       if (g.phase !== 'spin') continue;
       g.spinT += dt;
       g.spinNoiseT -= dt;
-      if (g.hum) g.hum.spin(g.spinT / g.spec.spin);
-      else if (audio.ready) g.hum = audio.genHum(g.x, g.y + 0.5, g.z, true);
+      if (g.hum) this._voiceLevel(g.hum, g.spinT / g.spec.spin);
+      else if (audio.ready) g.hum = this._voice(g, true);
       if (g.spinNoiseT <= 0) {
         g.spinNoiseT = 1.8;
         game.noise(g.x, g.z, g.spec.spinLoud, 'repair'); // the machine itself: only the host's monsters listen
@@ -838,10 +855,12 @@ export class Objectives {
     g.broken = false;
     g.ranAt = game.time;
     g.flick = 1.2;
-    if (g.hum) g.hum.spin(1); // a spun-up engine just keeps going
+    if (g.hum) this._voiceLevel(g.hum, 1); // a spun-up machine just keeps going
     this.count = this.gens.filter((q) => q.running).length;
     if (!by) this.dirty = true;
-    game.audio.genStart(g.x, g.y + 0.6, g.z);
+    // (3.0l) on the bog there is nothing to start but a pump: a lever, a prime, and water — not a starter motor
+    if (game.map === 'bog') game.audio.pumpStart(g.x, g.y + 0.6, g.z);
+    else game.audio.genStart(g.x, g.y + 0.6, g.z);
     game.onGeneratorStarted(g, this.count, by && by !== true ? by : null);
   }
 
