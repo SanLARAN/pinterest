@@ -114,13 +114,15 @@ export class MeshBuilder {
     this.tri(a, c, d, kind, 1 | (hideMask & 4 ? 2 : 0) | (hideMask & 8 ? 4 : 0));
   }
 
-  // quad that orients itself to face direction n (local space)
-  quadN(a, b, c, d, n, kind = this.kind) {
+  // quad that orients itself to face direction n (local space). hideMask as in quad(): a flat surface
+  // (a water plane, a deck) has no diagonal to draw, and the world material culls back faces — a plane
+  // wound the wrong way is not "dark", it is not there at all
+  quadN(a, b, c, d, n, kind = this.kind, hideMask = 0) {
     const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2];
     const vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
     const cx = uy * vz - uz * vy, cy = uz * vx - ux * vz, cz = ux * vy - uy * vx;
-    if (cx * n[0] + cy * n[1] + cz * n[2] < 0) this.quad(a, d, c, b, kind);
-    else this.quad(a, b, c, d, kind);
+    if (cx * n[0] + cy * n[1] + cz * n[2] < 0) this.quad(a, d, c, b, kind, hideMask);
+    else this.quad(a, b, c, d, kind, hideMask);
   }
 
   triN(a, b, c, n, kind = this.kind, hide = 0) {

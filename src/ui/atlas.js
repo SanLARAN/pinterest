@@ -308,7 +308,8 @@ export class Atlas {
     const tabs = $('atlasTabs');
     let html = `<button class="tab toc${p.id === 'contents' ? ' on' : ''}" data-go="contents" aria-label="${esc(T.ui.contents)}" title="${esc(T.ui.contents)}">${ICON_TOC}<em>${esc(T.ui.contents)}</em></button>`;
     for (const c of CHAPTERS) {
-      html += `<button class="tab${p.chapter === c.id ? ' on' : ''}" data-go="${c.entries[0]}"><b>${c.num}</b><em>${esc(T.chapters[c.id])}</em></button>`;
+      // 3.0i: a chapter may carry its own ink — the bog's is blue (style.css)
+      html += `<button class="tab ch-${c.id}${p.chapter === c.id ? ' on' : ''}" data-go="${c.entries[0]}" data-ch="${c.id}"><b>${c.num}</b><em>${esc(T.chapters[c.id])}</em></button>`;
     }
     tabs.innerHTML = html;
     $('atlasClose').setAttribute('aria-label', T.ui.close);
@@ -444,7 +445,7 @@ export class Atlas {
     let h = `<div class="ent-kicker"><span>${esc(T.ui.contents)}</span><span></span></div>`;
     h += `<h2 class="ent-name toc-title">${esc(T.ui.title)}</h2><p class="toc-found">${esc(T.ui.found)}</p>`;
     for (const c of CHAPTERS) {
-      h += `<div class="toc-ch"><h3>${c.num} · ${esc(T.chapters[c.id])}</h3><ol>`;
+      h += `<div class="toc-ch" data-ch="${c.id}"><h3>${c.num} · ${esc(T.chapters[c.id])}</h3><ol>`;
       for (const id of c.entries) {
         const k = this.pages.findIndex((p) => p.id === id);
         const E = ENTRIES[id];
@@ -586,6 +587,18 @@ export class Atlas {
       case 'shade':
         A.whisper(...at(-1.1, 0, 0.9));
         dur = 2.8;
+        break;
+      // chapter V, the bog (3.0i): the two things that live there
+      case 'drowned':
+        // water running off a body, then the hand closing on an ankle
+        A.drownedRise(...at(-1.1, -1.2, 3));
+        later(1600, () => A.drownedRise(...at(-1, -1.1, 2)));
+        later(3200, () => A.drownedGrab());
+        dur = 4.2;
+        break;
+      case 'gnat':
+        for (let k = 0; k < 5; k++) later(k * 700, () => A.gnatSwarm());
+        dur = 4;
         break;
       case 'generator':
         for (let k = 0; k < 4; k++) later(k * 900, () => A.beacon(...at(-1, -0.4, 2)));

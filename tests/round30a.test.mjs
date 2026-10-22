@@ -95,7 +95,10 @@ test('the bog has its own weather: soft mud, vapour, and a water line you can as
 
 test('the bog is built within budget, with nothing broken in it', () => {
   const w = bogWorld();
-  assert.ok(w.tris > 30000 && w.tris < 120000, `triangles: ${w.tris}`);
+  // (3.0i) the bog stopped being a bare field: peat-bog pines, willows, reeds, tussocks, cotton grass, deadwood.
+  // The ceiling is the forest's own (about 580k) with headroom, and the floor is there so a silent regression
+  // that deletes the vegetation again fails here instead of shipping an empty level.
+  assert.ok(w.tris > 250000 && w.tris < 750000, `triangles: ${w.tris}`);
   assert.ok(w.waterTris > 1000, 'the water is drawn');
   assert.ok(w.col.caps.every((c) => Number.isFinite(c.ax + c.az + c.bx + c.bz + c.r + c.h)), 'no NaN colliders');
   for (const s of w.sites) assert.ok(w.col.free(s.x + 1.6, s.z, 0.4), `${s.id} can be walked up to`);

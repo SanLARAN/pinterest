@@ -10,6 +10,12 @@ export const CHAPTERS = [
   { id: 'tasks', num: 'II', entries: ['generator', 'corpse', 'fuel', 'plug', 'fuses', 'belt', 'battery', 'shard', 'stone', 'flare', 'glowstick', 'flashlight', 'tape', 'crowbar', 'binoculars', 'syringe'] },
   { id: 'places', num: 'III', entries: ['camp', 'medhut', 'cabin', 'tower', 'stones', 'wreck', 'sovkhoz', 'firetower', 'zarya'] },
   { id: 'way', num: 'IV', entries: ['yard', 'uaz', 'wheel', 'carbattery', 'carb', 'jerrycan'] },
+  // V (3.0i): the second участок. Everything the forest never showed you — the bog's own creatures, its ground,
+  // what grows on it, the five pumps and the way the shift ends.
+  { id: 'bog', num: 'V', entries: [
+    'drowned', 'gnat', 'sink', 'plank', 'deadtree', 'dwarfpine', 'willow', 'reeds', 'tussock', 'cottongrass',
+    'pump', 'winch', 'pumpshed', 'barracks', 'peatstacks',
+  ] },
 ];
 
 export const ENTRIES = {
@@ -52,6 +58,22 @@ export const ENTRIES = {
   carbattery: { model: 'carbattery', sound: 'carbattery', kind: 'task', rate: [2, 2], log: [['fitted', 'car:1']] },
   carb: { model: 'carb', sound: 'carb', kind: 'task', rate: [3, 3], log: [['fitted', 'car:2']] },
   jerrycan: { model: 'jerrycan', sound: 'jerrycan', kind: 'task', rate: [3, 3], log: [['fitted', 'car:3']] },
+  // (3.0i) chapter V — the bog
+  drowned: { model: 'drowned', sound: 'drowned', kind: 'beast', rate: [5, 3, 1, 5], log: [['seen', 'seen:drowned'], ['killed', 'kills:drowned']] },
+  gnat: { model: 'gnat', sound: 'gnat', kind: 'beast', rate: [4, 1, 4, 3], log: [['seen', 'seen:gnat']] },
+  sink: { model: 'sink', kind: 'thing' },
+  plank: { model: 'plank', kind: 'thing' },
+  deadtree: { model: 'deadtree', kind: 'thing' },
+  dwarfpine: { model: 'dwarfpine', kind: 'thing' },
+  willow: { model: 'willow', kind: 'thing' },
+  reeds: { model: 'reeds', kind: 'thing' },
+  tussock: { model: 'tussock', kind: 'thing' },
+  cottongrass: { model: 'cottongrass', kind: 'thing' },
+  pump: { model: 'pump', kind: 'task', rate: [3, 4], log: [['started', 'gens']] },
+  winch: { model: 'winch', kind: 'task', rate: [4, 5], log: [['escaped', 'escapes']] },
+  pumpshed: { model: 'pumpshed', kind: 'place' },
+  barracks: { model: 'barracks', kind: 'place', log: [['startedHere', 'site:barracks']] },
+  peatstacks: { model: 'peatstacks', kind: 'place', log: [['startedHere', 'site:stacks']] },
 };
 
 const TEXT = {
@@ -1285,6 +1307,319 @@ const TEXT = {
     },
   },
 };
+
+
+// ---------------------------------------------------------------- chapter V: the bog (3.0i)
+// Everything here is measured in the bog's own code, not invented: DROWNED and GNAT in game/drowned.js and
+// game/gnat.js, PUMP in world/bog.js, WINCH in game/winch.js. Its chapter is blue on the shelf — see style.css.
+const BOG_TEXT_RU = {
+  drowned: {
+    name: 'Утопленник', latin: 'Mergulus profundus',
+    text: [
+      'Он живёт в воде и только в воде. На гать не выходит, за тобой на сухое не идёт: там он никто. Под поверхностью его не видно вовсе — эхо находит не тело, а кольцо, которое расходится по воде там, где он шевельнулся. Кольцо и есть всё предупреждение, какое у тебя будет.',
+      'Голоса он не слышит: в голове у него не осталось того, чем слушают. Он идёт по воде, которую ты толкаешь. Шаг в болоте стоит ему трёх шагов — по звуку.',
+      'Он не рвёт. Он берёт за ногу и ведёт в глубину, а глубина терпелива. Медленно, 0.9 метра в секунду, медленнее шага: он никого никогда не догонит. Он ждёт того, кто зашёл слишком далеко.',
+    ],
+    tips: [
+      'Не заходи глубже, чем по колено, без причины. Он берёт на глубине, а не на берегу.',
+      'Увидел кольцо — уходи вбок, к настилу, и не беги по воде: бег стоит ему десяти шагов.',
+      'Он держит 2.6 секунды. Рвись назад, к мелкому: по колено и меньше — он отпускает.',
+      'На гати он тебя не достанет. Гать — это не удобство, это стена.',
+    ],
+    facts: [['рост', '{h}'], ['скорость', '0.9 м/с'], ['берёт', '1.2 м · 2.6 с'], ['тащит', '0.8 м/с'], ['слышит шаг', '×3'], ['держит район', '42 м'], ['всплывает', '26 м от тебя']],
+    quote: 'Оно не хватало. Оно просто вело.',
+  },
+  gnat: {
+    name: 'Гнус', latin: 'Simulium vorax',
+    text: [
+      'Облако мошки размером с комнату. Тебя оно не ест и не догоняет — ему нужен не ты, а самый громкий звук на участке: голос, бег, мотор, крик. Услышало — и идёт через всё болото, 3.6 метра в секунду: быстрее шага, медленнее бега.',
+      'Внутри облака через три секунды эхо начинает возвращаться вдвое дольше. Двадцать секунд ты видишь метров на десять — а на болоте, где вода и так режет волну, это значит не отличить кол от человека.',
+      'Единственное, что его поворачивает, — дым. Горящий костёр или файер в восьми метрах, и рой отходит на восемь секунд. Ровно за этим на лагере и стоит костёр.',
+    ],
+    tips: [
+      'Не беги, когда он рядом: бег — это самый громкий звук, какой ты можешь издать.',
+      'Мошка слепа в дыму. Костёр, файер, горящий столб — восемь метров спокойствия.',
+      'Ослеплённому не верь своим глазам двадцать секунд: стой и слушай, куда идут остальные.',
+    ],
+    facts: [['скорость', '3.6 м/с'], ['облако', 'r 6 м'], ['слышит', '0.4 · 80 м'], ['внутри', '3 с'], ['слепота', '20 с · эхо ×2'], ['дым', '8 м · 8 с'], ['первый рой', '55–90 с']],
+  },
+  sink: {
+    name: 'Топь', latin: 'Palus edax',
+    text: [
+      'Три окна в торфе, по шесть метров, между кочками — не отличить от мокрого мха, пока не встанешь. Стоишь — тонешь медленно. Дёргаешься — тонешь вдвое быстрее, и это слышно далеко.',
+      'Выбраться можно: тянись к твёрдому и не спеши. Спешат в топи только те, кого уже держат за ногу.',
+    ],
+    tips: ['Почувствовал, что поехал вниз, — замри и слушай, где рядом настил.', 'Товарища из топи тянут, а не уговаривают: верёвка, рука, доска.'],
+    facts: [['пятен', '3'], ['радиус', '6 м'], ['спешка', '×2 быстрее']],
+  },
+  plank: {
+    name: 'Гать', latin: 'Via lignea',
+    text: [
+      'Пять дорог из плах, три метра шириной, на ладонь выше воды. По ним ходят быстро и сухо — и они скрипят так, что слышно через полболота.',
+      'Это единственное место, где Утопленник не достанет, а ты не утонешь. За это он и берёт свою плату: скрип.',
+    ],
+    tips: ['Иди по гати, когда слышишь кольца: вода — его, доски — твои.', 'Скрипят не все плахи одинаково: крайние тише.'],
+    facts: [['дорог', '5'], ['ширина', '2.6–3.0 м'], ['высота', '0.16 м над водой'], ['скрип', '0.35']],
+  },
+  deadtree: {
+    name: 'Сухостой', latin: 'Pinus demersa',
+    text: [
+      'Лес, который болото съело. Стволы стоят в воде по грудь, без коры, серые, как кость; треть из них сломана на высоте руки — те, что не выдержали льда.',
+      'По ним видно глубину: если у ствола вода до развилки — тут по пояс, и туда лучше не ходить. Они же и укрытие: за сухостоем эхо не проходит.',
+    ],
+    tips: ['Считай воду по стволам, а не по своему колену.', 'Под сломанным стволом удобно переждать рой — мошка идёт на звук, а не в укрытие.'],
+    facts: [['высота', '{h}'], ['вода у ствола', '0.12–1.9 м'], ['сломано', 'каждый третий']],
+  },
+  dwarfpine: {
+    name: 'Карликовая сосна', latin: 'Pinus nana',
+    text: [
+      'Сосна в человеческий рост, с кривым стволом и плоскими юбками хвои, посаженными одна над другой, будто кто-то собирал её из зонтов. Растёт только на сухом торфе.',
+      'Хвоя глушит шаг не хуже мха: под соснами ты идёшь тише, но и слышишь хуже.',
+    ],
+    tips: ['Заросли карликовой сосны — сухой остров: там не топь и не вода.', 'Но и эхо в них вязнет: не рассчитывай увидеть далеко.'],
+    facts: [['высота', '{h}'], ['растёт', 'на сухом · 1.6–4.6 м']],
+  },
+  willow: {
+    name: 'Ивняк', latin: 'Salix fruticosa',
+    text: [
+      'Кусты из тонких хлыстов, торчащих из мокрого торфа веером, с комом листвы на каждой верхушке. Растёт по краю воды, где терпит и сырость, и сухость.',
+      'В ивняке плохо видно и хорошо слышно: ветки не глушат ничего.',
+    ],
+    tips: ['Ивняк выдаёт берег: где он начинается, там вода уже близко.'],
+    facts: [['высота', '{h}'], ['хлыстов', '3–6']],
+  },
+  reeds: {
+    name: 'Камыш', latin: 'Phragmites palustris',
+    text: [
+      'Частокол тонких стеблей на самой кромке: там, где вода от трёх сантиметров до полуметра. Камыш — это линейка берега.',
+      'Он же и шумит: продираясь через камыш, ты гремишь на всё болото, и Утопленник слышит это как шаг по воде.',
+    ],
+    tips: ['Камыш = мелко. За ним обычно уже глубоко.', 'Обходить камыш по воде тише, чем ломиться через него.'],
+    facts: [['высота', '{h}'], ['вода', '0.03–0.55 м']],
+  },
+  tussock: {
+    name: 'Кочка', latin: 'Carex caespitosa',
+    text: [
+      'Торфяная шишка в полметра, из которой торчит пучок жёсткой травы. Болото состоит из них: идёшь не по плоскости, а с кочки на кочку.',
+      'Кочки — это ещё и карта: где они частые и высокие, там сухо; где редкие и в воде — там топь.',
+    ],
+    tips: ['Ставь ногу на кочку, а не между: между ними вода.'],
+    facts: [['высота', '{h}'], ['шаг', '0.3–0.7 м']],
+  },
+  cottongrass: {
+    name: 'Пушица', latin: 'Eriophorum vaginatum',
+    text: [
+      'Тонкий стебель с белым пуховым шариком на конце — то, из-за чего верховое болото в июне белое. Растёт на самом мокром и самом кислом торфе.',
+      'В темноте пушица — единственное белое пятно на болоте, кроме твоих рук: по ней видно, где стоишь, даже без эха.',
+    ],
+    tips: ['Белые точки в темноте — это пушица, а не глаза. Но проверь эхом, прежде чем подходить.'],
+    facts: [['высота', '{h}'], ['растёт', 'на мокром торфе']],
+  },
+  pump: {
+    name: 'Насос', latin: 'Machina sitiens',
+    text: [
+      'Ручной насос на чугунной плите: две колонки, голова, маховик и всасывающий патрубок, уходящий в воду. Пять штук на участке, по одному на место.',
+      'Каждый работающий насос опускает воду в своём секторе на 0.6 метра в радиусе сорока. Пять работающих — и гать проходит целиком, до самого УАЗа.',
+      'Насос — это шум. Металл, маховик, вода: на весь сектор.',
+    ],
+    tips: ['Запускай насосы по дороге к машине, а не после: вода уходит, пока ты идёшь.', 'Пять — это не «хорошо бы». Меньше пяти, и гать не проходит.'],
+    facts: [['насосов', '5'], ['сектор', '40 м · −0.6 м'], ['шум', 'высокий'], ['запуск', 'один человек']],
+  },
+  winch: {
+    name: 'Лебёдка', latin: 'Trochlea ultima',
+    text: [
+      'Барабан на носу УАЗа и трос к наклонному столбу. Машина сидит по ступицы, и вытащить её можно только вручную: сорок секунд ручки, которые никто не считает, потому что считать приходится вслух.',
+      'Каждый мёртвый насос отматывает назад 0.6 % в секунду против 2.5 %, которые ты наматываешь. Один-два — медленно. Три — ползком. Все пять — не вытянешь никогда.',
+      'Вытянул — заводи. Три секунды стартера, и это самые длинные три секунды на участке.',
+    ],
+    tips: ['Сначала все пять насосов, потом трос. Иначе простоишь у барабана всю ночь.', 'Трос гремит: пока крутишь, за спиной может кто-то стоять.'],
+    facts: [['крутить', '40 с'], ['потеря', '0.6 %/с за насос'], ['подъём', '1.15 м'], ['стартер', '3.0 с']],
+  },
+  pumpshed: {
+    name: 'Насосная', latin: 'Statio palustris',
+    text: [
+      'Открытый с одной стороны сарай на сваях: пол, три стены, железная крыша, маховик и главный насос. Внутри сухо — единственное сухое место на участке, кроме лагеря.',
+      'Стены держат эхо: изнутри ты видишь только дверной проём, зато и тебя не видно.',
+    ],
+    tips: ['В сарае можно переждать рой — но не Утопленника: он ждёт в воде.'],
+    facts: [['размер', '{len}'], ['стен', '3'], ['пол', 'на сваях']],
+  },
+  barracks: {
+    name: 'Барак на сваях', latin: 'Castra submersa',
+    text: [
+      'Длинная казарма на сваях, вода внутри по щиколотку. Койки стоят, как стояли; на одной до сих пор лежит чей-то матрас.',
+      'Сваи и стены держат вес, но не звук: под полом гудит вода, и по этому гулу слышно, кто ходит снаружи.',
+    ],
+    tips: ['Внутри барака вода — снаружи она глубже. Не выходи с той стороны, где нет настила.'],
+    facts: [['длина', '{len}'], ['пол', '0.9 м над торфом'], ['вода внутри', 'по щиколотку']],
+  },
+  peatstacks: {
+    name: 'Торфяные штабеля', latin: 'Turba siccans',
+    text: [
+      'Ряды тёмных брикетов в три слоя на сушильных стойках: резка, которую так и не вывезли. Торф лёгкий и горит жарко — если ночь совсем плоха, из него выйдет костёр.',
+      'Штабеля высокие и глухие: за ними прячутся, но и тебя за ними не видно.',
+    ],
+    tips: ['Брикет горит долго: один кусок — это десять минут дыма от мошки.'],
+    facts: [['брикетов', '36'], ['слоёв', '3'], ['размер', '{len}']],
+  },
+};
+
+const BOG_TEXT_EN = {
+  drowned: {
+    name: 'The Drowned', latin: 'Mergulus profundus',
+    text: [
+      'It lives in water and only in water. It does not come up onto the planks and will not follow you onto dry ground: there it is nothing. Under the surface it is not there at all — an echo finds no body, only a ring spreading on the water where it moved. That ring is the whole of the warning you get.',
+      'It cannot hear your voice: there is nothing left in its head to hear with. It goes by the water you push. One step in the bog is worth three steps to it.',
+      'It does not tear. It takes you by the leg and walks you out into the deep, and the deep is patient. Slowly — 0.9 metres a second, slower than a walk: it will never catch anyone. It waits for whoever goes in too far.',
+    ],
+    tips: [
+      'Do not wade deeper than your knee without a reason. It takes you in the deep, not at the shore.',
+      'Saw a ring — go sideways, to the decking, and do not run in the water: a run is worth ten steps to it.',
+      'It holds for 2.6 seconds. Tear back toward the shallows: knee-deep and less and it lets go.',
+      'On the planks it cannot reach you. The planks are not a convenience, they are a wall.',
+    ],
+    facts: [['height', '{h}'], ['speed', '0.9 m/s'], ['grabs', '1.2 m · 2.6 s'], ['drags', '0.8 m/s'], ['hears a step', 'at ×3'], ['keeps to', '42 m'], ['rises', '26 m away']],
+    quote: 'It did not grab. It simply led.',
+  },
+  gnat: {
+    name: 'The Gnat swarm', latin: 'Simulium vorax',
+    text: [
+      'A cloud of midges the size of a room. It does not eat you and does not chase you — it wants the loudest thing on the участок: a raised voice, a run, an engine, a scream. It hears one and comes across the whole bog at 3.6 metres a second: faster than a walk, slower than a run.',
+      'Inside the cloud, after three seconds, every echo starts coming back at twice the interval. For twenty seconds you see about ten metres — and on a bog, where the water already shortens every wave, that means you cannot tell a stake from a man.',
+      'The one thing that turns it is smoke. A lit fire or a flare within eight metres and the swarm breaks off for eight seconds. That is exactly what the campfire is for.',
+    ],
+    tips: [
+      'Do not run when it is near: a run is the loudest sound you can make.',
+      'It is blind in smoke. A fire, a flare, a burning stack — eight metres of peace.',
+      'While blinded, do not trust your eyes for twenty seconds: stand still and listen to where the others go.',
+    ],
+    facts: [['speed', '3.6 m/s'], ['cloud', 'r 6 m'], ['hears', '0.4 · 80 m'], ['inside', '3 s'], ['blind', '20 s · echo ×2'], ['smoke', '8 m · 8 s'], ['first swarm', '55–90 s']],
+  },
+  sink: {
+    name: 'The топь', latin: 'Palus edax',
+    text: [
+      'Three windows into the peat, six metres across, between the tussocks — indistinguishable from wet moss until you are in it. Stand still and you go down slowly. Struggle and you go down twice as fast, and it is heard a long way off.',
+      'You can get out: reach for something solid and do not hurry. Only those already held by the leg hurry in a bog.',
+    ],
+    tips: ['Felt yourself going down — freeze and listen for the decking.', 'A friend is pulled out of a bog, not talked out: a rope, a hand, a board.'],
+    facts: [['patches', '3'], ['radius', '6 m'], ['struggling', '×2 faster']],
+  },
+  plank: {
+    name: 'The гать', latin: 'Via lignea',
+    text: [
+      'Five roads of planks, three metres wide, a hand above the water. On them you move fast and dry — and they creak loud enough to be heard half a bog away.',
+      'This is the only place the Drowned cannot reach you and you cannot sink. That is what it charges for: the creak.',
+    ],
+    tips: ['Walk the planks when you hear rings: the water is its, the boards are yours.', 'Not every plank creaks alike: the outer ones are quieter.'],
+    facts: [['roads', '5'], ['width', '2.6–3.0 m'], ['height', '0.16 m above water'], ['creak', '0.35']],
+  },
+  deadtree: {
+    name: 'The dead wood', latin: 'Pinus demersa',
+    text: [
+      'The forest the bog ate. Trunks stand chest-deep in the water, barkless, grey as bone; a third of them snapped at arm height — the ones the ice broke.',
+      'They show you the depth: water up to the fork means waist-deep, and there you had better not go. They are shelter too: an echo does not pass through standing deadwood.',
+    ],
+    tips: ['Read the water off the trunks, not off your own knee.', 'A snapped trunk is a good place to wait out a swarm — it hunts by sound, not by shelter.'],
+    facts: [['height', '{h}'], ['water at the trunk', '0.12–1.9 m'], ['snapped', 'one in three']],
+  },
+  dwarfpine: {
+    name: 'The dwarf pine', latin: 'Pinus nana',
+    text: [
+      "A pine the height of a man, with a bent trunk and flat skirts of needles stacked one over another, as if someone had built it out of umbrellas. It grows only on dry peat.",
+      'Its needles muffle a step as well as moss does: under the pines you walk quieter — and hear worse.',
+    ],
+    tips: ['A stand of dwarf pine is a dry island: no топь, no water.', 'But an echo drowns in it too: do not count on seeing far.'],
+    facts: [['height', '{h}'], ['grows', 'dry · 1.6–4.6 m']],
+  },
+  willow: {
+    name: 'Willow scrub', latin: 'Salix fruticosa',
+    text: [
+      'Bushes of thin whips fanning out of the wet peat, a knot of leaves on each tip. It grows along the water, where it tolerates both wet and dry.',
+      'You see badly in willow scrub and hear well: the branches muffle nothing.',
+    ],
+    tips: ['Willow marks the shore: where it starts, the water is already close.'],
+    facts: [['height', '{h}'], ['stems', '3–6']],
+  },
+  reeds: {
+    name: 'Reeds', latin: 'Phragmites palustris',
+    text: [
+      'A palisade of thin stems right at the margin: where the water is three centimetres to half a metre deep. Reeds are the ruler of the shore.',
+      'They are loud, as well: pushing through reeds you crash across the whole bog, and the Drowned hears it as a step in water.',
+    ],
+    tips: ['Reeds mean shallow. Beyond them it is usually deep.', 'Going round reeds through the water is quieter than crashing through them.'],
+    facts: [['height', '{h}'], ['water', '0.03–0.55 m']],
+  },
+  tussock: {
+    name: 'The tussock', latin: 'Carex caespitosa',
+    text: [
+      'A peat hummock half a metre high with a tuft of coarse grass on top. The bog is made of them: you do not walk across a plane, you go from tussock to tussock.',
+      'They are also a map: where they are frequent and tall, it is dry; where they are rare and standing in water, it is топь.',
+    ],
+    tips: ['Put your foot on a tussock, never between two: between them is water.'],
+    facts: [['height', '{h}'], ['step', '0.3–0.7 m']],
+  },
+  cottongrass: {
+    name: 'Cotton grass', latin: 'Eriophorum vaginatum',
+    text: [
+      'A thin stem with a white tuft of down on top — what turns a raised bog white in June. It grows on the wettest, sourest peat there is.',
+      "In the dark cotton grass is the only white on the bog apart from your own hands: it shows you where you stand, even without an echo.",
+    ],
+    tips: ['White points in the dark are cotton grass, not eyes. But check with an echo before you go closer.'],
+    facts: [['height', '{h}'], ['grows', 'wet peat']],
+  },
+  pump: {
+    name: 'The pump', latin: 'Machina sitiens',
+    text: [
+      'A hand pump on a cast-iron plate: two columns, a head, a flywheel, and a suction pipe running off into the water. Five of them on the участок, one to a place.',
+      'Every running pump lowers the water in its own sector by 0.6 metres within a radius of forty. All five and the гать holds all the way out to the УАЗ.',
+      'A pump is noise: metal, flywheel, water — across the whole sector.',
+    ],
+    tips: ['Start the pumps on your way to the car, not after: the water drains while you walk.', 'Five is not "would be nice". Fewer than five and the гать does not hold.'],
+    facts: [['pumps', '5'], ['sector', '40 m · −0.6 m'], ['noise', 'high'], ['to start', 'one person']],
+  },
+  winch: {
+    name: 'The winch', latin: 'Trochlea ultima',
+    text: [
+      'A drum on the nose of the УАЗ and a cable out to a leaning post. The car is in up to the hubs, and the only way out is by hand: forty seconds of handle that nobody counts, because the counting has to be done out loud.',
+      'Every dead pump unwinds 0.6 % a second against the 2.5 % you wind on. One or two — slow. Three — a crawl. All five — you will never pull it out.',
+      'Out — start it. Three seconds of starter, and they are the longest three seconds on the участок.',
+    ],
+    tips: ['All five pumps first, then the cable. Otherwise you will stand at the drum all night.', 'The cable rings: while you turn it, someone may be standing behind you.'],
+    facts: [['turning', '40 s'], ['slip', '0.6 %/s per pump'], ['lift', '1.15 m'], ['starter', '3.0 s']],
+  },
+  pumpshed: {
+    name: 'The pump shed', latin: 'Statio palustris',
+    text: [
+      'A shed on stilts, open on one side: a floor, three walls, an iron roof, a flywheel and the master pump. Dry inside — the only dry place on the участок besides the camp.',
+      'The walls hold an echo: from inside you see only the doorway — and you cannot be seen either.',
+    ],
+    tips: ['You can wait out a swarm in the shed — but not the Drowned: it waits in the water.'],
+    facts: [['size', '{len}'], ['walls', '3'], ['floor', 'on stilts']],
+  },
+  barracks: {
+    name: 'The flooded barracks', latin: 'Castra submersa',
+    text: [
+      'A long hut on stilts with water ankle-deep inside. The bunks stand as they stood; somebody\'s mattress is still on one.',
+      'The stilts and walls carry weight, not sound: water booms under the floor, and by that boom you can hear who is walking outside.',
+    ],
+    tips: ['Inside the barracks there is water — outside it is deeper. Do not step out on the side with no decking.'],
+    facts: [['length', '{len}'], ['floor', '0.9 m over the peat'], ['water inside', 'ankle-deep']],
+  },
+  peatstacks: {
+    name: 'The peat stacks', latin: 'Turba siccans',
+    text: [
+      'Rows of dark bricks, three layers deep, on drying racks: a cutting nobody ever took away. Peat is light and burns hot — if the night gets bad enough, there is a fire in it.',
+      'The stacks are tall and blind: you can hide behind them, but nobody can see you there either.',
+    ],
+    tips: ['A peat brick burns long: one block is ten minutes of smoke against the midges.'],
+    facts: [['bricks', '36'], ['layers', '3'], ['size', '{len}']],
+  },
+};
+
+Object.assign(TEXT.ru.entries, BOG_TEXT_RU);
+Object.assign(TEXT.en.entries, BOG_TEXT_EN);
+TEXT.ru.chapters.bog = 'Торфяник';
+TEXT.en.chapters.bog = 'The bog';
 
 export function atlasText(lang) {
   return TEXT[lang] || TEXT.ru;

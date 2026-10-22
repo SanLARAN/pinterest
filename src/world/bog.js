@@ -182,8 +182,10 @@ function deck(world, b, ax, az, bx, bz, w, y) {
     const hw = w / 2;
     // the walking surface (a quad with its diagonal hidden), a hair above the water
     b.identity();
-    b.quad([x0 - px * hw, y, z0 - pz * hw], [x1 - px * hw, y, z1 - pz * hw],
-      [x1 + px * hw, y, z1 + pz * hw], [x0 + px * hw, y, z0 + pz * hw], KIND.WOOD, 15);
+    // (3.0i) wound to face UP: the world material culls back faces, and a deck wound the other way is not
+    // dark, it is simply not there
+    b.quadN([x0 - px * hw, y, z0 - pz * hw], [x1 - px * hw, y, z1 - pz * hw],
+      [x1 + px * hw, y, z1 + pz * hw], [x0 + px * hw, y, z0 + pz * hw], [0, 1, 0], KIND.WOOD, 15);
     // the edge board, so the deck reads at a glance from a low echo
     for (const s of [-1, 1]) {
       const ex = px * hw * s, ez = pz * hw * s;
@@ -240,6 +242,9 @@ export function buildBog(world, t0) {
   // two drowned pools: the deep water the Дrowned waits in (3.0c)
   terr.addBasin(-40, -34, 26, 1.5);
   terr.addBasin(66, 22, 22, 1.3);
+  // and the lagoon the camp stands on: the bog has to be *there* when you open your eyes, not fifteen metres of
+  // dry peat away (3.0i). You wake facing it — the fire ring is the last dry thing before the shore.
+  terr.addBasin(2, 21, 14, 1.6);
   terr.finalize();
 
   for (const L of world.landmarks) {
@@ -292,39 +297,53 @@ function placeCamp(world, L, rng) {
   });
 }
 
+// A place's own frame. `MeshBuilder.place()` takes world coordinates, so a building written out in local
+// metres has to be mapped through this — the bug it fixes (3.0i): the pump shed and the barracks were opened
+// with `b.place(L.x, y, L.z)` and then written out from (0, 0, 0), which put both of them on the camp's
+// doorstep. The barracks roof, two metres over the spawn point, *was* the «низкая крыша» you woke up under.
+function siteOf(L, ry = L.ry || 0) {
+  const cs = Math.cos(ry), sn = Math.sin(ry);
+  const y = L.y ?? 0;
+  return (x, z, dy = 0) => [L.x + x * cs + z * sn, y + dy, L.z - x * sn + z * cs];
+}
+
 // the pump shed: open-fronted, a master pump, a pipe running out into the bog
 function placeStation(world, L, rng) {
   const y = world.terrain.height(L.x, L.z);
   const ry = L.ry || 0;
+  const P = siteOf({ ...L, y }, ry);
   world.addProp(L.x, L.z, (b) => {
     b.identity();
-    b.place(L.x, y, L.z, 0, ry, 0);
     // floor
+    b.place(...P(0, 0, 0), 0, ry, 0);
     b.box(6.4, 0.18, 5.0, KIND.WOOD, { bottom: true });
-    // three walls and a roof
-    b.place(0, 0.18, -2.4);
+    // three walls and a roof (the fourth side is the way in)
+    b.place(...P(0, -2.4, 0.18), 0, ry, 0);
     b.box(6.4, 2.4, 0.16, KIND.WOOD, { bottom: true });
-    b.place(-3.1, 0.18, 0);
+    b.place(...P(-3.1, 0, 0.18), 0, ry, 0);
     b.box(0.16, 2.4, 5.0, KIND.WOOD, { bottom: true });
-    b.place(3.1, 0.18, 0);
+    b.place(...P(3.1, 0, 0.18), 0, ry, 0);
     b.box(0.16, 2.4, 5.0, KIND.WOOD, { bottom: true });
-    b.place(0, 2.5, -0.2, 0.08, 0, 0);
+    b.place(...P(0, -0.2, 2.68), 0.08, ry, 0);
     b.box(6.9, 0.14, 5.6, KIND.METAL);
     // the pump itself: a squat drum with a flywheel and a rising main
-    b.place(L.x - 1.2, y + 0.2, L.z + 0.6, 0, ry + 0.4, 0);
+    b.place(...P(-1.2, 0.6, 0.2), 0, ry + 0.4, 0);
+    const pump = b.m.clone();
     b.cylinder(10, 0.55, 0.5, 1.15, KIND.METAL, { capTop: true });
-    b.place(0, 1.2, 0);
+    sub(b, pump, 0, 1.2, 0);
     b.cylinder(8, 0.22, 0.22, 0.35, KIND.METAL, { capTop: true });
-    b.place(0.62, 0.6, 0, 0, 0, Math.PI / 2);
+    sub(b, pump, 0.62, 0.6, 0, 0, 0, Math.PI / 2);
     b.cylinder(12, 0.42, 0.42, 0.12, KIND.METAL);
-    // suction pipe into the water
-    b.setMatrix(new THREE.Matrix4().makeTranslation(L.x - 1.2, y + 0.2, L.z + 0.6));
+    // suction pipe into the water (a limb is local to the transform it is drawn in)
+    b.place(...P(-1.2, 0.6, 0.2), 0, ry + 0.4, 0);
     b.limb([0, 0.35, 0], [0, 0.35, 3.6], 0.17, 0.17, KIND.METAL, 6);
     b.limb([0, 0.35, 3.6], [0, -0.6, 3.6], 0.17, 0.17, KIND.METAL, 6);
   });
-  world.col.add(L.x - 3.3, L.z - 2.5, L.x + 3.3, L.z - 2.5, 0.2, 2.8, CAP.WOOD);
-  world.col.add(L.x - 3.1, L.z - 2.4, L.x - 3.1, L.z + 2.4, 0.2, 2.8, CAP.WOOD);
-  world.col.add(L.x + 3.1, L.z - 2.4, L.x + 3.1, L.z + 2.4, 0.2, 2.8, CAP.WOOD);
+  // the three closed sides, in the same frame
+  for (const [x0, z0, x1, z1] of [[-3.2, -2.5, 3.2, -2.5], [-3.1, -2.4, -3.1, 2.4], [3.1, -2.4, 3.1, 2.4]]) {
+    const a = P(x0, z0), c = P(x1, z1);
+    world.col.add(a[0], a[2], c[0], c[2], 0.2, 2.8, CAP.WOOD);
+  }
 }
 
 // the flooded barracks: a long hut on stilts, the water inside it ankle-deep
@@ -332,39 +351,42 @@ function placeBarracks(world, L, rng) {
   const y = world.terrain.height(L.x, L.z);
   const ry = L.ry || 0;
   const W = 11, D = 5.2, FLOOR = 0.9;
+  const P = siteOf({ ...L, y }, ry);
   world.addProp(L.x, L.z, (b) => {
     b.identity();
-    b.place(L.x, y, L.z, 0, ry, 0);
     // stilts
     for (const sx of [-W / 2 + 0.5, 0, W / 2 - 0.5]) {
       for (const sz of [-D / 2 + 0.4, D / 2 - 0.4]) {
-        b.place(sx, y - 0.4, sz);
+        b.place(...P(sx, sz, -0.4));
         b.limb([0, 0, 0], [0, FLOOR + 0.4, 0], 0.13, 0.11, KIND.WOOD, 5);
-        world.col.circle(L.x + sx * Math.cos(ry) + sz * Math.sin(ry), L.z - sx * Math.sin(ry) + sz * Math.cos(ry), 0.16, 1.6, CAP.WOOD);
+        const p = P(sx, sz);
+        world.col.circle(p[0], p[2], 0.16, 1.6, CAP.WOOD);
       }
     }
     // deck, walls, roof — the roof sagging, one leaf missing
-    b.place(0, FLOOR, 0);
+    b.place(...P(0, 0, FLOOR), 0, ry, 0);
     b.box(W, 0.16, D, KIND.WOOD, { bottom: true });
-    b.place(0, FLOOR + 0.16, -D / 2 + 0.1);
+    b.place(...P(0, -D / 2 + 0.1, FLOOR + 0.16), 0, ry, 0);
     b.box(W, 2.5, 0.14, KIND.WOOD, { bottom: true });
-    b.place(-W / 2 + 0.08, FLOOR + 0.16, 0);
+    b.place(...P(-W / 2 + 0.08, 0, FLOOR + 0.16), 0, ry, 0);
     b.box(0.14, 2.2, D, KIND.WOOD, { bottom: true });
-    b.place(W / 2 - 0.08, FLOOR + 0.16, 0);
+    b.place(...P(W / 2 - 0.08, 0, FLOOR + 0.16), 0, ry, 0);
     b.box(0.14, 2.2, D, KIND.WOOD, { bottom: true });
-    b.place(0, FLOOR + 2.5, 0, 0.05, 0, 0.03);
+    b.place(...P(0, 0, FLOOR + 2.5), 0.05, ry, 0.03);
     b.box(W + 0.8, 0.16, D + 0.9, KIND.METAL);
     // the bunks inside, and the water that got in
     for (let i = -1; i <= 1; i++) {
-      b.place(i * 3.2, FLOOR + 0.16, 1.3);
+      b.place(...P(i * 3.2, 1.3, FLOOR + 0.16), 0, ry, 0);
       b.box(1.9, 0.1, 0.8, KIND.WOOD, { bottom: true });
       b.limb([-0.85, 0, 0], [-0.85, 0.5, 0], 0.04, 0.04, KIND.METAL, 3);
       b.limb([0.85, 0, 0], [0.85, 0.5, 0], 0.04, 0.04, KIND.METAL, 3);
     }
   });
-  world.col.add(L.x - W / 2, L.z - D / 2, L.x - W / 2, L.z + D / 2, 0.2, 3.4, CAP.WOOD);
-  world.col.add(L.x - W / 2, L.z - D / 2, L.x + W / 2, L.z - D / 2, 0.2, 3.4, CAP.WOOD);
-  world.col.add(L.x + W / 2, L.z - D / 2, L.x + W / 2, L.z + D / 2, 0.2, 3.4, CAP.WOOD);
+  // the three closed sides, in the same frame
+  for (const [x0, z0, x1, z1] of [[-W / 2, -D / 2, -W / 2, D / 2], [-W / 2, -D / 2, W / 2, -D / 2], [W / 2, -D / 2, W / 2, D / 2]]) {
+    const a = P(x0, z0), c = P(x1, z1);
+    world.col.add(a[0], a[2], c[0], c[2], 0.2, 3.4, CAP.WOOD);
+  }
 }
 
 // peat stacks: the cutting that was never taken away — rows of dark, drying blocks
@@ -418,7 +440,7 @@ function placeBridges(world, L, rng) {
         const t0 = d / len, t1 = (d + 1.2) / len;
         const x0 = cx - ux * len / 2 + ux * len * t0, z0 = cz - uz * len / 2 + uz * len * t0;
         const x1 = cx - ux * len / 2 + ux * len * t1, z1 = cz - uz * len / 2 + uz * len * t1;
-        b.quad([x0 + uz, y, z0 - ux], [x1 + uz, y, z1 - ux], [x1 - uz, y, z1 + ux], [x0 - uz, y, z0 + ux], KIND.WOOD, 15);
+        b.quadN([x0 + uz, y, z0 - ux], [x1 + uz, y, z1 - ux], [x1 - uz, y, z1 + ux], [x0 - uz, y, z0 + ux], [0, 1, 0], KIND.WOOD, 15);
       }
       for (const s of [-1, 1]) {
         for (let d = 0; d <= len; d += 4) {
@@ -432,7 +454,7 @@ function placeBridges(world, L, rng) {
   }
 }
 
-const PLACES = {
+export const PLACES = {
   camp: placeCamp,
   pumpstation: placeStation,
   barracks: placeBarracks,
@@ -463,29 +485,30 @@ function genPumps(world, rng) {
     world.addProp(px, pz, (b) => {
       b.identity();
       b.place(px, y, pz, 0, yaw + Math.PI, 0);
+      const base = b.m.clone();
       // a base plate on the wet ground
       b.box(1.5, 0.16, 1.1, KIND.METAL, { bottom: true });
       // the two columns of a hand pump
-      b.place(-0.34, 0.16, 0);
+      sub(b, base, -0.34, 0.16, 0);
       b.limb([0, 0, 0], [0, 1.15, 0], 0.16, 0.13, KIND.METAL, 6);
-      b.place(0.34, 0.16, 0);
+      sub(b, base, 0.34, 0.16, 0);
       b.limb([0, 0, 0], [0, 1.15, 0], 0.16, 0.13, KIND.METAL, 6);
       // the head, the lever, the flywheel
-      b.place(0, 1.3, 0);
+      sub(b, base, 0, 1.3, 0);
       b.box(1.15, 0.34, 0.5, KIND.METAL, { bottom: true });
-      b.place(-0.62, 1.34, 0, 0, 0, -0.55);
+      sub(b, base, -0.62, 1.34, 0, 0, 0, -0.55);
       b.limb([0, 0, 0], [0, 1.5, 0], 0.055, 0.05, KIND.METAL, 4);
-      b.place(0.62, 1.36, 0.28, 0, 0, Math.PI / 2);
+      sub(b, base, 0.62, 1.36, 0.28, 0, 0, Math.PI / 2);
       b.cylinder(12, 0.36, 0.36, 0.1, KIND.METAL);
       // the rising main, elbow, and a standpipe
-      b.place(0, 1.32, -0.25);
+      sub(b, base, 0, 1.32, -0.25);
       b.limb([0, 0, 0], [0, 0.9, 0], 0.1, 0.1, KIND.METAL, 5);
       b.limb([0, 0.9, 0], [0, 0.9, -1.7], 0.1, 0.1, KIND.METAL, 5);
       b.limb([0, 0.9, -1.7], [0, -0.35, -1.7], 0.1, 0.1, KIND.METAL, 5);
       // the valve stand
-      b.place(-0.95, 0.16, 0.5, 0, 0, 0);
+      sub(b, base, -0.95, 0.16, 0.5, 0, 0, 0);
       b.limb([0, 0, 0], [0, 0.85, 0], 0.05, 0.045, KIND.METAL, 4);
-      b.place(0, 0.85, 0, 0, 0, Math.PI / 2);
+      sub(b, base, 0, 0.85, 0, 0, 0, Math.PI / 2);
       b.cylinder(10, 0.18, 0.18, 0.06, KIND.METAL);
     });
     world.col.circle(px, pz, 0.75, 1.7, CAP.METAL);
@@ -495,8 +518,9 @@ function genPumps(world, rng) {
     world.addProp(px + hx, pz + hz, (b) => {
       b.identity();
       b.place(px + hx, y, pz + hz);
+      const base = b.m.clone();
       b.limb([0, 0, 0], [0, 3.0, 0], 0.055, 0.04, KIND.METAL, 5);
-      b.place(0, 2.86, 0);
+      sub(b, base, 0, 2.86, 0);
       b.cone(6, 0.2, 0.22, KIND.METAL);
     });
   }
@@ -543,8 +567,9 @@ function genCar(world) {
   world.addProp(P.x, P.z, (b) => {
     b.identity();
     b.place(P.x, P.y, P.z, 0.14, 0.6, 0.1);
+    const base = b.m.clone();
     b.limb([0, 0, 0], [0, 3.0, 0], 0.15, 0.12, KIND.WOOD, 5);
-    b.place(0, 2.6, 0);
+    sub(b, base, 0, 2.6, 0);
     b.box(0.9, 0.12, 0.12, KIND.WOOD);
   });
   world.col.circle(P.x, P.z, 0.2, 3.0, CAP.WOOD);
@@ -552,47 +577,203 @@ function genCar(world) {
 
 // ---------------------------------------------------------------- growth
 
+// A piece hung on a prop that is already in the world: `MeshBuilder.place()` is absolute, so `b.place(0, 2, 0)`
+// means *the map's origin*, not "two metres up this tree". Writing a pine's skirts that way stacked them all at
+// (0, 2.4, 0) — the invisible panel over the spawn point in 3.0i. `sub()` maps local coordinates through the
+// prop's own matrix instead. The base is passed in and never re-read from `b`: composing on `b.m` a second time
+// would stack each piece on the last one and walk the clump off its stump.
+const _subM = new THREE.Matrix4(), _subQ = new THREE.Quaternion(), _subE = new THREE.Euler(),
+  _subV = new THREE.Vector3(), _subS = new THREE.Vector3();
+function sub(b, base, lx, ly, lz, rx = 0, ry = 0, rz = 0, sx = 1, sy = sx, sz = sx) {
+  _subE.set(rx, ry, rz, 'YXZ');
+  _subQ.setFromEuler(_subE);
+  _subV.set(lx, ly, lz);
+  _subS.set(sx, sy, sz);
+  b.setMatrix(_subM.compose(_subV, _subQ, _subS).premultiply(base));
+}
+
 function genGrowth(world, rng) {
   const half = world.half - 12;
-  // drowned trees: bare trunks standing in the water, the bog's own forest
-  for (let i = 0; i < 260; i++) {
+  const noise = new Simplex2(BOG.seed + 7);
+  const clear = (x, z, pad) => !world.inLandmark(x, z, pad) && !world.onWalk(x, z, pad);
+  const dry = (x, z) => world.water.depth(x, z) <= 0.02;
+  // how thick the cover is here: broad patches, so the bog has thickets and open lawns instead of a speckle
+  const thick = (x, z, sc = 55) => 0.5 + 0.5 * noise.fbm(x / sc, z / sc, 2);
+
+  // ---- dead trees standing in the water: the drowned forest the bog swallowed
+  for (let i = 0; i < 1500; i++) {
     const x = rng.float(-half, half), z = rng.float(-half, half);
     const d = world.water.depth(x, z);
-    if (d < 0.25 || d > 1.4) continue;
-    if (world.inLandmark(x, z, 3) || world.onWalk(x, z, 2)) continue;
-    const h = rng.float(2.2, 5.5), r = rng.float(0.12, 0.26);
+    if (d < 0.12 || d > 1.9) continue;
+    if (!clear(x, z, 2) || !world.col.free(x, z, 1.1)) continue;
+    if (rng.next() > 0.35 + 0.65 * thick(x, z, 70)) continue;
+    const h = rng.float(1.8, 6.2), r = rng.float(0.1, 0.28);
+    const lean = rng.float(-0.14, 0.14), lean2 = rng.float(-0.14, 0.14);
+    const broken = rng.chance(0.35);
+    const y = world.terrain.height(x, z);
     world.addProp(x, z, (b) => {
       b.identity();
-      b.place(x, world.terrain.height(x, z) - 0.2, z, rng.float(-0.08, 0.08), rng.float(0, 6.28), rng.float(-0.08, 0.08));
-      b.limb([0, 0, 0], [0, h, 0], r, r * 0.45, KIND.BARK, 5);
-      if (rng.chance(0.45)) b.limb([0, h * 0.6, 0], [rng.float(-0.9, 0.9), h * 0.95, rng.float(-0.9, 0.9)], r * 0.6, 0.02, KIND.BARK, 3);
+      b.place(x, y - 0.25, z, lean, rng.float(0, 6.28), lean2);
+      // a root flare in the mud, then the trunk (a broken one is a snapped stump)
+      b.limb([0, -0.15, 0], [0, 0.5, 0], r * 2.1, r * 1.25, KIND.BARK, 5);
+      if (broken) b.limb([0, 0.5, 0], [0, h * 0.45, 0], r * 1.15, r * 0.75, KIND.BARK, 5);
+      else {
+        b.limb([0, 0.5, 0], [rng.float(-0.25, 0.25), h * 0.72, rng.float(-0.25, 0.25)], r * 1.1, r * 0.6, KIND.BARK, 5);
+        b.limb([0, h * 0.7, 0], [rng.float(-0.5, 0.5), h, rng.float(-0.5, 0.5)], r * 0.6, r * 0.16, KIND.BARK, 4);
+        for (let k = 0; k < 2; k++) { // two gaunt limbs off the upper trunk
+          const a = rng.float(0, 6.28), up = h * rng.float(0.55, 0.85);
+          b.limb([0, up, 0], [Math.cos(a) * rng.float(0.7, 1.6), up + rng.float(0.3, 1.1), Math.sin(a) * rng.float(0.7, 1.6)], r * 0.34, 0.025, KIND.BARK, 3);
+        }
+      }
     });
-    world.col.circle(x, z, r * 1.4, 3.0, CAP.TREE);
+    world.col.circle(x, z, Math.max(0.22, r * 1.3), 3.4, CAP.TREE);
   }
-  // reeds: clumps of thin stalks at the shore
-  for (let i = 0; i < 420; i++) {
+
+  // ---- dwarf pines on the dry peat: bent trunks, flat skirts of needles
+  for (let i = 0; i < 2800; i++) {
     const x = rng.float(-half, half), z = rng.float(-half, half);
-    const d = world.water.depth(x, z);
-    if (d < 0.05 || d > 0.55) continue;
-    if (world.inLandmark(x, z, 2) || world.onWalk(x, z, 0.6)) continue;
+    if (!dry(x, z) || !clear(x, z, 2)) continue;
+    if (!world.col.free(x, z, 1.3) || rng.next() > thick(x, z, 48) * 0.9) continue;
+    const h = rng.float(1.6, 4.6), r = rng.float(0.09, 0.2);
+    const lean = rng.float(-0.16, 0.16), lean2 = rng.float(-0.16, 0.16);
+    const y = world.terrain.height(x, z);
+    const tiers = rng.int(2, 4);
     world.addProp(x, z, (b) => {
       b.identity();
-      const n = rng.int(4, 8);
+      b.place(x, y, z, lean, rng.float(0, 6.28), lean2);
+      const base = b.m.clone();
+      b.limb([0, 0, 0], [0.05, h * 0.55, -0.04], r * 1.3, r * 0.8, KIND.BARK, 4);
+      b.limb([0.05, h * 0.5, -0.04], [rng.float(-0.35, 0.35), h, rng.float(-0.35, 0.35)], r * 0.8, r * 0.3, KIND.BARK, 4);
+      for (let k = 0; k < tiers; k++) {
+        const t = 0.42 + (k / tiers) * 0.62; // up the trunk
+        const rr = rng.float(0.55, 1.05) * (1.15 - t * 0.55);
+        sub(b, base, 0, h * t, 0, 0, rng.float(0, 6.28), 0);
+        // a skirt: a squat cone of needles, the cheapest thing that reads as a pine from below
+        b.cone(6, rr, rr * 0.72, KIND.LEAF, { y0: 0, hideRibs: true });
+      }
+    });
+    world.col.circle(x, z, Math.max(0.2, r * 1.2), 3.0, CAP.TREE);
+  }
+
+  // ---- willow scrub: clumps of whippy stems with a leafy head, along the water and in the wet peat
+  for (let i = 0; i < 2400; i++) {
+    const x = rng.float(-half, half), z = rng.float(-half, half);
+    if (world.water.depth(x, z) > 0.42 || !clear(x, z, 1.5)) continue;
+    if (!world.col.free(x, z, 1.0) || rng.next() > 0.25 + thick(x, z, 34) * 0.85) continue;
+    const y = world.terrain.height(x, z);
+    const n = rng.int(3, 6), hh = rng.float(0.9, 2.1);
+    world.addProp(x, z, (b) => {
+      b.identity();
+      b.place(x, y, z, 0, rng.float(0, 6.28), 0);
+      const base = b.m.clone();
       for (let k = 0; k < n; k++) {
-        const ox = rng.float(-0.35, 0.35), oz = rng.float(-0.35, 0.35);
-        const hh = rng.float(0.8, 1.7);
-        b.limb([ox, -0.1, oz], [ox + rng.float(-0.08, 0.08), hh, oz + rng.float(-0.08, 0.08)], 0.022, 0.008, KIND.LEAF, 3);
+        b.setMatrix(base);
+        const a = (k / n) * 6.283 + rng.float(-0.3, 0.3);
+        const lean = rng.float(0.25, 0.75), h = hh * rng.float(0.75, 1.15);
+        const tx = Math.cos(a) * lean, tz = Math.sin(a) * lean;
+        b.limb([0, 0, 0], [tx, h, tz], 0.035, 0.014, KIND.BARK, 3);
+        // the head: a small leaf cluster at the tip
+        sub(b, base, tx, h, tz, 0, rng.float(0, 6.28), rng.float(0, 1), rng.float(1.5, 2.4), rng.float(1.1, 1.8), rng.float(1.5, 2.4));
+        b.rock(rng.float(0.16, 0.3), () => rng.next(), KIND.LEAF, 0.5, 0.8);
       }
     });
   }
-  // peat hummocks on the dry ground
-  for (let i = 0; i < 300; i++) {
+
+  // ---- reeds at the shore: the thin palisade between water and peat
+  for (let i = 0; i < 1800; i++) {
     const x = rng.float(-half, half), z = rng.float(-half, half);
-    if (world.water.depth(x, z) > 0.02 || world.inLandmark(x, z, 2) || !world.col.free(x, z, 1.2)) continue;
-    const r = rng.float(0.35, 0.9);
+    const d = world.water.depth(x, z);
+    if (d < 0.03 || d > 0.55 || !clear(x, z, 1)) continue;
+    if (rng.next() > 0.45 + thick(x, z, 22) * 0.55) continue;
+    const y = world.terrain.height(x, z);
     world.addProp(x, z, (b) => {
       b.identity();
-      b.place(x, world.terrain.height(x, z) - 0.1, z, 0, rng.float(0, 6.28), 0, 1, 0.5, 1);
+      b.place(x, y, z, 0, rng.float(0, 6.28), 0);
+      const n = rng.int(5, 9);
+      for (let k = 0; k < n; k++) {
+        const ox = rng.float(-0.34, 0.34), oz = rng.float(-0.34, 0.34);
+        const hh = rng.float(0.75, 1.75);
+        b.limb([ox, -0.12, oz], [ox + rng.float(-0.1, 0.1), hh, oz + rng.float(-0.1, 0.1)], 0.02, 0.007, KIND.LEAF, 3);
+      }
+    });
+  }
+
+  // ---- tussocks: the clumps of coarse grass every metre of a bog is made of
+  for (let i = 0; i < 5600; i++) {
+    const x = rng.float(-half, half), z = rng.float(-half, half);
+    if (world.water.depth(x, z) > 0.28 || !clear(x, z, 0.6) || !world.col.free(x, z, 0.6)) continue;
+    const y = world.terrain.height(x, z);
+    const n = rng.int(3, 6), sc = rng.float(0.7, 1.25);
+    world.addProp(x, z, (b) => {
+      b.identity();
+      b.place(x, y - 0.05, z, 0, rng.float(0, 6.28), 0, sc);
+      // a low hummock of peat under the blades
+      b.rock(0.34, () => rng.next(), KIND.GROUND, 0.3, 0.42);
+      for (let k = 0; k < n; k++) {
+        const a = (k / n) * 6.283 + rng.float(-0.5, 0.5);
+        const lean = rng.float(0.14, 0.4), h = rng.float(0.3, 0.7);
+        b.limb([0, 0.1, 0], [Math.cos(a) * lean, h, Math.sin(a) * lean], 0.028, 0.006, KIND.LEAF, 3);
+      }
+    });
+  }
+
+  // ---- cotton grass: the white tufts that give a raised bog its colour
+  for (let i = 0; i < 1700; i++) {
+    const x = rng.float(-half, half), z = rng.float(-half, half);
+    if (world.water.depth(x, z) > 0.3 || !clear(x, z, 0.8) || !world.col.free(x, z, 0.7) || rng.next() > 0.5) continue;
+    const y = world.terrain.height(x, z);
+    world.addProp(x, z, (b) => {
+      b.identity();
+      b.place(x, y, z, 0, rng.float(0, 6.28), 0);
+      const base = b.m.clone();
+      const n = rng.int(3, 6);
+      for (let k = 0; k < n; k++) {
+        b.setMatrix(base);
+        const ox = rng.float(-0.22, 0.22), oz = rng.float(-0.22, 0.22), h = rng.float(0.35, 0.72);
+        b.limb([ox, 0, oz], [ox, h, oz], 0.008, 0.006, KIND.LEAF, 3);
+        sub(b, base, ox, h, oz, 0, 0, 0.5, 1.6, 1, 1.6);
+        b.rock(0.05, () => rng.next(), KIND.BONE, 0.45, 0.9);
+      }
+    });
+  }
+
+  // ---- fallen trunks and stumps: what the cutting left behind
+  for (let i = 0; i < 300; i++) {
+    const x = rng.float(-half, half), z = rng.float(-half, half);
+    if (world.water.depth(x, z) > 0.9 || !clear(x, z, 2) || !world.col.free(x, z, 1.0)) continue;
+    const y = world.terrain.height(x, z);
+    const a = rng.float(0, 6.28), len = rng.float(2.2, 5.4), r = rng.float(0.14, 0.3);
+    world.addProp(x, z, (b) => {
+      b.identity();
+      b.place(x, y + r * 0.7, z, rng.float(-0.1, 0.1), a, rng.float(-0.12, 0.12));
+      b.limb([0, 0, 0], [0, 0, -len], r, r * 0.7, KIND.BARK, 5);
+      for (let k = 0; k < 2; k++) { // broken branch stubs
+        const t = rng.float(0.2, 0.8);
+        b.limb([0, 0, -len * t], [rng.float(-0.5, 0.5), rng.float(0.2, 0.6), -len * t + rng.float(-0.4, 0.4)], r * 0.4, 0.03, KIND.BARK, 3);
+      }
+    });
+    world.col.circle(x, z, 0.4, 1.0, CAP.TREE);
+  }
+  for (let i = 0; i < 420; i++) {
+    const x = rng.float(-half, half), z = rng.float(-half, half);
+    if (world.water.depth(x, z) > 0.3 || !clear(x, z, 2) || !world.col.free(x, z, 0.7)) continue;
+    const y = world.terrain.height(x, z), r = rng.float(0.16, 0.36), h = rng.float(0.25, 0.7);
+    world.addProp(x, z, (b) => {
+      b.identity();
+      b.place(x, y - 0.05, z, rng.float(-0.06, 0.06), rng.float(0, 6.28), rng.float(-0.06, 0.06));
+      b.cylinder(6, r * 1.2, r, h, KIND.BARK, { capTop: true });
+    });
+  }
+
+  // ---- peat hummocks: the low mounds the sphagnum builds, dotted over the open bog
+  for (let i = 0; i < 1100; i++) {
+    const x = rng.float(-half, half), z = rng.float(-half, half);
+    if (world.water.depth(x, z) > 0.1 || world.inLandmark(x, z, 2) || !world.col.free(x, z, 1.0)) continue;
+    const r = rng.float(0.4, 1.1);
+    const y = world.terrain.height(x, z);
+    world.addProp(x, z, (b) => {
+      b.identity();
+      b.place(x, y - 0.12, z, 0, rng.float(0, 6.28), 0, 1, 0.5, 1);
       b.rock(r, () => rng.next(), KIND.GROUND, 0.3, 0.5);
     });
   }
@@ -659,7 +840,8 @@ function buildWater(world) {
       if (world.water.depth(x + step / 2, z + step / 2) < 0.05) continue;
       const y = LEVEL;
       // (the diagonal is hidden: a calm surface, not a grid of triangles)
-      b.quad([x, y, z], [x1, y, z], [x1, y, z1], [x, y, z1], KIND.WATER, 15);
+      // (3.0i) the whole bog was invisible: the surface was wound downward, and the material culls back faces
+      b.quadN([x, y, z], [x1, y, z], [x1, y, z1], [x, y, z1], [0, 1, 0], KIND.WATER, 15);
     }
   }
   const geo = b.toGeometry();

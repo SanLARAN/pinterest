@@ -16,6 +16,7 @@
   --safe-b: env(safe-area-inset-bottom, 0px);
   --safe-l: env(safe-area-inset-left, 0px);
   --safe-r: env(safe-area-inset-right, 0px);
+  --bog-blue: #6ea6bd;
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -856,6 +857,16 @@ body.coop .voice-list.show { display: flex; }
 .book-tabs .tab.on b { color: var(--red); }
 .book-tabs .tab.on::before { content: ''; position: absolute; left: 10px; right: 10px; top: -1px; height: 2px; background: var(--red); box-shadow: 0 0 10px rgba(224, 54, 44, 0.7); }
 .book-tabs .tab.toc em { display: none; }
+/* (3.0i) chapter V is the bog: it is inked in bog-water blue, not in the forest's red. The rules below are the
+   red ones again with a different colour, kept next to them so the shelf stays one object. */
+.book-tabs .tab.ch-bog b { color: rgba(150, 190, 205, 0.7); }
+.book-tabs .tab.ch-bog.on { background: linear-gradient(180deg, #14201f, #0d1414); }
+.book-tabs .tab.ch-bog.on b { color: var(--bog-blue); }
+.book-tabs .tab.ch-bog.on::before { background: var(--bog-blue); box-shadow: 0 0 10px rgba(88, 150, 175, 0.75); }
+.book-tabs .tab.ch-bog.on em { color: #d6e4e8; }
+/* ...and in the contents the same chapter is blue, so a reader can see at a glance which is the second участок */
+.toc-ch[data-ch="bog"] h3 { color: var(--bog-blue); }
+.toc-ch[data-ch="bog"] h3::after { content: ''; display: block; width: 34px; height: 1px; margin-top: 5px; background: var(--bog-blue); opacity: 0.5; }
 .book-close {
   flex: 0 0 auto; width: 34px; height: 34px; margin-bottom: 5px; padding: 0; display: grid; place-items: center; cursor: pointer; border-radius: 50%;
   border: 1px solid rgba(167, 180, 182, 0.2); background: rgba(0, 0, 0, 0.45); color: var(--ash); transition: color 0.2s, border-color 0.2s, transform 0.2s;

@@ -21,6 +21,8 @@ import { cabinetGroup } from '../game/cabinets.js';
 import { torchArrays } from '../game/torch.js';
 import { buildTape, buildCrowbar } from '../game/toolModels.js';
 import { FIRETOWER, buildBinoculars } from '../world/expedition.js';
+import { BOG_LANDMARKS, PLACES as BOG_PLACES, BOG } from '../world/bog.js';
+import { buildDrowned } from '../game/drowned.js';
 
 const BEAM = 12; // a kind past the palette: the faint light pillar over a shard
 
@@ -723,6 +725,242 @@ function shkaf(mat) {
 }
 
 // ---------------- registry ----------------
+
+// ---------------- the bog (chapter V) ----------------
+// Everything here lives on the second участок and nowhere else: the drowned forest, the dwarf pines, the reeds,
+// the топь, the pumps and the winch. The portraits are built from the same primitives the level itself uses, so
+// a page in the book looks like the thing that will kill you at night.
+
+// a small still life out of a bare builder
+function specimen(build, view = {}, base = 0.3) {
+  return (mat) => {
+    const b = new MeshBuilder(2048);
+    b.identity();
+    build(b);
+    const root = new THREE.Group();
+    root.add(meshOf(b, mat));
+    return still(root, base, view);
+  };
+}
+
+// a place from the bog, drawn with its own builder: flat stand-in ground, no colliders, the same seed
+function bogPlace(id, view = {}) {
+  return (mat) => {
+    const L = BOG_LANDMARKS.find((l) => l.id === id);
+    const props = [];
+    const fake = {
+      terrain: { height: () => 0 }, col: { add() {}, circle() {} },
+      addProp: (x, z, fn) => props.push(fn),
+    };
+    BOG_PLACES[id](fake, { ...L, x: 0, z: 0 }, new RNG(BOG.seed));
+    const b = new MeshBuilder(16384);
+    for (const fn of props) {
+      b.identity();
+      fn(b);
+    }
+    const root = new THREE.Group();
+    root.add(meshOf(b, mat));
+    return still(root, 0.26, view);
+  };
+}
+
+// the drowned forest: a snapped trunk standing in the water, two gaunt limbs, a root flare in the mud
+const deadTree = specimen((b) => {
+  b.limb([0, -0.55, 0], [0, 0.35, 0], 0.42, 0.28, KIND.BARK, 6); // the flare
+  b.limb([0, 0.3, 0], [0.08, 2.2, 0], 0.27, 0.17, KIND.BARK, 6);
+  b.limb([0.08, 2.2, 0], [0.35, 4.5, 0.15], 0.17, 0.07, KIND.BARK, 5);
+  b.limb([0.1, 2.9, 0], [1.5, 3.7, 0.5], 0.09, 0.02, KIND.BARK, 4);
+  b.limb([0.12, 3.4, 0], [-1.2, 4.2, -0.4], 0.075, 0.02, KIND.BARK, 4);
+  b.place(0, -0.5, 0);
+  b.cylinder(10, 1.35, 1.2, 0.08, KIND.WATER, { capTop: false });
+}, { yaw: 0.7, pitch: 0.26, fit: 0.95 }, 0.34);
+
+// a dwarf pine: bent trunk, three squashed skirts of needles
+const dwarfPine = specimen((b) => {
+  b.limb([0, -0.1, 0], [0.1, 1.5, 0.05], 0.14, 0.1, KIND.BARK, 5);
+  b.limb([0.1, 1.5, 0.05], [0.32, 2.9, 0.1], 0.1, 0.045, KIND.BARK, 4);
+  const tiers = [[0.5, 1.0, 0.75], [1.05, 0.8, 0.7], [1.65, 0.58, 0.62], [2.2, 0.34, 0.5]];
+  for (const [y, r, h] of tiers) {
+    b.place(0.1, y, 0.04, 0, r * 3, 0);
+    b.cone(7, r, h, KIND.LEAF, { y0: 0, hideRibs: true });
+  }
+}, { yaw: 0.9, pitch: 0.3, fit: 0.95 }, 0.3);
+
+// willow scrub: whippy stems leaning out of the peat, a head of leaves on each
+const willow = specimen((b) => {
+  for (let i = 0; i < 6; i++) {
+    b.identity();
+    const a = (i / 6) * Math.PI * 2 + 0.4, lean = 0.45 + (i % 3) * 0.12, h = 1.5 + (i % 4) * 0.22;
+    const tx = Math.cos(a) * lean, tz = Math.sin(a) * lean;
+    b.limb([0, 0, 0], [tx, h, tz], 0.045, 0.016, KIND.BARK, 4);
+    b.place(tx, h, tz, 0, a, 0.4, 1.9, 1.3, 1.9);
+    b.rock(0.26, () => (i % 2 ? 0.6 : 0.4), KIND.LEAF, 0.45, 0.9);
+  }
+}, { yaw: 0.5, pitch: 0.34, fit: 0.9 }, 0.3);
+
+// reeds: the palisade at the shore, a dozen blades out of one clump
+const reeds = specimen((b) => {
+  for (let i = 0; i < 14; i++) {
+    b.identity();
+    const a = (i / 14) * Math.PI * 2, r = (i % 4) * 0.1;
+    const x = Math.cos(a) * r, z = Math.sin(a) * r, h = 1.1 + (i % 5) * 0.22;
+    b.limb([x, -0.1, z], [x + Math.cos(a) * 0.14, h, z + Math.sin(a) * 0.14], 0.022, 0.006, KIND.LEAF, 3);
+  }
+}, { yaw: 0.35, pitch: 0.24, fit: 0.95 }, 0.3);
+
+// a tussock: the hummock of peat every metre of a bog is made of, with its blades
+const tussock = specimen((b) => {
+  b.place(0, -0.16, 0, 0, 0.4, 0, 1, 0.55, 1);
+  b.rock(0.62, () => 0.5, KIND.GROUND, 0.32, 0.5);
+  for (let i = 0; i < 9; i++) {
+    b.identity();
+    const a = (i / 9) * Math.PI * 2, lean = 0.22 + (i % 3) * 0.12;
+    b.limb([0, 0.16, 0], [Math.cos(a) * lean, 0.62 + (i % 4) * 0.12, Math.sin(a) * lean], 0.026, 0.005, KIND.LEAF, 3);
+  }
+}, { yaw: 0.6, pitch: 0.42, fit: 0.9 }, 0.3);
+
+// cotton grass: thin stems, a white tuft on every one — what makes a raised bog white in June
+const cottonGrass = specimen((b) => {
+  for (let i = 0; i < 9; i++) {
+    b.identity();
+    const a = (i / 9) * Math.PI * 2, r = 0.12 + (i % 3) * 0.1, h = 0.5 + (i % 4) * 0.1;
+    const x = Math.cos(a) * r, z = Math.sin(a) * r;
+    b.limb([x, 0, z], [x, h, z], 0.009, 0.007, KIND.LEAF, 3);
+    b.place(x, h, z, 0, 0, 0.5, 1.6, 1, 1.6);
+    b.rock(0.06, () => 0.5, KIND.BONE, 0.45, 0.9);
+  }
+}, { yaw: 0.4, pitch: 0.3, fit: 0.95 }, 0.32);
+
+// the топь: a hole in the peat. A boot goes in and does not come out; a hand is already out of sight
+const sink = specimen((b) => {
+  b.place(0, -0.02, 0, 0, 0, 0, 1, 0.14, 1);
+  b.rock(1.5, () => 0.35, KIND.GROUND, 0.22, 0.16); // the wet patch
+  b.place(0, 0, 0, 0, 0, 0, 1, 0.05, 1);
+  b.rock(0.62, () => 0.7, KIND.WATER, 0.5, 0.2); // the hole itself
+  // the leg, going in at an angle, boot and all
+  b.place(0.16, 0.0, 0.18, 0, 0.5, 0.9);
+  b.limb([0, 0, 0], [0, 0.62, 0], 0.09, 0.11, KIND.WOOD, 5);
+  b.place(0.0, 0.6, 0.0, 0, 0.5, 0.9);
+  b.box(0.16, 0.14, 0.3, KIND.BARK);
+  // and a hand, three fingers above the surface, the rest under it
+  b.place(-0.5, 0.02, -0.35, 0.3, 1.1, 0.2);
+  b.limb([0, 0, 0], [0, 0.2, 0], 0.05, 0.045, KIND.FLESH, 4);
+  for (let i = 0; i < 3; i++) {
+    b.place(-0.02 + i * 0.04, 0.18, 0, 0, 0, 0.3);
+    b.limb([0, 0, 0], [0, 0.13, 0.02], 0.016, 0.012, KIND.BONE, 3);
+  }
+}, { yaw: 0.5, pitch: 0.55, fit: 0.82 }, 0.28);
+
+// the гать: a plank road with its edge boards and a pair of posts, three metres wide
+const plank = specimen((b) => {
+  for (let i = 0; i < 7; i++) {
+    const x0 = -3.2 + i * 0.92;
+    b.place(0, 0, 0);
+    b.quadN([x0, 0.34, -1.5], [x0 + 0.86, 0.34, -1.5], [x0 + 0.86, 0.34, 1.5], [x0, 0.34, 1.5], [0, 1, 0], KIND.WOOD, 15);
+    b.tri([x0, 0.34, 1.5], [x0 + 0.86, 0.34, 1.5], [x0 + 0.86, 0.22, 1.5], KIND.WOOD, 6);
+    b.tri([x0, 0.34, -1.5], [x0 + 0.86, 0.34, -1.5], [x0 + 0.86, 0.22, -1.5], KIND.WOOD, 6);
+  }
+  for (const x of [-2.6, 0, 2.6]) {
+    for (const z of [-1.3, 1.3]) {
+      b.limb([x, 0.3, z], [x, -0.7, z], 0.08, 0.08, KIND.WOOD, 4);
+    }
+  }
+  b.limb([2.6, 0.3, 1.3], [2.6, 1.3, 1.3], 0.05, 0.045, KIND.WOOD, 4);
+}, { yaw: 0.7, pitch: 0.42, fit: 0.95 }, 0.3);
+
+// a pump: two columns, a head, a flywheel, and the rising main running off into the bog
+const pump = specimen((b) => {
+  b.box(1.5, 0.16, 1.1, KIND.METAL, { bottom: true });
+  for (const x of [-0.34, 0.34]) {
+    b.place(x, 0.16, 0);
+    b.cylinder(6, 0.16, 0.13, 1.15, KIND.METAL);
+  }
+  b.place(0, 1.3, 0);
+  b.box(1.15, 0.34, 0.5, KIND.METAL, { bottom: true });
+  b.place(-0.62, 1.34, 0, 0, 0, -0.55);
+  b.limb([0, 0, 0], [0, 1.5, 0], 0.055, 0.05, KIND.METAL, 4);
+  b.place(0.62, 1.36, 0.28, 0, 0, Math.PI / 2);
+  b.cylinder(12, 0.36, 0.36, 0.1, KIND.METAL);
+  b.place(0, 1.32, -0.25);
+  b.limb([0, 0, 0], [0, 0.9, 0], 0.1, 0.1, KIND.METAL, 5);
+  b.limb([0, 0.9, 0], [0, 0.9, -1.7], 0.1, 0.1, KIND.METAL, 5);
+  b.limb([0, 0.9, -1.7], [0, -0.35, -1.7], 0.1, 0.1, KIND.METAL, 5);
+  b.place(-0.95, 0.16, 0.5);
+  b.limb([0, 0, 0], [0, 0.85, 0], 0.05, 0.045, KIND.METAL, 4);
+  b.place(0, 0.85, 0, 0, 0, Math.PI / 2);
+  b.cylinder(10, 0.18, 0.18, 0.06, KIND.METAL);
+}, { yaw: 0.75, pitch: 0.36, fit: 0.92 }, 0.32);
+
+// the winch: the nose of the УАЗ, the drum, and the cable run out to a leaning post
+const winch = specimen((b) => {
+  b.place(0, 0.4, 1.4);
+  b.box(1.86, 0.72, 2.6, KIND.METAL);
+  b.place(0, 0.8, 0.4);
+  b.box(1.7, 0.62, 1.6, KIND.LEAF);
+  for (const x of [-0.95, 0.95]) {
+    b.place(x, 0.36, -0.4, 0, 0, Math.PI / 2);
+    b.cylinder(10, 0.36, 0.36, 0.26, KIND.BARK);
+  }
+  b.place(0, 0.46, -1.1, 0, 0, Math.PI / 2);
+  b.cylinder(8, 0.16, 0.16, 0.42, KIND.METAL);
+  b.limb([0, 0.3, -1.4], [0, 0.25, -3.4], 0.03, 0.03, KIND.METAL, 3);
+  b.place(-3.4, 0, -0.6, 0.14, 0.6, 0.1);
+  b.limb([0, 0, 0], [0, 2.6, 0], 0.15, 0.12, KIND.WOOD, 5);
+  b.place(0, 2.2, 0);
+  b.box(0.9, 0.12, 0.12, KIND.WOOD);
+}, { yaw: 0.9, pitch: 0.3, fit: 0.95 }, 0.32);
+
+// the Дrowned: it hangs just under the surface and lets the water move it
+function drowned(mat) {
+  const rig = buildDrowned();
+  const root = rigMeshes(rig, mat);
+  const n = rig.nodes;
+  return {
+    root, base: 0.24, view: { yaw: 0.45, pitch: 0.12 },
+    tick(S) {
+      if (!n.hips) return;
+      n.hips.position.y = 0.62 + Math.sin(S.t * 0.85) * 0.03;
+      n.spine.rotation.x = Math.sin(S.t * 0.6) * 0.04 - 0.05;
+      n.spine.rotation.z = Math.sin(S.t * 0.45 + 1) * 0.05;
+      const want = S.react < 4 ? clamp(angleDiff(0, S.camAz), -1, 1) : 0;
+      n.head.rotation.y = lerp(n.head.rotation.y, want, 1 - Math.exp(-4 * S.dt));
+      n.head.rotation.x = -0.15;
+      for (const [k, s] of [['armL', 1], ['armR', -1]]) {
+        if (!n[k]) continue;
+        n[k].rotation.x = -0.12 + Math.sin(S.t * 0.7 + s) * 0.06;
+        n[k].rotation.z = s * 0.08;
+      }
+    },
+  };
+}
+
+// the Гнус: a cloud of specks the size of a room. In an echo it is a swarm, never a shape
+function gnat(mat) {
+  const root = new THREE.Group();
+  const cloud = [];
+  const rng = new RNG(4242);
+  for (let i = 0; i < 30; i++) {
+    const b = new MeshBuilder(32);
+    b.identity();
+    b.octa(0.1, 1, KIND.BARK);
+    const m = meshOf(b, mat);
+    const a = rng.float(0, 6.28), d = 0.2 + rng.float(0, 1.1), y = 0.2 + rng.float(0, 1.5);
+    m.position.set(Math.cos(a) * d, y, Math.sin(a) * d);
+    m.rotation.set(rng.float(0, 3), rng.float(0, 3), rng.float(0, 3));
+    root.add(m);
+    cloud.push({ m, a, d, y, ph: rng.float(0, 6.28), sp: 0.4 + rng.float(0, 0.5) });
+  }
+  return {
+    root, base: 0.22, view: { yaw: 0.3, pitch: 0.05, fit: 0.9 },
+    tick(S) {
+      for (const c of cloud) {
+        const a = c.a + S.t * c.sp;
+        c.m.position.set(Math.cos(a) * c.d, c.y + Math.sin(S.t * 1.7 + c.ph) * 0.12, Math.sin(a) * c.d);
+      }
+    },
+  };
+}
+
 const MODELS = {
   listener, crawler, watcher, howler, angler, shkaf, shade, stray,
   generator: (mat) => generator(mat, true),
@@ -745,6 +983,12 @@ const MODELS = {
   carbattery: carPart('battery', { yaw: 0.8, pitch: 0.3 }),
   carb: carPart('carb', { yaw: 0.9, pitch: 0.35 }),
   jerrycan: carPart('can', { yaw: 1.1, pitch: 0.2 }),
+  // chapter V: the bog
+  drowned, gnat, deadtree: deadTree, dwarfpine: dwarfPine, willow, reeds, tussock, cottongrass: cottonGrass,
+  sink, plank, pump, winch,
+  pumpshed: bogPlace('pumpstation', { yaw: 0.8, pitch: 0.28, fit: 0.85 }),
+  barracks: bogPlace('barracks', { yaw: 2.3, pitch: 0.3, fit: 0.9 }),
+  peatstacks: bogPlace('stacks', { yaw: 0.6, pitch: 0.42, fit: 0.9 }),
 };
 
 export function buildModel(key, mat, ctx = {}) {
