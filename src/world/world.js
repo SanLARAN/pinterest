@@ -10,6 +10,7 @@ import { ForestTrails } from './trails.js';
 import { Meadow } from './meadow.js';
 import { ForestNavigation } from './navigation.js';
 import { buildYard, buildOutside, inYard } from './yard.js';
+import { buildBunker } from './bunker.js';
 import { FIRETOWER, ZARYA, buildFiretower, buildZarya, buildWaymarks } from './expedition.js';
 
 export { CAP } from './caps.js'; // (re-exported: everything that imported it from here keeps working)
@@ -766,6 +767,9 @@ export class World {
   // the forestry yard: fence, gates, booth, floodlight, junk — and where the УАЗ stands (see yard.js)
   lm_yard(L) {
     buildYard(this, L);
+    // (3.0q) ...and the shelter under it: the cap in the yard, the corridor, the crack. Built with the yard — the
+    // same static chunks — but with a collision set of its own (world.bunkerCol, see world/bunker.js)
+    buildBunker(this, this.yard.y);
   }
 
   inYard(x, z, pad = 0) {

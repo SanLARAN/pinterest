@@ -48,6 +48,8 @@ export class Player {
     this.carrying = null; // co-op: the id of a friend on your shoulder (see Rescue)
     this.held = false; // the Angler has this one (see angler.js): dragged, tied — not to be hunted by the rest
     this.floorY = null; // (2.1s: the lookout's deck — while set, you stand on it, not on the terrain)
+    this.col = null; // (3.0q: under the yard, the shelter's own walls — see game/bunker.js)
+    this.underground = false; // (3.0q: five metres of clay between you and everything out there)
   }
 
   forward() {
@@ -92,7 +94,7 @@ export class Player {
 
     const ox = this.x, oz = this.z;
     const pos = { x: this.x + this.vx * dt, z: this.z + this.vz * dt };
-    const hit = this.world.col.resolve(pos, P.radius);
+    const hit = (this.col || this.world.col).resolve(pos, P.radius);
     const w = this.world.wall;
     pos.x = clamp(pos.x, -w, w);
     pos.z = clamp(pos.z, -w, w);

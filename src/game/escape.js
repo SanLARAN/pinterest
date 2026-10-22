@@ -374,31 +374,56 @@ export class Escape {
     return out.set(lx, ly, lz).applyMatrix4(this.car.matrixWorld);
   }
 
-  // ---------------- power: the gate opens ----------------
+  // ---------------- power: the yard comes alive, and the gate waits for the shelter ----------------
+  // (3.0q) The gate does not roll on the generators' power any more. The five machines put the yard on the
+  // mains — floodlight, siren, the drive unit's beacon blinking — and the drive unit's contactor is down in the
+  // shelter's breaker, where it has been since the forest service wired it in the fifties. Pull that, and the
+  // gate rolls. (The shelter is game/bunker.js; it asks for openGate() here.)
   powerOn() {
     if (this.power) return;
     this.power = true;
     const g = this.g, yd = this.Y;
-    this.gate.state = 'opening';
-    this.gate.t = 0;
     this.flood = 0.001;
     this.floodFlick = 1.4;
     this.beacon.visible = true;
     const a = g.audio;
     if (a.ready) {
-      this.gate.siren = a.gateSiren ? a.gateSiren(yd.motor.x, yd.motor.y + 0.4, yd.motor.z, 8.5) : null;
+      this.gate.siren = a.gateSiren ? a.gateSiren(yd.motor.x, yd.motor.y + 0.4, yd.motor.z, 6.5) : null;
       a.gateFar && a.gateFar(yd.motor.x, yd.motor.z);
     }
     g.noise(yd.front.x, yd.front.z, 0.8, 'repair'); // the siren: everything in the north of the forest comes to look
+    g.hud.flashAlert(t('aYardPower'), 'dawn', 3.2);
+    g.hud.peek(5);
+    g.addTrauma(0.12);
+    g.bunker?.onPower?.(); // the cap in the yard: its lock lets go, with a clunk you can hear from the gate
+    this.beaconT = 4;
+  }
+
+  // is the gate moving / open?
+  get gateOpen() {
+    return this.gate.state === 'opening' || this.gate.state === 'open';
+  }
+
+  // ...and the gate itself: the shelter's breaker closes the contactor, and the motor answers up here
+  openGate() {
+    if (this.gate.state !== 'shut') return;
+    const g = this.g, yd = this.Y, a = g.audio;
+    this.gate.state = 'opening';
+    this.gate.t = 0;
+    if (a.ready) {
+      this.gate.siren = a.gateSiren ? a.gateSiren(yd.motor.x, yd.motor.y + 0.4, yd.motor.z, 8.5) : null;
+      a.gateFar && a.gateFar(yd.motor.x, yd.motor.z);
+    }
+    g.noise(yd.front.x, yd.front.z, 0.8, 'repair');
     g.hud.flashAlert(t('aGateOpen'), 'dawn', 3.2);
     g.hud.peek(5);
     g.addTrauma(0.12);
+    this.beaconT = 4;
     if (g.player.alive && !this.hinted.gate) {
       this.hinted.gate = true;
       g.timeline.push({ at: g.time + 3.2, fn: () => g.hud.setHint(t('hintGate')) });
       g.timeline.push({ at: g.time + 10.5, fn: () => g.hud.setHint(null) });
     }
-    this.beaconT = 4;
   }
 
   gateShut() {
@@ -1445,7 +1470,7 @@ export class Escape {
   readNote(which) {
     const g = this.g, ob = g.objectives;
     if (which === 'gate') {
-      ob.openNote(t('noteGateKicker'), this.power ? t('noteGateOn') : t('noteGate'));
+      ob.openNote(t('noteGateKicker'), this.power ? (this.gateOpen ? t('noteGateMoving') : t('noteGateOn')) : t('noteGate'));
       return;
     }
     const where = (key) => {
@@ -1465,6 +1490,8 @@ export class Escape {
   taskText() {
     if (!this.power) return '';
     if (this.engine === 'running') return t('taskGo');
+    // (3.0q) the yard has power, the gate has not moved: the breaker is under it
+    if (!this.gateOpen) return t('taskBunker');
     if (this.ready) return t('taskStart');
     if (!this.inYardOnce) return t('taskYard');
     if (!this.knows) return t('taskLog');
@@ -1475,13 +1502,19 @@ export class Escape {
   // ---------------- beacons ----------------
   beacons(dt) {
     const g = this.g, me = g.player;
-    if (!this.power || !me.alive || this.cut || this.mySeat >= 0) return;
+    if (!this.power || !me.alive || this.cut || this.mySeat >= 0 || me.underground) return;
     if (inYard(me.x, me.z, -0.5)) this.inYardOnce = true;
     this.beaconT -= dt;
     if (this.beaconT > 0) return;
     let tx = null, tz = null, kind = 'car';
     const held = this.held;
-    if (!this.inYardOnce || held || this.ready) {
+    const sh = this.g.world.bunker;
+    if (this.power && !this.gateOpen && sh) {
+      // (3.0q) nothing moves until the shelter's breaker is down: the beacon points at the cap in the yard
+      tx = sh.hatch.x;
+      tz = sh.hatch.z - sh.hatch.d / 2 - 1.1;
+      kind = '';
+    } else if (!this.inYardOnce || held || this.ready) {
       const c = held ? this.slotPos(held.key, _v) : this.car.position;
       tx = c.x;
       tz = c.z;

@@ -289,7 +289,7 @@ export class Menus {
     $('overKicker').textContent = won
       ? `${isEsc ? t('escKicker') : t('winKicker')} · ${fmtTime(stats.time)}`
       : `${t('survived')} ${fmtTime(stats.time)} · ${t('generators')} ${stats.gens | 0}/5`;
-    const titles = { scream: 'deadScream', crawler: 'deadCrawler', watcher: 'deadWatcher', howler: 'deadHowler', shkaf: 'deadShkaf', angler: 'deadAngler' };
+    const titles = { scream: 'deadScream', crawler: 'deadCrawler', watcher: 'deadWatcher', howler: 'deadHowler', shkaf: 'deadShkaf', angler: 'deadAngler', razlom: 'deadRazlom' };
     let title = won ? t(isEsc ? 'escTitle' : 'winTitle') : t(titles[res.cause] || 'deadTitle');
     const who = !won && res.cause !== 'scream' ? (t('deathBy')[res.cause] || '') : '';
     let sub = won ? t(isEsc ? (res.alive === false ? 'escSubHurt' : 'escSub') : 'winSub') : who ? `— ${who}` : '';

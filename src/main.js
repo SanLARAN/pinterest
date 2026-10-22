@@ -79,6 +79,7 @@ const DEBUG = {
   fps: params.has('fps'),
   map: params.get('map') || '', // ?map=bog: walk the peat bog (3.0: the second участок)
   days: +params.get('days') || 0, // ?days=2|4|6: the shift length a pick in the menu asked for
+  shelter: params.has('shelter'), // (3.0q) start at the cap in the yard with the mains on: the corridor, without five generators
 };
 
 const $ = (id) => document.getElementById(id);
@@ -699,11 +700,30 @@ function startRun(opts = {}) {
     game.setupSolo();
     game.opening.forceSeats = DEBUG.seats;
     game.reset({ training, days: DEBUG.days || settings.shiftDays });
-    if (DEBUG.night || DEBUG.nointro || DEBUG.t > 0) game.startNight();
+    if (DEBUG.night || DEBUG.nointro || DEBUG.t > 0 || DEBUG.shelter) game.startNight();
     if (DEBUG.t > 0) {
       game.time = DEBUG.t;
       game.firstPingT = Math.max(0, DEBUG.t - 30);
       game.tut.done = true;
+    }
+    // (3.0q) ?shelter: the yard on the mains and the cap unlocked, you standing in front of it. What is down
+    // there still has to be walked, and the breaker still has to be thrown by hand.
+    if (DEBUG.shelter) {
+      game.tut.done = true;
+      try {
+        game.escape.powerOn();
+        game.bunker.unlock();
+        const H = game.world.bunker && game.world.bunker.hatch;
+        if (H) {
+          const p2 = game.player;
+          p2.x = H.x;
+          p2.z = H.z - H.d / 2 - 1.8;
+          p2.y = game.world.terrain.height(p2.x, p2.z) + 0.08;
+          p2.yaw = Math.PI; // facing the cap
+        }
+      } catch (e) {
+        console.warn('[shelter] debug start failed', e);
+      }
     }
   }
   beginRewards();

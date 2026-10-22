@@ -24,6 +24,8 @@ const NOTE_SECONDS = 11;
 const PH = ['dead', 'work', 'cord', 'spin', 'running'];
 const ESC_KINDS = new Set(['part', 'carNote', 'carDoor', 'carFit', 'carSeat']); // see Escape.consider
 const CAB_KINDS = new Set(['cabinet', 'cabinetItem', 'trapGrab', 'trapSelf']); // see Cabinets.consider
+// (3.0q) the shelter under the yard: the cap in the yard, the ladder, the breaker (see game/bunker.js)
+const BUNKER_KINDS = new Set(['shelterCap', 'shelterUp', 'shelterBreaker']);
 
 const _m = new THREE.Matrix4();
 const _l = new THREE.Matrix4();
@@ -615,6 +617,7 @@ export class Objectives {
       if (game.training) { game.train?.consider(consider); game.motos?.consider(consider); }
       for (const body of this.bodies) if (body.searched && body.gun?.visible) consider(body, body.x, body.z, USE_R_BODY, 'bodyGun');
       if (game.expedition) game.expedition.consider(consider);
+      if (game.bunker) game.bunker.consider(consider); // the shelter's cap, its ladder, its breaker
     }
     // (2.1q: the morning is for hauling too — a part may be picked up, carried and fitted in daylight;
     // sitting in the car and driving off still belong to the night)
@@ -678,6 +681,11 @@ export class Objectives {
     if (escKind) {
       this.searchT = 0;
       es.interact(best, dt, held, pressed, still, T);
+      return;
+    }
+    if (BUNKER_KINDS.has(best.kind)) {
+      this.searchT = 0;
+      game.bunker.interact(best, pressed, T);
       return;
     }
     if (CAB_KINDS.has(best.kind)) {

@@ -3324,6 +3324,190 @@ export class AudioEngine {
     [[312, 0.9], [497, 0.7], [783, 0.5], [1240, 0.3]].forEach(([f, d]) => this._tone(t, { f, a: 0.001, d, gain: 0.07, dest: pn }));
   }
 
+  // ---------------- 3.0q: the shelter under the yard ----------------
+  // the knife switch thrown under load: the bang, the arc, and the mains rushing into the contactor
+  bunkerBreaker(x, y, z) {
+    if (!this.ready) return;
+    const t = this.now;
+    const pn = this._far(x, y, z, 4, 0.7, 0.6);
+    this._noiseBurst(t, { type: 'bandpass', f: 2400, q: 1.6, a: 0.0005, d: 0.05, gain: 1.1, dest: pn });
+    this._tone(t, { f: 120, fEnd: 46, a: 0.001, d: 0.4, gain: 0.9, dest: pn });
+    this._noiseBurst(t + 0.02, { buf: this.brown, type: 'lowpass', f: 700, a: 0.001, d: 0.22, gain: 1.4, dest: pn });
+    for (let i = 0; i < 7; i++) {
+      this._noiseBurst(t + 0.04 + i * 0.035, { type: 'highpass', f: 3600, q: 2, a: 0.0004, d: 0.02 + Math.random() * 0.02, gain: 0.45 + Math.random() * 0.4, dest: pn });
+    }
+    // ...and then it holds: a mains hum with the earth in it
+    const hum = this._osc('sawtooth', 50);
+    const hl = this._filter('lowpass', 300, 0.9);
+    const hg = this._gain(0.0001);
+    hum.connect(hl).connect(hg).connect(pn);
+    hg.gain.setValueAtTime(0.0001, t + 0.12);
+    hg.gain.linearRampToValueAtTime(0.15, t + 0.34);
+    hg.gain.setValueAtTime(0.15, t + 2.4);
+    hg.gain.linearRampToValueAtTime(0.0001, t + 3.3);
+    hum.start(t + 0.12);
+    hum.stop(t + 3.5);
+  }
+
+  // the closing doors' siren: slower and deeper than the gate's, and it does not stop until it is over.
+  // { stop(fade) }
+  bunkerAlarm(x, y, z, dur = 180) {
+    if (!this.ready) return null;
+    const t = this.now;
+    const pn = this._far(x, y, z, 7, 0.5, 0.85);
+    const out = this._gain(0);
+    out.connect(pn);
+    const o = this._osc('sawtooth', 330);
+    const o2 = this._osc('square', 165);
+    const o2g = this._gain(0.3);
+    const bp = this._filter('bandpass', 760, 1.4);
+    const sh = this._shaper(this.distSoft);
+    const post = this._gain(0.3);
+    o.connect(bp);
+    o2.connect(o2g).connect(bp);
+    bp.connect(sh).connect(post).connect(out);
+    const period = 2.6; // (the gate's is 1.7: this one is slower, and lower)
+    for (let tt = t, k = 0; tt < t + dur; tt += period, k++) {
+      for (const p of [o.frequency, o2.frequency]) {
+        const m = p === o.frequency ? 1 : 0.5;
+        p.setValueAtTime(300 * m, tt);
+        p.linearRampToValueAtTime(690 * m, tt + period * 0.52);
+        p.linearRampToValueAtTime(300 * m, tt + period);
+      }
+    }
+    out.gain.setValueAtTime(0.0001, t);
+    out.gain.linearRampToValueAtTime(0.9, t + 0.7);
+    out.gain.setValueAtTime(0.9, t + dur - 1.2);
+    out.gain.linearRampToValueAtTime(0.0001, t + dur);
+    o.start(t); o2.start(t);
+    o.stop(t + dur + 0.1); o2.stop(t + dur + 0.1);
+    // the relay that started it, and the rattle in the horn
+    this._noiseBurst(t, { type: 'highpass', f: 2600, a: 0.0005, d: 0.03, gain: 0.8, dest: pn });
+    let stopped = false;
+    return {
+      stop: (fade = 0.4) => {
+        if (stopped) return;
+        stopped = true;
+        const n = this.now;
+        out.gain.cancelScheduledValues(n);
+        out.gain.setValueAtTime(out.gain.value, n);
+        out.gain.linearRampToValueAtTime(0.0001, n + fade);
+        try { o.stop(n + fade + 0.05); o2.stop(n + fade + 0.05); } catch { /* */ }
+      },
+    };
+  }
+
+  // six tonnes of steel slab coming down in its slot: a rumble under everything, and the ratchet that lets it
+  bunkerDoors(x, y, z, dur = 180) {
+    if (!this.ready) return null;
+    const t = this.now;
+    const pn = this._far(x, y, z, 6, 0.6, 0.7);
+    const out = this._gain(0.0001);
+    out.connect(pn);
+    const rum = this._noise(this.brown);
+    const lp = this._filter('lowpass', 160, 0.9);
+    const rg = this._gain(0.5);
+    rum.connect(lp).connect(rg).connect(out);
+    const sub = this._osc('sine', 31);
+    const sg = this._gain(0.16);
+    sub.connect(sg).connect(out);
+    rum.start(t); sub.start(t);
+    rum.stop(t + dur + 0.3); sub.stop(t + dur + 0.3);
+    out.gain.setValueAtTime(0.0001, t);
+    out.gain.linearRampToValueAtTime(0.85, t + 1.4);
+    out.gain.setValueAtTime(0.85, t + dur - 1.0);
+    out.gain.linearRampToValueAtTime(0.0001, t + dur);
+    // every so often the slab catches on its guides: a hard clank, then the rumble goes on
+    for (let tt = t + 2.5; tt < t + dur; tt += 5.4 + Math.random() * 3.4) {
+      this._tone(tt, { f: 88, fEnd: 54, a: 0.002, d: 0.35, gain: 0.5, dest: pn });
+      this._noiseBurst(tt, { type: 'bandpass', f: 1500 + Math.random() * 900, q: 3, a: 0.001, d: 0.08, gain: 0.3, dest: pn });
+    }
+    let stopped = false;
+    return {
+      stop: (fade = 0.5) => {
+        if (stopped) return;
+        stopped = true;
+        const n = this.now;
+        out.gain.cancelScheduledValues(n);
+        out.gain.setValueAtTime(out.gain.value, n);
+        out.gain.linearRampToValueAtTime(0.0001, n + fade);
+        try { rum.stop(n + fade + 0.05); sub.stop(n + fade + 0.05); } catch { /* */ }
+      },
+    };
+  }
+
+  // the wall at the far end moving: a sub-bass swell with stone grinding in it, and no direction you can fix
+  riftWake(x, y, z) {
+    if (!this.ready) return;
+    const t = this.now;
+    const pn = this._far(x, y, z, 9, 0.45, 1.0);
+    const out = this._gain(0.0001);
+    out.connect(pn);
+    const sub = this._osc('sine', 24);
+    const sg = this._gain(0.9);
+    sub.connect(sg).connect(out);
+    sub.frequency.setValueAtTime(24, t);
+    sub.frequency.linearRampToValueAtTime(43, t + 3.4);
+    sub.frequency.linearRampToValueAtTime(19, t + 6.2);
+    // the stone: brown noise pushed through a band that opens as the crack does
+    const nz = this._noise(this.brown);
+    const bp = this._filter('bandpass', 180, 1.1);
+    const ng = this._gain(0.55);
+    nz.connect(bp).connect(ng).connect(out);
+    bp.frequency.setValueAtTime(150, t);
+    bp.frequency.linearRampToValueAtTime(620, t + 3.0);
+    bp.frequency.linearRampToValueAtTime(230, t + 5.6);
+    nz.start(t); sub.start(t);
+    nz.stop(t + 6.4); sub.stop(t + 6.4);
+    out.gain.setValueAtTime(0.0001, t);
+    out.gain.linearRampToValueAtTime(0.9, t + 1.6);
+    out.gain.setValueAtTime(0.9, t + 3.6);
+    out.gain.linearRampToValueAtTime(0.0001, t + 6.2);
+    // grit coming off the ceiling
+    for (let i = 0; i < 10; i++) {
+      this._noiseBurst(t + 1.2 + Math.random() * 3.4, { type: 'bandpass', f: 2600 + Math.random() * 2200, q: 4, a: 0.0005, d: 0.04, gain: 0.12, dest: pn });
+    }
+  }
+
+  // the lamps go out: a contactor drops somewhere behind the wall, and the room is not the same room
+  bunkerBlackout(x, y, z) {
+    if (!this.ready) return;
+    const t = this.now;
+    const pn = this._far(x, y, z, 5, 0.7, 0.9);
+    this._noiseBurst(t, { type: 'bandpass', f: 1300, q: 1.2, a: 0.0004, d: 0.06, gain: 0.9, dest: pn });
+    this._tone(t, { f: 300, fEnd: 70, a: 0.001, d: 0.5, gain: 0.35, dest: pn });
+    this._tone(t + 0.06, { f: 1800, fEnd: 900, a: 0.002, d: 1.6, gain: 0.05, dest: pn }); // a filament cooling
+    // and, under it, something drawing breath
+    this._noiseBurst(t + 0.35, { buf: this.brown, type: 'lowpass', f: 240, a: 0.5, d: 1.4, gain: 0.5, dest: pn });
+  }
+
+  // one of them, coming up out of the crack: wet, and higher than a throat should go
+  razlomScreech(x, y, z, k = 1) {
+    if (!this.ready) return;
+    const t = this.now;
+    const pn = this._far(x, y, z, 5, 0.65, 0.9);
+    const out = this._gain(0.0001);
+    out.connect(pn);
+    const a = this._osc('sawtooth', 420);
+    const b = this._osc('square', 208);
+    const bp = this._filter('bandpass', 1400, 3.2);
+    const sh = this._shaper(this.distSoft);
+    a.connect(bp); b.connect(bp);
+    bp.connect(sh).connect(out);
+    a.frequency.setValueAtTime(420, t);
+    a.frequency.exponentialRampToValueAtTime(1150, t + 0.22);
+    a.frequency.exponentialRampToValueAtTime(300, t + 0.75);
+    b.frequency.setValueAtTime(208, t);
+    b.frequency.exponentialRampToValueAtTime(610, t + 0.22);
+    b.frequency.exponentialRampToValueAtTime(140, t + 0.75);
+    out.gain.setValueAtTime(0.0001, t);
+    out.gain.linearRampToValueAtTime(0.5 * k, t + 0.05);
+    out.gain.linearRampToValueAtTime(0.0001, t + 0.85);
+    a.start(t); b.start(t);
+    a.stop(t + 0.95); b.stop(t + 0.95);
+    this._noiseBurst(t + 0.03, { buf: this.brown, type: 'lowpass', f: 500, a: 0.02, d: 0.3, gain: 0.5 * k, dest: pn });
+  }
+
   // picked up: a grunt of effort, and the thing itself (own: it's in your arms)
   partPick(x, y, z, key, own = false) {
     if (!this.ready) return;

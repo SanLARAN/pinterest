@@ -7,6 +7,23 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v:'3.0q',date:'2026-10-22',
+    ru:{title:'Разлом',items:[
+      'У задней стены лесхоза стоит бетонный колпак с запертой на ток дверью. Под двором — убежище, которое лесхоз вырыл в пятидесятых и забыл: площадка, коридор на рёбрах, дальний зал, где стена разошлась',
+      'Ворота лесхоза больше не открываются сами: пять генераторов дают ток на двор — прожектор, сирену, мигающий привод, — а контактор ворот висит на рубильнике в убежище, в самом дальнем конце коридора. Спускаешься, идёшь мимо ламп и рёбер и кладёшь руку на рычаг',
+      'Дальше всё не в твоих руках. Ворота наверху ползут, стена в конце коридора отвечает, и лампы гаснут по одной — от дальнего конца к тебе. В темноте остаётся красное: разлом просыпается и выпускает своих',
+      'Двери убежища начинают закрываться и идут ровно три минуты. Бегом обратно по коридору, мимо красных глаз, к лестнице — успел, и ты в саду с закрытым колпаком за спиной; не успел, и убежище твоё',
+      'Сирена закрывающихся дверей своя, отдельная от воротной: ниже, медленнее и без перерыва. Дверь наверху потом бьёт изнутри три раза и затихает',
+    ]},
+    en:{title:'The rift',items:[
+      'Against the forestry yard\'s back wall stands a concrete cap with a door that runs on mains. Under the yard is a shelter the service dug in the fifties and forgot: a landing, a corridor on ribs, a vault at the far end where the wall has come apart',
+      'The gate no longer opens by itself: five generators put the yard on the mains — floodlight, siren, the drive unit\'s beacon blinking — and the gate\'s contactor hangs off a breaker in the shelter, at the very far end of the corridor. You go down, walk past the lamps and the ribs, and put your hand on the lever',
+      'After that none of it is yours. The gate rolls above, the wall at the end of the corridor answers, and the lamps go out one by one — from the far end back toward you. What is left in the dark is red: the rift wakes up and lets its own out',
+      'The shelter\'s doors start down and take exactly three minutes. Back along the corridor at a run, past the eyes, to the ladder — make it and you are in the yard with the cap shut behind you; don\'t, and the shelter keeps you',
+      'The closing doors have a siren of their own, apart from the gate\'s: lower, slower, and it does not stop. The cap up in the yard then takes three hits from the inside, and goes quiet',
+    ]}
+  },
+  {
     v:'3.0p',date:'2026-10-22',
     ru:{title:'План на стене',items:[
       'В гараже на задней стене вместо пустого листа теперь висит настоящий план участка: тот же отпечаток местности, что и в карточке перед сменой — вода, настилы, насосы и дорога к машине',

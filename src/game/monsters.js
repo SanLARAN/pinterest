@@ -722,6 +722,7 @@ export class Monster {
     let best = null, bd = 1e9;
     for (const q of this.game.livePlayers()) {
       if (q.held) continue; // the Angler's armful is his: nothing else hunts what he is already carrying
+      if (q.underground) continue; // (3.0q) ...and nobody hunts through five metres of clay
       const d = Math.hypot(q.x - x, q.z - z);
       if (d < bd) {
         bd = d;
@@ -1021,7 +1022,7 @@ export class Monster {
           if (!victim) {
             let vd = kd;
             for (const q of g.livePlayers()) {
-              if (q.held) continue;
+              if (q.held || q.underground) continue;
               const d = Math.hypot(q.x - this.x, q.z - this.z);
               if (d < vd) {
                 vd = d;
@@ -1351,7 +1352,7 @@ export class Watcher extends Monster {
     if (!lit && this.stateT > 0.6) {
       let victim = null, vd = CFG.MONSTER.killDist + 0.15;
       for (const q of g.livePlayers()) {
-        if (q.held) continue; // the Angler's catch is not to be taken out of his hands
+        if (q.held || q.underground) continue; // the Angler's catch is not to be taken out of his hands
         const d = Math.hypot(q.x - this.x, q.z - this.z);
         if (d < vd) {
           vd = d;

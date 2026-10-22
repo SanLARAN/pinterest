@@ -21,6 +21,7 @@ import { GlowSticks } from './glowsticks.js';
 import { MedHut } from './medhut.js';
 import { Rescue } from './rescue.js';
 import { Escape } from './escape.js';
+import { Bunker } from './bunker.js'; // 3.0q: the shelter under the yard, and what is in it
 import { Cabinets } from './cabinets.js';
 import { Torches } from './torch.js';
 import { ForestTools } from './tools.js';
@@ -93,6 +94,9 @@ export class Game {
     // your hands" test asks about (a missing one made the wristwatch refuse to come up on the bog — TAB was
     // dead, and the pack's own checks read it too), and the torch's charge is read as a number.
     this.escape = this.map === 'forest' ? new Escape(this) : inert(Escape, this, { load: () => null, seatOf: () => -1, mySeat: -1, seats: [], count: 0 });
+    // (3.0q) the shelter under the forestry yard: the cap, the corridor, the breaker at the far end, and the
+    // crack. The bog has none of it (inert: every call is a no-op, every field false)
+    this.bunker = this.map === 'forest' ? new Bunker(this) : inert(Bunker, this, { state: 'sealed', awake: false, remaining: null, inside: false });
     this.cabinets = new Cabinets(this); // cupboards in the buildings (and the шкафандр)
     this.torch = this.map === 'forest' ? new Torches(this) : inert(Torches, this, { hasLight: false, has: false, on: false, charge: 0 }); // flashlights
     this.tools = new ForestTools(this);
@@ -310,6 +314,7 @@ export class Game {
     this.shards.reset(this.world, this.rng);
     this.objectives.reset(this.rng);
     this.escape.reset(new RNG((this.rng.next() * 4294967296) >>> 0)); // (its own stream: the same on every machine)
+    this.bunker.reset(); // (3.0q) the shelter: the cap locked, the lamps burning, nothing out of the crack
     this.cabinets.reset(new RNG((this.rng.next() * 4294967296) >>> 0));
     this.torch.reset(new RNG((this.rng.next() * 4294967296) >>> 0), opts.online || this.online);
     this.tools.reset();
@@ -1818,6 +1823,7 @@ export class Game {
   // the night is over. Dawns one to three are a breather for whoever is still standing;
   // the fourth is the end of the shift and the win. The host's word starts it for everyone.
   startDawn() {
+    this.bunker?.evacuate?.(); // (3.0q) the shelter does not keep anyone past the night
     this.state = 'dawn';
     this.dawnT = 0;
     shared.uDawn.value = 0;
@@ -2243,6 +2249,10 @@ export class Game {
     this.shards.update(dt, this);
     this.objectives.update(dt, true);
     if (this.state !== 'play') return; // (the car left)
+    // (3.0q) the shelter: its lamps write the last word into the light slots, its script runs the beats, and the
+    // ones it lets out are its own. (It can end the night, so ask again before going on.)
+    this.bunker.update(dt);
+    if (this.state !== 'play') return;
     es.beacons(dt);
     if (this.auth) this.updateArrivals();
     this.updateFronts();
