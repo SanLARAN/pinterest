@@ -11,6 +11,8 @@ import { EDGE_GLSL } from '../render/sonar.js';
 import { Particles } from '../render/particles.js';
 import { clamp, lerp, damp, smoothstep } from '../core/rng.js';
 import { t } from '../core/i18n.js';
+import { settings } from '../core/storage.js';
+import { MAP_BOARD, paintMapBoard } from './mapBoard.js'; // (3.0p) the plan on the back wall
 import { buildSurvivor, dyeColors, poseFur } from '../game/survivor.js';
 import { cleanFit, shapeKey, item } from '../game/outfit.js';
 import {
@@ -585,6 +587,70 @@ export class Garage {
     return m;
   }
 
+  // (3.0p) the survey board on the back wall: the real plan of the участок the room is playing, printed from the
+  // same terrain the shift is played on (public/maps/<id>.png, scripts/mapPreview.mjs). The old thing there was a
+  // paper-coloured box with five pencil rings, which read as a blank sheet on a dark wall.
+  _buildMapBoard() {
+    this.mapCanvas = document.createElement('canvas');
+    this.mapCanvas.width = MAP_BOARD.w;
+    this.mapCanvas.height = MAP_BOARD.h;
+    this.mapTexture = new THREE.CanvasTexture(this.mapCanvas);
+    this.mapTexture.anisotropy = 4;
+    this.mapMat = new THREE.ShaderMaterial({
+      uniforms: { map: { value: this.mapTexture } },
+      vertexShader: 'varying vec2 vUv; void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
+      fragmentShader: 'uniform sampler2D map; varying vec2 vUv; void main(){gl_FragColor=vec4(texture2D(map,vUv).rgb,0.);}',
+    });
+    this.mapBoard = new THREE.Mesh(new THREE.PlaneGeometry(MAP_BOARD.plane.w, MAP_BOARD.plane.h), this.mapMat);
+    this.mapBoard.position.set(-1.02, 1.80, ROOM.Z0 + 0.05);
+    this.mapBoard.rotation.z = -0.012;
+    this.scene.add(this.mapBoard);
+    this.mapPlates = new Map(); // id -> Image (or null if it would not load)
+    this.mapLoading = new Set();
+    this.mapNow = null;
+    this.setMap(this.requestedMap || settings?.shiftMap || 'forest');
+  }
+
+  // the room's ground: whoever asks (the host, a guest, the solo panel) just names it
+  setMap(id) {
+    if (!this.mapCanvas) return;
+    const want = id === 'bog' ? 'bog' : 'forest';
+    if (want === this.mapNow && this.mapPlates.get(want)) return;
+    this.mapNow = want;
+    this._paintMap(want); // the frame and the name appear at once; the plate drops in when it has loaded
+    const have = this.mapPlates.get(want);
+    if (have === null) return; // already tried, and it is not there: the board says so
+    if (have && have.complete && have.naturalWidth) return;
+    if (this.mapLoading.has(want)) return;
+    if (typeof Image === 'undefined') return; // (no DOM: the board keeps its printed frame and says nothing more)
+    const img = new Image();
+    this.mapLoading.add(want);
+    img.onload = () => {
+      this.mapLoading.delete(want);
+      this.mapPlates.set(want, img);
+      if (this.mapNow === want) this._paintMap(want);
+    };
+    img.onerror = () => {
+      this.mapLoading.delete(want);
+      this.mapPlates.set(want, null);
+      if (this.mapNow === want) this._paintMap(want);
+    };
+    img.src = `maps/${want}.png`;
+  }
+
+  _paintMap(id) {
+    const bog = id === 'bog';
+    this.mapLastDrawn = paintMapBoard(this.mapCanvas.getContext('2d'), {
+      id: bog ? 'bog' : 'forest',
+      img: this.mapPlates.get(id) || null,
+      title: t('mapPlateTitle'),
+      ground: t(bog ? 'mapBog' : 'mapForest'),
+      foot: t(bog ? 'mapBogFoot' : 'mapForestFoot'),
+      empty: t('mapPlateEmpty'),
+    });
+    this.mapTexture.needsUpdate = true;
+  }
+
   _buildRulesPoster() {
     this.rulesCanvas=document.createElement('canvas');this.rulesCanvas.width=768;this.rulesCanvas.height=684;
     this.rulesTexture=new THREE.CanvasTexture(this.rulesCanvas);
@@ -596,6 +662,9 @@ export class Garage {
     this.scene.add(this.rulesPoster);this.rulesRay=new THREE.Raycaster();this.setRules({hideNames:false});
   }
   setRules(rules) {
+    // (3.0p) the wall shows the room's ground: the host's pick, carried to every guest with the other rules
+    if (rules && (rules.map === 'bog' || rules.map === 'forest')) this.requestedMap = rules.map;
+    if (this.mapBoard) this.setMap(this.requestedMap || settings?.shiftMap || 'forest');
     if(!this.rulesCanvas) return;
     const key=t('lobbySettings')+!!rules?.hideNames;if(key===this.rulesKey) return;this.rulesKey=key;
     const c=this.rulesCanvas.getContext('2d');c.fillStyle='#96917a';c.fillRect(0,0,768,684);
@@ -616,7 +685,10 @@ export class Garage {
   }
   hitRules(x,y) {
     this.rulesRay.setFromCamera(new THREE.Vector2(x/this.w*2-1,1-y/this.h*2),this.camera);
-    return this.rulesRay.intersectObject(this.rulesPoster).length>0;
+    // (3.0p) the survey board shares this wall and this job: it shows the room's ground, so a click on it opens
+    // the panel where the host changes it (a guest is told who can)
+    const targets = this.mapBoard ? [this.rulesPoster, this.mapBoard] : [this.rulesPoster];
+    return this.rulesRay.intersectObjects(targets).length>0;
   }
   rulesRect() {
     if(!this.rulesPoster) return null;
@@ -638,6 +710,7 @@ export class Garage {
     this.ceiling = this._mesh(buildCeiling());
     this._mesh(buildProps());
     this._buildRulesPoster();
+    this._buildMapBoard();
     this.gateLeaves = [-1, 1].map((side) => {
       const m = this._mesh(buildGateLeaf(side));
       m.position.set(ROOM.X0, 0, side < 0 ? GATE.z0 : GATE.z1);

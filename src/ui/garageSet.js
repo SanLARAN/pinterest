@@ -390,21 +390,9 @@ export function buildProps() {
   boxAt(b, 2.95, 0.22, -2.05, 0.5, 0.44, 0.4, KIND.WOOD, 0.35);
   boxAt(b, 2.95, 0.5, -2.05, 0.3, 0.12, 0.28, GK.DARK, 0.5);
 
-  // on the back wall: a hand-drawn map of the forest (five red rings) and a calendar
+  // on the back wall: a calendar (and, where a hand-drawn map of the forest used to be, the survey board —
+  // (3.0p) it is its own canvas mesh in ui/garage.js, because it has to show the участок the room is playing)
   const mz = Z0 + 0.02;
-  boxAt(b, -0.95, 1.85, mz, 1.0, 0.7, 0.008, GK.PAPER, 0, 0, 0.02);
-  for (let i = 0; i < 14; i++) {
-    const x = -1.38 + r.next() * 0.86, y = 1.56 + r.next() * 0.58;
-    boxAt(b, x, y, mz + 0.008, 0.06 + r.next() * 0.12, 0.006, 0.004, GK.WOODDARK, 0, 0, r.next() * PI);
-  }
-  for (const [x, y] of [[-1.25, 2.02], [-0.62, 1.98], [-1.05, 1.66], [-0.6, 1.62], [-0.85, 1.85]]) {
-    for (let k = 0; k < 6; k++) {
-      const a = (k / 6) * PI * 2;
-      boxAt(b, x + Math.cos(a) * 0.035, y + Math.sin(a) * 0.035, mz + 0.01, 0.04, 0.01, 0.004, GK.MARK, 0, 0, a + PI / 2);
-    }
-  }
-  boxAt(b, -1.4, 2.17, mz + 0.012, 0.02, 0.02, 0.02, GK.REDPAINT);
-  boxAt(b, -0.5, 2.17, mz + 0.012, 0.02, 0.02, 0.02, GK.REDPAINT);
   boxAt(b, 0.25, 1.9, mz, 0.4, 0.55, 0.008, GK.PAPER, 0, 0, -0.03);
   boxAt(b, 0.25, 2.06, mz + 0.006, 0.34, 0.18, 0.004, GK.WOODDARK, 0, 0, -0.03);
   for (let i = 0; i < 4; i++) for (let j = 0; j < 5; j++) boxAt(b, 0.12 + j * 0.065, 1.9 - i * 0.07, mz + 0.006, 0.04, 0.035, 0.004, (i === 2 && j === 3) ? GK.MARK : GK.CANVAS, 0, 0, -0.03);

@@ -7,6 +7,19 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v:'3.0p',date:'2026-10-22',
+    ru:{title:'План на стене',items:[
+      'В гараже на задней стене вместо пустого листа теперь висит настоящий план участка: тот же отпечаток местности, что и в карточке перед сменой — вода, настилы, насосы и дорога к машине',
+      'Он показывает ту землю, которую выбрала комната: хозяин переключил ЛЕСХОЗ / ТОРФЯНИК — и план на стене сменился у всех, у кого открыт гараж',
+      'Щелчок по плану открывает настройки комнаты — там же, где длина смены и сам участок',
+    ]},
+    en:{title:'The plan on the wall',items:[
+      'The blank sheet on the garage\'s back wall is a real survey of the ground now: the same print the shift card shows — water, planks, pumps and the road out to the car',
+      'It shows the ground the room picked: the host switches FORESTRY / PEAT BOG, and the plan changes on the wall for everyone whose garage is open',
+      'A click on it opens the room settings — where the shift length and the ground live',
+    ]}
+  },
+  {
     v:'3.0n',date:'2026-10-22',
     ru:{title:'Вода отвечает',items:[
       'Поверхность торфяника больше не плоскость, которая только подсвечивается: она ходит. Шаг в воду, шаг друга, брошенный камень, каждый шаг Утопленника — всё это толкает воду, и от места расходится кольцо, которое живёт секунду-две и гаснет',
