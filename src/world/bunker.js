@@ -1,42 +1,49 @@
-// 3.0q — the shelter under the forestry yard.
+// 3.0q — the shelter under the peat works, and the rift at the end of it.
 //
-// Behind the yard's back wall there is a concrete cap with a steel door on it, and under the slabs a shelter
-// the forest service dug in the fifties and forgot: a landing, a long corridor on a row of ribs, and a vault at
-// the far end where the wall has come apart. The yard's gates are not on the generators' circuit at all — they
-// hang off the shelter's breaker, down at the far end of the corridor, past the crack.
+// On the camp's island, south of the fire, there is a concrete cap with a steel door on it — the lintel says
+// НС-3, and the peat works dug it in the fifties to hold the contactors of the pumps that drain the sectors.
+// Under the slabs: a landing, a corridor twenty-one metres long on a row of ribs, and a vault at the far end
+// where the wall has come apart. The works' gate on the track out of the участок is on that same circuit: five
+// pumps put the camp on the mains, the cap's lock lets go, and the gate itself waits for the breaker down here,
+// past the crack.
 //
-// This file is the shelter as a place: the concrete, the ladder, the door frames, the pipes, the colliders —
-// everything that never moves. What moves (the lamps, the blast door, the breaker's lever, the crack's red
-// light and what comes out of it) belongs to game/bunker.js.
+// This file is the shelter as a place: the concrete, the ladder, the door frames, the pipes, the colliders, the
+// gate on the track — everything that never moves. What moves (the lamps, the blast door, the breaker's lever,
+// the crack's red light, the gate's leaf and what comes out of the crack) belongs to game/bunker.js.
 //
 // The underground has its own collision set (world.bunkerCol): the surface's capsules are 2D, and a corridor
-// forty metres long would otherwise put invisible walls across the yard. A player below is resolved against
+// thirty metres long would otherwise put invisible walls across the camp. A player below is resolved against
 // this one instead (game/player.js, world.col override).
-import { CFG } from '../core/config.js';
 import { RNG, clamp, smoothstep } from '../core/rng.js';
-import { KIND } from './builder.js';
+import { MeshBuilder, KIND } from './builder.js';
 import { GK } from '../ui/garageSet.js';
 import { Collision } from './collision.js';
 
-const Y = CFG.YARD;
+// where the cap stands, in world x/z: on the camp island, south of the fire, its door looking back at the tents
+// — so the corridor runs north under the camp itself and out under the bog behind it.
+export const SHELTER = { x: -7.0, z: 5.0 };
 
-// the layout, in world x/z. Laid out along −z: the yard's own fence is 24 deep, the corridor runs south under
-// the forest, well away from the cut (the cut's floor falls away to the highway, and a shelter there would have
-// been open to the sky).
+const A = SHELTER;
+
+// the layout, in world x/z, written round the cap. Laid out along −z: the corridor runs north under the camp and
+// the lagoon side, well inside the участок, and the vault is at the far end of it.
 export const BUNKER = {
-  depth: 5.7, // floor, this far under the yard's slabs
-  hatch: { x: Y.x - 5.5, z: Y.z + 6.5, w: 3.4, d: 3.0, h: 2.45, wall: 0.26 }, // the cap in the yard
-  landing: { x0: Y.x - 8.3, x1: Y.x - 2.7, z0: Y.z + 3.4, z1: Y.z + 9.6, h: 3.4 },
-  door: { z: Y.z + 2.9, x0: Y.x - 7.8, x1: Y.x - 3.2, h: 3.0 }, // the blast door: a slab in the ceiling slot
-  hall: { x0: Y.x - 7.3, x1: Y.x - 3.7, z0: Y.z - 19.0, z1: Y.z + 2.6, h: 3.15 },
-  vault: { x0: Y.x - 10.8, x1: Y.x - 0.2, z0: Y.z - 30.0, z1: Y.z - 19.0, h: 4.8 },
-  ladder: { x: Y.x - 4.0, z: Y.z + 7.4 }, // the way back up, in the landing
-  breaker: { x: Y.x - 0.55, z: Y.z - 26.6 }, // on the vault's east wall
-  rift: { x: Y.x - 5.6, z: Y.z - 28.4 }, // the wall that came apart, at the far end
-  spawn: { x: Y.x - 6.4, z: Y.z + 6.8, yaw: 0 }, // where you come down: facing the corridor (−z), two steps clear of the ladder
-  lamps: [Y.z + 6.4, Y.z + 0.4, Y.z - 6.6, Y.z - 12.6, Y.z - 18.0, Y.z - 24.0],
+  depth: 5.4, // the least the floor sits under the camp — the real one is measured from the peat (bunkerDepth)
+  hatch: { x: A.x, z: A.z, w: 3.4, d: 3.0, h: 2.45, wall: 0.26 }, // the cap on the camp island
+  landing: { x0: A.x - 2.8, x1: A.x + 2.8, z0: A.z - 3.1, z1: A.z + 3.1, h: 3.4 },
+  door: { z: A.z - 3.6, x0: A.x - 2.3, x1: A.x + 2.3, h: 3.0 }, // the blast door: a slab in the ceiling slot
+  hall: { x0: A.x - 1.8, x1: A.x + 1.8, z0: A.z - 25.5, z1: A.z - 3.9, h: 3.15 },
+  vault: { x0: A.x - 5.3, x1: A.x + 5.3, z0: A.z - 36.5, z1: A.z - 25.5, h: 4.8 },
+  ladder: { x: A.x + 1.5, z: A.z + 0.9 }, // the way back up, in the landing
+  breaker: { x: A.x + 4.95, z: A.z - 33.1 }, // on the vault's east wall
+  rift: { x: A.x - 0.1, z: A.z - 34.9 }, // the wall that came apart, at the far end
+  spawn: { x: A.x - 0.9, z: A.z + 0.3, yaw: 0 }, // where you come down: facing the corridor (−z), clear of the ladder
+  lamps: [A.z - 0.1, A.z - 6.1, A.z - 13.1, A.z - 19.1, A.z - 24.5, A.z - 30.5],
   doorTravel: 2.85, // how far the slab comes down before it is shut
 };
+
+// the works' gate on the track out: how wide the road is where it stands, and how far the leaf lifts
+export const WORKS = { half: 3.4, h: 2.2, lift: 2.55, openT: 5.5 };
 
 // s: the closing doors are given three minutes — see game/bunker.js
 export const DOOR_TIME = 180;
@@ -57,22 +64,45 @@ export function inBunker(x, z, pad = 0) {
 }
 
 // the floor of the shelter at (x, z) — null out in the open (the caller keeps the ground's own height)
-export function bunkerFloor(x, z, groundY) {
+export function bunkerFloor(x, z, groundY, depth = BUNKER.depth) {
   if (!inBunker(x, z, 0.05)) return null;
-  return groundY - BUNKER.depth;
+  return groundY - depth;
 }
 
-// the low, musty smell of the place: a box standing in the yard. Built with the yard's own frame of mind —
-// concrete that has been rained on for seventy years, a steel door, a lamp over it that has never worked —
-// but the inside is what matters and none of it is above ground.
-export function buildBunker(world, y0) {
+// How far under the camp the floor has to be: the vault is the tall room, so its ceiling has to clear the lowest
+// ground over the whole footprint. On the forest's yard that was a flat 5.7; a bog is not flat, and a shelter
+// whose roof comes up through the peat is a hill with a lamp on it.
+export function bunkerDepth(world, groundY) {
+  const B = BUNKER;
+  let minH = groundY;
+  for (const r of [B.landing, B.hall, B.vault]) {
+    const nx = 6, nz = 8;
+    for (let i = 0; i <= nx; i++) {
+      for (let j = 0; j <= nz; j++) {
+        const x = r.x0 + ((r.x1 - r.x0) * i) / nx;
+        const z = r.z0 + ((r.z1 - r.z0) * j) / nz;
+        minH = Math.min(minH, world.terrain.height(x, z));
+      }
+    }
+  }
+  // the vault's roof, with most of a metre of peat over it — and never less than the ladder's worth
+  const need = groundY - minH + B.vault.h + 0.75;
+  return Math.max(B.depth, Math.ceil(need * 20) / 20);
+}
+
+// the low, musty smell of the place: a box standing on the camp's own island. Built with the works' frame of mind
+// — concrete that has been rained on for seventy years, a steel door, a lamp over it that has never worked — but
+// the inside is what matters and none of it is above ground.
+export function buildBunker(world) {
   const B = BUNKER;
   const rng = new RNG(30517);
-  const fy = y0 - B.depth; // the shelter's floor
   const H = B.hatch;
+  const y0 = world.terrain.height(H.x, H.z); // the camp's ground: where the cap stands
+  const depth = bunkerDepth(world, y0);
+  const fy = y0 - depth; // the shelter's floor
   const L = B.landing, HL = B.hall, V = B.vault;
 
-  // ---- 1. the cap in the yard ----
+  // ---- 1. the cap on the camp island ----
   world.addProp(H.x, H.z, (b) => {
     const gy = (x, z) => world.terrain.height(x, z);
     const w = H.w / 2, d = H.d / 2;
@@ -160,9 +190,11 @@ export function buildBunker(world, y0) {
   world.bunker = {
     ...B,
     y: fy,
+    depth,
     groundY: y0,
     col,
     doorCap,
+    worksGate: world.worksGate || null, // the gate on the track out, on the same circuit (built by the bog)
     // the two ends the game asks about
     ladderTop: { x: B.ladder.x, z: B.ladder.z },
     rooms: ['landing', 'hall', 'vault'],
@@ -374,6 +406,108 @@ export function buildBunker(world, y0) {
   });
 
   return world.bunker;
+}
+
+// ---------------- the works' gate on the track out ----------------
+// The road off the участок, and the leaf that closes it: two piers, a guide on each, a motor on the near one and
+// the works' own board over the far one. The leaf itself is the game's (it has to move, and it has its own
+// contactor down in the shelter). `at` comes from the bog, which knows where its own track runs.
+export function buildWorksGate(world, at) {
+  const W = WORKS;
+  const x = at.x, z = at.z, yaw = at.yaw || 0;
+  const y = world.terrain.height(x, z);
+  const cs = Math.cos(yaw), sn = Math.sin(yaw);
+  // local (u along the road's width, v along the road) → world
+  const P = (u, v = 0) => [x + u * cs + v * sn, z - u * sn + v * cs];
+  world.addProp(x, z, (b) => {
+    b.identity();
+    for (const s of [-1, 1]) {
+      const [px, pz] = P(s * W.half);
+      const py = world.terrain.height(px, pz);
+      // a concrete pier, its top stained, with a steel guide bolted up its road side
+      b.place(px, py - 0.15, pz, 0, yaw, 0);
+      b.box(0.62, 0.3, 0.62, GK.CONCRETE);
+      b.place(px, py + 1.55, pz, 0, yaw, 0);
+      b.box(0.54, 3.4, 0.54, GK.CONCRETE);
+      b.place(px, py + 3.32, pz, 0, yaw, 0);
+      b.box(0.64, 0.14, 0.64, GK.CONCRETE);
+      // the guide the leaf rides in, on the road side of the pier
+      const [gx, gz] = P(s * (W.half - 0.3));
+      const gyy = world.terrain.height(gx, gz);
+      b.place(gx, gyy + 1.7, gz, 0, yaw, 0);
+      b.box(0.1, 3.2, 0.18, GK.TIN);
+      b.place(gx, gyy + 3.15, gz, 0, yaw, 0);
+      b.box(0.18, 0.16, 0.32, GK.RUST);
+    }
+    // the motor on the near pier: a box, a drum, and a lamp that has no bulb in it any more
+    const [mx, mz] = P(-W.half, -0.5);
+    const my = world.terrain.height(mx, mz);
+    b.place(mx, my + 2.35, mz, 0, yaw, 0);
+    b.box(0.5, 0.55, 0.42, GK.DARK);
+    b.place(mx, my + 2.7, mz, 0, yaw, Math.PI / 2);
+    b.cylinder(9, 0.17, 0.17, 0.12, GK.RUST);
+    b.place(mx, my + 2.1, mz, 0, yaw, 0);
+    b.box(0.22, 0.22, 0.22, GK.YELLOW);
+    // the board over the far pier: the works' number and the word for the way out
+    const [bx, bz] = P(W.half, 0.12);
+    const by = world.terrain.height(bx, bz);
+    b.place(bx, by + 3.0, bz, 0, yaw, 0);
+    b.box(1.5, 0.62, 0.06, GK.GATE);
+    b.place(bx, by + 3.0, bz + 0.04, 0, yaw, 0);
+    b.box(1.2, 0.1, 0.02, GK.YELLOW);
+    // the road under the leaf: two ruts of gravel, and a line of hazard paint at the threshold
+    for (const s of [-1, 1]) {
+      const [ax, az] = P(s * 0.55, -0.4), [cx, cz] = P(s * 0.55, 0.4);
+      b.place((ax + cx) / 2, world.terrain.height((ax + cx) / 2, (az + cz) / 2) + 0.02, (az + cz) / 2, 0, yaw, 0);
+      b.box(0.34, 0.02, 0.9, KIND.TRAIL_RUT);
+    }
+    for (let i = -3; i <= 3; i++) {
+      const [hx, hz] = P(i * 0.45, -0.55);
+      b.place(hx, world.terrain.height(hx, hz) + 0.012, hz, 0, yaw, 0);
+      b.box(0.26, 0.02, 0.3, i % 2 ? GK.YELLOW : GK.DARK);
+    }
+  });
+  // the piers are solid, and the road under the leaf is shut until the contactor closes
+  for (const s of [-1, 1]) {
+    const [px, pz] = P(s * W.half);
+    world.col.circle(px, pz, 0.4, 3.4);
+  }
+  const a = P(-W.half + 0.42), c = P(W.half - 0.42);
+  const cap = world.col.addDynamic((a[0] + c[0]) / 2, (a[1] + c[1]) / 2, W.half + 1, 0.3, 2.3);
+  world.col.setSeg(cap, a[0], a[1], c[0], c[1]);
+  world.worksGate = {
+    x, z, y, yaw,
+    span: { ax: a[0], az: a[1], bx: c[0], bz: c[1] },
+    cap,
+    open: false,
+    leafY: y + 0.06,
+  };
+  return world.worksGate;
+}
+
+// the leaf, as geometry with its origin at the bottom centre: the game lifts it in its guides
+export function buildWorksLeaf() {
+  const W = WORKS;
+  const b = new MeshBuilder(420);
+  const w = W.half * 2 - 0.12;
+  b.identity();
+  b.place(0, 0.06, 0);
+  b.box(w, 0.12, 0.1, GK.TIN); // the bottom beam
+  b.place(0, W.h - 0.08, 0);
+  b.box(w, 0.16, 0.14, GK.TIN); // ...and the top one
+  for (let u = -w / 2 + 0.1; u <= w / 2 - 0.09; u += 0.34) {
+    b.place(u, W.h / 2, 0);
+    b.box(0.05, W.h - 0.16, 0.05, GK.RUST); // the bars
+  }
+  b.place(0, W.h * 0.52, 0.04);
+  b.box(w - 0.1, 0.07, 0.03, GK.RUST); // a brace across
+  b.identity();
+  for (const s of [-1, 1]) {
+    b.limb([s * (w / 2 - 0.1), 0.12, 0], [s * (w / 2 - 2.1), W.h - 0.16, 0], 0.03, 0.03, GK.TIN, 4);
+  }
+  b.place(0, W.h * 0.5, -0.09);
+  b.box(0.34, 0.5, 0.03, GK.YELLOW); // a plate riveted to the road side
+  return b.toGeometry();
 }
 
 // ---------------- the shelter's script ----------------

@@ -375,10 +375,10 @@ export class Escape {
   }
 
   // ---------------- power: the yard comes alive, and the gate waits for the shelter ----------------
-  // (3.0q) The gate does not roll on the generators' power any more. The five machines put the yard on the
-  // mains — floodlight, siren, the drive unit's beacon blinking — and the drive unit's contactor is down in the
-  // shelter's breaker, where it has been since the forest service wired it in the fifties. Pull that, and the
-  // gate rolls. (The shelter is game/bunker.js; it asks for openGate() here.)
+  // (3.0q) The gate does not roll on the generators' power any more. The five machines put the yard on the mains
+  // — floodlight, siren, the drive unit's beacon blinking — and the drive unit's contactor is down in the
+  // shelter's breaker, where the works wired it in the fifties. Pull that, and the gate rolls. (The shelter is
+  // under the peat works' camp on the other участок: game/bunker.js, which asks for openGate() here.)
   powerOn() {
     if (this.power) return;
     this.power = true;
@@ -395,7 +395,7 @@ export class Escape {
     g.hud.flashAlert(t('aYardPower'), 'dawn', 3.2);
     g.hud.peek(5);
     g.addTrauma(0.12);
-    g.bunker?.onPower?.(); // the cap in the yard: its lock lets go, with a clunk you can hear from the gate
+    g.bunker?.onPower?.(); // the cap under the camp: its lock lets go, with a clunk you can hear from the gate
     this.beaconT = 4;
   }
 
@@ -1510,7 +1510,7 @@ export class Escape {
     const held = this.held;
     const sh = this.g.world.bunker;
     if (this.power && !this.gateOpen && sh) {
-      // (3.0q) nothing moves until the shelter's breaker is down: the beacon points at the cap in the yard
+      // (3.0q) nothing moves until the shelter's breaker is down: the beacon points at the cap under the camp
       tx = sh.hatch.x;
       tz = sh.hatch.z - sh.hatch.d / 2 - 1.1;
       kind = '';

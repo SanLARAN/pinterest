@@ -246,6 +246,7 @@ export class NetSync {
       case 'sw': if (a != null) g.stray?.netWear(a, b, c); break; // 2.1v: she is wearing someone
       case 'gb': if (isHostMsg && typeof a === 'string') g.gnats?.apply(a, +b); break; // 3.0e: the midges blinded someone
       case 'wn': if (isHostMsg && g.winch) { g.winch.p = 1; g.winch.done = true; g.winch.update(0); } break; // 3.0f: the car is on the planks
+      case 'xG': g.bunker?.remoteGate?.(); break; // 3.0q: the breaker is down and the gate on the track out is up
       case 'ibp': if (isHostMsg) g.inventory.applyParcel(a); break;
       case 'ibg': if (isHostMsg) g.inventory.applyClaim(a); break;
       case 'gd': if (r && typeof a === 'string') { const s = g.glows.find(a); if (s?.owner === pid && s.state === 'held') g.glows.dropFor(pid, +b, +c); } break;

@@ -10,6 +10,9 @@
 //   · the car has to come out of the rut. The winch drum sits on its own bumper, the cable runs back to a stake
 //     on the bank, and it is twenty-five seconds of turning it by hand. Every pump that is not running gives
 //     that back (0.6%/s against 4%/s of turning), so the drum and the pumps are the same argument.
+//   · (3.0q) and the works' gate on the track out has to be up. Its contactor is in the shelter under the camp,
+//     at the end of a corridor, past the crack — five pumps put the camp on the mains, but the road opens on the
+//     breaker and on nothing else. Without it there is nowhere to drive to, so there is no point starting her.
 //
 // Then hold E at the driver's door: three seconds of starter, the engine catches, and the whole участок hears it.
 import * as THREE from 'three';
@@ -108,6 +111,13 @@ export class Winch {
     return this.ford() > WINCH.dryDepth;
   }
 
+  // the works' gate on the track out: down until the shelter's breaker is thrown (there is no gate to open on
+  // any other участок, and a game without a shelter — a test, a training run — is not held up by this)
+  shut() {
+    const b = this.g.bunker;
+    return !!(b && b.B && !b.gateOpen);
+  }
+
   _place() {
     const c = this.car;
     if (!c || !c.node) return;
@@ -194,6 +204,17 @@ export class Winch {
         }
         return;
       }
+      // (3.0q) the way out of the участок is a gate on the track, and it is down until the breaker under the camp
+      // is thrown. Say so, once, and do not turn the starter into a wall.
+      if (this.shut()) {
+        g.hud.setUse(t('winchGateShut'), 0, false);
+        if (!this.said.gate) {
+          this.said.gate = true;
+          g.hud.setHint(t('winchGateShutHint'));
+          g.audio && g.audio.clank && g.audio.clank(this.car.x, this.car.y + 0.6, this.car.z, true);
+        }
+        return;
+      }
       g.hud.setUse(this.prompt('bogCar', T), this.crank / WINCH.crankT, true);
       if (!held || !still) return;
       this.crank = Math.min(WINCH.crankT, this.crank + dt);
@@ -206,7 +227,7 @@ export class Winch {
     const g = this.g;
     this.done = true;
     g.hud && g.hud.flashAlert(t('winchOut'), 'dawn', 3);
-    g.hud && g.hud.setHint(this.flooded() ? t('winchFloodedHint') : t('winchNeedsStart'));
+    g.hud && g.hud.setHint(this.shut() ? t('winchGateShutHint') : this.flooded() ? t('winchFloodedHint') : t('winchNeedsStart'));
     g.audio && g.audio.winchClank && g.audio.winchClank();
     g.addTrauma && g.addTrauma(0.2);
     if (g.sync && g.auth) g.sync.ev('wn', 1);
@@ -237,7 +258,7 @@ export class Winch {
     if (!this.said.finale) {
       this.said.finale = true;
       g.hud && g.hud.flashAlert(t('winchFinale'), 'dawn', 4);
-      g.hud && g.hud.setHint(this.flooded() ? t('winchFloodedHint') : t('winchHint'));
+      g.hud && g.hud.setHint(this.shut() ? t('winchGateShutHint') : this.flooded() ? t('winchFloodedHint') : t('winchHint'));
       // a beacon you can see from anywhere, on the car you came in
       g.radar && g.radar.blip && g.radar.blip(this.car.x, this.car.z, 'beacon');
     }

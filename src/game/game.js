@@ -21,7 +21,7 @@ import { GlowSticks } from './glowsticks.js';
 import { MedHut } from './medhut.js';
 import { Rescue } from './rescue.js';
 import { Escape } from './escape.js';
-import { Bunker } from './bunker.js'; // 3.0q: the shelter under the yard, and what is in it
+import { Bunker } from './bunker.js'; // 3.0q: the shelter under the peat works' camp, and what is in it
 import { Cabinets } from './cabinets.js';
 import { Torches } from './torch.js';
 import { ForestTools } from './tools.js';
@@ -94,9 +94,10 @@ export class Game {
     // your hands" test asks about (a missing one made the wristwatch refuse to come up on the bog — TAB was
     // dead, and the pack's own checks read it too), and the torch's charge is read as a number.
     this.escape = this.map === 'forest' ? new Escape(this) : inert(Escape, this, { load: () => null, seatOf: () => -1, mySeat: -1, seats: [], count: 0 });
-    // (3.0q) the shelter under the forestry yard: the cap, the corridor, the breaker at the far end, and the
-    // crack. The bog has none of it (inert: every call is a no-op, every field false)
-    this.bunker = this.map === 'forest' ? new Bunker(this) : inert(Bunker, this, { state: 'sealed', awake: false, remaining: null, inside: false });
+    // (3.0q) the shelter under the peat works' camp: the cap, the corridor, the breaker at the far end, the crack
+    // — and the works' gate on the track out, which is the same circuit. The forest has none of it: there is no
+    // world.bunker out there, and the class says so itself (every call a no-op, every field false)
+    this.bunker = new Bunker(this);
     this.cabinets = new Cabinets(this); // cupboards in the buildings (and the шкафандр)
     this.torch = this.map === 'forest' ? new Torches(this) : inert(Torches, this, { hasLight: false, has: false, on: false, charge: 0 }); // flashlights
     this.tools = new ForestTools(this);
@@ -1386,8 +1387,9 @@ export class Game {
     this.fx.white = Math.max(this.fx.white, 0.08);
     this.addTrauma(0.15);
     this.noise(g.x, g.z, g.spec.startLoud, 'repair'); // the engine roars — the host's monsters hear it whoever started it
-    // all five: there's power at the forestry yard — its floodlight, its siren, its gate (every machine sees it)
-    if (count >= 5) this.timeline.push({ at: this.time + 1.8, fn: () => { if (this.state === 'play') this.escape.powerOn(); } });
+    // all five: there's power — the forestry yard's floodlight and siren, or the peat works' camp and the lock on
+    // its cap (3.0q: on the bog the escape is a stand-in, so the shelter is told directly)
+    if (count >= 5) this.timeline.push({ at: this.time + 1.8, fn: () => { if (this.state !== 'play') return; this.escape.powerOn(); this.bunker.onPower(); } });
   }
 
   // a thing beat a running generator until it stopped (2.1q): the count falls and the task points back

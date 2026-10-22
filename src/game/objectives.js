@@ -24,7 +24,7 @@ const NOTE_SECONDS = 11;
 const PH = ['dead', 'work', 'cord', 'spin', 'running'];
 const ESC_KINDS = new Set(['part', 'carNote', 'carDoor', 'carFit', 'carSeat']); // see Escape.consider
 const CAB_KINDS = new Set(['cabinet', 'cabinetItem', 'trapGrab', 'trapSelf']); // see Cabinets.consider
-// (3.0q) the shelter under the yard: the cap in the yard, the ladder, the breaker (see game/bunker.js)
+// (3.0q) the shelter under the peat works' camp: the cap on the island, the ladder, the breaker (game/bunker.js)
 const BUNKER_KINDS = new Set(['shelterCap', 'shelterUp', 'shelterBreaker']);
 
 const _m = new THREE.Matrix4();
@@ -435,7 +435,13 @@ export class Objectives {
   // under water, and what the shift does about it is start the pumps. Same chain, its own words.
   taskText() {
     const g = this.gens.find((q) => !q.running);
-    if (!g) return this.g.escape ? this.g.escape.taskText() : '';
+    if (!g) {
+      // (3.0q) the pumps are running and the way out still has not moved: the contactor is in the shelter under
+      // the camp's own island. (On the forest the yard's escape says the same thing in its own words.)
+      const b = this.g.bunker;
+      if (b && b.needsBreaker) return t('taskBunker');
+      return this.g.escape ? this.g.escape.taskText() : '';
+    }
     const bog = this.g.map === 'bog';
     if (g.phase === 'spin') return t(bog ? 'taskPumpSpin' : 'taskSpin');
     if (g.broken) return t(bog ? 'taskPumpRestart' : 'taskRestartGen').replace('{site}', this.siteAt(g.site));

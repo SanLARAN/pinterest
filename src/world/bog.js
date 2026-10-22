@@ -16,6 +16,7 @@ import { Terrain } from './terrain.js';
 import { ForestNavigation } from './navigation.js';
 import { CAP } from './caps.js';
 import { buildCrewCar } from '../game/uaz.js'; // (3.0l) the crew's УАЗ is the garage's car, not a new one
+import { buildBunker, buildWorksGate } from './bunker.js'; // (3.0q) the shelter under the camp, and the gate on the track out
 
 const LEVEL = 0.34; // the water line, in world metres
 const HALF = 170;
@@ -293,6 +294,8 @@ export function buildBog(world, t0) {
   genPumps(world, rng);
   genCar(world);
   genCrewCar(world); // (3.0l) the car they came in: at the bank, and it is not going anywhere
+  genWorksGate(world); // (3.0q) the works' gate on the track out (it needs the camp set, so it comes after the car)
+  buildBunker(world); // ...and the shelter under the camp, with the corridor running north under it
   genGrowth(world, rng);
 
   world.navigation = new ForestNavigation(world);
@@ -623,6 +626,19 @@ function genCar(world) {
     b.box(0.9, 0.12, 0.12, KIND.WOOD);
   });
   world.col.circle(P.x, P.z, 0.2, 3.0, CAP.WOOD);
+}
+
+// (3.0q) The works' gate across the track out of the участок. It stands past the flooded проезд — far enough
+// that the УАЗ has to be dragged out of its rut first — and it is on the shelter's circuit: five pumps put the
+// camp on the mains, and the leaf itself waits for the breaker down under the camp. Nothing drains the проезд
+// for it: the ford is still the pumps' business (3.0m), and this only opens the way past it.
+function genWorksGate(world) {
+  const T = CAMP_TRACK;
+  const far = (world.campSet && world.campSet.far) || { x: T.x * 21, z: T.z * 21 };
+  const at = { x: far.x + T.x * 13, z: far.z + T.z * 13 };
+  at.yaw = Math.atan2(-T.x, -T.z); // the leaf stands across the road, its piers on either side
+  buildWorksGate(world, at);
+  return world.worksGate;
 }
 
 // ---------------------------------------------------------------- growth

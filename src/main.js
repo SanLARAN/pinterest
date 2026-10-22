@@ -79,7 +79,7 @@ const DEBUG = {
   fps: params.has('fps'),
   map: params.get('map') || '', // ?map=bog: walk the peat bog (3.0: the second участок)
   days: +params.get('days') || 0, // ?days=2|4|6: the shift length a pick in the menu asked for
-  shelter: params.has('shelter'), // (3.0q) start at the cap in the yard with the mains on: the corridor, without five generators
+  shelter: params.has('shelter'), // (3.0q) start on the peat works' camp with the cap unlocked: the shelter, without five pumps
 };
 
 const $ = (id) => document.getElementById(id);
@@ -104,7 +104,7 @@ const shadows = new OmniShadows(renderer); // walls stop light (filled with the 
 
 // ---------------- systems ----------------
 const worldMat = createWorldMaterial();
-const world = new World(scene, worldMat, DEBUG.map === 'bog' ? 'bog' : 'forest');
+const world = new World(scene, worldMat, DEBUG.map === 'bog' || DEBUG.shelter ? 'bog' : 'forest'); // (3.0q: the shelter is on the bog)
 const pulses = new Pulses();
 const ghosts = new Ghosts(scene);
 const eyes = new Eyes(scene);
@@ -706,12 +706,12 @@ function startRun(opts = {}) {
       game.firstPingT = Math.max(0, DEBUG.t - 30);
       game.tut.done = true;
     }
-    // (3.0q) ?shelter: the yard on the mains and the cap unlocked, you standing in front of it. What is down
+    // (3.0q) ?shelter: the camp on the mains and the cap unlocked, you standing in front of it. What is down
     // there still has to be walked, and the breaker still has to be thrown by hand.
     if (DEBUG.shelter) {
       game.tut.done = true;
       try {
-        game.escape.powerOn();
+        game.bunker.onPower(); // the camps have power: the cap's lock lets go (the pumps are not needed for this)
         game.bunker.unlock();
         const H = game.world.bunker && game.world.bunker.hatch;
         if (H) {
@@ -1238,7 +1238,7 @@ function boot() {
     updateMicUI();
     // 3.0g: a link that names the ground wins over the remembered one — otherwise ?map=bog would bounce the
     // player back to the forest the moment the shift started
-    if (DEBUG.map === 'bog') { settings.shiftMap = 'bog'; saveSettings(); }
+    if (DEBUG.map === 'bog' || DEBUG.shelter) { settings.shiftMap = 'bog'; saveSettings(); } // (3.0q: the shelter is on the bog)
     if (DEBUG.autostart) startRun();
     if (params.has('sfx')) import('./ui/sfxtest.js').then((m) => m.mountSfxPanel(audio));
     lobby.menuLabel();

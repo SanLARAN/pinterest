@@ -1,24 +1,24 @@
 // 3.0q — what happens in the shelter, once you are down there.
 //
-// The place itself (the concrete, the corridor, the void where the wall came apart) is built by the yard:
-// see world/bunker.js, which also holds the script — the order of the beats, the three minutes, the lamps going
-// out one by one. This file is the part that can be seen and heard: the cap's door in the yard, the lamps, the
-// breaker's lever, the blast door coming down in its slot, the red in the crack, and the ones that come out of
-// it.
+// The place itself (the concrete, the corridor, the void where the wall came apart) is built by the bog: see
+// world/bunker.js, which also holds the script — the order of the beats, the three minutes, the lamps going out
+// one by one. This file is the part that can be seen and heard: the cap's door on the camp island, the lamps, the
+// breaker's lever, the blast door coming down in its slot, the works' gate lifting on the track out, the red in
+// the crack, and the ones that come out of it.
 //
 // The order of the whole thing, and there is nothing the player can do about any of it:
 //
-//   the five generators run → the yard has power → the cap's lock clicks
-//   she goes down the ladder, along the corridor, past the ribs, to the breaker at the far end
-//   the breaker: the gate above starts rolling, the wall answers, the lamps die from the far end back
+//   the five pumps run → the camp has power → the cap's lock clicks
+//   down the ladder, along the corridor, past the ribs, to the breaker at the far end
+//   the breaker: the works' gate above starts up, the wall answers, the lamps die from the far end back
 //   the alarm, the blast door starts down (three minutes), and the crack lets everything out
 //   she runs. The ladder is at the other end of the corridor. If the slab is down before she is through, it is
 //   the shelter's.
 //
 // Everything here is local: a friend who comes down has their own shelter, their own alarm, their own three
-// minutes. (The gate itself is the host's — the breaker asks Escape for it, as powerOn always did.)
+// minutes. (The gate itself is the host's — the breaker asks the map for it.)
 import * as THREE from 'three';
-import { DOOR_TIME, HORDE_MAX, ShelterScript, T_ALARM } from '../world/bunker.js';
+import { DOOR_TIME, HORDE_MAX, ShelterScript, T_ALARM, WORKS, buildWorksLeaf } from '../world/bunker.js';
 import { MeshBuilder, KIND } from '../world/builder.js';
 import { GK } from '../ui/garageSet.js';
 import { shared, shadowLights, createWorldMaterial } from '../render/sonar.js';
@@ -26,7 +26,9 @@ import { RNG, clamp, damp } from '../core/rng.js';
 import { t } from '../core/i18n.js';
 import { haloMaterial } from './glowsticks.js';
 
-const LAMP_SLOT0 = 6; // 0..4 the generators, 5 the yard's floodlight, 6..12 Zarya (game/campPower.js)
+// 0..4 the five objectives, 5 the forestry yard's floodlight, 6..12 Zarya's own grid — and Zarya is the forest's,
+// so on the bog the six lamps of the shelter (6..11) have those slots to themselves
+const LAMP_SLOT0 = 6;
 const LAMP_I = 1.0;
 const FADE_TO = 0.55; // s of black on the way down (and up)
 const FADE_FROM = 0.7; // ...and coming out of it
@@ -64,9 +66,12 @@ export class Bunker {
     if (!this.B) return;
     this.B = this.world.bunker;
     this.fy = this.B.y;
+    this.capOpen = false; // the steel leaf over the hatch: it opens from inside when she is out
+    this._capT = 0;
     this._materials();
     this._buildCap();
     this._buildInside();
+    this._buildWorks();
   }
 
   // ---------------- the materials ----------------
@@ -107,6 +112,29 @@ export class Bunker {
     this.capLamp.material.opacity = 0.5;
     g.scene.add(this.capLamp);
     this.capFront = { x: H.x, z: H.z - H.d / 2 - 1.1 };
+  }
+
+  // ---------------- the works' gate on the track out ----------------
+  // Two piers and a steel leaf across the road off the участок (the piers are in world/bunker.js). The leaf is
+  // this file's, because it moves: up in its guides, five and a half seconds of motor, and the road is open.
+  _buildWorks() {
+    const g = this.g, W = this.B.worksGate;
+    if (!W) return;
+    this.worksLeaf = new THREE.Mesh(buildWorksLeaf(), this.mat);
+    this.worksLeaf.position.set(W.x, W.leafY, W.z);
+    this.worksLeaf.rotation.y = W.yaw;
+    g.scene.add(this.worksLeaf);
+    if (g.shadows) g.shadows.addDynamic(this.worksLeaf, 4);
+    // the lamp on the near pier: red while the leaf is down, green once the contactor closes
+    const cs = Math.cos(W.yaw), sn = Math.sin(W.yaw), u = -WORKS.half;
+    this.worksLamp = new THREE.Sprite(haloMaterial(0xff3020));
+    this.worksLamp.position.set(W.x + u * cs, W.y + 3.0, W.z - u * sn);
+    this.worksLamp.scale.setScalar(0.55);
+    this.worksLamp.material.opacity = 0.45;
+    g.scene.add(this.worksLamp);
+    this.worksT = 0;
+    this.worksOpen = 0;
+    this._worksDone = false;
   }
 
   // ---------------- under the concrete ----------------
@@ -235,8 +263,22 @@ export class Bunker {
     this.dead = false;
     this.beatT = 0;
     this._hit = 0;
+    this.capOpen = false;
+    this._capT = 0;
+    this.worksT = 0;
+    this.worksOpen = 0;
+    this._worksDone = false;
     this.rng = new RNG(9931);
     if (!this.B) return;
+    // the works' gate: the leaf back down in its guides, the road shut again
+    const W = this.B.worksGate;
+    if (W && this.worksLeaf) {
+      W.open = false;
+      this.worksLeaf.position.y = W.leafY;
+      this.world.col.setSeg(W.cap, W.span.ax, W.span.az, W.span.bx, W.span.bz);
+      this.worksLamp.material.color.setHex(0xff3020);
+      this.worksLamp.material.opacity = 0.45;
+    }
     for (const h of this.horde) this.g.scene.remove(h.group);
     this.horde = [];
     this.lever.rotation.z = 0;
@@ -282,6 +324,7 @@ export class Bunker {
     if (g.audio.ready && g.audio.clank) g.audio.clank(H.x, this.capY + 1.0, H.z - H.d / 2, 0.8);
     g.hud.flashAlert(t('aShelterUnlocked'), 'dawn', 3.4);
     g.hud.peek(5);
+    if (g.radar && g.radar.blip) g.radar.blip(H.x, H.z, 'beacon'); // the cap, from anywhere on the участок
     if (g.player.alive && !this.seen.hintLock) {
       this.seen.hintLock = true;
       g.timeline.push({ at: g.time + 2.6, fn: () => g.hud.setHint(t('hintShelter')) });
@@ -295,7 +338,7 @@ export class Bunker {
     this.cine = null;
     this.fade = 0;
     this._up();
-    this.g.hud?.setHint?.(null);
+    if (this.g.hud) this.g.hud.setHint(null);
   }
 
   // ---------------- the E prompt ----------------
@@ -309,8 +352,15 @@ export class Bunker {
       if (this.script.canThrow) fn({ kind: 'shelterBreaker' }, B.breaker.x - 0.4, B.breaker.z, 2.4, 'shelterBreaker');
       return;
     }
-    // the cap in the yard: only worth pointing at once you are close
+    // the cap on the camp island: only worth pointing at once you are close
     if (Math.hypot(p.x - this.capFront.x, p.z - this.capFront.z) < 3.2) fn({ kind: 'shelterCap' }, this.capFront.x, this.capFront.z, 2.4, 'shelterCap');
+    // ...and the gate on the track out, before the breaker: the foreman's sheet is wired to it
+    const W = B.worksGate;
+    if (W && !this.gate && !this.seen.gateNote && Math.hypot(p.x - W.x, p.z - W.z) < 7) {
+      this.seen.gateNote = true;
+      g.hud.popup(t('noteGateBog'), 'dim');
+      g.hud.flashAlert(t('hintWorks'), 'dawn', 3.4);
+    }
   }
 
   interact(best, pressed, T) {
@@ -430,13 +480,15 @@ export class Bunker {
   _beat(ev) {
     const g = this.g, B = this.B, R = B.rift;
     if (ev === 'gate') {
-      g.escape?.openGate?.(); // the gate above: motor, siren, the forest hears it
+      g.escape?.openGate?.(); // the forest's gate, if this were the forest (it is not: it has no shelter now)
+      this._openWorks(); // the works' gate on the track out: motor, siren, the whole участок hears it
       this.gate = true;
       g.hud.flashAlert(t('aGateOpen'), 'dawn', 3.2);
       g.hud.peek(4);
       return;
     }
     if (ev === 'stir') {
+      this._openCap(); // the way out above: the leaf over the hatch turns out, and the sky gets in
       if (g.audio.ready && g.audio.riftWake) g.audio.riftWake(R.x, this.fy + 1.7, R.z);
       g.addTrauma(0.35);
       g.particles.burst(R.x, this.fy + 2.4, R.z + 0.6, 26, { color: [0.5, 0.46, 0.42], speed: 2.4, life: 1.6, size: 0.05, gravity: -2.2, drag: 1.1, dir: { x: 0, y: 0.2, z: 1 }, cone: 1.1 });
@@ -466,6 +518,17 @@ export class Bunker {
   }
 
   // ---------------- the horde ----------------
+  // ...and the way out above opens by itself, which is the worst thing in the whole night: the hatch is a hole
+  // in the sky now, and the light coming down it is the camp's
+  _openCap() {
+    const g = this.g;
+    if (this.capOpen) return;
+    this.capOpen = true;
+    this._capT = 1e-3; // ...and _cap turns it out over a second
+    if (g.audio.ready && g.audio.clank) g.audio.clank(this.B.hatch.x, this.capY + 1.2, this.B.hatch.z, 1.2);
+    g.addTrauma(0.22);
+  }
+
   _spawn() {
     const g = this.g, B = this.B, R = B.rift;
     if (this.horde.length >= HORDE_MAX) return;
@@ -543,6 +606,10 @@ export class Bunker {
     const g = this.g;
     if (this.dead || !g.player.alive) return;
     this.dead = true;
+    // the last thing you hear is the one behind you, not the one in the crack
+    if (g.audio.ready && g.audio.razlomScreech) g.audio.razlomScreech(g.player.x, this.fy + 1.3, g.player.z);
+    this.capOpen = false;
+    if (this.capDoor) this.capDoor.rotation.y = 0;
     const h = near || this.horde.reduce((a, b) => {
       const da = Math.hypot(a.x - g.player.x, a.z - g.player.z), db = Math.hypot(b.x - g.player.x, b.z - g.player.z);
       return db < da ? b : a;
@@ -561,10 +628,82 @@ export class Bunker {
     g.beginDeath(m, cause);
   }
 
+  // ---------------- the works' gate, and the cap over the hole ----------------
+  _openWorks() {
+    const g = this.g, W = this.B.worksGate;
+    if (!W || this.worksT > 0) return;
+    this.worksT = 1e-3;
+    this.worksLamp.material.color.setHex(0x5cff88);
+    this.worksLamp.material.opacity = 0.9;
+    if (g.audio.ready) {
+      // the siren is the yard's own voice, borrowed: the same motor, heard across the peat
+      if (g.audio.gateSiren) g.audio.gateSiren(W.x, W.y + 2.4, W.z, WORKS.openT + 2.5);
+      if (g.audio.clank) g.audio.clank(W.x, W.y + 2.6, W.z, 1);
+    }
+    if (g.noise) g.noise(W.x, W.z, 1.2, 'repair'); // everything on the участок comes to look at the road
+    g.addTrauma(0.12);
+    if (g.sync && g.auth) g.sync.ev('xG'); // co-op: everyone's road opens, not just the host's
+  }
+
+  // co-op: the gate on the track out is the one thing about the shelter every machine has to agree on — the host
+  // opens it, and the guests raise their own leaf to match ('xG', see game/netsync.js)
+  remoteGate() {
+    const W = this.B && this.B.worksGate;
+    if (!W) return;
+    this.gate = true;
+    this.worksT = WORKS.openT + 1;
+    this.worksOpen = 1;
+    this._worksDone = true;
+    this.worksLeaf.position.y = W.leafY + WORKS.lift;
+    this.worksLamp.material.color.setHex(0x5cff88);
+    this.worksLamp.material.opacity = 0.9;
+    if (!W.open) {
+      W.open = true;
+      this.world.col.setSeg(W.cap, 1e5, 1e5, 1e5, 1e5);
+    }
+  }
+
+  _works(dt) {
+    const g = this.g, W = this.B.worksGate;
+    if (!W || this.worksT <= 0 || this.worksOpen >= 1) return;
+    this.worksT += dt;
+    const k = clamp(this.worksT / WORKS.openT, 0, 1);
+    this.worksOpen = k * k * (3 - 2 * k); // the motor takes up the slack, then it runs
+    this.worksLeaf.position.y = W.leafY + WORKS.lift * this.worksOpen;
+    if (!W.open && this.worksOpen > 0.55) {
+      // the leaf is high enough to drive under: the road is open
+      W.open = true;
+      this.world.col.setSeg(W.cap, 1e5, 1e5, 1e5, 1e5);
+      if (g.audio.ready && g.audio.clank) g.audio.clank(W.x, W.y + 3, W.z, 0.9);
+      g.hud.flashAlert(t('aWorksOpen'), 'dawn', 3);
+      g.hud.peek(3);
+      const car = this.world.crewCar;
+      if (car && g.radar && g.radar.blip) g.radar.blip(car.x, car.z, 'beacon'); // the way out, on the car
+    }
+    if (this.worksOpen >= 1 && !this._worksDone) {
+      this._worksDone = true;
+      if (g.audio.ready && g.audio.winchClank) g.audio.winchClank();
+      g.hud.setHint(t('hintWorksOpen'));
+      g.timeline.push({ at: (g.time || 0) + 9, fn: () => g.hud.setHint(null) });
+    }
+  }
+
+  // the steel leaf over the hatch: it is thrown open from inside when she is out, and slams at the end
+  _cap(dt) {
+    if (!this.capDoor || this._capT <= 0) return;
+    this._capT += dt;
+    const k = clamp(this._capT / 1.1, 0, 1);
+    this.capDoor.rotation.y = (k * k * (3 - 2 * k)) * 1.75;
+    if (k >= 1) this._capT = 0;
+  }
+
   // ---------------- per frame ----------------
   update(dt) {
     if (!this.B) return;
     const g = this.g, p = g.player, B = this.B;
+    // the works' gate and the cap over the hole are outside the shelter's own clock: they run all night
+    if (B.worksGate) this._works(dt);
+    this._cap(dt);
     // the cap's lamp breathes while it is worth looking at
     if (!this._inside) {
       const on = this.script.state !== 'sealed';
@@ -699,7 +838,7 @@ export class Bunker {
         this.seen.cross = true;
         const zb = B.door.z - 11;
         const cross = new THREE.Mesh(this.hordeGeo, this.hordeMat);
-        cross.position.set(B.hall.x0 + 0.7, this.fy, zb);
+        cross.position.set(B.hall.x0 + 0.55, this.fy, zb);
         cross.rotation.y = -PI / 2; // across the corridor, left to right
         g.scene.add(cross);
         this.crossT = { mesh: cross, t: 0, x: B.hall.x0 + 0.6 };
@@ -720,9 +859,9 @@ export class Bunker {
     if (this.crossT) {
       const c = this.crossT;
       c.t += dt;
-      c.mesh.position.x += dt * 4.2;
+      c.mesh.position.x += dt * 3.6;
       c.mesh.position.y = this.fy + Math.abs(Math.sin(c.t * 9)) * 0.05;
-      if (c.t > 0.62) { // it is through the wall opposite by then
+      if (c.t > 0.62) { // it is at the far wall by then, and gone
         g.scene.remove(c.mesh);
         this.crossT = null;
       }
@@ -753,6 +892,20 @@ export class Bunker {
   // ---------------- for the HUD / the task line ----------------
   get inside() {
     return !!this._inside;
+  }
+  // the works' gate is up: the road off the участок is open (game/winch.js asks before the car can leave)
+  get gateOpen() {
+    return !!this.gate;
+  }
+  // there is power on the участок, the cap is unlocked, and the breaker has not been thrown: the task line and
+  // the beacon both point down the hole (game/objectives.js)
+  get needsBreaker() {
+    const st = this.script.state;
+    return !this.gate && (st === 'unlocked' || st === 'open' || st === 'inside');
+  }
+  // where the cap's steel leaf is, for anything that wants to walk up to it
+  get hatchFront() {
+    return this.capFront;
   }
   get state() {
     return this.script.state;
