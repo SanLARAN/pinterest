@@ -7,6 +7,21 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v:'2.1x',date:'2026-10-22',
+    ru:{title:'На компьютере',items:[
+      'Игру можно поставить на компьютер: один портативный .exe для Windows, без установки и без прав администратора. Это тот же самый билд, что на сайте, в своём окне — со своим значком и без адресной строки',
+      'Микрофон работает как в браузере: оболочка отдаёт игру по собственной безопасной схеме hush://, поэтому это защищённый контекст, а не файл с диска. Разрешение спрашивается только на микрофон — камера, геолокация и буфер обмена ей недоступны, как и весь остальной диск',
+      'F11 — полный экран, F12 — инструменты, Ctrl+R — перезапуск, F10 — сброс масштаба. Второй запуск не открывает второе окно, а поднимает уже открытое',
+      'Сборка лежит в Actions (артефакт HUSH-win-x64) и в Releases на каждом теге. Ветка unsigned: Windows один раз спросит «неизвестный издатель» — это нормально',
+    ]},
+    en:{title:'On a desktop',items:[
+      'The game can be taken off the browser: one portable Windows .exe, no installer, no admin rights. It is the very same build the site serves, in its own window, with its own icon and no address bar',
+      'The microphone works as it does in a browser: the shell serves the game over its own secure hush:// scheme, so the page is a secure context instead of a file on disk. Only the microphone is allowed — the camera, geolocation and the clipboard are refused, and so is the rest of the disk',
+      'F11 — fullscreen, F12 — devtools, Ctrl+R — restart, F10 — reset zoom. A second launch raises the running window instead of opening another',
+      'The build lives in Actions (artifact HUSH-win-x64) and in Releases on every tag. It is unsigned: Windows will ask once about an unknown publisher, and that is expected',
+    ]}
+  },
+  {
     v:'2.1w',date:'2026-10-22',
     ru:{title:'Одежда Найдёныша',items:[
       'Тело у неё то же, что и было: игра рисует людей скупо, и она такая же. Поправили одежду — футболка на два размера больше наконец висит как футболка: сходит с плеч, узкая в груди, до середины бедра, воротник сползает на одну сторону',

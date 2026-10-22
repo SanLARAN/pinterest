@@ -1,0 +1,39 @@
+# ТИШЕ / HUSH — the Windows build.
+#
+# A portable .exe: one file, no installer, no admin rights, nothing written outside the user's temp folder when
+# it runs. The web build in ./dist is packed into the app (asar) and served over hush:// by electron/main.cjs.
+# Build locally:  npm run build && npm run desktop:win
+# In CI:          .github/workflows/desktop.yml (Actions → Desktop (HUSH) → Run workflow)
+appId: ru.hush.echolocation
+productName: HUSH
+copyright: ТИШЕ / HUSH
+
+# electron-builder normally reads the version from devDependencies; the desktop deps are installed on demand, so
+# the version is pinned here (it must match the workflow's `npm i --no-save electron@…`).
+electronVersion: 45.0.0
+
+directories:
+  output: release
+  buildResources: electron/assets
+
+files:
+  - electron/main.cjs
+  - electron/serve.cjs
+  - electron/assets/**
+  - dist/**
+  - package.json
+
+asar: true
+compression: maximum
+
+win:
+  icon: electron/assets/icon.png
+  target:
+    - target: portable
+      arch: [x64]
+  artifactName: HUSH-${version}-win-${arch}.${ext}
+
+portable:
+  artifactName: HUSH-${version}-win-${arch}.${ext}
+  # hush:// is our own scheme, so nothing has to be registered system-wide and the game never needs admin
+  requestExecutionLevel: user

@@ -9,7 +9,10 @@
     "build": "vite build",
     "test": "node --test tests/*.test.mjs",
     "build:pages": "vite build --outDir play --emptyOutDir",
-    "preview": "vite preview --host 0.0.0.0"
+    "preview": "vite preview --host 0.0.0.0",
+    "desktop": "npm run build && npx --yes electron@45.0.0 .",
+    "desktop:dev": "npx --yes electron@45.0.0 .",
+    "desktop:win": "npm run build && npx --yes electron-builder@26.15.3 --win portable --x64 --publish never"
   },
   "dependencies": {
     "@fontsource/jetbrains-mono": "^5.3.0",
@@ -21,5 +24,7 @@
   },
   "devDependencies": {
     "vite": "^8.3.4"
-  }
+  },
+  "author": "HUSH",
+  "main": "electron/main.cjs"
 }
