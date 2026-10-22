@@ -9,9 +9,13 @@
 //   • and the request handler only ever serves files from dist/ — the game cannot reach the rest of the disk.
 //
 // Run it: `npm run desktop` (builds first) · Package it: `npm run desktop:win` / the Desktop workflow.
-const { app, BrowserWindow, Menu, session, protocol, shell, dialog } = require('electron');
+const { app, BrowserWindow, Menu, session, protocol, shell, dialog, ipcMain } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
+const https = require('node:https');
+const { spawn } = require('node:child_process');
+// (3.0m) which release is newer and what to download from it: pure, and tested without Electron
+const { API, PAGE, bestRelease } = require('./update.cjs');
 // the part that decides *what* may be read and *who* may speak: pure, and tested in tests/round21x.test.mjs
 const { allowsPermission, isOwnOrigin, serveBuild } = require('./serve.cjs');
 
@@ -66,6 +70,7 @@ function createWindow() {
     autoHideMenuBar: true,
     show: false,
     webPreferences: {
+      preload: path.join(__dirname, 'preload.cjs'), // the update bridge, and nothing else
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
@@ -101,6 +106,136 @@ function createWindow() {
   return win;
 }
 
+// ---------------------------------------------------------------- updating itself (3.0m)
+// The build is one portable .exe attached to the GitHub release (see .github/workflows/desktop.yml). It cannot
+// patch itself like an installed app, but it can do the honest portable thing: download the new .exe next to
+// itself, and swap it in with a tiny script once the process has exited — then start again.
+//
+// Nothing here runs in a dev window (`electron .`): there is no build to replace.
+const UPD_DIR = () => path.join(app.getPath('userData'), 'updates');
+const state = { phase: 'idle', latest: null, notes: '', page: PAGE, progress: 0, error: '', file: '' };
+
+function say(patch) {
+  Object.assign(state, patch);
+  for (const w of BrowserWindow.getAllWindows()) w.webContents.send('hush:update:progress', { ...state });
+  return { ...state };
+}
+
+function fetchJson(url, redirects = 0) {
+  return new Promise((resolve, reject) => {
+    const req = https.get(url, { headers: { 'User-Agent': 'HUSH-desktop', Accept: 'application/vnd.github+json' }, timeout: 12000 }, (res) => {
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location && redirects < 3) {
+        res.resume();
+        return fetchJson(res.headers.location, redirects + 1).then(resolve, reject);
+      }
+      if (res.statusCode !== 200) { res.resume(); return reject(new Error(`HTTP ${res.statusCode}`)); }
+      let body = '';
+      res.setEncoding('utf8');
+      res.on('data', (c) => { if (body.length < 4e6) body += c; });
+      res.on('end', () => { try { resolve(JSON.parse(body)); } catch (e) { reject(e); } });
+    });
+    req.on('timeout', () => req.destroy(new Error('timeout')));
+    req.on('error', reject);
+  });
+}
+
+async function checkUpdate() {
+  const running = app.getVersion();
+  if (!app.isPackaged) return say({ phase: 'idle', error: '', version: running, dev: true });
+  say({ phase: 'checking', error: '', version: running });
+  try {
+    const list = await fetchJson(API);
+    const best = bestRelease(list, running);
+    if (!best) return say({ phase: 'idle', error: '', version: running, latest: null });
+    return say({
+      phase: 'ready',
+      version: running, latest: best.version, notes: best.notes, page: best.page,
+      newer: best.newer, asset: best.asset, error: '',
+    });
+  } catch (e) {
+    return say({ phase: 'error', error: String(e.message || e), version: running });
+  }
+}
+
+function downloadTo(url, dest, expected, onProgress) {
+  return new Promise((resolve, reject) => {
+    const get = (u, redirects = 0) => https.get(u, { headers: { 'User-Agent': 'HUSH-desktop' }, timeout: 30000 }, (res) => {
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location && redirects < 4) {
+        res.resume();
+        return get(res.headers.location, redirects + 1);
+      }
+      if (res.statusCode !== 200) { res.resume(); return reject(new Error(`HTTP ${res.statusCode}`)); }
+      const total = Number(res.headers['content-length'] || expected || 0);
+      let got = 0, last = 0;
+      fs.mkdirSync(path.dirname(dest), { recursive: true });
+      const out = fs.createWriteStream(dest);
+      res.on('data', (c) => {
+        got += c.length;
+        const now = Date.now();
+        if (onProgress && now - last > 200) { last = now; onProgress(total ? Math.min(1, got / total) : 0); }
+      });
+      res.pipe(out);
+      out.on('finish', () => out.close(() => resolve(dest)));
+      out.on('error', reject);
+    });
+    get(url).on('timeout', function () { this.destroy(new Error('timeout')); }).on('error', reject);
+  });
+}
+
+// drop the new build over this one after we are gone, then start it again
+function installAndRestart(file) {
+  const exe = process.execPath;
+  const dir = path.dirname(exe);
+  const bat = path.join(app.getPath('temp'), `hush-update-${Date.now()}.cmd`);
+  const script = [
+    '@echo off',
+    'chcp 65001 > nul',
+    'ping 127.0.0.1 -n 3 > nul',
+    ':again',
+    `copy /y "${file}" "${exe}" > nul`,
+    'if errorlevel 1 (',
+    '  ping 127.0.0.1 -n 2 > nul',
+    '  goto again',
+    ')',
+    `start "" "${exe}"`,
+    'del "%~f0"',
+  ].join('\r\n');
+  try {
+    fs.writeFileSync(bat, script, 'utf8');
+    spawn('cmd.exe', ['/c', bat], { detached: true, stdio: 'ignore', windowsVerbatimArguments: true }).unref();
+    // the folder may be read-only (a stick, Program Files): say so instead of leaving a silent black window
+    fs.accessSync(dir, fs.constants.W_OK);
+    setTimeout(() => app.quit(), 250);
+    return true;
+  } catch (e) {
+    say({ phase: 'error', error: `cannot replace the build here: ${e.message}` });
+    return false;
+  }
+}
+
+function wireUpdateIpc() {
+  ipcMain.handle('hush:version', () => app.getVersion());
+  ipcMain.handle('hush:update:check', () => checkUpdate());
+  ipcMain.handle('hush:update:page', () => { shell.openExternal(state.page || PAGE); return true; });
+  ipcMain.handle('hush:update:download', async () => {
+    if (!app.isPackaged) return say({ phase: 'idle', dev: true });
+    const fresh = await checkUpdate();
+    if (!fresh.asset) return fresh;
+    const file = path.join(UPD_DIR(), fresh.asset.name);
+    say({ phase: 'downloading', progress: 0, error: '' });
+    try {
+      await downloadTo(fresh.asset.url, file, fresh.asset.size, (p) => say({ progress: p }));
+      say({ phase: 'downloaded', progress: 1, file });
+      // the new file is on disk whatever happens next: install, or launch it by hand
+      if (process.platform === 'win32') installAndRestart(file);
+      else shell.showItemInFolder(file);
+      return { ...state };
+    } catch (e) {
+      return say({ phase: 'error', error: String(e.message || e) });
+    }
+  });
+}
+
 // one copy at a time: a second launch focuses the first (two windows would fight over the microphone)
 if (!app.requestSingleInstanceLock()) {
   app.quit();
@@ -122,7 +257,10 @@ if (!app.requestSingleInstanceLock()) {
       }
       serveBuildRequests();
     }
+    wireUpdateIpc(); // before the window: the page asks for its version the moment it loads
     createWindow();
+    // check once, quietly, a few seconds in; a portable build is often launched for one shift
+    if (app.isPackaged) setTimeout(() => { checkUpdate().catch(() => {}); }, 3500);
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow();
     });

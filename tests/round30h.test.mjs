@@ -79,7 +79,7 @@ test('the bog builds a whole Game — the thing that used to spin on «лес р
   assert.equal(game.partMap.inert, true);
   // the bog's own systems are real ones
   assert.equal(game.winch.inert, undefined);
-  assert.ok(game.winch.car, 'the car is in the water');
+  assert.ok(game.winch.car, 'the car the shift came in is the one to get out');
   assert.equal(game.drowned.inert, undefined);
   assert.equal(game.gnats.inert, undefined);
   // the forest's yard and tower are the inert ones
@@ -100,9 +100,10 @@ test('a bog shift starts, runs frames and never touches a missing place', () => 
   for (let i = 0; i < 120; i++) frame(game);
   assert.equal(game.state, 'dawn');
   // the winch is where the car is, and it is offered as a target
+  // (3.0m) the drum is on the nose of the car the shift came in, not of a wreck across the map
   const d = game.winch.drum();
-  const near = Math.hypot(d.x - game.world.car.x, d.z - game.world.car.z);
-  assert.ok(Math.abs(near - 2.6) < 0.01, `the drum is on the nose: ${near}`);
+  const near = Math.hypot(d.x - game.world.crewCar.x, d.z - game.world.crewCar.z);
+  assert.ok(Math.abs(near - 1.5) < 0.01, `the drum is on the nose: ${near}`);
 });
 
 test('the bog does not sit you on the fire tower: you can actually walk', () => {

@@ -653,8 +653,11 @@ function fitCampSet(world) {
   if (!near) near = { x: CAMP_FLOOD.x - 4, z: CAMP_FLOOD.z - 1.5, d: 12 };
   if (!far) far = { x: near.x + 9, z: near.z + 3.3, d: near.d + 9 };
   // the crew's car: on the outer bank, nose to the water — it is as far as the road went
-  const nose = { x: -T.x, z: -T.z };
-  const car = { x: far.x + T.x * 3.4, z: far.z + T.z * 3.4, nose };
+  const len = Math.hypot(T.x, T.z) || 1;
+  const nose = { x: -T.x / len, z: -T.z / len }; // a unit vector pointing at the water
+  // (3.0m) its nose is *in* the проезд and its rear wheels are on the bank: the opening film ends on this
+  // picture, and the whole night is about getting it out of there
+  const car = { x: far.x + T.x * 1.0, z: far.z + T.z * 1.0, nose };
   // (the car is built in the garage's frame — nose toward -x, driver's side +z — so its yaw is not the box's)
   car.yaw = Math.atan2(nose.z, -nose.x);
   car.y = world.terrain.height(car.x, car.z);
@@ -682,6 +685,8 @@ function fitCampSet(world) {
     prime: at(-0.8, 0.95),
     marker: { x: near.x - toWater.x * 1.1, z: near.z - toWater.z * 1.1 },
     sign: { x: car.x + T.x * 2.4 + side.x * 2.6, z: car.z + T.z * 2.4 + side.z * 2.6 },
+    // (3.0m) the stake the winch cable runs back to: behind the car, on the dry bank
+    anchor: { x: car.x + T.x * 4.6 + side.x * 1.4, z: car.z + T.z * 4.6 + side.z * 1.4 },
     toWater,
     side,
   };
@@ -697,6 +702,14 @@ function genCrewCar(world) {
   node.updateMatrix();
   world.scene.add(node);
   world.crewCar = { x, z, y, yaw, nose, node };
+  // (3.0m) the stake the winch cable runs back to — one car, one way out
+  const A = set.anchor;
+  world.addProp(A.x, A.z, (bb) => {
+    bb.identity();
+    bb.place(A.x, world.terrain.height(A.x, A.z), A.z);
+    bb.limb([0, 0, 0], [0, 1.15, 0], 0.09, 0.07, KIND.WOOD, 5);
+    bb.box(0.5, 0.09, 0.09, KIND.METAL); // the bar the cable is hitched round
+  });
   // it is 4.4 m long and 1.8 wide, and it stands across the road: a capsule along its own nose axis
   world.col.add(x + nose.x * 1.9, z + nose.z * 1.9, x - nose.x * 1.9, z - nose.z * 1.9, 0.95, 1.6, CAP.METAL);
 

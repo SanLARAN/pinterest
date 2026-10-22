@@ -72,6 +72,14 @@ jobs:
       - name: Install Electron and electron-builder
         run: npm i --no-save electron@45.0.0 electron-builder@26.15.3
 
+      # (3.0m) the portable build updates itself: it asks GitHub for the newest release and compares versions.
+      # A tag like `arena/live47` says nothing about what is inside, so the run number is stamped into the
+      # version here — electron-builder then names the file HUSH-1.0.<n>-win-x64.exe, and that number is the
+      # one the updater reads, both from its own app.getVersion() and from the asset name on the release.
+      - name: Stamp the build number
+        shell: bash
+        run: npm pkg set version="1.0.${{ github.run_number }}" && node -p "require('./package.json').version"
+
       - name: Pack the portable .exe
         run: npx electron-builder --win portable --x64 --publish never
         env:
@@ -98,6 +106,11 @@ jobs:
           name: ТИШЕ / HUSH ${{ github.ref_name }}
           body: |
             Портативная сборка для Windows (x64): скачай `HUSH-…-win-x64.exe` и запусти — установка не нужна.
+
+            **Обновляется сама.** Запущенная сборка раз в несколько часов спрашивает эту страницу, и если здесь
+            лежит новее, в меню появляется строка «есть сборка 1.0.N — скачать». По кнопке она скачивает новый
+            `.exe` рядом с собой и подменяет старый при выходе. Скачанное всегда остаётся в
+            `%APPDATA%\HUSH\updates`, так что можно запустить и руками.
 
             Portable Windows build (x64): download `HUSH-…-win-x64.exe` and run it — nothing to install.
 

@@ -1563,3 +1563,31 @@ body.reel-open .panel.over-panel { filter: blur(1px) brightness(0.5); }
   .reel-btns .btn { font-size: 9px; min-width: 72px; }
   .reel-cap { font-size: 9px; letter-spacing: 0.12em; }
 }
+
+/* (3.0m) the desktop build's update line: bottom-left, quiet, gone unless there is something to say */
+.updater {
+  position: fixed; left: 18px; bottom: 18px; z-index: 60;
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 10px 7px 12px;
+  font: 10px/1.4 'JetBrains Mono', ui-monospace, monospace;
+  letter-spacing: 0.18em; text-transform: lowercase;
+  color: rgba(214, 205, 192, 0.55);
+  background: rgba(8, 9, 10, 0.62);
+  border: 1px solid rgba(167, 180, 182, 0.12);
+  backdrop-filter: blur(6px);
+  pointer-events: auto;
+}
+.updater[hidden] { display: none; }
+.updater-go {
+  font: inherit; letter-spacing: 0.2em; color: var(--bone, #d6cdc0);
+  background: none; border: 1px solid rgba(167, 180, 182, 0.3);
+  padding: 4px 9px; cursor: pointer;
+}
+.updater-go:hover:not(:disabled) { border-color: rgba(214, 205, 192, 0.7); }
+.updater-go:disabled { opacity: 0.5; cursor: default; }
+.updater-x {
+  font: inherit; font-size: 12px; line-height: 1; color: rgba(214, 205, 192, 0.4);
+  background: none; border: 0; cursor: pointer; padding: 0 2px;
+}
+.updater-x:hover { color: var(--bone, #d6cdec); }
+@media (max-width: 720px) { .updater { left: 10px; bottom: 10px; max-width: calc(100vw - 20px); } }

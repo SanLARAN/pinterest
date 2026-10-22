@@ -7,6 +7,38 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v:'3.0n',date:'2026-10-22',
+    ru:{title:'Вода отвечает',items:[
+      'Поверхность торфяника больше не плоскость, которая только подсвечивается: она ходит. Шаг в воду, шаг друга, брошенный камень, каждый шаг Утопленника — всё это толкает воду, и от места расходится кольцо, которое живёт секунду-две и гаснет',
+      'Кольца складываются: два следа рядом дают двойную волну, а на глубине вода отвечает сильнее, чем в луже. Гребень ловит эхо и светится, впадина остаётся чёрной — волну видно силуэтом, а не только ярким кругом сверху',
+      'Сетка воды стала вчетверо мельче (2 м вместо 4), иначе волне не на чем было бы быть: 21 тысяча треугольников на всю карту',
+      'Хозяин комнаты выбирает участок прямо в настройках лобби, рядом с длиной смены: ЛЕСХОЗ или ТОРФЯНИК. На старте все переезжают на выбранную землю — гостю даже не надо знать, откуда хост её открыл',
+      'С колёс УАЗа в гараже убран белый кубик «вентиля», который торчал из покрышки и мерцал, и второй ряд протекторов, прорезавший первый. Колесо теперь просто колесо',
+    ]},
+    en:{title:'The water answers',items:[
+      'The bog\'s surface is no longer a plane that only lights up: it moves. A boot in the water, a friend\'s boot, a thrown stone, every stride of the Дrowned — all of them push it, and a ring runs out from the spot, lives a second or two and settles',
+      'Rings add up: two trails side by side give twice the wave, and deep water answers harder than a puddle. The crest catches the echo and glows, the trough stays black — you see the wave as a shape, not just a bright circle drawn on top',
+      'The water grid is four times finer (2 m cells instead of 4): a swell has to have something to be. Twenty-one thousand triangles for the whole map',
+      'The host picks the участок in the lobby\'s own settings, next to the shift length: FORESTRY or PEAT BOG. Everyone moves to that ground at the start — a guest does not even need to know which URL the host opened',
+      'The wheels of the garage УАЗ lost the white \"valve\" cube that poked out of the tyre and shimmered, and the second ring of tread blocks that cut through the first. A wheel is just a wheel again',
+    ]}
+  },
+  {
+    v:'3.0m',date:'2026-10-22',
+    ru:{title:'Одна машина, один выезд',items:[
+      'Раньше смена приезжала на одном УАЗе, а уезжала на другом — на развалине в конце гати. Теперь на участке одна машина: та, что привезла вас, и она стоит там, где её оставил фильм — носом в затопленный проезд, задними колёсами на берегу',
+      'Выезд из двух условий, и оба — про эту ночь. Проезд надо откачать: пока вода стоит, стартер крутит, а мотор хлебает воду — «ДВИГАТЕЛЬ ХЛЕБНУЛ», и сначала насос в лагере. И машину надо вытащить из колеи: лебёдка на её же бампере, трос на колышек на берегу, двадцать пять секунд ручки',
+      'Лебёдка держит только пока крутишь: бросил — машина сползла обратно. Каждый мёртвый насос отматывает назад 0.6 % в секунду, так что насосы и барабан — один и тот же спор',
+      'Портативная сборка для Windows теперь обновляет себя: раз в несколько часов она спрашивает страницу релизов, и если там новее, в меню появляется строка «есть сборка 1.0.N — скачать». Скачивает рядом с собой и подменяет старый .exe при выходе',
+    ]},
+    en:{title:'One car, one way out',items:[
+      'The shift used to arrive in one УАЗ and drive home in another — a wreck at the end of the causeway. Now there is one car on the участок: the one that brought you, standing where the opening film left it, nose into the flooded проезд, rear wheels on the bank',
+      'Getting out takes two things, and both are what the night is about. The проезд has to be pumped down: while the water is up the starter turns and the engine drinks — THE ENGINE IS FLOODED — so the camp pump comes first. And the car has to come out of the rut: a winch on its own bumper, a cable back to a stake on the bank, twenty-five seconds of handle',
+      'The drum only holds while you turn it: let go and the car slides back. Every dead pump unwinds 0.6 % a second, so the pumps and the drum are the same argument',
+      'The portable Windows build now updates itself: every few hours it asks the releases page, and if there is a newer one the menu offers \"build 1.0.N is out — download\". It downloads next to itself and swaps the old .exe out when you quit',
+    ]}
+  },
+  {
     v:'3.0l',date:'2026-10-22',
     ru:{title:'Торфяник: приехали',items:[
       'Смена начинается не с неба, а с дороги: УАЗ выезжает из дождя по старой колее и тормозит у воды — проезд затоплен, дальше не проехать. Отсюда и вся ночь: пока не запустишь насосы, машина стоит',

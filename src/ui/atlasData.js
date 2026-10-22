@@ -1451,7 +1451,7 @@ const BOG_TEXT_RU = {
     name: 'Насос', latin: 'Machina sitiens',
     text: [
       'Ручной насос на чугунной плите: две колонки, голова, маховик и всасывающий патрубок, уходящий в воду. Пять штук на участке, по одному на место.',
-      'Каждый работающий насос опускает воду в своём секторе на 0.6 метра в радиусе сорока. Пять работающих — и гать проходит целиком, до самого УАЗа.',
+      'Каждый работающий насос опускает воду в своём секторе на 0.6 метра в радиусе сорока. Пять работающих — и проезд проходит целиком, до сухого берега за ним, а наш УАЗ выбирается из колеи.',
       'Насос — это шум. Металл, маховик, вода: на весь сектор.',
     ],
     tips: ['Запускай насосы по дороге к машине, а не после: вода уходит, пока ты идёшь.', 'Пять — это не «хорошо бы». Меньше пяти, и гать не проходит.'],
@@ -1460,12 +1460,12 @@ const BOG_TEXT_RU = {
   winch: {
     name: 'Лебёдка', latin: 'Trochlea ultima',
     text: [
-      'Барабан на носу УАЗа и трос к наклонному столбу. Машина сидит по ступицы, и вытащить её можно только вручную: сорок секунд ручки, которые никто не считает, потому что считать приходится вслух.',
-      'Каждый мёртвый насос отматывает назад 0.6 % в секунду против 2.5 %, которые ты наматываешь. Один-два — медленно. Три — ползком. Все пять — не вытянешь никогда.',
-      'Вытянул — заводи. Три секунды стартера, и это самые длинные три секунды на участке.',
+      'Барабан на бампере нашего же УАЗа и трос к колышку на берегу. Машина стоит носом в проезде, задние колёса на сухом, и вытащить её можно только вручную: двадцать пять секунд ручки, которые никто не считает, потому что считать приходится вслух.',
+      'Каждый мёртвый насос отматывает назад 0.6 % в секунду против 4 %, которые ты наматываешь. Один-два — медленно. Три — ползком. Все пять — сто секунд у барабана, и всю ночь спиной к торфу.',
+      'Вытянул — не заводи. Пока проезд под водой, стартер крутит, а мотор хлебает: сначала насос в лагере, потом дверь. Три секунды, и это самые длинные три секунды на участке.',
     ],
-    tips: ['Сначала все пять насосов, потом трос. Иначе простоишь у барабана всю ночь.', 'Трос гремит: пока крутишь, за спиной может кто-то стоять.'],
-    facts: [['крутить', '40 с'], ['потеря', '0.6 %/с за насос'], ['подъём', '1.15 м'], ['стартер', '3.0 с']],
+    tips: ['Насос в лагере — до стартера, лебёдка — до насоса: пока крутишь, вода успевает уйти.', 'Трос гремит: пока крутишь, за спиной может кто-то стоять.'],
+    facts: [['крутить', '25 с'], ['потеря', '0.6 %/с за насос'], ['сдвиг', '2.2 м'], ['стартер', '3.0 с']],
   },
   pumpshed: {
     name: 'Насосная', latin: 'Statio palustris',
@@ -1603,7 +1603,7 @@ const BOG_TEXT_EN = {
     name: 'The pump', latin: 'Machina sitiens',
     text: [
       'A hand pump on a cast-iron plate: two columns, a head, a flywheel, and a suction pipe running off into the water. Five of them on the участок, one to a place.',
-      'Every running pump lowers the water in its own sector by 0.6 metres within a radius of forty. All five and the гать holds all the way out to the УАЗ.',
+      'Every running pump lowers the water in its own sector by 0.6 metres within a radius of forty. All five and the проезд goes all the way through, to the dry bank beyond it, and our УАЗ comes out of the rut.',
       'A pump is noise: metal, flywheel, water — across the whole sector.',
     ],
     tips: ['Start the pumps on your way to the car, not after: the water drains while you walk.', 'Five is not "would be nice". Fewer than five and the гать does not hold.'],
@@ -1612,12 +1612,12 @@ const BOG_TEXT_EN = {
   winch: {
     name: 'The winch', latin: 'Trochlea ultima',
     text: [
-      'A drum on the nose of the УАЗ and a cable out to a leaning post. The car is in up to the hubs, and the only way out is by hand: forty seconds of handle that nobody counts, because the counting has to be done out loud.',
-      'Every dead pump unwinds 0.6 % a second against the 2.5 % you wind on. One or two — slow. Three — a crawl. All five — you will never pull it out.',
-      'Out — start it. Three seconds of starter, and they are the longest three seconds on the участок.',
+      'A drum on the bumper of our own УАЗ and a cable back to a stake on the bank. The car stands nose-in at the проезд with its rear wheels on dry ground, and the only way out is by hand: twenty-five seconds of handle that nobody counts, because the counting has to be done out loud.',
+      'Every dead pump unwinds 0.6 % a second against the 4 % you wind on. One or two — slow. Three — a crawl. All five — a hundred seconds at the drum, with your back to the peat.',
+      'Out — but not started. While the проезд is under water the starter turns and the engine drinks: the camp pump first, then the door. Three seconds, and they are the longest three seconds on the участок.',
     ],
-    tips: ['All five pumps first, then the cable. Otherwise you will stand at the drum all night.', 'The cable rings: while you turn it, someone may be standing behind you.'],
-    facts: [['turning', '40 s'], ['slip', '0.6 %/s per pump'], ['lift', '1.15 m'], ['starter', '3.0 s']],
+    tips: ['The camp pump before the starter, the winch before the pump: the water drains while you crank.', 'The cable rings: while you turn it, someone may be standing behind you.'],
+    facts: [['turning', '25 s'], ['slip', '0.6 %/s per pump'], ['pull', '2.2 m'], ['starter', '3.0 s']],
   },
   pumpshed: {
     name: 'The pump shed', latin: 'Statio palustris',

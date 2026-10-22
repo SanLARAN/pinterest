@@ -35,6 +35,7 @@ import { Input } from './input/input.js';
 import { HUD, fmtTime, fmtScore } from './ui/hud.js';
 import { Radar } from './ui/radar.js';
 import { Menus } from './ui/menus.js';
+import { installDesktopUpdate } from './ui/desktopUpdate.js'; // 3.0m: the exe keeps itself current
 import { Game } from './game/game.js';
 import { buildListener } from './game/monsters.js';
 import { PLAYER_COLORS } from './game/remote.js';
@@ -293,6 +294,8 @@ function measureFPS(now) {
 document.addEventListener('visibilitychange', () => { perf.sampleT = 0; perf.measured = false; });
 
 // ---------------- menus ----------------
+installDesktopUpdate(); // (no-op in a browser: it needs the desktop shell's bridge)
+
 const menus = new Menus({
   graphicsStats: () => ({ w: post.w, h: post.h, ow: canvas.width, oh: canvas.height, fps: perf.measured ? perf.fps : 0, fxaa: post.u.uAA.value }),
   onPlay: () => startRun(),

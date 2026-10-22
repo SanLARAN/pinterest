@@ -19,6 +19,8 @@ directories:
 files:
   - electron/main.cjs
   - electron/serve.cjs
+  - electron/update.cjs
+  - electron/preload.cjs
   - electron/assets/**
   - dist/**
   - package.json
