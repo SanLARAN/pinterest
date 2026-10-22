@@ -116,7 +116,9 @@ export class Game {
     this.scareRigs = {};
     this._ears = { x: 0, y: 0, z: 0 };
     this.roomRules = { hideNames: false };
-    this.partMap=new PartMap(this);
+    // (3.0h) the parts map hangs in the forestry yard and prints the forest's four hiding places: on the bog there
+    // is no yard and no UAZ to lay out. Inert, so the bag never offers an item that does not exist here
+    this.partMap = this.map === 'forest' ? new PartMap(this) : inert(PartMap, this, { has: false, owner: null, locations: [], source: null, distance: () => 1 });
     this.inventory = new Backpack(this);
     this.fieldView = new FieldView(this);
     this.bag3d = new Bag3D(this); // the round pack (a desktop's view of the same four pockets)

@@ -19,7 +19,9 @@ export class ForestTools {
     this.g = game;
     const W = game.world, C = W.zarya, F = W.firetower;
     this.geo = { tape: geometryOf(buildTape().toArrays()), crowbar: geometryOf(buildCrowbar().toArrays()) };
-    const specs = [
+    // (3.0h) the kit lies out in the forest: the zarya yard and the fire tower are its two places, and the bog
+    // has neither. No places, no items — everything else here is a list that is simply empty
+    const specs = !C || !F ? [] : [
       { kind: 'tape', x: C.x + 3.9, y: C.y + 0.94, z: C.z - 25.65, yaw: 0.18 },
       { kind: 'crowbar', x: C.x - 2.8, y: C.y + 0.025, z: C.z + 18, yaw: 0.8 },
       { kind: 'tape', x: F.x + 3.4, y: F.y + 0.025, z: F.z + 0.1, yaw: -0.4 },

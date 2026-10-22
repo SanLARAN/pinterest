@@ -20,6 +20,7 @@
       <div class="boot-inner">
         <div class="sonar-loader"><i></i><i></i><i></i></div>
         <div id="bootText">лес растёт…</div>
+        <button id="bootRetry" class="btn" type="button" hidden>ПОВТОРИТЬ</button>
       </div>
     </div>
 
@@ -309,6 +310,10 @@
       <div class="panel form-panel solo-shift">
         <h2 data-i18n="soloShiftTitle">ДЛИНА СМЕНЫ</h2>
         <p class="solo-sub" data-i18n="soloShiftSub"></p>
+        <figure class="solo-plate">
+          <img id="soloMapPreview" src="maps/forest.png" alt="" width="440" height="560" decoding="async" />
+          <figcaption><span id="soloMapCaption" data-i18n="mapPreview"></span><b id="soloMapNote"></b></figcaption>
+        </figure>
         <div class="solo-maps" role="group" aria-label="участок">
           <button class="solo-map" type="button" data-map="forest"><b data-i18n="mapForest">ЛЕСХОЗ</b><span data-i18n="mapForestHint"></span></button>
           <button class="solo-map" type="button" data-map="bog"><b data-i18n="mapBog">ТОРФЯНИК</b><span data-i18n="mapBogHint"></span></button>

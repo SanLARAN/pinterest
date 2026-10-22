@@ -99,9 +99,25 @@ export class Menus {
         });
         b.addEventListener('mouseenter', () => this.h.uiSound && this.h.uiSound('hover'));
       }
+      // 3.0h: the plate above the cards is the chosen ground — the real plan of it, printed from the terrain
+      const plate = $('soloMapPreview'), note = $('soloMapNote');
       this.paintSoloMap = () => {
         const want = cleanMap(settings.shiftMap);
         for (const b of nights.querySelectorAll('[data-map]')) b.setAttribute('aria-pressed', String(b.dataset.map === want));
+        if (plate) {
+          const src = `maps/${want}.png`;
+          if (!plate.getAttribute('src')?.endsWith(src)) {
+            plate.classList.add('swap');
+            const show = () => {
+              plate.src = src;
+              plate.alt = t(want === 'bog' ? 'mapBog' : 'mapForest');
+              plate.classList.remove('swap');
+            };
+            // (a cached plate is ready at once; a fresh one fades in behind the dark)
+            if (plate.complete && plate.naturalWidth) show(); else setTimeout(show, 90);
+          }
+        }
+        if (note) note.textContent = t(want === 'bog' ? 'mapBogFoot' : 'mapForestFoot');
       };
       click('btnSoloBack', () => this.show('soloPanel', false));
       this.paintSoloDays();

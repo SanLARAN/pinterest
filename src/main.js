@@ -1153,28 +1153,55 @@ function highlightFrame(t) {
   }
 }
 
+// (3.0h) a failed boot says so, and offers the one ground that is known to build. Before this, any throw in the
+// generation or in the menu's own setup left the sonar loader spinning on «лес растёт…» for ever.
+function bootFailed(where, e) {
+  console.error(`[boot] ${where} failed on ${world.mapId}`, e);
+  const line = $('bootText');
+  if (line) line.textContent = `${t('bootFailed')} ${world.mapId === 'bog' ? t('mapBog') : t('mapForest')} — ${e && e.message ? e.message : e}`;
+  const retry = $('bootRetry');
+  if (retry) {
+    retry.hidden = false;
+    retry.textContent = t('bootRetry');
+    retry.onclick = () => { location.href = runUrl('forest', settings.shiftDays); }; // the forest always builds
+  }
+}
+
 // ---------------- boot ----------------
 function boot() {
   applyQuality();
   applyRadar();
   requestAnimationFrame(frame);
+  // if the tables are still empty after 45 seconds, something is stuck rather than slow: say it
+  setTimeout(() => {
+    if (state === 'boot' || document.getElementById('boot')?.classList.contains('show')) {
+      if (!game) bootFailed('timeout', new Error('45 s and still loading'));
+    }
+  }, 45000);
   // let the boot screen paint before the heavy generation
   setTimeout(() => {
+    // (3.0h) everything that can fail on a given участок fails HERE, and says so. A throw used to leave the
+    // boot screen spinning on «лес растёт…» for ever — which is what a broken map looked like from outside
     try {
       world.generate();
+      for (const g of world.occluders) shadows.addStatic(g);
+      game = new Game({ scene, camera, world, pulses, ghosts, eyes, particles, audio, mic, input, hud, radar, post, shadows, drawPortrait: (fit, canvas, view) => {
+        if (!wardrobe.mq) return false;
+        wardrobe.mq.still(fit, 'body', canvas, view);
+        return true;
+      } });
     } catch (e) {
-      $('bootText').textContent = 'world generation failed: ' + e.message;
-      throw e;
+      bootFailed('build', e);
+      return;
     }
-    for (const g of world.occluders) shadows.addStatic(g);
-    game = new Game({ scene, camera, world, pulses, ghosts, eyes, particles, audio, mic, input, hud, radar, post, shadows, drawPortrait: (fit, canvas, view) => {
-      if (!wardrobe.mq) return false;
-      wardrobe.mq.still(fit, 'body', canvas, view);
-      return true;
-    } });
     game.onEnd = onEnd;
-    setupAttract();
-    wardrobe.init(); // the live survivor now belongs to the shared garage scene
+    try {
+      setupAttract();
+      wardrobe.init(); // the live survivor now belongs to the shared garage scene
+    } catch (e) {
+      bootFailed('menu', e);
+      return;
+    }
     // warm up shaders so the first ping doesn't hitch
     renderer.compile(scene, camera);
     window.__hush = { world, game, shared, pulses, ghosts, eyes, renderer, perf, mic, audio, music: menuMusic, input, hud, post, shadows, coop, lobby, atlas, wardrobe, micCal, news, home, debug: DEBUG, startRun, pause, resume, toMenu, highlights, reel, get opening() { return game && game.opening; }, ensureGarage, cloud, account, social, notifications, get garage() { return garage; }, get state() { return state; } };
