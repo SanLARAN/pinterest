@@ -8,6 +8,7 @@
 //
 // When it has you it does not tear: it walks you out into the deep, and the deep is patient. It is slow —
 // 0.9 m/s, slower than a walking man — so it never catches anyone. It waits for whoever goes in too far.
+import { waterKick } from './waves.js'; // (3.0n) the Дrowned shoves the surface as it walks
 import { Monster, makeRig, node, part, registerRig } from './monsters.js';
 import { KIND } from '../world/builder.js';
 import { CFG } from '../core/config.js';
@@ -216,6 +217,12 @@ export class Drowned {
     if (!body) return;
     if (this.cap) this._drag(dt, body);
     else this._hunt(dt, body);
+    // (3.0n) it is heavy, and the water says so: a ring every stride while it is up and moving
+    this.ringT = (this.ringT || 0) - dt;
+    if (this.ringT <= 0 && g.waves && body.mode !== 'idle' && g.world.water && g.world.water.depth(body.x, body.z) > 0.25) {
+      waterKick(g.waves, g.world, body.x, body.z, g.time || 0, 'brute');
+      this.ringT = 0.45;
+    }
   }
 
   // ---------------- the hunt ----------------

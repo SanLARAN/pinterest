@@ -51,9 +51,9 @@ function wheelPart(b) {
     b.place(0, s * w * 0.42, 0, s < 0 ? PI : 0, 0, 0);
     b.cylinder(6, 0.07, 0.06, 0.03, GK.CHROME, { y0: 0 });
   }
-  // a strip of reflective tape someone wound round the rim (it catches any light)
-  b.place(r * 0.56, 0, 0, 0, 0, 0);
-  b.box(0.03, w * 0.8, 0.07, KIND.SHARD);
+  // (3.0m fix) there was a strip of "reflective tape" here, wound across the rim in KIND.SHARD — the brightest
+  // kind in the sonar palette, which the shader also sparkles per fragment. On a turning wheel that read as a
+  // white bar flashing in the dark, so it is gone; the wheel is rubber, a painted disc and two chrome caps.
 }
 
 function batteryPart(b) {

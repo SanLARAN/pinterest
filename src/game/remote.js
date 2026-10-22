@@ -3,6 +3,7 @@
 // simply see, in their own clothes, wherever real light falls on them; footsteps you can hear; and the 3D
 // position their voice comes from. Down, they lie where they fell — or over someone's shoulder, or on the
 // first-aid hut's cot (see Rescue).
+import { waterKick } from './waves.js'; // (3.0n) a friend's step moves the water
 import * as THREE from 'three';
 import { CFG } from '../core/config.js';
 import { BAG_KINDS } from './backpackData.js';
@@ -146,6 +147,8 @@ export class RemotePlayer {
             const w = this.game.world;
             const depth = w.water && !w.onWalk(this.x, this.z, 0) ? w.water.depth(this.x, this.z) : 0; // 3.0k
             this.game.audio.mateStep(this.x, this.y + 0.1, this.z, this.carrying ? 0.62 : this.sprinting ? 0.85 : 0.4, depth);
+            // (3.0n) a friend in the water pushes it too, in the same field your own boot writes to
+            if (this.game.waves) waterKick(this.game.waves, w, this.x, this.z, this.game.time || 0, this.sprinting ? 'run' : this.crouching ? 'tap' : 'step', 0.7 + 0.5 * Math.min(1, depth / 0.7));
           }
         }
       }

@@ -6,6 +6,7 @@ import { CFG } from '../core/config.js';
 const N = CFG.PULSE.slots;
 export const GLOW_SLOTS = 6; // small lights: glow sticks, the first-aid hut's lantern
 export const DISC_SLOTS = 12; // contact-shade pools on the meadow (see shared.uDisc)
+export const WAVE_SLOTS = 8; // (3.0n) rings travelling on the water (game/waves.js)
 export const LAMP_SLOTS = 13; // five main sites, yard floodlight, seven lamps on Zarya’s independent local grid
 // omni shadows (see render/shadows.js): every small light and every lamp has six faces of distances in one
 // atlas — a row per light, a tile per face
@@ -44,6 +45,9 @@ export const shared = {
   uRoadK: { value: new THREE.Vector3(0, 0, 0) },
   // the УАЗ's headlights: between the two lamps + intensity, and which way they point
   uHead: { value: new THREE.Vector4(0, -100, 0, 0) },
+  // (3.0n) the water's own motion: x, z, t0, amplitude — and speed, reach, decay, kind
+  uWv: { value: Array.from({ length: WAVE_SLOTS }, () => new THREE.Vector4(0, 0, 0, 0)) },
+  uWvR: { value: Array.from({ length: WAVE_SLOTS }, () => new THREE.Vector4(1, 1, 1, 0)) },
   // soft pools of shade on the meadow under the solid things (the bikes, the rack, a target): where
   // something meets the ground. uDisc = x, z, cos, sin of the owner's frame; uDiscR = half-axes,
   // strength (0 = the slot is free). Written by game/groundShade.js.
@@ -305,13 +309,45 @@ const vec3 KC[12] = vec3[12](
 );
 `;
 
+// (3.0n) the surface of the water is not a plate. Every ring a body pushes into it is a travelling swell,
+// summed here in the vertex shader — so the normals the fragment shader derives from the displacement are the
+// real ones, and a crest catches the sonar the same way a root does.
+const WAVE_GLSL = /* glsl */ `
+#define MAXW ${WAVE_SLOTS}
+uniform float uTime;
+uniform vec4 uWv[MAXW];  // x, z, t0, amplitude
+uniform vec4 uWvR[MAXW]; // speed, reach, decay, kind (0 step, 1 body, 2 brute)
+float waveHeight(vec2 p, float t) {
+  float h = 0.0;
+  for (int i = 0; i < MAXW; i++) {
+    vec4 A = uWv[i];
+    if (A.w <= 0.0002) continue;
+    vec4 B = uWvR[i];
+    float age = t - A.z;
+    if (age < 0.0 || age > 3.4) continue;
+    float r = age * B.x;
+    if (r > B.y) continue;
+    float q = length(p - A.xy) - r; // how far behind the crest
+    if (q > 1.0 || q < -2.6) continue;
+    h += A.w * exp(-q * q * 1.4) * (1.0 - r / B.y) * exp(-age * B.z) * cos(q * 1.9);
+  }
+  return h;
+}
+`;
+
 const WORLD_VERT = /* glsl */ `
 attribute vec4 data;
 varying vec3 vWorld;
 varying vec3 vBary;
 varying float vKind;
+varying float vWave;
+${WAVE_GLSL}
 void main() {
   vec4 wp = modelMatrix * vec4(position, 1.0);
+  int kd = int(floor(data.w * 255.0 + 0.5));
+  float h = 0.0;
+  if (kd == 10) { h = waveHeight(wp.xz, uTime); wp.y += h; }
+  vWave = h;
   vWorld = wp.xyz;
   vBary = data.xyz;
   vKind = floor(data.w * 255.0 + 0.5);
@@ -330,6 +366,7 @@ uniform float uSelfLit; // (what's in your arms: you can always just about make 
 varying vec3 vWorld;
 varying vec3 vBary;
 varying float vKind;
+varying float vWave;
 
 ${KIND_COLORS_GLSL}${GARAGE_PAL_GLSL}// daylight palette: what the forest looks like when you can actually see it
 const vec3 DC[12] = vec3[12](
@@ -440,6 +477,15 @@ void main() {
   vec3 seen = dayC * near * (0.78 + 0.3 * st) * (wire > 0.0 ? 0.75 : 1.3); // (thin wire takes less of the light)
   if (k == 10) seen *= 0.75 + 0.5 * face; // water still moves
   col = mix(col, seen + col * 0.35, nat);
+
+  // (3.0n) a crest catches what light there is and a trough stays black: the ring is visible as a shape,
+  // not only as a bright circle drawn over a flat plane
+  if (k == 10 && abs(vWave) > 0.0004) {
+    float crest = clamp(vWave * 7.0, 0.0, 1.0);
+    float trough = clamp(-vWave * 4.0, 0.0, 0.6);
+    col += vec3(0.52, 0.64, 0.72) * crest * (0.18 + 0.6 * nat + 0.9 * ring) * (1.0 + uDawn * 0.5);
+    col *= 1.0 - trough;
+  }
 
   // The lookout's binoculars amplify what is actually in the image; the depth buffer still hides
   // everything behind walls / trees. This uniform is never consulted by lightAt or the Watcher's AI.

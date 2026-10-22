@@ -37,6 +37,7 @@ import { IntroCutscene } from './intro.js';
 import { CAP } from '../world/world.js';
 import { shared } from '../render/sonar.js';
 import { Pulses } from '../render/pulses.js';
+import { WaveField, waterKick } from './waves.js'; // (3.0n) the water answers whoever touches it
 import {PartMap} from './partMap.js';
 import { Angler } from './angler.js'; // 2.1o: the man with the lantern (see CFG.ANGLER)
 import { Stray } from './stray.js'; // 2.1v: the girl who takes the voice (see CFG.STRAY)
@@ -110,6 +111,8 @@ export class Game {
     this.mult = 1;
     this.hearingScale = 1;
     this.speedScale = 1;
+    // (3.0n) the rings travelling on the water: pure state, uploaded to the shader every frame
+    this.waves = new WaveField();
     this.onEnd = null; // (result) => void
     // co-op
     this.role = 'solo'; // solo | host | client
@@ -295,6 +298,7 @@ export class Game {
     this.glows.reset();
     this.fire.reset();
     this.pulses.clear();
+    this.waves.clear(); // (3.0n) no ring survives into the next night
     this.ghosts.clear();
     this.particles.clear();
     this.stones.clear();
@@ -441,10 +445,20 @@ export class Game {
     this.torch.update(dt);
     this.glows.update(dt);
     this.pulses.update(this.time);
+    this._waterFrame();
     this.audio.morningTick();
     this.fx.danger = 0;
     this._commonFx(dt);
     if (this.morningT >= CFG.SHIFT.MORNING + (this.auth ? 0 : 6)) this.startDusk(); // a guest only goes alone if the host never says
+  }
+
+  // (3.0n) retire the spent rings and hand the live ones to the shader: called with the pulses, so the water
+  // and the echo always agree about when a step happened
+  _waterFrame() {
+    // (the stub games some tests build have no field: make one rather than fail a frame)
+    if (!this.waves) this.waves = new WaveField();
+    this.waves.update(this.time);
+    this.waves.write(shared);
   }
 
   // ---------------- the training ground ----------------
@@ -505,6 +519,7 @@ export class Game {
     this.flares.update(dt);
     this.rescue.update(dt);
     this.pulses.update(this.time);
+    this._waterFrame();
 
     // HUD: the intro speaks once; then only what your hands are near
     if (this.time > 9 && this.time - dt <= 9) this.hud.setIntro(null);
@@ -575,6 +590,7 @@ export class Game {
     this.doors.update(dt);
     this.rescue.update(dt);
     this.pulses.update(this.time);
+    this._waterFrame();
     this._commonFx(dt);
     if (k >= CFG.DUSK_SECONDS) this.startNight();
   }
@@ -921,6 +937,7 @@ export class Game {
     const s = this.pulses.emit(h.x, h.y + 0.3, h.z, this.time, { radius: 17, strength: 1.0, decay: 0.55, color: STONE, kind: 'stone' });
     this.echoTicks(s, 0.35);
     this.audio.impact(h.x, h.y, h.z, h.water);
+    if (h.water) waterKick(this.waves, this.world, h.x, h.z, this.time, 'stone'); // (3.0n) it pushes the surface too
     this.particles.burst(h.x, h.y + 0.15, h.z, h.water ? 26 : 18, {
       color: h.water ? [0.5, 0.8, 1.0] : [0.9, 0.97, 1.0], speed: h.water ? 3.5 : 4.5, up: h.water ? 3 : 1.5,
       life: h.water ? 0.9 : 0.6, size: 0.09, gravity: -9, drag: 1,
@@ -2148,7 +2165,8 @@ export class Game {
       // (3.0b) a step in the water is a splash and a ring on the surface; on the planks it is a creak
       if (s.water) {
         this.audio.wade(s.intensity, s.depth || 0.3); // 3.0k: water under a foot has its own sound
-
+        // (3.0n) and the surface itself takes the push: a boot, a stride, a crouched tip-toe
+        waterKick(this.waves, this.world, p.x, p.z, this.time, s.mode === 'sprint' ? 'run' : s.mode === 'crouch' ? 'tap' : 'step', 0.7 + 0.5 * Math.min(1, (s.depth || 0.3) / 0.7));
         this.pulses.emitStep(p.x, this.world.water?.level ?? p.y, p.z, this.time, { radius: s.ring || 8, strength: 0.5, speed: 12, decay: 1.6, kind: 'step' });
       } else if (s.plank) {
         this.audio.creak(s.intensity);
@@ -2204,6 +2222,7 @@ export class Game {
 
     // ---- world ----
     this.pulses.update(this.time);
+    this._waterFrame();
     this.stones.update(dt, this);
     this.doors.update(dt);
     this.flares.update(dt);
@@ -2280,6 +2299,7 @@ export class Game {
     }
     this.mic.update(dt, this.audio.outputDb()); // keeps the meter honest; the dead make no noise
     this.pulses.update(this.time);
+    this._waterFrame();
     this.stones.update(dt, this);
     this.doors.update(dt);
     this.flares.update(dt);

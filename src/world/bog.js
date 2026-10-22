@@ -999,7 +999,7 @@ export function refreshWater(world) {
 // plane with the ground's edges showing through it.
 function buildWater(world) {
   const b = new MeshBuilder(40000);
-  const step = 4;
+  const step = 2; // (3.0n) the surface has to be fine enough to carry a swell: 2 m cells, ~22k triangles
   const half = world.half;
   b.identity();
   for (let z = -half; z < half; z += step) {

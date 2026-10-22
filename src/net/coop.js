@@ -8,6 +8,7 @@ import { settings, saveSettings } from '../core/storage.js';
 import { t } from '../core/i18n.js';
 import { myFit, cleanFit } from '../game/outfit.js';
 import { cleanLobbyRules } from './lobbyRules.js';
+import { cleanMap } from '../core/maps.js';
 import {currentIdentity} from '../core/identity.js';
 
 const LOBBY_TYPES = new Set(['hi', 'roster', 'full', 'start', 'bye', 'nm', 'lobby']);
@@ -259,6 +260,17 @@ export class Coop {
     if (!this.active || !this.isHost || this.phase !== 'lobby' || ![2, 4, 6].includes(value)) return false;
     this.rules = cleanLobbyRules({ ...this.rules, days: value });
     settings.shiftDays = value; saveSettings();
+    this._broadcastRoster(); this.emit('change'); return true;
+  }
+
+  // (3.0n) the host picks the участок from the lobby's own settings: it is the room's ground, so it belongs
+  // with the other rules instead of being whatever URL the host happened to open
+  setMap(value) {
+    if (!this.active || !this.isHost || this.phase !== 'lobby') return false;
+    const map = cleanMap(value);
+    if (map === this.rules.map) return false;
+    this.rules = cleanLobbyRules({ ...this.rules, map });
+    settings.shiftMap = map; saveSettings();
     this._broadcastRoster(); this.emit('change'); return true;
   }
 

@@ -46,7 +46,7 @@ export class Lobby {
     this.rulesButton.innerHTML='<span></span>';this.rulesButton.hidden=true;this.el.append(this.rulesButton);
     this.rulesPanel=document.createElement('section');this.rulesPanel.id='lobbyRules';this.rulesPanel.hidden=true;
     this.rulesPanel.setAttribute('role','dialog');this.rulesPanel.setAttribute('aria-modal','true');this.rulesPanel.setAttribute('aria-labelledby','lobbyRulesTitle');
-    this.rulesPanel.innerHTML='<div class="lobby-rules-backdrop"></div><div class="lobby-rules-card"><div class="rules-kicker">HUSH / GARAGE</div><h2 id="lobbyRulesTitle"></h2><p class="rule-authority"></p><div class="rules-line"><span></span><div class="rule-choices"><button type="button" data-hide="yes"></button><button type="button" data-hide="no"></button></div></div><div class="rules-line days-line"><span></span><div class="rule-choices"><button type="button" data-days="2"></button><button type="button" data-days="4"></button><button type="button" data-days="6"></button></div></div><p class="rules-explain"></p><p class="rule-place"></p><button type="button" class="rules-close"></button></div>';
+    this.rulesPanel.innerHTML='<div class="lobby-rules-backdrop"></div><div class="lobby-rules-card"><div class="rules-kicker">HUSH / GARAGE</div><h2 id="lobbyRulesTitle"></h2><p class="rule-authority"></p><div class="rules-line"><span></span><div class="rule-choices"><button type="button" data-hide="yes"></button><button type="button" data-hide="no"></button></div></div><div class="rules-line days-line"><span></span><div class="rule-choices"><button type="button" data-days="2"></button><button type="button" data-days="4"></button><button type="button" data-days="6"></button></div></div><div class="rules-line map-line"><span></span><div class="rule-choices"><button type="button" data-lmap="forest"></button><button type="button" data-lmap="bog"></button></div></div><p class="rules-map-note"></p><p class="rules-explain"></p><p class="rule-place"></p><button type="button" class="rules-close"></button></div>';
     this.el.append(this.rulesPanel);
     this.rulesPanel.addEventListener('keydown',e=>{
       if(!this.rulesOpen) return;
@@ -62,6 +62,7 @@ export class Lobby {
     this.rulesPanel.querySelector('.lobby-rules-backdrop').addEventListener('click',()=>this.closeRules());
     for(const button of this.rulesPanel.querySelectorAll('[data-hide]')) button.addEventListener('click',()=>{this.coop.setHideNames(button.dataset.hide==='yes');this.renderRules();});
     for(const button of this.rulesPanel.querySelectorAll('[data-days]')) button.addEventListener('click',()=>{this.coop.setDays(+button.dataset.days);this.renderRules();});
+    for(const button of this.rulesPanel.querySelectorAll('[data-lmap]')) button.addEventListener('click',()=>{this.coop.setMap(button.dataset.lmap);this.renderRules();});
     this._bind();
   }
 
@@ -242,9 +243,20 @@ export class Lobby {
     this.rulesPanel.querySelector('.rule-authority').textContent=t(host?'ruleHost':'ruleGuest');
     this.rulesPanel.querySelector('.rules-line > span').textContent=t('ruleHideNames');
     this.rulesPanel.querySelector('.rules-explain').textContent=t('ruleExplain');
-    // 3.0g: the участок is the host's ground, not a rule — say which one, and say if you are not on it
+    // 3.0g: the участок is the host's ground — and (3.0n) the host sets it right here, with the rest of the rules
     const rm = (r.map || 'forest') === 'bog' ? t('mapBog') : t('mapForest');
     this.rulesPanel.querySelector('.rule-place').textContent = `${t('ruleMap')}: ${rm}`;
+    const mapLine = this.rulesPanel.querySelector('.map-line');
+    if (mapLine) {
+      mapLine.querySelector('span').textContent = t('ruleMap');
+      for (const b of mapLine.querySelectorAll('[data-lmap]')) {
+        b.textContent = t(b.dataset.lmap === 'bog' ? 'mapBog' : 'mapForest');
+        b.disabled = !host;
+        b.setAttribute('aria-pressed', String((r.map || 'forest') === b.dataset.lmap));
+      }
+      const note = this.rulesPanel.querySelector('.rules-map-note');
+      if (note) note.textContent = t(host ? 'ruleMapHost' : 'ruleMapGuest');
+    }
     this.rulesPanel.querySelector('.rules-close').textContent=`${t('bagClose')} [ ESC ]`;
     for(const b of this.rulesPanel.querySelectorAll('[data-hide]')) { const yes=b.dataset.hide==='yes';b.textContent=t(yes?'ruleYes':'ruleNo');b.disabled=!host;b.setAttribute('aria-pressed',String(r.hideNames===yes)); }
     this.rulesPanel.querySelector('.days-line > span').textContent=t('ruleDays');
