@@ -233,7 +233,7 @@ export class Stray {
   _appear() {
     const g = this.g, s = S();
     const p = g.player;
-    const w = CFG.WORLD_WALL - 8;
+    const w = this.g.world.wall - 8;
     for (let k = 0; k < 30; k++) {
       const a = g.rng.float(0, Math.PI * 2), d = g.rng.float(s.appearFar[0], s.appearFar[1]);
       const x = p.x + Math.cos(a) * d, z = p.z + Math.sin(a) * d;

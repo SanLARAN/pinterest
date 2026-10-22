@@ -43,6 +43,8 @@ import { Stray } from './stray.js'; // 2.1v: the girl who takes the voice (see C
 import { buildSurvivor } from './survivor.js'; // 2.1v: her face, for the death close-up
 import { STRAY_FIT } from './stray.js';
 import { echoOf, mistScale } from './water.js'; // 3.0b: what water does to a sound
+import { inert } from '../core/inert.js'; // 3.0: a system the current map does not have
+import { syncPumps } from '../world/bog.js'; // 3.0c: a running pump drains its sector
 
 const RED = [1.0, 0.13, 0.08];
 const CUT_FADE = 13.9; // s into the fly-by when the screen starts going dark
@@ -62,6 +64,7 @@ export class Game {
   constructor(deps) {
     Object.assign(this, deps); // scene, camera, world, pulses, ghosts, eyes, particles, audio, mic, input, hud, radar, post
     this.hl = null; // the shift's highlight director (src/game/highlights.js), attached by main.js
+    this.map = this.world.mapId || 'forest'; // which участок this shift is on (3.0: 'forest' | 'bog')
     this.player = new Player(this.world);
     this.dread = new Dread(this, this.eyes);
     this.shards = new Shards(this.scene);
@@ -75,11 +78,12 @@ export class Game {
     this.rescue = new Rescue(this);
     this.angler = new Angler(this); // the man with the lantern, from the third night (see CFG.ANGLER)
     this.stray = new Stray(this); // the fourth night's girl: walk past her, never run (see CFG.STRAY)
-    this.escape = new Escape(this); // the forestry yard, the УАЗ and its four parts, the way out
+    // the forestry yard, the УАЗ and its four parts, the way out — the forest's, not the bog's
+    this.escape = this.map === 'forest' ? new Escape(this) : inert(Escape, this, { load: () => null, seatOf: () => -1 });
     this.cabinets = new Cabinets(this); // cupboards in the buildings (and the шкафандр)
-    this.torch = new Torches(this); // flashlights: one lies out there each night
+    this.torch = this.map === 'forest' ? new Torches(this) : inert(Torches, this, { hasLight: false }); // flashlights
     this.tools = new ForestTools(this);
-    this.expedition = new Expedition(this);
+    this.expedition = this.map === 'forest' ? new Expedition(this) : inert(Expedition, this);
     this.selfBody = new SelfBody(this); // yours, when you look down
     this.beyond = new Beyond(document.getElementById('beyond')); // co-op: the dead talk among themselves
     this.hud.onNoteClose = () => this.objectives.closeNote();
@@ -308,6 +312,7 @@ export class Game {
     this.morningAudio = false;
     this.events = [];
     this._resetNight();
+    if (this.map === 'bog') syncPumps(this.world, this.objectives.gens); // no pump runs yet: the water is where it was
     shared.uDawn.value = MORNING_LIGHT;
     shared.uMorning.value = 1;
     shared.uSun.value.set(0.42, 0.62, -0.66).normalize(); // a high, friendly sun
@@ -408,6 +413,7 @@ export class Game {
     else if (this.morningT > 19 && this.morningT < 26) hint = t('morningGen');
     hud.setHint(hint);
     this.objectives.update(dt, false);
+    if (this.map === 'bog') syncPumps(this.world, this.objectives.gens); // the bog's water (3.0c)
     this.doors.update(dt);
     this.rescue.update(dt); // the bleed clock and the carrying shoulder do not stop for the sun (2.1r)
     this.escape.update(dt); // the parts live and roll in daylight too (2.1q)
@@ -468,6 +474,7 @@ export class Game {
 
     // the same lamps, doors, cupboards and kit as a night — just without the night
     this.objectives.update(dt, false); // lamps + the camp generator's hum (no night logic when night=false)
+    if (this.map === 'bog') syncPumps(this.world, this.objectives.gens);
     this.objectives._interact(dt); // E: the rack, a bike, a door, a cupboard
     this.train?.update(dt); // the targets
     this.doors.update(dt);
@@ -545,6 +552,7 @@ export class Game {
       this.fx.shockAmp = 0.7;
     }
     this.objectives.update(dt, false);
+    if (this.map === 'bog') syncPumps(this.world, this.objectives.gens); // a pump started or stopped (3.0c)
     this.doors.update(dt);
     this.rescue.update(dt);
     this.pulses.update(this.time);
@@ -687,7 +695,7 @@ export class Game {
 
   spawnMonster(type, dmin, dmax) {
     const p = this._around();
-    const w = CFG.WORLD_WALL - 6;
+    const w = this.world.wall - 6;
     for (let k = 0; k < 40; k++) {
       const a = this.rng.float(0, Math.PI * 2), d = this.rng.float(dmin, dmax);
       const x = p.x + Math.cos(a) * d, z = p.z + Math.sin(a) * d;
@@ -706,7 +714,7 @@ export class Game {
 
   relocate(m) {
     const p = this._around();
-    const w = CFG.WORLD_WALL - 6;
+    const w = this.world.wall - 6;
     for (let k = 0; k < 30; k++) {
       const a = this.rng.float(0, Math.PI * 2), d = this.rng.float(55, 85);
       const x = p.x + Math.cos(a) * d, z = p.z + Math.sin(a) * d;

@@ -148,6 +148,8 @@ function shuffle(rng, a) {
 // camp first, then the sovkhoz and three of the four forest sites in a fresh order (2.1s):
 // every shift one forest generator stands down — its machine is scrap, its body keeps a note and nothing else
 export function pickChain(rng, siteCount = 6) {
+  // a smaller участок (the bog, 3.0c) has exactly five pumps, and all five are the shift: nothing to scrap
+  if (siteCount <= 5) return Array.from({ length: siteCount }, (_, i) => i);
   const dropped = 1 + Math.floor(rng.next() * 4);
   const pool = [1, 2, 3, 4, 5].filter((i) => i !== dropped && i < siteCount);
   return [0, ...shuffle(rng, pool)];

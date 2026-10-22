@@ -10,7 +10,7 @@ export class ForestNavigation {
  constructor(world){this.world=world;this.portals=[...(world.doors||[]),...(world.navBuildings||[])].map(buildingPortal);this.stamp=null;this.plansThisFrame=0;this.searches=0;this.expanded=0;}
  beginFrame(stamp){if(this.stamp!==stamp){this.stamp=stamp;this.plansThisFrame=0;}}
  radiusAt(x,z,r){for(const p of this.portals)if(Math.hypot(x-p.mid.x,z-p.mid.z)<1.8)return Math.min(r,.32);return r;}
- free(x,z,r=.5){const rr=this.radiusAt(x,z,r),w=this.world,L=w.lake;if(Math.max(Math.abs(x),Math.abs(z))>CFG.WORLD_WALL-1)return false;if(L&&Math.hypot(x-L.x,z-L.z)<L.r+.55+rr)return false;return w.col.free(x,z,rr);}
+ free(x,z,r=.5){const rr=this.radiusAt(x,z,r),w=this.world,L=w.lake;if(Math.max(Math.abs(x),Math.abs(z))>(w.wall??CFG.WORLD_WALL)-1)return false;if(L&&Math.hypot(x-L.x,z-L.z)<L.r+.55+rr)return false;return w.col.free(x,z,rr);}
  segment(a,b,r=.5){const d=distance(a,b),n=Math.max(1,Math.ceil(d/.2));for(let i=0;i<=n;i++)if(!this.free(a.x+(b.x-a.x)*i/n,a.z+(b.z-a.z)*i/n,r))return false;return true;}
  redirect(a,b){for(const p of this.portals){const ai=inside(p,a),bi=inside(p,b);if(ai===bi)continue;const near=ai?p.inside:p.outside,far=ai?p.outside:p.inside;
    const dx=a.x-p.mid.x,dz=a.z-p.mid.z,tangent=Math.abs(dx*p.c-dz*p.s),depth=Math.abs(dx*p.s+dz*p.c);

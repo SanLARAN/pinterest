@@ -286,7 +286,7 @@ export class Angler {
       if (i >= 0) g.monsters.splice(i, 1);
       this.body = null;
     }
-    const w = CFG.WORLD_WALL - 6;
+    const w = this.g.world.wall - 6;
     for (let k = 0; k < 40; k++) {
       const ang = g.rng.float(0, Math.PI * 2), d = g.rng.float(dmin, dmax);
       const x = cx + Math.cos(ang) * d, z = cz + Math.sin(ang) * d;
@@ -314,8 +314,9 @@ export class Angler {
     if (b.mode !== 'leave') {
       b.mode = 'leave';
       const ang = Math.atan2(b.x, b.z) + (Math.random() - 0.5);
-      b.tx = clamp(b.x + Math.sin(ang) * 90, -CFG.WORLD_WALL + 8, CFG.WORLD_WALL - 8);
-      b.tz = clamp(b.z + Math.cos(ang) * 90, -CFG.WORLD_WALL + 8, CFG.WORLD_WALL - 8);
+      const W = this.g.world.wall;
+      b.tx = clamp(b.x + Math.sin(ang) * 90, -W + 8, W - 8);
+      b.tz = clamp(b.z + Math.cos(ang) * 90, -W + 8, W - 8);
     }
     let near = 1e9;
     for (const q of this.g.livePlayers()) near = Math.min(near, Math.hypot(q.x - b.x, q.z - b.z));

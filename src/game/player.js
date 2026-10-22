@@ -93,7 +93,7 @@ export class Player {
     const ox = this.x, oz = this.z;
     const pos = { x: this.x + this.vx * dt, z: this.z + this.vz * dt };
     const hit = this.world.col.resolve(pos, P.radius);
-    const w = CFG.WORLD_WALL;
+    const w = this.world.wall;
     pos.x = clamp(pos.x, -w, w);
     pos.z = clamp(pos.z, -w, w);
     this.bumpCD -= dt;

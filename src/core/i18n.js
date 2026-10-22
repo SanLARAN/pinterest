@@ -306,7 +306,9 @@ const STR = {
     touchSkip: 'ПРОПУСТИТЬ',
     touchUse: 'РУКИ',
     // generators, bodies, notes
-    siteAt: { cabin3:'у южной охотничьей хижины',cabin4:'у восточной хижины',cabin5:'у западной хижины',camp: 'в лагере', cabin: 'у охотничьей избушки', tower: 'у старой вышки', stones: 'у каменного круга', wreck: 'у разбитой машины', sovkhoz: 'у совхозного коровника' },
+    siteAt: { cabin3:'у южной охотничьей хижины',cabin4:'у восточной хижины',cabin5:'у западной хижины',camp: 'в лагере', cabin: 'у охотничьей избушки', tower: 'у старой вышки', stones: 'у каменного круга', wreck: 'у разбитой машины', sovkhoz: 'у совхозного коровника',
+      // Торфяник (3.0)
+      pumpstation: 'у насосной', barracks: 'у затопленного барака', stacks: 'у торфяных складов', bridges: 'у мостков' },
     parts: { fuel: 'канистра бензина', plug: 'свеча зажигания', fuses: 'предохранители', belt: 'приводной ремень', battery: 'аккумулятор' },
     actions: { fuel: 'залить бензин', plug: 'вкрутить свечу', fuses: 'поменять предохранители', belt: 'натянуть ремень', battery: 'подключить аккумулятор' },
     noteKicker: 'записка',
@@ -1086,7 +1088,9 @@ const STR = {
     skipHint: 'Enter — skip',
     touchSkip: 'SKIP',
     touchUse: 'HANDS',
-    siteAt: { cabin3:'by the south hunting hut',cabin4:'by the east hut',cabin5:'by the west hut',camp: 'at the camp', cabin: 'by the hunting cabin', tower: 'by the old tower', stones: 'by the stone circle', wreck: 'by the wrecked truck', sovkhoz: 'by the sovkhoz cowshed' },
+    siteAt: { cabin3:'by the south hunting hut',cabin4:'by the east hut',cabin5:'by the west hut',camp: 'at the camp', cabin: 'by the hunting cabin', tower: 'by the old tower', stones: 'by the stone circle', wreck: 'by the wrecked truck', sovkhoz: 'by the sovkhoz cowshed',
+      // the peat bog (3.0)
+      pumpstation: 'by the pump house', barracks: 'by the flooded barracks', stacks: 'by the peat stacks', bridges: 'by the bridges' },
     parts: { fuel: 'a can of fuel', plug: 'a spark plug', fuses: 'fuses', belt: 'a drive belt', battery: 'a battery' },
     actions: { fuel: 'pour the fuel', plug: 'fit the spark plug', fuses: 'replace the fuses', belt: 'fit the belt', battery: 'connect the battery' },
     noteKicker: 'note',

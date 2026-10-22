@@ -233,6 +233,11 @@ export class World {
     this.col.add(x - rx * half, z - rz * half, x + rx * half, z + rz * half, D.d / 2, D.h, CAP.WOOD);
   }
 
+  // the edge a player and a monster are kept inside: the map's own, not the forest's 286
+  get wall() {
+    return this.half - 14;
+  }
+
   // is this point on a plank road? (the bog's decks stand over water; a player walking them is dry)
   onWalk(x, z, pad = 0) {
     for (const w of this.walks) {
@@ -1309,7 +1314,7 @@ export class World {
   }
 
   randomOpenPoint(rng, minFromSpawn = 20, tries = 60) {
-    const half = CFG.WORLD_WALL - 12;
+    const half = this.wall - 12;
     for (let i = 0; i < tries; i++) {
       const x = rng.float(-half, half), z = rng.float(-half, half);
       if (Math.hypot(x - this.spawn.x, z - this.spawn.z) < minFromSpawn) continue;

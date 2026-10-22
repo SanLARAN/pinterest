@@ -19,6 +19,9 @@ import { CAP } from './caps.js';
 const LEVEL = 0.34; // the water line, in world metres
 const HALF = 170;
 
+// what a running pump does: it drains the sector it stands in, 0.6 m in 40 m, and the water surface with it
+export const PUMP = { drainR: 40, drainDrop: 0.6 };
+
 // Six places. The first five carry a pump (the chain); the causeway is where the shift ends.
 export const BOG_LANDMARKS = [
   { id: 'camp', x: 0, z: 0, r: 18 }, // dry island: the tents, the fire, the cots
@@ -452,7 +455,10 @@ function genPumps(world, rng) {
     else { px = L.x + 2.2; pz = L.z + 2.4; }
     const y = world.terrain.height(px, pz);
     const yaw = Math.atan2(L.x - px, L.z - pz);
-    const site = { id, x: px, z: pz, y, yaw, corpse: null };
+    // whoever came out here to start it: a body on the dry ground by the pump, a note in its hand
+    const cx = px + Math.cos(yaw + 1.4) * 2.6, cz = pz - Math.sin(yaw + 1.4) * 2.6;
+    const corpse = { x: cx, z: cz, yaw: Math.atan2(px - cx, pz - cz) + rng.float(-0.6, 0.6), seed: rng.int(1, 1e6) };
+    const site = { id, x: px, z: pz, y, yaw, corpse };
     world.sites.push(site);
     world.addProp(px, pz, (b) => {
       b.identity();
@@ -586,7 +592,53 @@ function genGrowth(world, rng) {
   }
 }
 
+// ---------------------------------------------------------------- pumps
+
+// The shift's clock, read off the pumps: every running one drains its own sector, and the water surface is
+// redrawn when that set changes (a handful of times a night at most). Because it is derived from the generators'
+// state, it heals itself in co-op: a guest's pump drains the water on the host's screen and in everyone's list.
+export function pumpDrains(world, gens) {
+  const out = [];
+  for (const g of gens || []) {
+    if (!g.running) continue;
+    out.push({ x: g.site.x, z: g.site.z, r: PUMP.drainR, drop: PUMP.drainDrop });
+  }
+  return out;
+}
+
+// the same sectors? (order does not matter: it is a set of positions)
+export function sameDrains(a, b) {
+  if (a.length !== b.length) return false;
+  const key = (d) => `${d.x.toFixed(1)},${d.z.toFixed(1)}`;
+  const set = new Set(a.map(key));
+  return b.every((d) => set.has(key(d)));
+}
+
+// put the current drains into the map, and redraw the water if they changed. Returns true when it redrew.
+export function syncPumps(world, gens) {
+  const water = world.water;
+  if (!water) return false;
+  const next = pumpDrains(world, gens);
+  if (sameDrains(water.drains, next)) return false;
+  water.drains = next;
+  refreshWater(world);
+  return true;
+}
+
 // ---------------------------------------------------------------- water surface
+
+// Redraw the surface where the water stands now (a pump changed the level somewhere).
+export function refreshWater(world) {
+  for (let i = world.meshes.length - 1; i >= 0; i--) {
+    const m = world.meshes[i];
+    if (!m.userData.water) continue;
+    world.scene.remove(m);
+    m.geometry?.dispose();
+    world.meshes.splice(i, 1);
+  }
+  buildWater(world);
+  return world;
+}
 
 // The water itself, drawn as a sparse grid only where it stands: in the sonar it reads as a flat, quiet
 // plane with the ground's edges showing through it.

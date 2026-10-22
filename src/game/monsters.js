@@ -747,7 +747,7 @@ export class Monster {
       this.tx = this.x + Math.cos(a) * d;
       this.tz = this.z + Math.sin(a) * d;
     }
-    const w = CFG.WORLD_WALL - 8;
+    const w = this.game.world.wall - 8;
     this.tx = clamp(this.tx, -w, w);
     this.tz = clamp(this.tz, -w, w);
   }
@@ -873,7 +873,7 @@ export class Monster {
       const lx = pos.x - L.x, lz = pos.z - L.z, ld = Math.hypot(lx, lz);
       if (ld < L.r + 0.5) { const safe=Math.max(ld,.001),nx=ld>.001?lx/safe:1,nz=ld>.001?lz/safe:0;pos.x=L.x+nx*(L.r+.5);pos.z=L.z+nz*(L.r+.5); }
     }
-    const w = CFG.WORLD_WALL;
+    const w = this.game.world.wall;
     this.x = clamp(pos.x, -w, w);
     this.z = clamp(pos.z, -w, w);
     const moved = Math.hypot(this.x - ox, this.z - oz);
@@ -1198,7 +1198,7 @@ export class Watcher extends Monster {
 
   // somewhere behind someone, in the dark, away from the lamps
   appearBehind(p, dmin, dmax) {
-    const g = this.game, w = CFG.WORLD_WALL - 6;
+    const g = this.game, w = g.world.wall - 6;
     if (!p) return false;
     const f = p.forward();
     for (let k = 0; k < 40; k++) {
