@@ -520,7 +520,7 @@ export class Stray {
     // in a lamp's light: a sticky afterimage, the way a teammate in the dark is drawn
     if (this.rig.root.visible) {
       const str = Math.min(0.85, 0.25 + g.glowAt(this.x, this.y + 1.2, this.z) * 1.2);
-      if (!this.lampGhost) this.lampGhost = g.ghosts.spawn(this.rig, g.time, { sticky: true, strength: str, full: 0.25, color: 0xcdbf9f, jitter: 0.5 });
+      if (!this.lampGhost) this.lampGhost = g.ghosts.spawn(this.rig, g.time, { sticky: true, strength: str, full: 0.25, color: 0xcdbf9f, jitter: 0.15 }); // (3.0w: 0.5 shook her afterimage under a lamp — it read as a hitch)
       else { g.ghosts.refresh(this.lampGhost, this.rig); this.lampGhost.strength = str; }
     } else if (this.lampGhost) { g.ghosts.release(this.lampGhost); this.lampGhost = null; }
   }

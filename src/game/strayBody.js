@@ -258,15 +258,9 @@ export function strayVerts(R) {
 // st: { t, dt, mode, speed, sniff, anger } — mode is the controller's phase ('follow', 'anger', 'chase', 'grab',
 // 'leave', 'wear', 'away' or 'idle'); speed m/s; sniff 0..1 (it has stopped to smell the air); anger 0..1.
 //
-// The gait is a stop-motion one: the cycle is read in eighths and the pose snaps from one to the next, then
-// holds — a thing that walks like it remembers how, not like it learned. Everything else is blended on the rig's
-// own state (R.pose), so phases never pop.
-const STEP8 = PI / 4;
-function jerk(ph) {
-  const k = Math.floor(ph / STEP8);
-  const f = ph / STEP8 - k;
-  return (k + f * f * f * f) * STEP8; // snap late, hold long
-}
+// Everything is blended on the rig's own state (R.pose), so phases never pop. (3.0t walked her in stop-motion —
+// the cycle read in eighths, snapping and holding — and in play it read as the same hitch the author was chasing
+// in his own movement, so 3.0w gave her a smooth gait back.)
 const ease = (cur, want, k) => cur + (want - cur) * k;
 
 export function poseStray(R, st = {}) {
@@ -286,7 +280,7 @@ export function poseStray(R, st = {}) {
   const amp = clamp(speed / 1.6, 0, 1.3) * (1 - P.grab);
   // the gait: a walk on two legs, a gallop on four when it chases
   P.ph += dt * (speed * (P.run > 0.5 ? 2.6 : 3.4) + 0.001);
-  const ph = P.run > 0.5 ? P.ph : jerk(P.ph);
+  const ph = P.ph;
   const s = Math.sin(ph), c = Math.cos(ph);
   const run = P.run, walk = 1 - run;
 

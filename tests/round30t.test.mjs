@@ -1,7 +1,7 @@
 // 3.0t: Дворняжка — the Stray remade in the game's own style. Not a girl in a tee: a mongrel that learned to stand
 // like the people it followed, in someone else's ватник. Her own rig (game/strayBody.js) with a dog's legs — knee
 // forward, hock back, on its toes — arms to the knees, a muzzle with a jaw on its own hinge, hackles, eyeshine;
-// a stop-motion walk, stops to smell the air, a gallop on all fours, a grab at the throat. Her player skin is the
+// a walk on her toes (stop-motion in 3.0t, smooth since 3.0w), stops to smell the air, a gallop on all fours, a grab at the throat. Her player skin is the
 // muzzle as a mask and the torn coat; her sounds are a dog's (sniffs, whine, growl, nails) and a person's «эй».
 // (Replaces tests/round21w, which guarded the tee.)
 import test from 'node:test';
@@ -71,7 +71,7 @@ test('the arms hang to the knees, the coat hangs to mid-thigh, and the head is a
   assert.ok(nose[2] > skull[2] + 0.2, 'the nose is well in front of the skull');
 });
 
-test('nothing sinks into the ground in any gait, and the walk is stop-motion: snaps and holds', () => {
+test('nothing sinks into the ground in any gait, and the walk is smooth (3.0w: no more stop-motion)', () => {
   for (const mode of ['follow', 'anger', 'chase', 'grab', 'leave']) {
     const R = buildStrayBody();
     let worst = 9;
@@ -81,19 +81,18 @@ test('nothing sinks into the ground in any gait, and the walk is stop-motion: sn
     }
     assert.ok(worst > -0.025, `${mode}: lowest point ${worst.toFixed(3)} m`);
   }
-  // the walk: frame-to-frame changes of the thigh are mostly tiny, with a few big snaps
+  // the walk: frame-to-frame changes of the thigh stay even — no snaps, no holds (the author read them as hitches)
   const R = buildStrayBody();
   const d = [];
   let prev = null;
   for (let i = 0; i < 240; i++) {
     poseStray(R, { t: i / 60, dt: 1 / 60, mode: 'follow', speed: 1.3 });
     const x = R.nodes.thL.rotation.x;
-    if (prev !== null) d.push(Math.abs(x - prev));
+    if (prev !== null && i > 60) d.push(Math.abs(x - prev));
     prev = x;
   }
-  d.sort((a, b) => a - b);
-  const med = d[d.length >> 1], max = d[d.length - 1];
-  assert.ok(max > med * 6, `snaps against holds (max ${max.toFixed(3)}, median ${med.toFixed(4)})`);
+  const mean = d.reduce((a, b) => a + b, 0) / d.length, max = Math.max(...d);
+  assert.ok(max < mean * 2.5, `smooth: the biggest frame step (${max.toFixed(4)}) is close to the average (${mean.toFixed(4)})`);
 });
 
 test('the poses say what it is doing: sniffing, angry, galloping, taking', () => {

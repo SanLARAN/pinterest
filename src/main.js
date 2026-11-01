@@ -73,6 +73,7 @@ const DEBUG = {
   t: parseFloat(params.get('t')) || 0,
   speed: parseFloat(params.get('speed')) || 1,
   autostart: params.has('autostart'),
+  perfGraph: params.has('perf'), // (3.0w) a frame-time strip: which frames are long, and what happened in them
   range: params.has('range'), // (3.0u) a reload that was on its way to the training ground: play its film, not a shift
   night: params.has('night'), // skip the morning
   nointro: params.has('nointro'), // ...and the opening cut scene
@@ -217,6 +218,7 @@ function applyQuality() {
   resize();
 }
 function resize() {
+  perf.resizedAt = perf.frameNo; // (3.0w: the ?perf strip marks the frames that paid for a resize)
   const w = innerWidth, h = innerHeight;
   const p = renderPlan();
   perf.scale = Math.min(p.maxScale, Math.max(p.minScale, perf.scale));
@@ -1176,38 +1178,97 @@ function step(now, render) {
   shadows.update(camera);
   post.render(scene, camera);
   // 2.1u: the highlight director's eye — only while the night is actually running
+  const grabsBefore = hlGrabs;
   if (state === 'playing' && game && game.state !== 'idle') highlights.update(game.time, highlightFrame);
+  if (DEBUG.perfGraph) perfGraph(now, { faces: shadows.faces || 0, grab: hlGrabs !== grabsBefore, resized: perf.resizedAt === perf.frameNo, calls: renderer.info.render.calls });
+  perf.frameNo = (perf.frameNo || 0) + 1;
   if (state === 'menu' && !MENU_COVERS.some((id) => menus.isOpen(id))) wardrobe.menuFrame(rawDt);
 }
 
 // ---------------- the highlight reel's eye (2.1u) ----------------
-// A small JPEG of what is on screen right now. The director asks for one at ~10 a second; drawing a WebGL
-// canvas into a 640×360 2D canvas is cheap, and the encode is asynchronous, so the night does not hitch.
+// A small JPEG of what is on screen right now. The director asks for one at ~10 a second.
 // (Called right after post.render, in the same frame: the drawing buffer is still there.)
+//
+// (3.0w) It used to be drawImage(webglCanvas) into a 2D canvas, right here in the frame. That is a synchronous
+// read of the GPU's picture: the CPU stops until the GPU has finished the frame, ten times a second — a hitch you
+// feel as «micro-teleports» while walking, and the heavier the frame (under a lamp, in daylight) the longer each
+// stop. Now createImageBitmap takes the snapshot without waiting for it, and the shrink and the JPEG happen later,
+// off the frame. The old path stays only for a browser without createImageBitmap.
 const HL_W = HL_CAPTURE.w, HL_H = HL_CAPTURE.h;
-let hlGrabber = null;
+let hlGrabber = null, hlGrabs = 0;
 function highlightFrame(t) {
+  hlGrabs++;
   try {
     if (!hlGrabber) {
       const cv = document.createElement('canvas');
       cv.width = HL_W; cv.height = HL_H;
       const ctx = cv.getContext('2d', { alpha: false });
       if (!ctx) return null;
-      hlGrabber = { cv, ctx };
+      hlGrabber = { cv, ctx, busy: 0 };
     }
     const src = renderer.domElement;
     const { cv, ctx } = hlGrabber;
     const sw = src.width || 1, sh = src.height || 1;
     const k = Math.max(HL_W / sw, HL_H / sh); // cover: no black bars in the reel
     const w = sw * k, h = sh * k;
-    ctx.drawImage(src, (HL_W - w) / 2, (HL_H - h) / 2, w, h);
-    const blob = new Promise((res) => {
+    const encode = () => new Promise((res) => {
       try { cv.toBlob((b) => res(b), 'image/jpeg', HL_CAPTURE.q); } catch { res(null); }
     });
-    return { t, blob };
+    if (typeof createImageBitmap === 'function') {
+      if (hlGrabber.busy > 3) return null; // (a slow encoder: skip a frame rather than queue them up)
+      hlGrabber.busy++;
+      const blob = createImageBitmap(src, { resizeWidth: Math.max(1, Math.round(w)), resizeHeight: Math.max(1, Math.round(h)), resizeQuality: 'low' })
+        .then((bmp) => {
+          ctx.drawImage(bmp, (HL_W - w) / 2, (HL_H - h) / 2);
+          bmp.close?.();
+          return encode();
+        })
+        .catch(() => null)
+        .finally(() => { hlGrabber.busy--; });
+      return { t, blob };
+    }
+    ctx.drawImage(src, (HL_W - w) / 2, (HL_H - h) / 2, w, h);
+    return { t, blob: encode() };
   } catch {
     return null; // (no canvas / a lost context: the reel simply has nothing to keep)
   }
+}
+
+// ---------------- ?perf (3.0w) ----------------
+// A strip of the last 240 frame times in the corner (red: longer than 25 ms), how many long frames in the last
+// ten seconds, and what the longest of them was doing: shadow faces redrawn, a resize, a reel snapshot, draw calls.
+// For «it jerks on my machine»: a screenshot of this says which.
+const PG = { n: 240, dt: new Float32Array(240), flags: [], i: 0, last: 0, el: null, ctx: null };
+function perfGraph(now, info) {
+  if (!PG.el) {
+    PG.el = document.createElement('canvas');
+    PG.el.width = 480; PG.el.height = 120;
+    PG.el.style.cssText = 'position:fixed;right:10px;bottom:10px;z-index:300;width:480px;height:120px;background:rgba(0,0,0,.72);border:1px solid #445;pointer-events:none';
+    document.body.appendChild(PG.el);
+    PG.ctx = PG.el.getContext('2d');
+  }
+  const dt = PG.last ? now - PG.last : 16.7;
+  PG.last = now;
+  PG.dt[PG.i] = dt;
+  PG.flags[PG.i] = { ...info, at: now };
+  PG.i = (PG.i + 1) % PG.n;
+  const c = PG.ctx;
+  c.fillStyle = '#05070a'; c.fillRect(0, 0, 480, 120);
+  c.fillStyle = '#334'; c.fillRect(0, 120 - 16.7 * 2, 480, 1); c.fillRect(0, 120 - 33.3 * 2, 480, 1); // 60 and 30 fps lines
+  let worst = -1, wv = 0, long = 0, sum = 0;
+  for (let k = 0; k < PG.n; k++) {
+    const j = (PG.i + k) % PG.n, v = PG.dt[j];
+    sum += v;
+    if (v > 25) long++;
+    if (v > wv) { wv = v; worst = j; }
+    c.fillStyle = v > 25 ? '#e0473c' : v > 18 ? '#d8b26a' : '#7fa88a';
+    const hgt = Math.min(118, v * 2);
+    c.fillRect(k * 2, 120 - hgt, 2, hgt);
+  }
+  const f = PG.flags[(worst - 1 + PG.n) % PG.n] || {}; // (a long interval is paid for by the frame before it)
+  c.fillStyle = '#d6cdc0'; c.font = '11px monospace';
+  c.fillText(`avg ${(sum / PG.n).toFixed(1)} ms · long >25ms: ${long}/240 · worst ${wv.toFixed(0)} ms`, 6, 13);
+  c.fillText(`worst frame: shadow faces ${f.faces ?? '-'} · reel grab ${f.grab ? 'YES' : 'no'} · resize ${f.resized ? 'YES' : 'no'} · calls ${f.calls ?? '-'}`, 6, 27);
 }
 
 // (3.0h) a failed boot says so, and offers the one ground that is known to build. Before this, any throw in the

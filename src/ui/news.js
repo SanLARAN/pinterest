@@ -7,6 +7,19 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v:'3.0w',date:'2026-11-01',
+    ru:{title:'Без микро-рывков',items:[
+      'Найдена причина «микро-телепортов» при ходьбе: сборник смены десять раз в секунду копировал кадр игры так, что процессор каждый раз ждал, пока видеокарта дорисует картинку. Чем тяжелее кадр — под лампой, днём, — тем дольше было ожидание. Теперь кадр для сборника снимается без ожидания, а сжатие идёт отдельно от игры.',
+      'Найдёныш снова ходит плавно: походка «как плохая плёнка» из прошлого обновления читалась как такой же рывок. Его отпечаток в свете лампы почти не дрожит.',
+      'Если что-то всё ещё дёргается — добавь к адресу ?perf: в углу появится полоска времени кадров и подпись, что происходило в самом долгом из них. Скриншот этой полоски скажет, в чём дело.',
+    ]},
+    en:{title:'No more micro-hitches',items:[
+      'Found the cause of the "micro-teleports" while walking: the shift reel copied the game frame ten times a second in a way that made the CPU wait for the GPU to finish the picture each time. The heavier the frame — under a lamp, in daylight — the longer the wait. Now the reel takes its snapshot without waiting, and the compression happens apart from the game.',
+      'The Stray walks smoothly again: last update\'s "badly shot film" gait read as the same hitch. Its afterimage under a lamp barely shakes.',
+      'If anything still jerks, add ?perf to the address: a strip of frame times appears in the corner with a note on what the longest frame was doing. A screenshot of it will tell what is wrong.',
+    ]},
+  },
+  {
     v:'3.0v',date:'2026-11-01',
     ru:{title:'Мышь как мышь',items:[
       'Камера больше не переходит в режим «зажми ЛКМ и тяни». Раньше хватало двух неудачных попыток захватить мышь — например, дважды закрыть рюкзак клавишей Esc, — и до перезагрузки страницы взгляд водился только с зажатой кнопкой. Теперь следующий клик просто снова захватывает мышь.',
