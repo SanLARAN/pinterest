@@ -7,6 +7,23 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v:'3.0r',date:'2026-11-01',
+    ru:{title:'Свои слова',items:[
+      'Торфяник больше не говорит лесными словами. Подсказка в начале смены — «у насоса лежит тело», а не у генератора; утром «насос чавкает», а не «генератор тарахтит»; на часах и в паузе — насосы, а не генераторы.',
+      'Вместо «УАЗ 0/4» на часах теперь трос лебёдки в процентах: на болоте нет деталей, которые надо искать, есть машина, которую надо вытащить.',
+      'Экран итогов после выезда — «ПРОЧЬ С ТОРФЯНИКА» и старая колея, а не лес и ночное шоссе; строки «детали УАЗа» на болоте больше нет.',
+      'В английской версии из болотных подсказок и записок убраны русские слова («the проезд», «the участок»), а у Утопленника в новостях больше нет русской «Д».',
+      'Исправлен редкий сбой в кооперативе на торфянике: запрос гостя «взять фонарик» ронял игру у хозяина комнаты — фонарика на болоте нет, и заглушка не знала, что ответить.',
+    ]},
+    en:{title:'Its own words',items:[
+      'The bog no longer talks like the forest. The first hint of the shift is "there is a body by the pump", not by the generator; the morning line is the pump slurping in the rain; the watch and the pause screen count pumps, not generators.',
+      'Where the watch used to show "UAZ 0/4" it now shows the winch cable in per cent: on the bog there are no parts to find, only a car to drag out.',
+      'The end screen after driving off says "OFF THE BOG" and the old track, not the forest and the night highway; the "UAZ parts" row is gone on the bog.',
+      'The English bog hints and notes lost their Russian words ("the проезд", "the участок"), and the Drowned in the news no longer starts with a Cyrillic letter.',
+      'Fixed a rare co-op crash on the bog: a guest asking to pick up a flashlight brought the host\'s game down — there is no flashlight on the bog, and its stand-in had no answer.',
+    ]},
+  },
+  {
     v:'3.0q',date:'2026-10-22',
     ru:{title:'Разлом',items:[
       'На острове, где стоит лагерь, у самой воды — бетонный колпак с надписью НС-3 и стальной дверью на замке под током. Под лагерем убежище, которое торфоразработки вырыли в пятидесятых и забыли: площадка с лестницей, коридор на рёбрах в двадцать с лишним метров и дальний зал, где стена разошлась',
@@ -17,7 +34,7 @@ export const NEWS = [
     ]},
     en:{title:'The rift',items:[
       'On the island the camp stands on, at the edge of the water, there is a concrete cap marked НС-3 with a steel door on a mains lock. Under the camp is a shelter the peat works dug in the fifties and forgot: a landing with a ladder, a corridor on ribs better than twenty metres long, and a vault at the far end where the wall has come apart',
-      'The way off the участок no longer opens by itself: five pumps put the camp on the mains, and only then does the cap\'s lock let go. The contactor of the gate on the causeway hangs off a breaker in the shelter, at the very far end of the corridor. You go down, walk past the lamps and the ribs, and put your hand on the lever',
+      'The way off the site no longer opens by itself: five pumps put the camp on the mains, and only then does the cap\'s lock let go. The contactor of the gate on the causeway hangs off a breaker in the shelter, at the very far end of the corridor. You go down, walk past the lamps and the ribs, and put your hand on the lever',
       'After that none of it is yours. The gate on the way out lifts, the wall at the end of the corridor answers, and the lamps go out one by one — from the far end back toward you. What is left in the dark is red: the rift wakes up and lets its own out',
       'The shelter\'s doors start down and take exactly three minutes. Back along the corridor at a run, past the eyes, to the ladder: make it and you are on the island with the cap standing open above you; don\'t, and the shelter keeps you. Whatever catches you kills you as the Rift',
       'The closing doors have a siren of their own, apart from the gate\'s: lower, slower, and it does not stop. And with the gate down there is no driving out: the ford is not the argument any more, the road is shut',
@@ -46,11 +63,11 @@ export const NEWS = [
       'С колёс УАЗа в гараже убран белый кубик «вентиля», который торчал из покрышки и мерцал, и второй ряд протекторов, прорезавший первый. Колесо теперь просто колесо',
     ]},
     en:{title:'The water answers',items:[
-      'The bog\'s surface is no longer a plane that only lights up: it moves. A boot in the water, a friend\'s boot, a thrown stone, every stride of the Дrowned — all of them push it, and a ring runs out from the spot, lives a second or two and settles',
+      'The bog\'s surface is no longer a plane that only lights up: it moves. A boot in the water, a friend\'s boot, a thrown stone, every stride of the Drowned — all of them push it, and a ring runs out from the spot, lives a second or two and settles',
       'Rings add up: two trails side by side give twice the wave, and deep water answers harder than a puddle. The crest catches the echo and glows, the trough stays black — you see the wave as a shape, not just a bright circle drawn on top',
       'The water grid is four times finer (2 m cells instead of 4): a swell has to have something to be. Twenty-one thousand triangles for the whole map',
-      'The host picks the участок in the lobby\'s own settings, next to the shift length: FORESTRY or PEAT BOG. Everyone moves to that ground at the start — a guest does not even need to know which URL the host opened',
-      'The wheels of the garage УАЗ lost the white \"valve\" cube that poked out of the tyre and shimmered, and the second ring of tread blocks that cut through the first. A wheel is just a wheel again',
+      'The host picks the site in the lobby\'s own settings, next to the shift length: FORESTRY or PEAT BOG. Everyone moves to that ground at the start — a guest does not even need to know which URL the host opened',
+      'The wheels of the garage UAZ lost the white \"valve\" cube that poked out of the tyre and shimmered, and the second ring of tread blocks that cut through the first. A wheel is just a wheel again',
     ]}
   },
   {
@@ -62,8 +79,8 @@ export const NEWS = [
       'Портативная сборка для Windows теперь обновляет себя: раз в несколько часов она спрашивает страницу релизов, и если там новее, в меню появляется строка «есть сборка 1.0.N — скачать». Скачивает рядом с собой и подменяет старый .exe при выходе',
     ]},
     en:{title:'One car, one way out',items:[
-      'The shift used to arrive in one УАЗ and drive home in another — a wreck at the end of the causeway. Now there is one car on the участок: the one that brought you, standing where the opening film left it, nose into the flooded проезд, rear wheels on the bank',
-      'Getting out takes two things, and both are what the night is about. The проезд has to be pumped down: while the water is up the starter turns and the engine drinks — THE ENGINE IS FLOODED — so the camp pump comes first. And the car has to come out of the rut: a winch on its own bumper, a cable back to a stake on the bank, twenty-five seconds of handle',
+      'The shift used to arrive in one UAZ and drive home in another — a wreck at the end of the causeway. Now there is one car on the site: the one that brought you, standing where the opening film left it, nose into the flooded track, rear wheels on the bank',
+      'Getting out takes two things, and both are what the night is about. The flooded track has to be pumped down: while the water is up the starter turns and the engine drinks — THE ENGINE IS FLOODED — so the camp pump comes first. And the car has to come out of the rut: a winch on its own bumper, a cable back to a stake on the bank, twenty-five seconds of handle',
       'The drum only holds while you turn it: let go and the car slides back. Every dead pump unwinds 0.6 % a second, so the pumps and the drum are the same argument',
       'The portable Windows build now updates itself: every few hours it asks the releases page, and if there is a newer one the menu offers \"build 1.0.N is out — download\". It downloads next to itself and swaps the old .exe out when you quit',
     ]}
@@ -79,11 +96,11 @@ export const NEWS = [
       'У насосов свой голос: ход поршня, стук клапана и вода, уходящая по шлангу. Генераторного гула и писка у них больше нет ни на старте, ни в работе',
     ]},
     en:{title:'Peat bog: we made it',items:[
-      'The shift no longer opens with a camera falling out of the sky: a UAZ comes up the old track out of the rain and stops at the water — the проезд is flooded, and that is as far as the road goes. Which is the whole night: until the pumps run, the car stays where it is',
+      'The shift no longer opens with a camera falling out of the sky: a UAZ comes up the old track out of the rain and stops at the water — the flooded track is flooded, and that is as far as the road goes. Which is the whole night: until the pumps run, the car stays where it is',
       'Doors, four of them out, and they wade the flooded stretch on foot — a splash on every boot where the water actually is. Then a cut, and they are at the pump, each at their own job: the suction line to the water, the lever, water into the casing, a stake with a red rag at the edge',
       'The lever takes water — and only then does the day go: the sky dies over a running pump instead of over a fire',
-      'The camp is a base at a washed-out road now: two ridge tents for four, a ring of stones on the fire itself, a table with the shift log, a fuel drum, crates. The camp pump moved to the проезд, its suction line lies in the water, and there is a board with a red rag at the bank',
-      'The night\'s aim is worded differently: "the проезд is under water — start the camp pump and it drains". The five pumps are still the chain, but they are no longer generators for a gate',
+      'The camp is a base at a washed-out road now: two ridge tents for four, a ring of stones on the fire itself, a table with the shift log, a fuel drum, crates. The camp pump moved to the flooded track, its suction line lies in the water, and there is a board with a red rag at the bank',
+      'The night\'s aim is worded differently: "the track is under water — start the camp pump and it drains". The five pumps are still the chain, but they are no longer generators for a gate',
       'The pumps have their own voice: a piston stroke, a valve knocking, water running away down the line. No generator hum and no beep, at the start or in the running',
     ]}
   },

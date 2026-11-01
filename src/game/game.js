@@ -99,7 +99,7 @@ export class Game {
     // world.bunker out there, and the class says so itself (every call a no-op, every field false)
     this.bunker = new Bunker(this);
     this.cabinets = new Cabinets(this); // cupboards in the buildings (and the шкафандр)
-    this.torch = this.map === 'forest' ? new Torches(this) : inert(Torches, this, { hasLight: false, has: false, on: false, charge: 0 }); // flashlights
+    this.torch = this.map === 'forest' ? new Torches(this) : inert(Torches, this, { hasLight: false, has: false, on: false, charge: 0, items: [], spare: 0 }); // flashlights (3.0r: `items`/`spare` too — a guest's torch claim used to throw on the host)
     this.tools = new ForestTools(this);
     this.expedition = this.map === 'forest' ? new Expedition(this) : inert(Expedition, this);
     this.selfBody = new SelfBody(this); // yours, when you look down
@@ -439,7 +439,7 @@ export class Game {
     else hud.setIntro(null);
     let hint = null;
     if (this.morningT > 8 && this.morningT < 17) hint = this.input.touch ? t('morningHintTouch') : t('morningHint');
-    else if (this.morningT > 19 && this.morningT < 26) hint = t('morningGen');
+    else if (this.morningT > 19 && this.morningT < 26) hint = t(this.map === 'bog' ? 'morningGenBog' : 'morningGen');
     hud.setHint(hint);
     this.objectives.update(dt, false);
     if (this.map === 'bog') syncPumps(this.world, this.objectives.gens); // the bog's water (3.0c)
@@ -1375,8 +1375,8 @@ export class Game {
     g.paid = true;
     this.score += pts;
     this.hud.popup(pts > 0
-      ? (by ? `+${Math.round(pts)} · ${t('mateStarted').replace('{name}', this.nameOf(by))}` : `+${Math.round(pts)}`)
-      : t('genRestarted'), 'amber');
+      ? (by ? `+${Math.round(pts)} · ${t(this.map === 'bog' ? 'mateStartedBog' : 'mateStarted').replace('{name}', this.nameOf(by))}` : `+${Math.round(pts)}`)
+      : t(this.map === 'bog' ? 'genRestartedBog' : 'genRestarted'), 'amber');
     // (3.0g) on the bog the chain is pumps: same five, different machine
     this.hud.flashAlert(t(this.map === 'bog' ? 'aPumpOn' : 'aGenOn').replace('{n}', count), 'dawn', 2.6);
     this.hud.peek(4);
@@ -1397,7 +1397,7 @@ export class Game {
     this.hlNote('genBroken');
     this.stats.gens = this.objectives.count;
     if (!remote && this.sab && this.sab.day === this.day) this.sab.done++;
-    this.hud.flashAlert(t('aGenBroken').replace('{site}', this.objectives.siteAt(g.site)), 'danger', 3);
+    this.hud.flashAlert(t(this.map === 'bog' ? 'aGenBrokenBog' : 'aGenBroken').replace('{site}', this.objectives.siteAt(g.site)), 'danger', 3);
     this.hud.peek(4);
     this.audio.sting(0.4);
     this.noise(g.x, g.z, g.spec.startLoud, 'repair'); // the death rattle carries: things come to look
@@ -2577,7 +2577,7 @@ export class Game {
       hud.setHint(touch ? t('tutMoveTouch') : t('tutMove'));
       if (tut.t > 7) { tut.step = 2; tut.t = 0; }
     } else if (tut.step === 2) {
-      hud.setHint(touch ? t('tutUseTouch') : t('tutUse'));
+      hud.setHint(touch ? t('tutUseTouch') : t(this.map === 'bog' ? 'tutUseBog' : 'tutUse')); // (3.0r: the bog's machine is a pump)
       if (tut.t > 9 || this.stats.bodies > 0) { tut.step = 3; tut.t = 0; }
     } else if (tut.step === 3) {
       hud.setHint(touch ? t('tutStoneTouch') : t('tutStone'));

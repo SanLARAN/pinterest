@@ -114,11 +114,12 @@ export class FieldView {
   drawLCD() {
     const g=this.g,p=g.player;
     if(!this.lcd) return;
-    const task=g.objectives.taskText()||t('watchFind');
+    const bog=g.map==='bog'; // (3.0r) the bog counts pumps and the winch's cable, not generators and car parts
+    const task=g.objectives.taskText()||t(bog?'watchFindBog':'watchFind');
     const calm=Math.ceil(g.calmLeft?.()||0),state=g.state,S=CFG.SHIFT;
     // the shift has four days: the big number counts DOWN — to dusk in the morning, to dawn at night
     const rem=state==='play'?Math.max(0,S.NIGHT-(g.time||0)):state==='morning'?Math.max(0,S.MORNING-(g.morningT||0)):(g.time||0);
-    const info={time:fmtTime(rem),day:`${g.day||1}/${g.daysTotal||S.DAYS}`,gens:g.objectives.count||0,parts:g.escape.count||0,score:Math.floor(g.score||0),mult:(g.mult||1).toFixed(1),team:g.online?`${g.livePlayers().length}/${g.remotes.size+1}`:'1/1',pos:fmtPos(p.x,p.z),calm,task,torch:g.torch.has?Math.ceil(g.torch.charge*100):null};
+    const info={time:fmtTime(rem),day:`${g.day||1}/${g.daysTotal||S.DAYS}`,gens:g.objectives.count||0,parts:g.escape.count||0,winch:bog?Math.round((g.winch?.p||0)*100):0,score:Math.floor(g.score||0),mult:(g.mult||1).toFixed(1),team:g.online?`${g.livePlayers().length}/${g.remotes.size+1}`:'1/1',pos:fmtPos(p.x,p.z),calm,task,torch:g.torch.has?Math.ceil(g.torch.charge*100):null};
     const key=JSON.stringify(info)+t('watchTime')+state;if(key===this.lcdKey) return;this.lcdKey=key;this.data=info;
     const c=this.lcd;c.fillStyle='#151c1d';c.fillRect(0,0,512,672);
     c.fillStyle='#ccd5cd';c.font='bold 40px monospace';c.fillText('HUSH',34,64);
@@ -128,9 +129,9 @@ export class FieldView {
     const bg=c.createLinearGradient(0,145,0,558);bg.addColorStop(0,'#9da78b');bg.addColorStop(.5,'#c0ceb0');bg.addColorStop(1,'#8caa98');c.fillStyle=bg;c.fillRect(36,146,440,410);
     c.fillStyle='#1e322a';c.font='bold 20px monospace';c.fillText(`${t('watchDayN').replace('{n}',g.day||1).replace('{d}',g.daysTotal||S.DAYS)} · ${t(state==='morning'?'watchDay':'watchNight')}`,51,177);
     c.font='bold 76px monospace';c.fillText(info.time,46,254);
-    c.font='bold 23px monospace';c.fillText(`${t('watchGens')} ${info.gens}/5`,51,291);
+    c.font='bold 23px monospace';c.fillText(`${t(bog?'watchGensBog':'watchGens')} ${info.gens}/5`,51,291);
     for(let i=0;i<5;i++){c.globalAlpha=i<info.gens?1:.18;c.fillRect(301+i*29,270,20,21);}c.globalAlpha=1;
-    c.font='bold 22px monospace';c.fillText(`${t('watchCar')} ${info.parts}/4   ${t('watchAlive')} ${info.team}`,51,324);
+    c.font='bold 22px monospace';c.fillText(`${bog?`${t('watchWinch')} ${info.winch}%`:`${t('watchCar')} ${info.parts}/4`}   ${t('watchAlive')} ${info.team}`,51,324);
     c.fillText(`${t('watchScore')} ${String(info.score).padStart(5,'0')}  x${info.mult}`,51,357);
     c.font='20px monospace';c.fillText(calm>0?`${t('watchCalm')} ${calm}s`:info.torch!==null?`${t('watchBat')} ${info.torch}%`:`${t('watchBag')} ${g.inventory.slots.filter(Boolean).length}/4`,51,388);
     c.fillRect(51,402,410,2);
@@ -143,7 +144,7 @@ export class FieldView {
     c.fillText(`${t('watchPos')} ${info.pos}`,51,540);
     c.fillStyle='#7b9390';c.font='bold 20px monospace';c.textAlign='center';c.fillText('ALARM · CHRONOGRAPH',256,604);c.font='16px monospace';c.fillText('LIGHT                 DATA',256,645);c.textAlign='left';
     this.lcdTex.needsUpdate=true;
-    if(this.a11y) this.a11y.textContent=`${t('watchDayN').replace('{n}',g.day||1).replace('{d}',g.daysTotal||S.DAYS)}. ${info.time}. ${t('generators')} ${info.gens}/5. ${t('watchCar')} ${info.parts}/4. ${t('score')} ${info.score} x${info.mult}. ${t('watchAlive')} ${info.team}. ${t('watchPos')} ${info.pos}. ${calm?`${t('watchCalm')} ${calm}. `:''}${task}`;
+    if(this.a11y) this.a11y.textContent=`${t('watchDayN').replace('{n}',g.day||1).replace('{d}',g.daysTotal||S.DAYS)}. ${info.time}. ${t(bog?'pumps':'generators')} ${info.gens}/5. ${bog?`${t('watchWinch')} ${info.winch}%`:`${t('watchCar')} ${info.parts}/4`}. ${t('score')} ${info.score} x${info.mult}. ${t('watchAlive')} ${info.team}. ${t('watchPos')} ${info.pos}. ${calm?`${t('watchCalm')} ${calm}. `:''}${task}`;
   }
   place(camera,show) {
     const g=this.g,bag=g.inventory,reach=bag.progress,k=ease(clamp(this.watch,0,1));

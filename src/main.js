@@ -797,7 +797,7 @@ function pause() {
   $('pauseStats').innerHTML = training
     ? t('trainingSmall')
     : night
-    ? `${fmtTime(game.time)} · ${t('generators')} ${game.objectives.count}/5<br>${t('score')} ${fmtScore(game.score)} ×${game.mult.toFixed(1)}`
+    ? `${fmtTime(game.time)} · ${t(game.map === 'bog' ? 'pumps' : 'generators')} ${game.objectives.count}/5<br>${t('score')} ${fmtScore(game.score)} ×${game.mult.toFixed(1)}`
     : `${t('morningBig')}`;
   $('btnRestartP').hidden = training;
   renderPauseVoices();
@@ -943,7 +943,7 @@ function onEnd(res) {
   const hlEnd = res.escaped ? (res.won ? 'escape' : 'left') : (res.won ? 'win' : 'death');
   highlights.note(hlEnd, { cause: res.cause });
   highlights.stop();
-  menus.showOver(res, stats, rank, list, team);
+  menus.showOver({ map: game.map, ...res }, stats, rank, list, team); // (3.0r: the end screen speaks the ground's words)
   paintReelButton();
   // the night's own trailer: solo, a few moments to speak of, and you have not touched the results yet
   overTouched = false;

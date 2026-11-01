@@ -138,7 +138,7 @@ export class HUD {
       const calm = g.calmLeft ? Math.ceil(g.calmLeft()) : 0;
       const quiet = calm > 0 ? ` · ${t('calmLeft').replace('{s}', calm)}` : '';
       const car = g.escape && g.escape.power ? ` · ${t('aCarParts').replace('{n}', g.escape.count)}` : '';
-      this._set('ps', this.peekSub, `${t('generators')} ${gens}/5${car} · ${t('score')} ${fmtScore(g.score)} ×${g.mult.toFixed(1)}${team}${quiet}`);
+      this._set('ps', this.peekSub, `${t(g.map === 'bog' ? 'pumps' : 'generators')} ${gens}/5${car} · ${t('score')} ${fmtScore(g.score)} ×${g.mult.toFixed(1)}${team}${quiet}`);
       this._set('ptask', this.peekTask, g.objectives.taskText());
       if (this.cache.pg !== gens) {
         this.cache.pg = gens;
