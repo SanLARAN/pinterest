@@ -2,8 +2,8 @@
 //
 // The game connects players directly (WebRTC). Most of the time STUN is enough; when it is not — mobile internet,
 // carrier-grade NAT, strict office Wi-Fi, which is what «my friend in another country can't join» usually is —
-// the packets need a relay. This function asks Cloudflare's TURN service for short-lived credentials (6 h) and
-// hands them to the game, which adds them to its ICE servers (src/net/ice.js). Traffic stays end-to-end
+// the packets need a relay. This function hands the game a TURN login (from its secrets, or short-lived ones from
+// Cloudflare), which the game adds to its ICE servers (src/net/ice.js). Traffic stays end-to-end
 // encrypted: a TURN server only forwards it.
 //
 // Two ways to configure it (Supabase → Edge Functions → Secrets):
