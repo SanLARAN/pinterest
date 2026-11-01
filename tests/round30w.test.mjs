@@ -16,7 +16,7 @@ test('the reel takes its snapshot without stopping the frame for the GPU', () =>
   const fn = main.slice(main.indexOf('function highlightFrame(t) {'), main.indexOf('// ---------------- ?perf (3.0w)'));
   const bitmap = fn.indexOf('createImageBitmap(src');
   const sync = fn.indexOf('ctx.drawImage(src,');
-  assert.ok(bitmap > 0, 'createImageBitmap is the way in');
+  assert.ok(bitmap > 0, 'createImageBitmap is still there (3.0z put an async GPU readback in front of it)');
   assert.ok(sync > bitmap, 'the synchronous drawImage of the GL canvas is only the fallback, after it');
   assert.match(fn, /if \(typeof createImageBitmap === 'function'\) \{/);
   assert.match(fn, /hlGrabber\.busy > 3\) return null/, 'a slow encoder skips frames instead of queueing them');

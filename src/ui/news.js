@@ -7,6 +7,19 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v:'3.0z',date:'2026-11-01',
+    ru:{title:'Рывки, попытка третья',items:[
+      'Полоска ?perf показала, откуда они: десять раз в секунду сборник смены фотографировал экран, и на быстрых мониторах каждый такой снимок давал кадр в 18–25 мс вместо 5 — под лампой заметнее всего.',
+      'Теперь снимок для сборника рисует сама видеокарта в маленькую картинку и отдаёт её, когда освободится. Игра больше не ждёт её ни в одном кадре, а сборник выглядит так же.',
+      'Если что-то всё равно дёргается — снова ?perf и скриншот полоски.',
+    ]},
+    en:{title:'Stutter, third attempt',items:[
+      'The ?perf strip showed where it came from: ten times a second the shift reel took a picture of the screen, and on fast monitors each one cost an 18–25 ms frame instead of 5, most visible under a lamp.',
+      'Now the graphics card draws the reel picture into a small image of its own and hands it over when it is free. The game no longer waits for it in any frame, and the reel looks the same.',
+      'If anything still stutters, ?perf again and a screenshot of the strip.',
+    ]},
+  },
+  {
     v:'3.0y',date:'2026-11-01',
     ru:{title:'Все готовы?',items:[
       'В лобби у каждого гостя есть кнопка «Я готов». Рядом с ником видно, кто готов, а кто нет, и кнопка «Начать» у хозяина ждёт всех — при наведении она пишет, кого ещё нет. Если хозяин меняет число ночей или участок, а также после каждой смены отметки снимаются: новые условия — новое «да».',

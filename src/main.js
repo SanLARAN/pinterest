@@ -1217,6 +1217,13 @@ function step(now, render) {
 // feel as «micro-teleports» while walking, and the heavier the frame (under a lamp, in daylight) the longer each
 // stop. Now createImageBitmap takes the snapshot without waiting for it, and the shrink and the JPEG happen later,
 // off the frame. The old path stays only for a browser without createImageBitmap.
+//
+// (3.0z) createImageBitmap was not enough: on the author's machine (~185 fps) the ?perf strip still showed a
+// 18–25 ms frame at every snapshot, «reel grab YES» on the worst one — the browser still copies the full-size
+// WebGL canvas inside the frame to make the bitmap. Now the GPU draws the finished picture once more into a small
+// target of its own (post.capture, ~640×360) and three's readRenderTargetPixelsAsync reads it through a pixel
+// buffer and a fence: nothing in the frame waits for the GPU, and the canvas itself is never read. The flip
+// (GL rows are bottom-up), the crop and the JPEG happen when the pixels arrive, between frames.
 const HL_W = HL_CAPTURE.w, HL_H = HL_CAPTURE.h;
 let hlGrabber = null, hlGrabs = 0;
 function highlightFrame(t) {
@@ -1227,7 +1234,7 @@ function highlightFrame(t) {
       cv.width = HL_W; cv.height = HL_H;
       const ctx = cv.getContext('2d', { alpha: false });
       if (!ctx) return null;
-      hlGrabber = { cv, ctx, busy: 0 };
+      hlGrabber = { cv, ctx, busy: 0, bufs: [], tmp: null, tctx: null };
     }
     const src = renderer.domElement;
     const { cv, ctx } = hlGrabber;
@@ -1237,8 +1244,34 @@ function highlightFrame(t) {
     const encode = () => new Promise((res) => {
       try { cv.toBlob((b) => res(b), 'image/jpeg', HL_CAPTURE.q); } catch { res(null); }
     });
+    if (hlGrabber.busy > 3) return null; // (a slow encoder: skip a frame rather than queue them up)
+    if (typeof renderer.readRenderTargetPixelsAsync === 'function') {
+      const gw = Math.max(1, Math.round(w)), gh = Math.max(1, Math.round(h));
+      const rt = post.capture(gw, gh);
+      const size = gw * gh * 4;
+      let buf = hlGrabber.bufs.pop();
+      if (!buf || buf.length !== size) buf = new Uint8Array(size); // (a few reused buffers: no 1 MB of garbage a shot)
+      hlGrabber.busy++;
+      const blob = renderer.readRenderTargetPixelsAsync(rt, 0, 0, gw, gh, buf)
+        .then((px) => {
+          let { tmp, tctx } = hlGrabber;
+          if (!tmp || tmp.width !== gw || tmp.height !== gh) {
+            tmp = hlGrabber.tmp = document.createElement('canvas');
+            tmp.width = gw; tmp.height = gh;
+            tctx = hlGrabber.tctx = tmp.getContext('2d');
+          }
+          tctx.putImageData(new ImageData(new Uint8ClampedArray(px.buffer, px.byteOffset, size), gw, gh), 0, 0);
+          hlGrabber.bufs.push(px);
+          ctx.setTransform(1, 0, 0, -1, 0, HL_H); // (GL's rows run bottom-up)
+          ctx.drawImage(tmp, (HL_W - gw) / 2, (HL_H - gh) / 2);
+          ctx.setTransform(1, 0, 0, 1, 0, 0);
+          return encode();
+        })
+        .catch(() => null)
+        .finally(() => { hlGrabber.busy--; });
+      return { t, blob };
+    }
     if (typeof createImageBitmap === 'function') {
-      if (hlGrabber.busy > 3) return null; // (a slow encoder: skip a frame rather than queue them up)
       hlGrabber.busy++;
       const blob = createImageBitmap(src, { resizeWidth: Math.max(1, Math.round(w)), resizeHeight: Math.max(1, Math.round(h)), resizeQuality: 'low' })
         .then((bmp) => {

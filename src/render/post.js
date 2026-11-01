@@ -291,4 +291,14 @@ export class Post {
     }
     this._pass(this.comp, null);
   }
+
+  // (3.0z) the reel's eye: the finished picture drawn once more, small, into a target of its own (8-bit RGBA) that
+  // main.js reads back with a fence instead of copying the full-size canvas. One fullscreen pass at ~640×360.
+  capture(w, h) {
+    if (!this.rtGrab) this.rtGrab = new THREE.WebGLRenderTarget(w, h, { depthBuffer: false });
+    else if (this.rtGrab.width !== w || this.rtGrab.height !== h) this.rtGrab.setSize(w, h);
+    this._pass(this.comp, this.rtGrab);
+    this.renderer.setRenderTarget(null);
+    return this.rtGrab;
+  }
 }
