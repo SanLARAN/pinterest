@@ -30,7 +30,7 @@ import { mapOpen } from './core/mapUnlock.js'; // 3.0s: the bog is earned on the
 import { Ghosts } from './render/ghosts.js';
 import { Eyes } from './render/eyes.js';
 import { Particles } from './render/particles.js';
-import { audio } from './audio/audio.js';
+import { audio, latencyFor } from './audio/audio.js';
 import { MenuMusic } from './audio/music.js';
 import { mic, Mic } from './audio/mic.js';
 import { Input } from './input/input.js';
@@ -133,6 +133,20 @@ const coop = new Coop({ audio, mic });
 const mates = new Mates($('mates'));
 const voiceMix = new VoiceMix(audio); // your volume for each friend's voice
 const menuMusic = new MenuMusic(); // the record under the main menu (its own volume setting)
+
+// (3.1g) the sound card's buffer: small for a quick echo, larger for Bluetooth headphones (see audio.js latencyFor).
+// Decided before the first click creates the AudioContext; device names are there once the mic was ever allowed.
+async function pickAudioBuffer() {
+  let label = '';
+  try {
+    if (settings.audioBuffer === 'auto' && navigator.mediaDevices?.enumerateDevices) {
+      const outs = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'audiooutput');
+      label = (outs.find((d) => d.deviceId === 'default') || outs[0])?.label || '';
+    }
+  } catch { /* no device list: the small buffer */ }
+  audio.latencyHint = latencyFor(settings.audioBuffer, label);
+}
+pickAudioBuffer();
 const pauseVoices = new VoiceList($('pauseVoiceRows'), voiceMix, audio);
 // the atlas (main menu): a field journal with live 3D plates. its own little canvas; the forest isn't drawn while it's open
 const atlas = new Atlas({ audio, world, onClose: () => home.atlasClosed() });
@@ -344,6 +358,7 @@ const menus = new Menus({
     if (key === 'quality' || key?.startsWith('graphics:') && key !== 'graphics:effects') applyQuality();
     if (key === 'graphics:effects') applyGraphics();
     if (key === 'radar') applyRadar();
+    if (key === 'audioBuffer') { pickAudioBuffer(); $('sAudioBufNote').hidden = !audio.ctx; } // (3.1g) a running context keeps its buffer
     if (key === 'lang' || key === undefined) {
       hud.cache = {};
       atlas.applyI18n();

@@ -7,6 +7,19 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v:'3.1g',date:'2026-11-01',
+    ru:{title:'Звук и Bluetooth',items:[
+      'Если в Bluetooth-наушниках звук пропадал на всём компьютере на несколько секунд (например, после запуска генератора) — в настройках появился пункт «Звук». Вариант «Bluetooth (без обрывов)» даёт звуковой карте запас побольше: эхо приходит на долю секунды позже, зато звук не обрывается.',
+      'По умолчанию стоит «авто»: если по названию устройства видно, что это беспроводные наушники, игра сама выберет запас побольше. «Быстрый отклик» — для проводных наушников и колонок.',
+      'Новое значение начинает действовать после перезапуска игры.',
+    ]},
+    en:{title:'Sound and Bluetooth',items:[
+      'If your Bluetooth headphones lost sound across the whole computer for a few seconds (after starting a generator, say), the settings now have a Sound option. Bluetooth (no dropouts) gives the sound card a bigger buffer: the echo arrives a fraction of a second later, but the sound no longer drops.',
+      'The default is auto: if the device name says these are wireless headphones, the game picks the bigger buffer itself. Fastest response is for wired headphones and speakers.',
+      'A new choice takes effect after restarting the game.',
+    ]},
+  },
+  {
     v:'3.1f',date:'2026-11-01',
     ru:{title:'Камера в приложении',items:[
       'В версии для Windows не вертелась камера: «кликни, чтобы управлять взглядом» — и ничего. Приложение запрещало игре захватывать мышь, разрешало только микрофон. Теперь разрешено.',

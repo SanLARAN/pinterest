@@ -108,6 +108,17 @@ const VOICE = {
 };
 const dbGain = (db) => Math.pow(10, db / 20);
 
+// (3.1g) how big a buffer the sound card gets. The smallest ('interactive', ~10 ms) answers a ping fastest, but on
+// Bluetooth headphones any hiccup becomes an underrun — and some Bluetooth stacks answer one by dropping the
+// stream for seconds, for the whole PC (the author's «звук пропадает на всём ПК» after a generator start).
+// 'playback' trades ~100 ms of delay for a buffer that does not run dry. 'auto' looks at the output's name.
+export const BT_OUTPUT = /bluetooth|hands-?free|headset|airpods|buds|\bwh-|\bwf-|jbl|sony|beats|bose|marshall|\bbt\b/i;
+export function latencyFor(pref, outputLabel = '') {
+  if (pref === 'bt') return 'playback';
+  if (pref === 'fast') return 'interactive';
+  return BT_OUTPUT.test(String(outputLabel || '')) ? 'playback' : 'interactive';
+}
+
 export class AudioEngine {
   constructor() {
     this.ctx = null;
@@ -128,6 +139,7 @@ export class AudioEngine {
     this._anglerFoundState = 'idle'; // the Angler's entrance: a borrowed recording (see anglerFound)
     this._anglerFoundBuf = null;
     this._anglerFoundNorm = 1;
+    this.latencyHint = 'interactive'; // (3.1g) set before the first init (main.js: pickAudioBuffer)
   }
 
   get ready() {
@@ -144,7 +156,7 @@ export class AudioEngine {
     }
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC && !ctxOverride) return;
-    const ctx = (this.ctx = ctxOverride || new AC({ latencyHint: 'interactive' }));
+    const ctx = (this.ctx = ctxOverride || new AC({ latencyHint: this.latencyHint || 'interactive' }));
     this.offline = !!ctxOverride;
     this.master = ctx.createGain();
     this.master.gain.value = settings.volume;

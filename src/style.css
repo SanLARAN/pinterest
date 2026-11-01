@@ -1642,3 +1642,7 @@ body.reel-open .panel.over-panel { filter: blur(1px) brightness(0.5); }
 .qw-hint { position: absolute; bottom: 14%; margin: 0; font: 12px var(--mono); color: var(--ash); letter-spacing: 0.08em; text-align: center; }
 @media (max-width: 460px) { .qw-ring { transform: scale(0.82); } }
 @media (prefers-reduced-motion: reduce) { .qw-slot { transition: none; } .qw-slot.sel { transform: none; } }
+
+/* (3.1g) a note under a setting that only applies after a restart */
+.settings-note { grid-column: 1 / -1; display: block; margin: -4px 0 4px; font-size: 12px; color: var(--amber); }
+.settings-note[hidden] { display: none; }

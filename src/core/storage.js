@@ -16,6 +16,7 @@ const DEFAULTS = {
   voiceEcho: true,
   scares: 'full',
   quality: 'auto',
+  audioBuffer: 'auto', // (3.1g) 'auto' | 'fast' | 'bt' — see audio.js latencyFor
   graphics: { ...GRAPHICS_DEFAULTS },
   lobbyHideNames: false, // host's preferred rule for newly created rooms
   shiftDays: 4, // preferred shift length in nights: 2, 4 or 6 (solo, and a host's new rooms)

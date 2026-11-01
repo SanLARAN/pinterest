@@ -218,6 +218,7 @@ export class Menus {
     bindCheck('sRadar', 'radar');
     bindSelect('sScares', 'scares');
     bindSelect('sQuality', 'quality');
+    bindSelect('sAudioBuf', 'audioBuffer'); // (3.1g)
     bindSelect('sLang', 'lang');
 
     // tap anywhere on the game-over screen background = restart (touch friendly)
@@ -237,6 +238,7 @@ export class Menus {
     $('sRadar').checked = !!settings.radar;
     $('sScares').value = settings.scares;
     $('sQuality').value = settings.quality;
+    $('sAudioBuf').value = ['auto', 'fast', 'bt'].includes(settings.audioBuffer) ? settings.audioBuffer : 'auto';
     $('sLang').value = getLang();
   }
 
