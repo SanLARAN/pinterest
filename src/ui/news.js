@@ -7,6 +7,21 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v:'3.0y',date:'2026-11-01',
+    ru:{title:'Все готовы?',items:[
+      'В лобби у каждого гостя есть кнопка «Я готов». Рядом с ником видно, кто готов, а кто нет, и кнопка «Начать» у хозяина ждёт всех — при наведении она пишет, кого ещё нет. Если хозяин меняет число ночей или участок, а также после каждой смены отметки снимаются: новые условия — новое «да».',
+      'У тех, кто уже выиграл смену в Лесхозе, рядом с ником висит значок «лесхоз ✓» — сразу видно, кто знает дорогу на болото.',
+      'Клавиши можно переназначить: Настройки → Клавиши. Нажми на клавишу действия, затем новую; если она уже занята, действия поменяются местами. Стрелки, Esc и Enter работают всегда — это путь назад, если что-то пошло не так. «Вернуть как было» сбрасывает всё.',
+      'Панель аккаунта и друзей перерисована в цветах самой игры и стала читаемой: текст крупнее (раньше местами 6–8 пикселей), кнопки удобнее, никаких зелёных пятен из другого интерфейса.',
+    ]},
+    en:{title:'Everyone ready?',items:[
+      'Every guest in the lobby has an «I\'m ready» button. The list shows who is ready and who is not, and the host\'s Start waits for everyone; hover it to see who is missing. Changing the number of nights or the ground, or finishing a shift, clears the ticks: new terms, a new yes.',
+      'Players who have won a shift on the forestry wear a «forestry ✓» badge by their name, so you can see who knows the way to the bog.',
+      'Keys can be rebound: Settings → Keys. Click an action\'s key, then press the new one; if it is taken, the two actions swap. The arrows, Esc and Enter always work, as the way back if something goes wrong. Back to defaults puts everything back.',
+      'The account and friends panel is redrawn in the game\'s own colours and is readable now: bigger text (some of it was 6–8 pixels), easier buttons, no green leftovers from another interface.',
+    ]},
+  },
+  {
     v:'3.0x',date:'2026-11-01',
     ru:{title:'Личное дело',items:[
       'У каждого теперь есть профиль на весь экран — «личное дело»: портрет твоего выжившего, ночи, выигранные смены, самая долгая ночь, рекорд очков, пройденные участки, генераторы и насосы, обысканные тела, поднятые друзья, встреченные твари и то, что убивало тебя чаще всего.',

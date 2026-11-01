@@ -15,7 +15,7 @@ export function signalSave(section,owner=scope){if(muted)return;for(const fn of 
 export function hydrate(fn){muted++;try{return fn();}finally{muted--;}}
 export function readDevice(){const v=readJSON('hush.device.v1',null,'guest')||readJSON('hush.settings.v1',{},'guest');return v&&typeof v==='object'&&!Array.isArray(v)?v:{};}
 // settings that belong to this machine only: never the cloud, always re-overlaid on load
-export const DEVICE_KEYS=['quality','graphics','micEnabled','micSens','micCal','voiceVol'];
+export const DEVICE_KEYS=['quality','graphics','micEnabled','micSens','micCal','voiceVol','keys']; // (3.0y: keys — your keyboard, not your account)
 export function saveDevice(settings){const v={};for(const k of DEVICE_KEYS)v[k]=settings[k];writeJSON('hush.device.v1',v,null,'guest');}
 export function readMeta(owner=scope){const v=readJSON('hush.cloud-meta.v1',{},owner)||{};return{version:Math.max(0,Number(v.version)||0),dirty:v.dirty===true,rev:Math.max(0,Number(v.rev)||0),lastSync:typeof v.lastSync==='string'?v.lastSync:null};}
 export function writeMeta(meta,owner=scope){writeJSON('hush.cloud-meta.v1',meta,null,owner);}

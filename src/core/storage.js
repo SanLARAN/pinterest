@@ -25,6 +25,7 @@ const DEFAULTS = {
   tutorialDone: false,
   voiceVol: {}, // co-op: your volume for each friend, by name (only the ones you changed)
   micCal: null, // the 15-second setup: { floor, talk, shout } dBFS (see ui/miccal.js)
+  keys: {}, // (3.0y) rebound keys, only those that differ from the defaults (core/keybinds.js); a device setting
 };
 
 function read(key,fallback){return readJSON(key,fallback);}

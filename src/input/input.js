@@ -1,11 +1,10 @@
 // Unified input: keyboard (layout-independent codes), mouse (pointer lock w/ drag fallback), touch.
 import { settings } from '../core/storage.js';
+import { cleanKeys, actionMap } from '../core/keybinds.js';
 
-const GAME_KEYS = new Set([
-  'KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space',
-  'ShiftLeft', 'ShiftRight', 'KeyC', 'KeyI', 'KeyM', 'KeyP', 'KeyR', 'KeyE', 'Tab', 'Enter',
-]);
-const QTE_KEYS = { KeyW: 'qU', ArrowUp: 'qU', KeyA: 'qL', ArrowLeft: 'qL', KeyS: 'qD', ArrowDown: 'qD', KeyD: 'qR', ArrowRight: 'qR' };
+// (3.0y) the keyboard is read as actions (core/keybinds.js): the player can rebind them in the settings.
+// The шкафандр's beat follows the movement keys, whatever they are (and the arrows).
+const QTE_OF = { forward: 'qU', left: 'qL', back: 'qD', right: 'qR', turnLeft: 'qL', turnRight: 'qR' };
 
 export class Input {
   constructor(canvas) {
@@ -35,7 +34,21 @@ export class Input {
     this.joy = { id: -1, ox: 0, oy: 0, x: 0, y: 0, mag: 0 };
     this.look = { id: -1, x: 0, y: 0 };
     this.mouseDrag = { down: false, x: 0, y: 0, moved: 0, t: 0 };
+    this.capturing = false; // (3.0y) the settings are listening for a key to bind: the game ignores it
+    this.setKeys(settings.keys);
     this._bind();
+  }
+
+  // (3.0y) apply a player's bindings (anything invalid falls back to the defaults)
+  setKeys(raw) {
+    this.binds = cleanKeys(raw);
+    this.amap = actionMap(this.binds);
+  }
+
+  // is any key bound to this action held right now?
+  held(action) {
+    for (const c of this.keys) if (this.amap.get(c) === action) return true;
+    return false;
   }
 
   emit(type) {
@@ -55,52 +68,53 @@ export class Input {
         if (e.code === 'Enter' || e.code === 'Escape') e.target.blur();
         return;
       }
-      if (GAME_KEYS.has(e.code) && this.gameActive) e.preventDefault();
-      if (e.code === 'Space') e.preventDefault();
+      if (this.capturing) return; // (the settings take this key)
+      const act = this.amap.get(e.code);
+      if (act && this.gameActive) e.preventDefault();
+      if (act === 'ping') e.preventDefault();
       if (e.repeat) return;
       this.keys.add(e.code);
-      if (QTE_KEYS[e.code]) this.emit(QTE_KEYS[e.code]); // (the шкафандр's beat: W A S D, or the arrows)
-      switch (e.code) {
-        case 'Space':
+      if (QTE_OF[act]) this.emit(QTE_OF[act]); // (the шкафандр's beat)
+      switch (act) {
+        case 'ping':
           this.pingHeld = true;
           this.emit('pingDown');
           break;
-        case 'KeyI':
+        case 'bag':
           this.emit('bag');
           break;
-        case 'KeyE':
+        case 'use':
           this.useHeld = true;
           this.emit('useDown');
           break;
-        case 'KeyC':
+        case 'crouch':
           this.crouch = !this.crouch;
           this.emit('crouch');
           break;
-        case 'KeyM':
+        case 'mic':
           this.emit('mic');
           break;
-        case 'Tab':
+        case 'watch':
           this.peekHeld = true;
           break;
-        case 'Escape':
-        case 'KeyP':
+        case 'pause':
           this.emit('pause');
           break;
-        case 'KeyR':
+        case 'carry':
           this.emit('restart'); // (on the results screen)
           this.emit('carry'); // (in the forest: lift a friend who's down / put them down)
           break;
-        case 'Enter':
-        case 'NumpadEnter':
+        case 'confirm':
           this.emit('confirm');
           break;
       }
     });
     window.addEventListener('keyup', (e) => {
       this.keys.delete(e.code);
-      if (e.code === 'Tab') this.peekHeld = false;
-      if (e.code === 'KeyE') this.useHeld = false;
-      if (e.code === 'Space' && this.pingHeld) {
+      const act = this.amap.get(e.code);
+      if (act === 'watch' && !this.held('watch')) this.peekHeld = false;
+      if (act === 'use' && !this.held('use')) this.useHeld = false;
+      if (act === 'ping' && this.pingHeld && !this.held('ping')) {
         this.pingHeld = false;
         this.emit('pingUp');
       }
@@ -359,13 +373,14 @@ export class Input {
   poll() {
     const k = this.keys;
     let mx = 0, my = 0, turn = 0;
-    if (k.has('KeyW') || k.has('ArrowUp')) my += 1;
-    if (k.has('KeyS') || k.has('ArrowDown')) my -= 1;
-    if (k.has('KeyD')) mx += 1;
-    if (k.has('KeyA')) mx -= 1;
-    if (k.has('ArrowLeft')) turn -= 1;
-    if (k.has('ArrowRight')) turn += 1;
-    let sprint = k.has('ShiftLeft') || k.has('ShiftRight');
+    void k;
+    if (this.held('forward')) my += 1;
+    if (this.held('back')) my -= 1;
+    if (this.held('right')) mx += 1;
+    if (this.held('left')) mx -= 1;
+    if (this.held('turnLeft')) turn -= 1;
+    if (this.held('turnRight')) turn += 1;
+    let sprint = this.held('sprint');
     if (this.joy.id !== -1) {
       mx += this.joy.x;
       my += this.joy.y;

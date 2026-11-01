@@ -13,7 +13,8 @@ import {currentIdentity} from '../core/identity.js';
 import { forestCleared, mapAskList, roomMapOpen } from '../core/mapUnlock.js';
 
 // (3.0s) mq: the host asks a player who has not cleared the forest whether the room may go to the bog; ma: the answer
-const LOBBY_TYPES = new Set(['hi', 'roster', 'full', 'start', 'bye', 'nm', 'lobby', 'mq', 'ma']);
+// (3.0y) rd: a player says they are ready (or not) for the next night
+const LOBBY_TYPES = new Set(['hi', 'roster', 'full', 'start', 'bye', 'nm', 'lobby', 'mq', 'ma', 'rd']);
 
 // (3.0x) a player's cloud account id, if they have one — so a name in the lobby can open their profile
 export const cleanUid = (v) => (typeof v === 'string' && /^[0-9a-f-]{36}$/i.test(v) ? v : null);
@@ -221,6 +222,11 @@ export class Coop {
       case 'ma':
         if (this.isHost && d) this._onMapAnswer(pid, d);
         break;
+      case 'rd': {
+        const r = this.roster.get(pid);
+        if (this.isHost && r && d && this.phase === 'lobby') { r.ready = d.ready === true; this._broadcastRoster(); this.emit('change'); }
+        break;
+      }
       case 'nm': {
         const r = this.roster.get(pid);
         if (r && d) {
@@ -292,6 +298,7 @@ export class Coop {
     if (!this.active || !this.isHost || this.phase !== 'lobby' || ![2, 4, 6].includes(value)) return false;
     this.rules = cleanLobbyRules({ ...this.rules, days: value });
     settings.shiftDays = value; saveSettings();
+    this._unready(); // (3.0y) new terms: everyone says yes again
     this._broadcastRoster(); this.emit('change'); return true;
   }
 
@@ -315,6 +322,7 @@ export class Coop {
 
   _applyMap(map) {
     this.ask = null;
+    if (map !== this.rules.map) this._unready(); // (3.0y) a different ground: everyone says yes again
     this.rules = cleanLobbyRules({ ...this.rules, map });
     settings.shiftMap = map; saveSettings();
     this._broadcastRoster(); this.emit('change');
@@ -361,6 +369,27 @@ export class Coop {
     return true;
   }
 
+  // ---------------- ready (3.0y) ----------------
+  // every player ticks «ready»; the host's START waits for the guests (the host's own press is their yes)
+  setReady(on) {
+    const me = this.me();
+    if (!me || !this.active || this.phase !== 'lobby') return false;
+    me.ready = !!on;
+    if (this.isHost) this._broadcastRoster();
+    else if (this.hostId) this.net.send('rd', { ready: !!on }, this.hostId);
+    this.emit('change');
+    return true;
+  }
+
+  // the seated guests who have not said they are ready (names, for the note and the START button)
+  notReady() {
+    return this.players().filter((p) => !p.host && !p.ready).map((p) => p.name);
+  }
+
+  _unready() {
+    for (const p of this.roster.values()) p.ready = false;
+  }
+
   // the names still holding the bog back (for the lobby's note)
   askNames() {
     const wait = this.ask ? [...this.ask.wait] : [];
@@ -369,7 +398,7 @@ export class Coop {
 
   _broadcastRoster() {
     if (!this.isHost) return;
-    const list = this.players().map((p) => ({ id: p.id, name: p.name, slot: p.slot, host: !!p.host, mic: !!p.mic, inRun: !!p.inRun, fit: p.fit, cleared: !!p.cleared, uid: p.self ? this.uid : p.uid || null }));
+    const list = this.players().map((p) => ({ id: p.id, name: p.name, slot: p.slot, host: !!p.host, mic: !!p.mic, inRun: !!p.inRun, fit: p.fit, cleared: !!p.cleared, uid: p.self ? this.uid : p.uid || null, ready: !!p.ready }));
     const ask = this.ask ? { map: this.ask.map, wait: [...this.ask.wait] } : null;
     const refused = this.refused && performance.now() - this.refused.at < 8000 ? this.refused.name : null;
     this.net.send('roster', { host: this.selfId, phase: this.phase, list, rules: this.rules, ask, refused });
@@ -397,6 +426,7 @@ export class Coop {
       r.host = !!e.host;
       if (!r.self) r.cleared = !!e.cleared;
       if (!r.self) r.uid = cleanUid(e.uid);
+      r.ready = !!e.ready; // (3.0y) the host's word, for everyone (yours too: it went through the host)
       if (!r.self) r.mic = !!e.mic;
       if (!r.self && e.fit) r.fit = cleanFit(e.fit);
       r.inRun = !!e.inRun;
@@ -446,6 +476,7 @@ export class Coop {
   startRun({ cut = false } = {}) {
     if (!this.isHost) return null;
     if (this.ask && cut !== 2) return null; // (3.0s) the night waits until the bog question is answered (the gates to the range do not)
+    if (this.notReady().length) return null; // (3.0y) and until every guest has said they are ready
     const list = this.players();
     for (const p of list) p.inRun = true;
     this.phase = 'game';
@@ -482,7 +513,7 @@ export class Coop {
     this.queue = [];
     if (!this.isHost) return;
     this.phase = 'lobby';
-    for (const p of this.roster.values()) p.inRun = false;
+    for (const p of this.roster.values()) { p.inRun = false; p.ready = false; } // (3.0y) a new night, a new yes
     this._broadcastRoster();
   }
 

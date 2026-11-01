@@ -67,6 +67,7 @@ import { VoiceMix, VoiceList } from './ui/voicemix.js';
 import { Atlas } from './ui/atlas.js';
 import { Wardrobe } from './ui/wardrobe.js';
 import { ProfileScreen, myCard } from './ui/profile.js'; // 3.0x
+import { KeysPanel } from './ui/keysPanel.js'; // 3.0y
 
 setLang(settings.lang);
 
@@ -308,6 +309,7 @@ document.addEventListener('visibilitychange', () => { perf.sampleT = 0; perf.mea
 // ---------------- menus ----------------
 installDesktopUpdate(); // (no-op in a browser: it needs the desktop shell's bridge)
 
+let keysPanel = null; // (3.0y) the settings' key rebinding (built below, once the input and the audio exist)
 const menus = new Menus({
   unlockAll: () => DEBUG.unlock,
   graphicsStats: () => ({ w: post.w, h: post.h, ow: canvas.width, oh: canvas.height, fps: perf.measured ? perf.fps : 0, fxaa: post.u.uAA.value }),
@@ -345,6 +347,7 @@ const menus = new Menus({
       atlas.applyI18n();
       wardrobe.applyI18n();
       reel.applyI18n();
+      keysPanel?.refresh(); // (3.0y: the key names in the new language)
       news.render();
       account.render();social.update();syncIdentityFields();
       updateMicUI();
@@ -418,6 +421,10 @@ function syncIdentityFields(){const p=currentIdentity();for(const id of['nameInp
 const account=new AccountUI({cloud,canOpen:()=>state==='menu'&&!wardrobe.isOpen()&&!atlas.isOpen()&&!micCal.isOpen()&&!lobby.rulesOpen&&!lobby.starting,canChange:canApplyAccount,getRoom:()=>coop.active&&!coop.inRun?coop.code:null,getInviteLink:()=>coop.active?coop.inviteLink():null,onJoin:async room=>{
  if(state!=='menu'||lobby.starting)throw new Error('leave_room');account.close();lobby.open();if(coop.active&&coop.code===room.room_code)return;await coop.join(room.room_code,{strategy:room.strategy});lobby.render();
 }});
+// (3.0y) rebinding keys, in the settings, above «back»
+const keysHost=document.createElement('div');$('btnSettingsBack').before(keysHost);
+keysPanel=new KeysPanel({host:keysHost,input,uiSound:(k)=>{if(audio.ready)audio.uiClick();}});
+$('btnSettingsBack').addEventListener('click',()=>keysPanel.refresh());
 const portraitOf=(fit,canvas)=>{if(!wardrobe.mq)return false;wardrobe.mq.still(fit,'head',canvas);return true;};
 // (3.0x) the full-screen profile: from your portrait or name in the corner, a friend's name, a name in the lobby
 const profile=new ProfileScreen({cloud,portrait:portraitOf,canOpen:()=>state==='menu'&&!wardrobe.isOpen()&&!atlas.isOpen()&&!lobby.starting,

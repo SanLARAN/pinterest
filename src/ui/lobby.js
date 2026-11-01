@@ -164,6 +164,18 @@ export class Lobby {
       this._go(() => this.coop.join(code));
     });
     click('btnCopy', () => this._copy());
+    // (3.0y) «I'm ready»: everyone ticks it; the host's START waits for the guests
+    this.readyBtn = document.createElement('button');
+    this.readyBtn.id = 'btnReady';
+    this.readyBtn.className = 'btn';
+    this.readyBtn.type = 'button';
+    $('btnStart').before(this.readyBtn);
+    this.readyBtn.addEventListener('click', () => {
+      if (this.uiSound) this.uiSound('click');
+      const me = this.coop.me();
+      this.coop.setReady(!(me && me.ready));
+      this.render();
+    });
     click('btnStart', () => {
       if (this.coop.isHost && this.coop.active) this.coop.startRun({ cut: true });
     });
@@ -383,8 +395,14 @@ export class Lobby {
     $('btnCoopMic').textContent = t('coopMicAsk');
     const start = $('btnStart');
     start.classList.toggle('hidden-host', !c.isHost);
-    start.disabled = !c.isHost || c.status === 'joining' || this.starting || !!c.ask; // (3.0s) not while the bog is being asked about
-    start.title = c.ask ? t('ruleMapWait').replace('{names}', c.askNames().join(', ') || '…') : '';
+    const waiting = c.notReady(); // (3.0y) the guests who have not ticked «ready»
+    start.disabled = !c.isHost || c.status === 'joining' || this.starting || !!c.ask || waiting.length > 0; // (3.0s) not while the bog is being asked about
+    start.title = c.ask ? t('ruleMapWait').replace('{names}', c.askNames().join(', ') || '…') : waiting.length ? t('coopWaitReady').replace('{names}', waiting.join(', ')) : '';
+    const me = c.me();
+    this.readyBtn.hidden = !this._inRoom() || this.starting || c.phase !== 'lobby' || !me || me.host || me.slot < 0; // (the host's ready is START)
+    this.readyBtn.textContent = t(me && me.ready ? 'coopReadyOn' : 'coopReadyOff');
+    this.readyBtn.setAttribute('aria-pressed', String(!!(me && me.ready)));
+    this.readyBtn.classList.toggle('on', !!(me && me.ready));
     this._renderAsk();
     this._measure();
   }
@@ -478,7 +496,11 @@ export class Lobby {
     const tags = [];
     if (p.self) tags.push(t('coopYou'));
     if (p.host) tags.push(t('coopHost'));
-    set(n, `${esc(p.name)}${tags.map((x) => `<em>${esc(x)}</em>`).join('')}`);
+    // (3.0y) ready (words, not only a colour) and the forestry badge for those who have cleared it
+    const badges = [];
+    if (!p.host) badges.push(p.ready ? `<em class="tag-ready">${esc(t('coopTagReady'))}</em>` : `<em class="tag-wait">${esc(t('coopTagNotReady'))}</em>`);
+    if (p.cleared) badges.push(`<em class="tag-forest" title="${esc(t('coopTagForestTitle'))}">${esc(t('coopTagForest'))}</em>`);
+    set(n, `${esc(p.name)}${tags.map((x) => `<em>${esc(x)}</em>`).join('')}${badges.join('')}`);
     if (this.onProfile) { n.classList.add('lobby-name-link'); n.title = t('pfOpen'); }
     mic.className = `mic ${p.mic ? 'on' : 'off'}`;
     set(mic, p.mic ? MIC_ON : MIC_OFF);
@@ -511,6 +533,7 @@ export class Lobby {
     if (this.starting) main = `<span class="go">${esc(t('coopGo'))}</span>`;
     else if (c.status === 'version') main = `<span class="bad">${esc(t('coopVersion'))}</span>`;
     else if (c.status === 'joining') main = esc(t('coopJoining'));
+    else if (c.isHost && c.players().length > 1 && c.notReady().length) main = `<span class="warn">${esc(t('coopWaitReady').replace('{names}', c.notReady().join(', ')))}</span>`;
     else if (c.isHost) main = esc(c.players().length > 1 ? (this.garage ? t('coopReadyHostCar') : t('coopReadyHost')) : t('coopWaitFriends'));
     else if (c.status === 'hostLost') main = `<span class="warn">${esc(t('coopHostLeft'))}</span>`;
     else if (!c.hostId) main = since > 14 ? `<span class="warn">${esc(t('coopNoHost'))}</span>` : esc(t('coopSearching'));

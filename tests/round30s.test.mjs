@@ -124,6 +124,7 @@ test('a player who has not cleared it is asked; the rule changes on the last yes
   assert.equal(b.answerMap(true), true);
   for (const c of peers) assert.equal(c.rules.map, 'bog');
   assert.equal(host.ask, null);
+  for (const c of peers.slice(1)) c.setReady(true); // (3.0y: the night also waits for every guest's ready tick)
   assert.ok(host.startRun({ cut: true }), 'and now the night starts');
 });
 
@@ -188,7 +189,7 @@ test('a guest cannot move the room or answer for someone else', () => {
 test('the lobby shows the question, the waiting note and holds the start button; the words exist in both languages', () => {
   const lobby = src('ui/lobby.js');
   assert.match(lobby, /this\.coop\.answerMap\(button\.dataset\.ans==='yes'\)/);
-  assert.match(lobby, /start\.disabled = .*\|\| !!c\.ask;/);
+  assert.match(lobby, /start\.disabled = .*\|\| !!c\.ask \|\| waiting\.length > 0;/); // (3.0y: and the ready ticks)
   assert.match(lobby, /roomMapOpen\('bog', c\.players\(\)\)/);
   for (const lang of ['ru', 'en']) {
     setLang(lang);
@@ -207,6 +208,6 @@ test('the lobby shows the question, the waiting note and holds the start button;
 
 test('the wire changed, so the protocol did', async () => {
   const { PROTOCOL } = await import('../src/net/net.js');
-  assert.equal(PROTOCOL, 19);
+  assert.equal(PROTOCOL >= 19, true); // (3.0y moved it to 20 for the ready ticks)
   assert.match(src('net/coop.js'), /'mq', 'ma'/);
 });
