@@ -15,6 +15,9 @@ import { forestCleared, mapAskList, roomMapOpen } from '../core/mapUnlock.js';
 // (3.0s) mq: the host asks a player who has not cleared the forest whether the room may go to the bog; ma: the answer
 const LOBBY_TYPES = new Set(['hi', 'roster', 'full', 'start', 'bye', 'nm', 'lobby', 'mq', 'ma']);
 
+// (3.0x) a player's cloud account id, if they have one — so a name in the lobby can open their profile
+export const cleanUid = (v) => (typeof v === 'string' && /^[0-9a-f-]{36}$/i.test(v) ? v : null);
+
 export function cleanName(s) {
   return String(s || '').replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 14) || '???';
 }
@@ -55,6 +58,7 @@ export class Coop {
     this.ask = null; // (3.0s) host: { id, map, wait: Set } — who still has to agree to the bog; guest: the host's { map, wait }
     this.question = null; // (3.0s) guest: the host's open question to this machine { id, map }
     this.refused = null; // (3.0s) the last «no»: { name, at }
+    this.uid = null; // (3.0x) this machine's cloud account id (main sets it), announced so friends can open the profile
   }
 
   get selfId() {
@@ -173,7 +177,7 @@ export class Coop {
 
   // ---------------- handshake ----------------
   _hello() {
-    return { v: PROTOCOL, name: myName(), host: this.isHost, mic: this.mic.state === 'on', fit: myFit(), cleared: forestCleared() };
+    return { v: PROTOCOL, name: myName(), host: this.isHost, mic: this.mic.state === 'on', fit: myFit(), cleared: forestCleared(), uid: this.uid };
   }
 
   _onPeerJoin(pid) {
@@ -224,6 +228,7 @@ export class Coop {
           r.mic = !!d.mic;
           if (d.fit) r.fit = cleanFit(d.fit);
           if (typeof d.cleared === 'boolean') r.cleared = d.cleared;
+          if ('uid' in d) r.uid = cleanUid(d.uid);
           // (3.0s: a player who wins the forest while being asked has nothing left to agree to)
           if (this.isHost && r.cleared && this.ask?.wait.has(pid)) { this._onMapAnswer(pid, { id: this.ask.id, yes: true }); break; }
           if (this.isHost) this._broadcastRoster();
@@ -250,6 +255,7 @@ export class Coop {
     r.mic = !!d.mic;
     r.fit = cleanFit(d.fit); // what they wear (an older client sends nothing: the standard kit)
     r.cleared = d.cleared === true; // (3.0s) has won a shift on the forestry
+    r.uid = cleanUid(d.uid);
     if (d.host && !this.isHost) {
       this.hostId = pid;
       if (this.status === 'searching') this.status = 'ready';
@@ -363,7 +369,7 @@ export class Coop {
 
   _broadcastRoster() {
     if (!this.isHost) return;
-    const list = this.players().map((p) => ({ id: p.id, name: p.name, slot: p.slot, host: !!p.host, mic: !!p.mic, inRun: !!p.inRun, fit: p.fit, cleared: !!p.cleared }));
+    const list = this.players().map((p) => ({ id: p.id, name: p.name, slot: p.slot, host: !!p.host, mic: !!p.mic, inRun: !!p.inRun, fit: p.fit, cleared: !!p.cleared, uid: p.self ? this.uid : p.uid || null }));
     const ask = this.ask ? { map: this.ask.map, wait: [...this.ask.wait] } : null;
     const refused = this.refused && performance.now() - this.refused.at < 8000 ? this.refused.name : null;
     this.net.send('roster', { host: this.selfId, phase: this.phase, list, rules: this.rules, ask, refused });
@@ -390,6 +396,7 @@ export class Coop {
       if (!r.self) r.name = cleanName(e.name);
       r.host = !!e.host;
       if (!r.self) r.cleared = !!e.cleared;
+      if (!r.self) r.uid = cleanUid(e.uid);
       if (!r.self) r.mic = !!e.mic;
       if (!r.self && e.fit) r.fit = cleanFit(e.fit);
       r.inRun = !!e.inRun;
@@ -427,7 +434,8 @@ export class Coop {
     me.mic = this.mic.state === 'on';
     me.fit = myFit();
     me.cleared = forestCleared();
-    this.net.send('nm', { name: me.name, mic: me.mic, fit: me.fit, cleared: me.cleared });
+    me.uid = this.uid;
+    this.net.send('nm', { name: me.name, mic: me.mic, fit: me.fit, cleared: me.cleared, uid: this.uid });
     if (this.isHost) this._broadcastRoster();
     this.emit('change');
   }

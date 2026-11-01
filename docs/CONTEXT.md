@@ -4,7 +4,7 @@
 > Он написан для человека и для агента: любой новый чат начинается с чтения `AGENTS.md`, а тот отправляет
 > сюда. Если код и этот файл расходятся — прав код, а файл надо поправить в том же коммите.
 >
-> Последнее обновление: раунд **3.0w** (без микро-рывков: снимок сборника без ожидания GPU, ?perf).
+> Последнее обновление: раунд **3.0x** (личное дело: профили на весь экран с фоном, статистика, друзья).
 
 ---
 
@@ -438,6 +438,27 @@
   `shadows.faces`, снимок сборника, `resize`, `renderer.info.render.calls`.
 - **Тесты:** `tests/round30w.test.mjs` (3); `round30t` — плавная походка (макс. шаг < 2,5× среднего).
 
+### 3.0x — личное дело (профили на весь экран)
+
+- **Экран** — `ui/profile.js` + `profile.css` (`#profileScreen`, z 150, `role=dialog`, ловушка фокуса, Esc).
+  Слои: `.pf-banner` (img/video/canvas, `opacity .42`, `object-fit: cover`), `.pf-scrim` (градиенты + строки),
+  `.pf-sheet` (шапка с портретом через `wardrobe.mq.still`, плитки, блоки, действия, `role=status`).
+- **Кто что видит** — сервер: `hush_profile_view(p_id)` отдаёт себя или друга, остальным `not_friend`; незнакомцу из
+  лобби экран показывает ник и «Добавить в друзья» (`friendAction('request', uid)`).
+- **Фон** — `cloud/banner.js` (PNG/JPG/GIF/MP4, 20 МБ): `CloudController.uploadBanner` кладёт файл в
+  `hush-banners/<uid>/banner-<время>.<ext>`, `hush_banner_set` записывает путь, старый файл удаляется; чтение —
+  `createSignedUrl(path, 3600)`. Без аккаунта — IndexedDB (`hush-media/banner`, ключ `self`).
+  `prefers-reduced-motion`: видео без автозапуска, GIF замораживается на первом кадре (`freezeGif`); «Пауза фона».
+- **Карточка** — `core/profileCard.js`: `buildCard` из атласа, таблицы рекордов, кошелька, встреч с Найдёнышем и
+  наряда; `cleanCard` всё зажимает (≤ 4 КБ, 4 убийцы, наряд < 600 байт). `main.js publishCard()` — после готовности
+  облака и после каждой смены, только при изменении (дебаунс 1,5 с).
+- **Входы** — портрет в углу (`account.onNav`), свой ник в углу (`.social-name[data-profile]`), друг в уголке и в
+  панели друзей (`data-action="viewProfile"`), ник в лобби (`Lobby.onProfile` → `coop.roster.get(peer).uid`).
+  `coop.uid` (облачный id) едет в `hi`/`nm`/`roster`, проверяется `cleanUid`; протокол не менялся (поле необязательное).
+- **База** — миграция `20261101120000_hush_profile_cards.sql` применена к живому проекту; `supabase/tests/profile_cards.sql`
+  (друг видит, чужой нет, нельзя писать за другого и в чужую папку, лишний тип и большая карточка отклоняются).
+- **Тесты:** `tests/round30x.test.mjs` (6).
+
 ## 2. Петля игры (и это надо понимать буквально)
 
 ```
@@ -687,7 +708,7 @@ src/
   ui/              hud.js, menus.js, graphics.js (расширенная графика), garage*.js (3D-гараж), lobby.js, wardrobe.js, mannequin.js, atlas*.js,
                    bag3d.js, touchButtons.js, radar.js, news.js, miccal.js, socialDock/Toasts/Words, account.js,
                    beyond.js, voicemix.js, sfxtest.js, reel.js (2.1u: plays the shift's highlights, writes .webm)
-tests/             node:test, 50 файлов / 440 тестов (на 3.0w)
+tests/             node:test, 51 файл / 446 тестов (на 3.0x)
 play/              собранная игра для GitHub Pages (артефакт сборки, коммитится)
 ```
 
@@ -701,7 +722,7 @@ play/              собранная игра для GitHub Pages (артефа
 
 ## 6. Проверка: как убедиться, что не сломал
 
-1. `npm test` — 440 тестов (3.0w), все должны проходить (правка теста допустима только если изменилось **поведение по
+1. `npm test` — 446 тестов (3.0x), все должны проходить (правка теста допустима только если изменилось **поведение по
    замыслу**, и тогда в коммит-сообщении надо сказать, какое).
 2. `npm run build:pages` — сборка в `play/`; без неё деплой покажет старую версию.
 3. Живой прогон в браузере (headless-харнесс, рецепт ниже) на **конкретной сцене**, а не «в целом работает».

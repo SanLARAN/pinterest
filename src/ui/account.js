@@ -7,11 +7,12 @@ import {socialWords} from './socialWords.js';
 import {copyText} from './clipboard.js';
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export class AccountUI {
- constructor({cloud,canOpen=()=>true,canChange=()=>true,getRoom=()=>null,getInviteLink=()=>null,onJoin=()=>{}}){
+ constructor({cloud,canOpen=()=>true,canChange=()=>true,getRoom=()=>null,getInviteLink=()=>null,onJoin=()=>{},onNav=null,onProfile=null}){
+  this.onNav=onNav;this.onProfile=onProfile; // (3.0x) the corner portrait opens the full profile; a name in a list opens theirs
   this.cloud=cloud;this.canOpen=canOpen;this.canChange=canChange;this.getRoom=getRoom;this.getInviteLink=getInviteLink;this.onJoin=onJoin;this.opened=false;this.view='profile';this.mode='login';this.draft={};this.edited=new Set();this.results=null;this.query='';this.busy=false;this.message='';this.error='';this.lastUser=cloud.user?.id||null;
   this.el=document.createElement('section');this.el.id='accountPanel';this.el.className='account-panel';this.el.hidden=true;this.el.setAttribute('role','dialog');this.el.setAttribute('aria-modal','true');this.el.setAttribute('aria-labelledby','cloudTitle');document.body.append(this.el);
   this.disposeTouch=reliableTouchButtons(this.el,()=>this.opened,()=>this.cloud.user?.id||'guest');
-  this.nav=document.getElementById('btnAccount');this.lobbyNav=document.getElementById('btnLobbyFriends');this.nav?.addEventListener('click',()=>this.open());this.lobbyNav?.addEventListener('click',()=>this.open('invite'));
+  this.nav=document.getElementById('btnAccount');this.lobbyNav=document.getElementById('btnLobbyFriends');this.nav?.addEventListener('click',()=>this.onNav?this.onNav():this.open());this.lobbyNav?.addEventListener('click',()=>this.open('invite'));
   this.el.addEventListener('keydown',e=>{e.stopPropagation();if(e.code==='Escape'){e.preventDefault();this.close();}if(e.code==='Tab'){const a=[...this.el.querySelectorAll('button,input,textarea')].filter(x=>!x.disabled&&x.getClientRects().length),i=a.indexOf(document.activeElement);if(a.length){e.preventDefault();a[(i+(e.shiftKey?-1:1)+a.length)%a.length].focus();}}});this.el.addEventListener('keyup',e=>e.stopPropagation());
   this.el.addEventListener('submit',e=>{e.preventDefault();e.stopPropagation();if(!this.busy)this.submit(e.target);});
   this.el.addEventListener('click',e=>{const b=e.target.closest('button');if(!b||b.disabled||!b.dataset.action)return;if(b.dataset.action==='close'){this.close();return;}if(!this.busy)this.action(b.dataset.action,b.dataset.id);});
@@ -63,7 +64,7 @@ export class AccountUI {
   if(c.lastSync)html+=`<p class="cloud-note">${W.lastSync}: ${esc(new Date(c.lastSync).toLocaleString())}</p>`;return html;
  }
  inviteHTML(W){const S=socialWords(),c=this.cloud;return `<button type="button" data-action="copyInvite" class="invite-copy">${S.copy}</button>`+(c.user?`<section class="cloud-list"><h3>${S.friends}</h3>${c.social.friends.map(f=>this.row(f,this.button('invite',S.send,f.id),`<small>${W.presence[f.state]||W.presence.offline}</small>`)).join('')||`<p class="cloud-note">${S.empty}</p>`}</section>`:`<p class="cloud-note">${S.signin}</p>${this.button('inviteLogin',S.login)}`);}
- row(person,buttons,extra=''){return`<div class="cloud-person"><div><b>${esc(person.display_name)}</b><span>@${esc(person.handle)}</span>${extra}</div><div class="cloud-row-actions">${buttons}</div></div>`;}
+ row(person,buttons,extra=''){return`<div class="cloud-person"><div>${this.onProfile&&person.id?`<button type="button" class="cloud-name" data-action="viewProfile" data-id="${esc(person.id)}">${esc(person.display_name)}</button>`:`<b>${esc(person.display_name)}</b>`}<span>@${esc(person.handle)}</span>${extra}</div><div class="cloud-row-actions">${buttons}</div></div>`;}
  friendsHTML(W){
   const c=this.cloud,u=c.user.id,s=c.social;let html=`<form data-kind="search" class="cloud-search"><label>${W.search}<input name="query" value="${esc(this.query)}" maxlength="21" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="@putnik" /></label><button type="submit"${this.busy?' disabled':''}>${W.find}</button></form><p class="cloud-note">${W.searchHint}</p>`;
   if(this.results){html+=`<div class="cloud-results">${this.results.length?this.results.map(p=>this.row(p,s.friends.some(f=>f.id===p.id)?esc(W.list):s.requests.some(r=>r.sender_id===p.id||r.recipient_id===p.id)?esc(W.outgoing):this.button('add',W.add,p.id))).join(''):`<p>${W.nothing}</p>`}</div>`;}
@@ -103,6 +104,7 @@ export class AccountUI {
   const W=cloudWords();if(['profile','friends'].includes(action)){this.capture();this.scrollReset=true;this.view=action;this.render();if(action==='friends'&&this.cloud.user)this.cloud.refreshSocial().catch(e=>{this.error=cloudError(e);this.render();});return;}
   if(['login','register','recover'].includes(action)){this.clearPasswords();this.mode=action;this.message='';this.error='';this.view='profile';this.render();return;}
   if(action==='cancelConfirm'){this.confirm=null;this.render();return;}
+  if(action==='viewProfile'&&this.onProfile){const s=this.cloud.social,p=[...s.friends,...s.requests,...s.blocked,...(this.results||[])].find(x=>x.id===id||x.sender_id===id);this.close();this.onProfile(id,p?.display_name||'');return;}
   if(action==='confirm'){const c=this.confirm;this.confirm=null;if(c)this.action(c.action,c.id,true);return;}
   if(!confirmed&&(['remove','block'].includes(action)||['acceptInvite','joinFriend'].includes(action)&&this.getRoom())){this.confirm={action,id,text:action==='block'?W.confirmBlock:action==='remove'?W.confirmRemove:W.confirmJoin};this.render();return;}
   this.perform(async()=>{

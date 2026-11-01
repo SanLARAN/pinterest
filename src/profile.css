@@ -1,0 +1,83 @@
+/* 3.0x: the full-screen profile — a personal file over its owner's backdrop. The game's own palette and type:
+   ash and bone on black, red only for death, amber for the lit; JetBrains Mono, Rubik Wet Paint for the name. */
+.profile-screen[hidden] { display: none !important; }
+.profile-screen {
+  position: fixed; inset: 0; z-index: 150; overflow: hidden; background: #050607; color: var(--bone); font-family: var(--mono);
+  display: grid; place-items: stretch;
+}
+/* the backdrop: half there, as if seen through a dirty window */
+.pf-banner { position: absolute; inset: 0; opacity: 0; transition: opacity .6s ease; }
+.pf-banner.on { opacity: .42; }
+.pf-banner img, .pf-banner video, .pf-banner canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; filter: saturate(.75) contrast(1.05); }
+.pf-scrim {
+  position: absolute; inset: 0; pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(5, 6, 7, .55) 0%, rgba(5, 6, 7, .2) 30%, rgba(5, 6, 7, .72) 70%, rgba(5, 6, 7, .96) 100%),
+    radial-gradient(120% 90% at 50% 40%, transparent 40%, rgba(0, 0, 0, .7) 100%),
+    repeating-linear-gradient(0deg, rgba(167, 180, 182, .035) 0 1px, transparent 1px 3px);
+}
+.pf-sheet {
+  position: relative; display: flex; flex-direction: column; gap: 22px; width: min(1080px, 100%); margin: 0 auto;
+  padding: calc(28px + var(--safe-t)) calc(24px + var(--safe-r)) calc(24px + var(--safe-b)) calc(24px + var(--safe-l));
+  overflow-y: auto; max-height: 100dvh;
+}
+.pf-head { display: grid; grid-template-columns: auto 1fr auto; align-items: end; gap: 20px; }
+.pf-portrait { width: 128px; height: 128px; border: 1px solid var(--ash-dim); border-radius: 3px; background: rgba(0, 0, 0, .55); }
+.pf-portrait[hidden] { display: none; }
+.pf-kicker { margin: 0 0 6px; font-size: 11px; letter-spacing: .22em; color: var(--ash); }
+.pf-name { margin: 0; font-family: var(--horror); font-weight: 400; font-size: clamp(34px, 6vw, 64px); line-height: 1; color: var(--bone); text-shadow: 0 2px 18px rgba(0, 0, 0, .9); overflow-wrap: anywhere; }
+.pf-handle { margin: 8px 0 0; font-size: 13px; letter-spacing: .08em; color: var(--ash); }
+.pf-handle[data-state="lobby"], .pf-handle[data-state="playing"] { color: var(--amber); }
+.pf-close {
+  align-self: start; width: 44px; height: 44px; font: inherit; font-size: 24px; line-height: 1; color: var(--bone);
+  background: rgba(0, 0, 0, .55); border: 1px solid var(--ash-dim); border-radius: 3px; cursor: pointer;
+}
+.pf-close:hover { border-color: var(--bone); }
+.profile-screen button:focus-visible { outline: 2px solid var(--bone); outline-offset: 2px; }
+
+.pf-body { display: flex; flex-direction: column; gap: 18px; }
+.pf-note { color: var(--ash); font-size: 13px; }
+.pf-big { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.pf-tile { padding: 16px 14px 12px; background: var(--panel); border: 1px solid var(--ash-faint); border-radius: 3px; }
+.pf-tile b { display: block; font-size: clamp(26px, 4vw, 40px); font-weight: 700; font-variant-numeric: tabular-nums; color: var(--bone); }
+.pf-tile span { display: block; margin-top: 4px; font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--ash); }
+.pf-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.pf-block { padding: 14px 16px; background: var(--panel); border: 1px solid var(--ash-faint); border-radius: 3px; }
+.pf-block h2 { margin: 0 0 10px; font-size: 11px; font-weight: 400; letter-spacing: .2em; text-transform: uppercase; color: var(--ash); }
+.pf-row { display: flex; justify-content: space-between; gap: 12px; margin: 6px 0; font-size: 14px; line-height: 1.5; }
+.pf-row span { color: var(--bone-dim); }
+.pf-row b { font-weight: 700; font-variant-numeric: tabular-nums; }
+.pf-flag { padding: 0 6px; border: 1px solid currentColor; border-radius: 2px; font-size: 11px; letter-spacing: .14em; }
+.pf-flag.yes { color: var(--amber); }
+.pf-flag.no { color: var(--ash); }
+.pf-bars { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.pf-bars li { display: grid; grid-template-columns: 9em 1fr auto; align-items: center; gap: 10px; font-size: 13px; }
+.pf-bars span { color: var(--bone-dim); }
+.pf-bars i { height: 6px; background: linear-gradient(90deg, var(--blood) var(--w), var(--ash-faint) var(--w)); border-radius: 1px; }
+.pf-bars b { font-variant-numeric: tabular-nums; }
+.pf-since { margin: 0; font-size: 12px; color: var(--ash); letter-spacing: .06em; }
+.pf-stranger { padding: 18px; max-width: 46ch; background: var(--panel); border: 1px solid var(--ash-faint); border-radius: 3px; line-height: 1.6; }
+
+.pf-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: auto; }
+.pf-actions button {
+  min-height: 44px; padding: 0 18px; font: inherit; font-size: 12px; letter-spacing: .14em; color: var(--bone);
+  background: rgba(0, 0, 0, .6); border: 1px solid var(--ash-dim); border-radius: 3px; cursor: pointer;
+}
+.pf-actions button:hover:not(:disabled) { border-color: var(--bone); }
+.pf-actions button.primary { border-color: var(--bone); background: rgba(214, 205, 192, .1); }
+.pf-actions button:disabled { opacity: .45; cursor: default; }
+.pf-status { min-height: 1.5em; margin: 0; font-size: 12px; color: var(--ash); }
+.pf-status.bad { color: var(--red); }
+
+/* the nick that opens a profile: it says so under the pointer */
+[data-profile] { cursor: pointer; }
+.social-name[data-profile]:hover, .lobby-name-link:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+@media (max-width: 720px) {
+  .pf-head { grid-template-columns: auto 1fr; }
+  .pf-close { grid-column: 2; grid-row: 1; justify-self: end; }
+  .pf-portrait { width: 84px; height: 84px; }
+  .pf-big { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pf-grid { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) { .pf-banner { transition: none; } }

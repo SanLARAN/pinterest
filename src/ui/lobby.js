@@ -22,8 +22,9 @@ const SPEAKER = (muted) =>
   }</svg>`;
 
 export class Lobby {
-  constructor({ coop, mic, audio, mix, onMicToggle, uiSound, onWardrobe = null, beforeOpen = null, afterClose = null }) {
+  constructor({ coop, mic, audio, mix, onMicToggle, uiSound, onWardrobe = null, beforeOpen = null, afterClose = null, onProfile = null }) {
     this.coop = coop;
+    this.onProfile = onProfile; // (3.0x) a name in the list opens that player's profile (yours, a friend's, or a stranger's card)
     this.afterClose=afterClose;
     this.beforeOpen = beforeOpen; // (main builds the garage the first time)
     this.onWardrobe = onWardrobe; // your own tag (or figure) opens the wardrobe
@@ -130,6 +131,12 @@ export class Lobby {
         e.preventDefault();
         if (this.uiSound) this.uiSound('click');
         if (this.onWardrobe) this.onWardrobe();
+        return;
+      }
+      if (this.onProfile && row.dataset.id && e.target.closest('.n') && !row.classList.contains('empty')) {
+        e.preventDefault();
+        if (this.uiSound) this.uiSound('click');
+        this.onProfile(row.dataset.id);
         return;
       }
       if (e.target.closest('.vbtn') || (row.classList.contains('mate') && !e.target.closest('.vol'))) {
@@ -472,6 +479,7 @@ export class Lobby {
     if (p.self) tags.push(t('coopYou'));
     if (p.host) tags.push(t('coopHost'));
     set(n, `${esc(p.name)}${tags.map((x) => `<em>${esc(x)}</em>`).join('')}`);
+    if (this.onProfile) { n.classList.add('lobby-name-link'); n.title = t('pfOpen'); }
     mic.className = `mic ${p.mic ? 'on' : 'off'}`;
     set(mic, p.mic ? MIC_ON : MIC_OFF);
     const rtt = p.self ? null : this.coop.rtt(p.id);

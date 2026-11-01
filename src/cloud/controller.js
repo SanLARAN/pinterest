@@ -4,6 +4,7 @@ import {capturePayload,scopeSnapshot,activateSnapshot,cleanPayload,cleanWallet} 
 import {wallet,applyWallet,setPurchaseBackend} from '../game/wallet.js';
 import {rewardRows,removeReward,recoverAbandonedRewards,pendingRewards} from './rewards.js';
 import {createCloudClient,authRedirect,hasStoredSession,isAuthReturn,readAuthProviders,SUPABASE_URL} from './client.js';
+import {BANNER_BUCKET,BANNER_MAX,BANNER_EXT,bannerKind} from './banner.js';
 const emptySocial=()=>({friends:[],requests:[],invites:[],blocked:[]});
 const err=e=>e instanceof Error?e:Object.assign(new Error(e?.message||'cloud_error'),{code:e?.code,status:e?.status});
 export class CloudController {
@@ -151,6 +152,15 @@ export class CloudController {
  }
  async updateProfile(handle,name){if(!this.canApply())throw new Error('leave_room');const owner=this.user?.id,epoch=this.epoch;await this.flush();if(owner!==this.user?.id||epoch!==this.epoch)throw new Error('stale_session');if(this.conflict)throw new Error('cloud_conflict');const s=await this.rpc('hush_profile_update',{p_owner:owner,p_handle:handle,p_name:name});writeMeta({version:Number(s.save.version),dirty:false,rev:0},owner);this.dirty=false;this.receive(s);}
  async search(query){return await this.rpc('hush_search',{p_query:query});}
+ // 3.0x profiles: yours or a friend's (the server says not_friend to anyone else), the stats card, the banner
+ async profileView(id){return await this.rpc('hush_profile_view',{p_id:id});}
+ async publishCard(card){if(!this.user||!this.ready)return false;await this.rpc('hush_card_publish',{p_owner:this.user.id,p_card:card});return true;}
+ async uploadBanner(file){const owner=this.user?.id;if(!owner||!this.client)throw new Error('not_authenticated');const kind=bannerKind(file);if(!kind)throw new Error('banner_type');if(file.size>BANNER_MAX)throw new Error('banner_size');
+  const path=`${owner}/banner-${Date.now().toString(36)}.${BANNER_EXT[file.type]}`;const{error}=await this.client.storage.from(BANNER_BUCKET).upload(path,file,{contentType:file.type,upsert:false,cacheControl:'3600'});if(error)throw err(error);
+  const old=this.profile?.banner;await this.rpc('hush_banner_set',{p_owner:owner,p_path:path,p_kind:kind});if(this.profile){this.profile.banner=path;this.profile.banner_kind=kind;}
+  if(old&&old!==path)this.client.storage.from(BANNER_BUCKET).remove([old]).catch(()=>{});this.emit();return{path,kind};}
+ async clearBanner(){const owner=this.user?.id;if(!owner)throw new Error('not_authenticated');const old=this.profile?.banner;await this.rpc('hush_banner_set',{p_owner:owner,p_path:null,p_kind:null});if(this.profile){this.profile.banner=null;this.profile.banner_kind=null;}if(old)this.client.storage.from(BANNER_BUCKET).remove([old]).catch(()=>{});this.emit();}
+ async bannerUrl(path){if(!path||!this.client)return null;const{data,error}=await this.client.storage.from(BANNER_BUCKET).createSignedUrl(path,3600);if(error)throw err(error);return data?.signedUrl||null;}
  async friendAction(action,target=null,request=null){this.social=await this.rpc('hush_friend_action',{p_owner:this.user.id,p_action:action,p_target:target,p_request:request});this.subscribe();this.emit();}
  async refreshSocial(){if(!this.user)return;const before=this.social,old=before.friends.map(f=>f.id).join(',');const after=await this.rpc('hush_social');this.social=after;
   const requests=new Set(before.requests.map(r=>r.id)),invites=new Set(before.invites.map(r=>r.id)),friends=new Set(before.friends.map(f=>f.id));

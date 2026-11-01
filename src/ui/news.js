@@ -7,6 +7,21 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v:'3.0x',date:'2026-11-01',
+    ru:{title:'Личное дело',items:[
+      'У каждого теперь есть профиль на весь экран — «личное дело»: портрет твоего выжившего, ночи, выигранные смены, самая долгая ночь, рекорд очков, пройденные участки, генераторы и насосы, обысканные тела, поднятые друзья, встреченные твари и то, что убивало тебя чаще всего.',
+      'Открывается нажатием на свой ник или портрет в углу меню, на ник друга в списке друзей и на ник игрока в лобби.',
+      'За профилем — твой фон: загрузи с компьютера PNG, JPG, GIF или MP4 до 20 МБ. Он виден полупрозрачным, как сквозь грязное стекло, и без звука. Если в системе включено «уменьшить движение», видео и GIF стоят на месте; кнопка «Пауза фона» останавливает их в любой момент.',
+      'Профиль и фон видят только твои друзья. Игрок из комнаты, который тебе не друг, увидит ник и кнопку «Добавить в друзья». Без аккаунта профиль тоже работает, но фон хранится только на этом компьютере.',
+    ]},
+    en:{title:'Personal file',items:[
+      'Everyone now has a full-screen profile, a «personal file»: your survivor, the nights, the shifts won, the longest night, the best score, the grounds cleared, generators and pumps, bodies searched, friends raised, the things you met and what killed you most.',
+      'It opens from your own name or portrait in the corner of the menu, a friend in the friends list, and any name in the lobby.',
+      'Behind it is your backdrop: upload a PNG, JPG, GIF or MP4 of up to 20 MB from your computer. It shows half there, as if through a dirty window, and without sound. With reduced motion on in your system, video and GIFs stand still; the Pause backdrop button stops them at any time.',
+      'Only your friends see the profile and the backdrop. A player in your room who is not your friend sees the name and an Add friend button. Without an account the profile works too, but the backdrop stays on this computer.',
+    ]},
+  },
+  {
     v:'3.0w',date:'2026-11-01',
     ru:{title:'Без микро-рывков',items:[
       'Найдена причина «микро-телепортов» при ходьбе: сборник смены десять раз в секунду копировал кадр игры так, что процессор каждый раз ждал, пока видеокарта дорисует картинку. Чем тяжелее кадр — под лампой, днём, — тем дольше было ожидание. Теперь кадр для сборника снимается без ожидания, а сжатие идёт отдельно от игры.',

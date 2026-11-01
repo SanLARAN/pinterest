@@ -7,6 +7,7 @@ import '@fontsource/jetbrains-mono/latin-400.css';
 import '@fontsource/jetbrains-mono/cyrillic-700.css';
 import '@fontsource/jetbrains-mono/latin-700.css';
 import './style.css';
+import './profile.css'; // 3.0x: the full-screen profile
 import './garage-home.css';
 import './screen-editor.css';
 import './cloud.css';
@@ -65,6 +66,7 @@ import { Mates } from './ui/mates.js';
 import { VoiceMix, VoiceList } from './ui/voicemix.js';
 import { Atlas } from './ui/atlas.js';
 import { Wardrobe } from './ui/wardrobe.js';
+import { ProfileScreen, myCard } from './ui/profile.js'; // 3.0x
 
 setLang(settings.lang);
 
@@ -380,6 +382,8 @@ const lobby = new Lobby({
   coop, mic, audio, mix: voiceMix,
   beforeOpen: () => { home.setActive(false); return ensureGarage(); },
   afterClose: () => home.enter(),
+  // (3.0x) a name in the room's list: your own profile, a friend's (by their cloud id), or a stranger's card
+  onProfile: (peer) => { const r = coop.roster.get(peer); if (!r) return; if (r.self) profile.open({ self: true }); else profile.open({ id: r.uid, name: r.name }); },
   onMicToggle: () => toggleMic(),
   onWardrobe: () => {
     if (state === 'menu') wardrobe.open(); // (over the lobby: you stay in the room)
@@ -414,7 +418,18 @@ function syncIdentityFields(){const p=currentIdentity();for(const id of['nameInp
 const account=new AccountUI({cloud,canOpen:()=>state==='menu'&&!wardrobe.isOpen()&&!atlas.isOpen()&&!micCal.isOpen()&&!lobby.rulesOpen&&!lobby.starting,canChange:canApplyAccount,getRoom:()=>coop.active&&!coop.inRun?coop.code:null,getInviteLink:()=>coop.active?coop.inviteLink():null,onJoin:async room=>{
  if(state!=='menu'||lobby.starting)throw new Error('leave_room');account.close();lobby.open();if(coop.active&&coop.code===room.room_code)return;await coop.join(room.room_code,{strategy:room.strategy});lobby.render();
 }});
-const social=new SocialDock({cloud,account,portrait:(fit,canvas)=>{if(!wardrobe.mq)return false;wardrobe.mq.still(fit,'head',canvas);return true;}});
+const portraitOf=(fit,canvas)=>{if(!wardrobe.mq)return false;wardrobe.mq.still(fit,'head',canvas);return true;};
+// (3.0x) the full-screen profile: from your portrait or name in the corner, a friend's name, a name in the lobby
+const profile=new ProfileScreen({cloud,portrait:portraitOf,canOpen:()=>state==='menu'&&!wardrobe.isOpen()&&!atlas.isOpen()&&!lobby.starting,
+ onAccount:()=>account.open('profile'),onJoin:(id)=>account.action('joinFriend',id),
+ onInvite:Object.assign((id)=>cloud.invite(id),{available:()=>coop.active&&!!coop.code&&!coop.inRun})});
+account.onNav=()=>profile.open({self:true});
+account.onProfile=(id,name)=>profile.open(id===cloud.user?.id?{self:true}:{id,name});
+const social=new SocialDock({cloud,account,portrait:portraitOf,onProfile:(id,name)=>profile.open(id?{id,name}:{self:true})});
+// (3.0x) your card for your friends' view of you: published when the cloud is ready and after every shift — only when it changed
+let cardKey='',cardTimer=0;
+function publishCard(){clearTimeout(cardTimer);cardTimer=setTimeout(()=>{if(!cloud.user||!cloud.ready)return;const card=myCard(),key=JSON.stringify({...card,at:0});if(key===cardKey)return;cloud.publishCard(card).then(()=>{cardKey=key;}).catch(()=>{});},1500);}
+cloud.on(()=>{const uid=cloud.user?.id||null;if(coop.uid!==uid){coop.uid=uid;if(coop.active)coop.announce();}if(cloud.ready)publishCard();});
 const notifications=new SocialToasts({cloud,account});
 lobby.onInvite=()=>account.open('invite');
 cloud.on(()=>syncIdentityFields());
@@ -964,6 +979,7 @@ function onEnd(res) {
   try {
     const started = game.objectives.gens.filter((g) => g.running).map((g) => ({ k: g.k, site: g.site && g.site.id }));
     recordNight(stats, res, started);
+    publishCard(); // (3.0x) the night is in the card friends see
     atlas.refreshBadge();
   } catch (e) {
     console.warn('[atlas] could not record the night', e);
@@ -1322,7 +1338,7 @@ function boot() {
     }
     // warm up shaders so the first ping doesn't hitch
     renderer.compile(scene, camera);
-    window.__hush = { world, game, shared, pulses, ghosts, eyes, renderer, perf, mic, audio, music: menuMusic, input, hud, post, shadows, coop, lobby, atlas, wardrobe, micCal, news, home, debug: DEBUG, startRun, pause, resume, toMenu, highlights, reel, get opening() { return game && game.opening; }, ensureGarage, cloud, account, social, notifications, get garage() { return garage; }, get state() { return state; } };
+    window.__hush = { world, game, shared, pulses, ghosts, eyes, renderer, perf, mic, audio, music: menuMusic, input, hud, post, shadows, coop, lobby, atlas, wardrobe, micCal, news, home, debug: DEBUG, profile, startRun, pause, resume, toMenu, highlights, reel, get opening() { return game && game.opening; }, ensureGarage, cloud, account, social, notifications, get garage() { return garage; }, get state() { return state; } };
     state = 'menu';
     menuTime = 0;
     post.u.uFade.value = 0;
