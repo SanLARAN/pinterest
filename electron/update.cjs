@@ -72,4 +72,57 @@ function bestRelease(list, running, opts) {
   return null;
 }
 
-module.exports = { REPO, API, PAGE, parts, compare, isNewer, pickAsset, versionOf, cleanRelease, bestRelease };
+// ---------------------------------------------------------------- 3.1d: the launcher's manifest
+// Every release carries hush-manifest.json (scripts/pack-game.cjs writes it in CI): which game is inside, the
+// .pak with its size and hash, and the shell (its fingerprint, the installer, the portable exe). The launcher
+// fetches it from «the latest release» and takes nothing from it on trust: names, sizes and hashes are checked
+// here, and every download URL is built from our own repository, never read from the file.
+const LATEST = `https://github.com/${REPO}/releases/latest/download/`;
+const MANIFEST_URL = `${LATEST}hush-manifest.json`;
+const VERSION = /^\d+\.\d+\.\d+$/;
+const HASH = /^[0-9a-f]{64}$/;
+
+function cleanAsset(a, ext, maxMb) {
+  if (!a || typeof a !== 'object') return null;
+  const name = String(a.name || '');
+  if (!new RegExp(`^[A-Za-z0-9._-]{1,120}\\.${ext}$`).test(name)) return null;
+  const size = Number(a.size);
+  if (!Number.isInteger(size) || size <= 0 || size > maxMb * 1024 * 1024) return null;
+  if (!HASH.test(String(a.sha256 || ''))) return null;
+  return { name, size, sha256: a.sha256, url: LATEST + encodeURIComponent(name) };
+}
+
+function cleanManifest(raw) {
+  if (!raw || typeof raw !== 'object' || raw.v !== 1) return null;
+  if (!VERSION.test(String(raw.version || ''))) return null;
+  const game = cleanAsset(raw.pak, 'pak', 200);
+  if (!game) return null;
+  const s = raw.shell && typeof raw.shell === 'object' ? raw.shell : {};
+  const shell = {
+    id: /^[0-9a-f]{16}$/.test(String(s.id || '')) ? s.id : null,
+    version: VERSION.test(String(s.version || '')) ? s.version : null,
+    setup: cleanAsset(s.setup, 'exe', 400),
+    portable: cleanAsset(s.portable, 'exe', 400),
+  };
+  return {
+    version: raw.version,
+    game: String(raw.game || '').slice(0, 16),
+    pak: game,
+    shell,
+    date: typeof raw.date === 'string' ? raw.date.slice(0, 32) : null,
+  };
+}
+
+// what to do with a manifest: { game: bool (download the new game), shell: 'setup' | 'portable' | null }
+function plan(m, { gameVersion, shellId, mode }) {
+  if (!m) return { game: false, shell: null };
+  const game = isNewer(m.version, gameVersion);
+  let shell = null;
+  if (m.shell.id && shellId && m.shell.id !== shellId) {
+    if (mode === 'nsis' && m.shell.setup) shell = 'setup';
+    else if (mode === 'portable' && m.shell.portable) shell = 'portable';
+  }
+  return { game, shell };
+}
+
+module.exports = { REPO, API, PAGE, LATEST, MANIFEST_URL, parts, compare, isNewer, pickAsset, versionOf, cleanRelease, bestRelease, cleanAsset, cleanManifest, plan };

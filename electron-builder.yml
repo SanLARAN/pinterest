@@ -1,7 +1,11 @@
 # ТИШЕ / HUSH — the Windows build.
 #
-# A portable .exe: one file, no installer, no admin rights, nothing written outside the user's temp folder when
-# it runs. The web build in ./dist is packed into the app (asar) and served over hush:// by electron/main.cjs.
+# (3.1d) Two files per release:
+#   HUSH-Setup-<v>.exe        the installer: per-user (no admin), Start menu + desktop shortcut, opens the launcher.
+#                             The launcher keeps it current — the game part from each release's .pak, and the shell
+#                             by re-running the newest installer silently when it changed (electron/updater.cjs).
+#   HUSH-<v>-win-x64.exe      the portable build, for a USB stick: same launcher, swaps its own file to update.
+# The web build in ./dist is packed into the app (asar) and served over hush:// by electron/main.cjs.
 # Build locally:  npm run build && npm run desktop:win
 # In CI:          .github/workflows/desktop.yml (Actions → Desktop (HUSH) → Run workflow)
 appId: ru.hush.echolocation
@@ -22,6 +26,11 @@ files:
   - electron/update.cjs
   - electron/oauth.cjs
   - electron/preload.cjs
+  - electron/preload-launcher.cjs
+  - electron/updater.cjs
+  - electron/content.cjs
+  - electron/pak.cjs
+  - electron/net.cjs
   - electron/assets/**
   - dist/**
   - package.json
@@ -32,9 +41,24 @@ compression: maximum
 win:
   icon: electron/assets/icon.png
   target:
+    - target: nsis
+      arch: [x64]
     - target: portable
       arch: [x64]
   artifactName: HUSH-${version}-win-${arch}.${ext}
+
+# (3.1d) the installer: one click, into the user's own profile (no UAC prompt), shortcuts, and the game starts at
+# the end. The launcher runs a newer one of these with `/S --updated` to update the shell in place.
+nsis:
+  oneClick: true
+  perMachine: false
+  allowElevation: false
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+  shortcutName: ТИШЕ HUSH
+  runAfterFinish: true
+  deleteAppDataOnUninstall: false
+  artifactName: HUSH-Setup-${version}.${ext}
 
 portable:
   artifactName: HUSH-${version}-win-${arch}.${ext}

@@ -12,7 +12,7 @@
     "preview": "vite preview --host 0.0.0.0",
     "desktop": "npm run build && npx --yes electron@45.0.0 .",
     "desktop:dev": "npx --yes electron@45.0.0 .",
-    "desktop:win": "npm run build && npx --yes electron-builder@26.15.3 --win portable --x64 --publish never"
+    "desktop:win": "npm run build && npx --yes electron-builder@26.15.3 --win nsis portable --x64 --publish never && node scripts/pack-game.cjs"
   },
   "dependencies": {
     "@fontsource/jetbrains-mono": "^5.3.0",

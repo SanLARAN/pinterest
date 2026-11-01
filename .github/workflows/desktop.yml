@@ -1,10 +1,12 @@
-# The desktop build: one portable Windows .exe of ТИШЕ / HUSH.
+# The desktop build of ТИШЕ / HUSH: an installer with a launcher that keeps itself current (3.1d).
 #
 # Runs by hand (Actions → "Desktop (HUSH)" → Run workflow) and on every arena/* tag, next to the Pages deploy.
-# Two kinds of output, so the .exe can be got at without a local Windows machine:
-#   • the exe as a workflow artifact ("HUSH-win-x64") — Actions run page → Artifacts → download;
-#   • a GitHub Release asset on a tag, named HUSH-…-win-x64.exe;
-#   • and, if the GDRIVE_SA secret is set, an upload to Google Drive (see docs/DESKTOP.md).
+# What a tag's release carries (the launcher reads it from «the latest release»):
+#   • HUSH-Setup-1.0.<n>.exe     the installer (what players download once);
+#   • HUSH-1.0.<n>-win-x64.exe   the portable build;
+#   • hush-game-1.0.<n>.pak      the game alone (~7 MB): installed copies pull this and nothing else;
+#   • hush-manifest.json         versions, sizes, sha-256 and the shell's fingerprint (scripts/pack-game.cjs).
+# Also: the same files as a workflow artifact ("HUSH-win-x64"), and Google Drive if GDRIVE_SA is set.
 name: Desktop (HUSH)
 
 on:
@@ -80,21 +82,28 @@ jobs:
         shell: bash
         run: npm pkg set version="1.0.${{ github.run_number }}" && node -p "require('./package.json').version"
 
-      - name: Pack the portable .exe
-        run: npx electron-builder --win portable --x64 --publish never
+      - name: Pack the installer and the portable .exe
+        run: npx electron-builder --win nsis portable --x64 --publish never
         env:
           # unsigned builds: no certificate is configured, and electron-builder must not go looking for one
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
 
+      # (3.1d) the launcher's half of the release: the game as a .pak, and the manifest with every hash
+      - name: Pack the game and the manifest
+        run: node scripts/pack-game.cjs --dist dist --out release
+
       - name: What came out
         shell: bash
-        run: ls -la release && du -h release/*.exe
+        run: ls -la release && du -h release/*.exe release/*.pak && cat release/hush-manifest.json
 
-      - name: Upload the exe
+      - name: Upload the build
         uses: actions/upload-artifact@v4
         with:
           name: HUSH-win-x64
-          path: release/*.exe
+          path: |
+            release/*.exe
+            release/*.pak
+            release/hush-manifest.json
           if-no-files-found: error
           retention-days: 90
 
@@ -102,17 +111,28 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/arena/')
         uses: softprops/action-gh-release@v2
         with:
-          files: release/*.exe
+          files: |
+            release/*.exe
+            release/*.pak
+            release/hush-manifest.json
+          # the launcher reads «the latest release»: this one has to be it
+          make_latest: true
           name: ТИШЕ / HUSH ${{ github.ref_name }}
           body: |
-            Портативная сборка для Windows (x64): скачай `HUSH-…-win-x64.exe` и запусти — установка не нужна.
+            **Установка:** скачай `HUSH-Setup-….exe` и запусти — без прав администратора, ярлыки на рабочем столе
+            и в «Пуске». Откроется лаунчер: ИГРАТЬ, что нового, обновления.
 
-            **Обновляется сама.** Запущенная сборка раз в несколько часов спрашивает эту страницу, и если здесь
-            лежит новее, в меню появляется строка «есть сборка 1.0.N — скачать». По кнопке она скачивает новый
-            `.exe` рядом с собой и подменяет старый при выходе. Скачанное всегда остаётся в
-            `%APPDATA%\HUSH\updates`, так что можно запустить и руками.
+            **Обновляется сама.** Лаунчер при каждом запуске (и раз в три часа) смотрит сюда. Новая игра — это файл
+            `hush-game-….pak` на несколько мегабайт: он скачивается и проверяется сам, переустанавливать ничего не
+            нужно. Если поменялась сама оболочка, лаунчер тихо скачает новый установщик и поставит его при выходе.
 
-            Portable Windows build (x64): download `HUSH-…-win-x64.exe` and run it — nothing to install.
+            Без установки: `HUSH-…-win-x64.exe` — портативная сборка, тоже с лаунчером и обновлениями.
+
+            **Install:** download `HUSH-Setup-….exe` and run it — no admin rights, desktop and Start menu shortcuts.
+            The launcher keeps the game current on its own. No install: `HUSH-…-win-x64.exe` (portable).
+
+            Windows может показать «Система Windows защитила ваш компьютер»: сборка не подписана сертификатом —
+            «Подробнее» → «Выполнить в любом случае». Windows may warn that the app is unsigned: More info → Run anyway.
 
             Микрофон: игра спросит разрешение при первом запуске (система может переспросить в «Параметрах конфиденциальности»).
             Microphone: the game asks on first run (Windows may also ask in Privacy settings).
@@ -129,6 +149,6 @@ jobs:
           $rclone = (Get-ChildItem rclone -Recurse -Filter rclone.exe | Select-Object -First 1).FullName
           $env:GDRIVE_SA | Out-File -FilePath sa.json -Encoding utf8
           & $rclone config create gdrive drive service_account_file sa.json scope drive --config rclone.conf
-          $exe = (Get-ChildItem release -Filter *.exe | Select-Object -First 1).FullName
+          $exe = (Get-ChildItem release -Filter 'HUSH-Setup-*.exe' | Select-Object -First 1).FullName
           & $rclone copy $exe "gdrive:$env:GDRIVE_FOLDER" --config rclone.conf --verbose
           Remove-Item sa.json

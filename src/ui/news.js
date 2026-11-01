@@ -7,6 +7,23 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v:'3.1d',date:'2026-11-01',
+    ru:{title:'Лаунчер и автообновление',items:[
+      'Игру для Windows теперь можно установить: скачай HUSH-Setup со страницы релизов и запусти. Права администратора не нужны, ярлыки появятся на рабочем столе и в «Пуске».',
+      'Первым открывается лаунчер: большая кнопка ИГРАТЬ, что нового в игре, строка обновления и две настройки — «сразу запускать игру» и «игра на весь экран». Пока ты играешь, лаунчер спрятан, а когда закрываешь игру, возвращается.',
+      'Обновления приходят сами. Новая версия игры — это файл на несколько мегабайт: лаунчер скачивает его, проверяет и подставляет, ничего не переустанавливая. Если обновилась сама программа, лаунчер тихо скачает её в фоне и поставит, когда ты выйдешь.',
+      'Если обновление скачалось, пока ты играл, в меню появится строка с кнопкой ПЕРЕЗАПУСТИТЬ. Без интернета играешь на том, что уже есть.',
+      'Портативная версия (один .exe без установки) тоже осталась — с тем же лаунчером. Заодно исправлено её старое самообновление: оно подменяло временную копию, а не тот файл, который ты запускал.',
+    ]},
+    en:{title:'Launcher and auto-update',items:[
+      'The Windows game can now be installed: download HUSH-Setup from the releases page and run it. No admin rights, with desktop and Start menu shortcuts.',
+      'It opens on a launcher: a big PLAY button, what is new, the update line and two settings — start the game right away, and play in full screen. It hides while you play and comes back when you close the game.',
+      'Updates arrive on their own. A new game version is a file of a few megabytes: the launcher downloads it, checks it and swaps it in with nothing to reinstall. If the program itself was updated, the launcher quietly downloads it in the background and installs it when you quit.',
+      'If an update arrives while you play, the menu shows a RESTART button. Without internet you simply play what you have.',
+      'The portable build (one .exe, no install) is still there, with the same launcher. Its old self-update is fixed too: it used to replace a temporary copy instead of the file you launched.',
+    ]},
+  },
+  {
     v:'3.1c',date:'2026-11-01',
     ru:{title:'Сороки',items:[
       'В сухих деревьях у тропинок теперь сидят сороки — по четыре–семь птиц. Тронуть они не тронут, зато выдадут: пробеги под ними, подойди к самому стволу или нашуми рядом, и стая взлетит с треском. Этот стрекот слышат твари метров на пятьдесят вокруг, и считается он твоим шумом.',

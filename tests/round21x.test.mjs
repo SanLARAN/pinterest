@@ -56,7 +56,8 @@ test('it cannot read the disk: every request is confined to ./dist', () => {
   }
   // the handler must go through that function and not re-decide on its own
   assert.match(main, /require\('\.\/serve\.cjs'\)/, 'main.cjs uses the tested handler');
-  assert.match(main, /serveBuild\(request, DIST,/, 'every request goes through it');
+  assert.match(main, /serveBuild\(request, gameCopy\.dir,/, 'every request goes through it (3.1d: from the current copy of the game)');
+  assert.match(main, /let gameCopy = \{ dir: DIST,/, 'which is the bundled build until the launcher has a newer one');
   assert.match(serve, /const hit = resolveRequest\(request\.url, dist\)/, 'and it starts by resolving the path');
   // and the page itself is sandboxed
   assert.match(main, /nodeIntegration: false/);
@@ -180,7 +181,7 @@ test('the workflow packs the exe and leaves it where a player can get it', () =>
   assert.match(wf, /npm ci/);
   assert.match(wf, /npm test/, 'a broken build is not shipped');
   assert.match(wf, /npm run build/);
-  assert.match(wf, /electron-builder --win portable --x64/);
+  assert.match(wf, /electron-builder --win nsis portable --x64/); // (3.1d: the installer and the portable build)
   assert.match(wf, /actions\/upload-artifact@v4/, 'the exe is downloadable from the run');
   assert.match(wf, /softprops\/action-gh-release@v2/, 'and attached to a tag release');
   assert.match(wf, /tags: \['arena\/\*'\]/, 'built on the same tags as the site');
@@ -192,7 +193,7 @@ test('the workflow packs the exe and leaves it where a player can get it', () =>
 
 test('the npm scripts a human types are the same commands the workflow runs', () => {
   assert.match(pkg.scripts.desktop, /npm run build && npx --yes electron@45\.0\.0 \./);
-  assert.match(pkg.scripts['desktop:win'], /electron-builder@26\.15\.3 --win portable --x64/);
+  assert.match(pkg.scripts['desktop:win'], /electron-builder@26\.15\.3 --win nsis portable --x64/);
   // the desktop deps are deliberately not in package.json: the Pages deploy stays light
   assert.equal(pkg.devDependencies.electron, undefined);
   assert.equal(pkg.devDependencies['electron-builder'], undefined);

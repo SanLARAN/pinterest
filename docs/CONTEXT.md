@@ -4,7 +4,7 @@
 > Он написан для человека и для агента: любой новый чат начинается с чтения `AGENTS.md`, а тот отправляет
 > сюда. Если код и этот файл расходятся — прав код, а файл надо поправить в том же коммите.
 >
-> Последнее обновление: раунд **3.1c** (сороки, быстрое колесо рюкзака, предпросмотр батарейки).
+> Последнее обновление: раунд **3.1d** (установщик, лаунчер, автообновление игры и оболочки).
 
 ---
 
@@ -536,6 +536,26 @@
   чип «ФОНАРЬ ПОСЛЕ» в рюкзаке, строка на кармане колеса.
 - **Тесты:** `tests/round31c.test.mjs` (12).
 
+### 3.1d — установщик, лаунчер, автообновление
+
+- **Два окна:** лаунчер (`launcher.html`, frameless 980×600, `preload-launcher.cjs` → `window.hushLauncher`) и окно
+  игры (как раньше). IPC лаунчера отвечает только отправителю `launcherWin.webContents`; настройки — `autoplay`,
+  `fullscreen` в `<userData>/launcher.json`. `--play` или нет `launcher.html` в копии — сразу в игру.
+- **Копии игры** (`content.cjs`): встроенная `dist/` (версия = `app.getVersion()`) и скачанные
+  `<userData>/game/<x.y.z>/` + `current.json`; служит более новая из целых (маркер `.hush-ok`). `gameCopy` выбирается
+  при открытии окна игры, протокол `hush://app/` читает из `gameCopy.dir`.
+- **Релиз** (`scripts/pack-game.cjs` в CI): `hush-game-<v>.pak` (`pak.cjs`: `HUSHPAK1` + gzip, sha-256 по файлам,
+  отказ путям наружу), `hush-manifest.json` `{v:1, version, game, pak, shell:{id, version, setup, portable}}`,
+  `make_latest: true`. URL — только `releases/latest/download/<имя>` своего репо.
+- **Updater** (`updater.cjs`, сеть внедряется): `idle → checking → latest | downloading → ready | offline | error`
+  (+ `dev`); `shell: none → downloading → ready | error`. Оболочка — `plan()`: `shellId` манифеста ≠ свой →
+  `setup` (NSIS: `/S --updated [--force-run]`, при выходе или кнопкой) или `portable` (подмена `.cmd` файла
+  `PORTABLE_EXECUTABLE_FILE`). Уже скачанный установщик с тем же хэшем не качается повторно.
+- **В игре** `desktopUpdate.js`: строка «обновление скачано — ПЕРЕЗАПУСТИТЬ» (`hush:update:restart` → reload на
+  новую копию); `hush:update:download` убран — качает лаунчер.
+- **Не проверено вживую:** сам установщик и Electron (агент их не запускает) — проверяются CI-сборкой и игроком.
+- **Тесты:** `tests/round31d.test.mjs` (13); `round21x`, `round30m` — под новые цели сборки и мост.
+
 ## 2. Петля игры (и это надо понимать буквально)
 
 ```
@@ -785,7 +805,7 @@ src/
   ui/              hud.js, menus.js, graphics.js (расширенная графика), garage*.js (3D-гараж), lobby.js, wardrobe.js, mannequin.js, atlas*.js,
                    bag3d.js, touchButtons.js, radar.js, news.js, miccal.js, socialDock/Toasts/Words, account.js,
                    beyond.js, voicemix.js, sfxtest.js, reel.js (2.1u: plays the shift's highlights, writes .webm)
-tests/             node:test, 56 файлов / 476 тестов (на 3.1c)
+tests/             node:test, 57 файлов / 489 тестов (на 3.1d)
 play/              собранная игра для GitHub Pages (артефакт сборки, коммитится)
 ```
 
@@ -799,7 +819,7 @@ play/              собранная игра для GitHub Pages (артефа
 
 ## 6. Проверка: как убедиться, что не сломал
 
-1. `npm test` — 476 тестов (3.1c), все должны проходить (правка теста допустима только если изменилось **поведение по
+1. `npm test` — 489 тестов (3.1d), все должны проходить (правка теста допустима только если изменилось **поведение по
    замыслу**, и тогда в коммит-сообщении надо сказать, какое).
 2. `npm run build:pages` — сборка в `play/`; без неё деплой покажет старую версию.
 3. Живой прогон в браузере (headless-харнесс, рецепт ниже) на **конкретной сцене**, а не «в целом работает».

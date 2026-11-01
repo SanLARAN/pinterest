@@ -8,14 +8,21 @@
 //     worklets, the mic and the peer connection behave exactly as they do on the https site;
 //   • and the request handler only ever serves files from dist/ — the game cannot reach the rest of the disk.
 //
+// (3.1d) It opens on a launcher (launcher.html: ИГРАТЬ, updates, what's new) and keeps itself current: the game
+// part (~7 MB) is swapped in from each release without reinstalling, the shell (~80 MB) re-installs itself when
+// it changed. See updater.cjs, content.cjs and docs/DESKTOP.md.
+//
 // Run it: `npm run desktop` (builds first) · Package it: `npm run desktop:win` / the Desktop workflow.
 const { app, BrowserWindow, Menu, session, protocol, shell, dialog, ipcMain } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
-const https = require('node:https');
 const { spawn } = require('node:child_process');
-// (3.0m) which release is newer and what to download from it: pure, and tested without Electron
-const { API, PAGE, bestRelease } = require('./update.cjs');
+// (3.0m) which release is newer; (3.1d) and what the launcher may take from the release manifest — pure, tested
+const { PAGE } = require('./update.cjs');
+// (3.1d) the launcher's updater, the copies of the game on disk, and the two network calls — all without Electron
+const { Updater } = require('./updater.cjs');
+const content = require('./content.cjs');
+const net = require('./net.cjs');
 // (3.1a) Google sign-in in the player's own browser, back through a one-shot loopback server
 const oauth = require('./oauth.cjs');
 // the part that decides *what* may be read and *who* may speak: pure, and tested in tests/round21x.test.mjs
@@ -26,6 +33,8 @@ const ROOT = path.join(__dirname, '..');
 const DIST = path.join(ROOT, 'dist');
 const DEV_URL = process.env.HUSH_DEV_URL || ''; // e.g. HUSH_DEV_URL=http://localhost:5173 for hot reload
 const ICON = path.join(__dirname, 'assets', 'icon.png');
+const SITE = 'https://sanlaran.github.io/pinterest/';
+const ISSUES = 'https://github.com/SanLARAN/pinterest/issues';
 
 // before app is ready, and before any window exists: the scheme has to be privileged up front
 protocol.registerSchemesAsPrivileged([
@@ -50,17 +59,20 @@ function gatePermissions() {
   // the game needs no camera, no notifications, no clipboard: anything else is refused by the handler above
 }
 
-// serve dist/ over hush://app/…, and nothing outside it. Reading through `fs`, not through a file: URL, is what
+// serve the game over hush://app/…, and nothing outside it. Reading through `fs`, not through a file: URL, is what
 // makes it work inside app.asar: Electron's fs patches know about the archive, a bare file: URL does not.
+// (3.1d) «the game» is whichever copy is current: the bundled dist/, or a newer one the launcher downloaded. It is
+// chosen when a window opens on it (gameCopy), never under a page that is already running.
+let gameCopy = { dir: DIST, version: '0.0.0', source: 'bundled' };
 function serveBuildRequests() {
   protocol.handle(SCHEME, (request) =>
-    serveBuild(request, DIST, (file) => {
+    serveBuild(request, gameCopy.dir, (file) => {
       if (!fs.existsSync(file) || !fs.statSync(file).isFile()) throw new Error('missing');
       return fs.readFileSync(file);
     }));
 }
 
-function createWindow() {
+function createGameWindow() {
   const win = new BrowserWindow({
     width: 1280,
     height: 800,
@@ -103,91 +115,126 @@ function createWindow() {
     dialog.showErrorBox('ТИШЕ / HUSH', `Окно игры закрылось (${details.reason}).\nЗапусти её ещё раз — смена не сохраняется.`);
   });
 
+  if (prefs.fullscreen) win.setFullScreen(true);
   if (DEV_URL) win.loadURL(DEV_URL);
   else win.loadURL(`${SCHEME}://app/index.html`);
   return win;
 }
 
-// ---------------------------------------------------------------- updating itself (3.0m)
-// The build is one portable .exe attached to the GitHub release (see .github/workflows/desktop.yml). It cannot
-// patch itself like an installed app, but it can do the honest portable thing: download the new .exe next to
-// itself, and swap it in with a tiny script once the process has exited — then start again.
-//
-// Nothing here runs in a dev window (`electron .`): there is no build to replace.
-const UPD_DIR = () => path.join(app.getPath('userData'), 'updates');
-const state = { phase: 'idle', latest: null, notes: '', page: PAGE, progress: 0, error: '', file: '' };
-
-function say(patch) {
-  Object.assign(state, patch);
-  for (const w of BrowserWindow.getAllWindows()) w.webContents.send('hush:update:progress', { ...state });
-  return { ...state };
+// ---------------------------------------------------------------- the launcher (3.1d)
+// The first window: ИГРАТЬ, the update line, what's new. It hides while the game window is open and comes back
+// when it closes; closing the launcher quits. Its two settings live in <userData>/launcher.json.
+const PREFS_FILE = () => path.join(app.getPath('userData'), 'launcher.json');
+let prefs = { autoplay: false, fullscreen: false };
+function loadPrefs() {
+  try { prefs = { ...prefs, ...JSON.parse(fs.readFileSync(PREFS_FILE(), 'utf8')) }; } catch { /* first run */ }
+}
+function savePrefs() {
+  try { fs.writeFileSync(PREFS_FILE(), JSON.stringify(prefs)); } catch { /* a read-only profile: keep them for this run */ }
 }
 
-function fetchJson(url, redirects = 0) {
-  return new Promise((resolve, reject) => {
-    const req = https.get(url, { headers: { 'User-Agent': 'HUSH-desktop', Accept: 'application/vnd.github+json' }, timeout: 12000 }, (res) => {
-      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location && redirects < 3) {
-        res.resume();
-        return fetchJson(res.headers.location, redirects + 1).then(resolve, reject);
-      }
-      if (res.statusCode !== 200) { res.resume(); return reject(new Error(`HTTP ${res.statusCode}`)); }
-      let body = '';
-      res.setEncoding('utf8');
-      res.on('data', (c) => { if (body.length < 4e6) body += c; });
-      res.on('end', () => { try { resolve(JSON.parse(body)); } catch (e) { reject(e); } });
-    });
-    req.on('timeout', () => req.destroy(new Error('timeout')));
-    req.on('error', reject);
+// how this copy of the shell was installed, which decides how it updates itself
+function shellMode() {
+  if (!app.isPackaged) return 'dev';
+  if (process.env.PORTABLE_EXECUTABLE_FILE) return 'portable';
+  return 'nsis';
+}
+
+let updater = null;
+let launcherWin = null;
+let gameWin = null;
+let pendingPlay = false;
+let quitting = false;
+let shellApplied = false;
+
+function sendState(s) {
+  if (launcherWin && !launcherWin.isDestroyed()) launcherWin.webContents.send('hush:ln:state', s);
+  if (gameWin && !gameWin.isDestroyed()) gameWin.webContents.send('hush:update:progress', gameView(s));
+  // ИГРАТЬ was pressed while the new game was downloading: go as soon as it is in (or failed)
+  if (pendingPlay && !['downloading', 'checking'].includes(s.phase)) { pendingPlay = false; openGame(); }
+}
+
+function createLauncher() {
+  const win = new BrowserWindow({
+    width: 980,
+    height: 600,
+    resizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    frame: false,
+    backgroundColor: '#050607',
+    title: 'ТИШЕ / HUSH',
+    icon: fs.existsSync(ICON) ? ICON : undefined,
+    show: false,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload-launcher.cjs'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      spellcheck: false,
+    },
   });
+  win.once('ready-to-show', () => { if (!gameWin) win.show(); });
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (/^https?:/i.test(url)) shell.openExternal(url);
+    return { action: 'deny' };
+  });
+  win.on('closed', () => { launcherWin = null; if (!gameWin) app.quit(); });
+  if (DEV_URL) win.loadURL(`${DEV_URL}/launcher.html`);
+  else win.loadURL(`${SCHEME}://app/launcher.html`);
+  return win;
 }
 
-async function checkUpdate() {
-  const running = app.getVersion();
-  if (!app.isPackaged) return say({ phase: 'idle', error: '', version: running, dev: true });
-  say({ phase: 'checking', error: '', version: running });
+// ИГРАТЬ: the newest copy of the game, in its own window; the launcher steps aside
+function play(force) {
+  if (gameWin) { if (gameWin.isMinimized()) gameWin.restore(); gameWin.focus(); return {}; }
+  if (!force && updater && updater.state.phase === 'downloading') { pendingPlay = true; return { waiting: true }; }
+  pendingPlay = false;
+  openGame();
+  return {};
+}
+
+function openGame() {
+  if (gameWin) return;
+  if (updater) gameCopy = updater.current();
+  gameWin = createGameWindow();
+  gameWin.on('closed', () => {
+    gameWin = null;
+    if (quitting) return;
+    if (launcherWin) { launcherWin.show(); launcherWin.focus(); updater?.check(); }
+    else app.quit();
+  });
+  launcherWin?.hide();
+}
+
+// the shell's own update: the downloaded installer (or portable exe) takes over from here
+function applyShell(restart) {
+  if (shellApplied || !updater?.shellFile || !fs.existsSync(updater.shellFile)) return false;
+  const file = updater.shellFile;
+  const mode = shellMode();
   try {
-    const list = await fetchJson(API);
-    const best = bestRelease(list, running);
-    if (!best) return say({ phase: 'idle', error: '', version: running, latest: null });
-    return say({
-      phase: 'ready',
-      version: running, latest: best.version, notes: best.notes, page: best.page,
-      newer: best.newer, asset: best.asset, error: '',
-    });
+    if (mode === 'nsis') {
+      // electron-builder's NSIS installer: /S silent, --updated keeps the shortcuts, --force-run starts it again
+      spawn(file, ['/S', '--updated', ...(restart ? ['--force-run'] : [])], { detached: true, stdio: 'ignore' }).unref();
+    } else if (mode === 'portable') {
+      if (!swapPortable(file, restart)) return false;
+    } else return false;
   } catch (e) {
-    return say({ phase: 'error', error: String(e.message || e), version: running });
+    updater.setShell({ phase: 'error', error: String(e.message || e) });
+    return false;
   }
+  shellApplied = true;
+  quitting = true;
+  setTimeout(() => app.quit(), 200);
+  return true;
 }
 
-function downloadTo(url, dest, expected, onProgress) {
-  return new Promise((resolve, reject) => {
-    const get = (u, redirects = 0) => https.get(u, { headers: { 'User-Agent': 'HUSH-desktop' }, timeout: 30000 }, (res) => {
-      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location && redirects < 4) {
-        res.resume();
-        return get(res.headers.location, redirects + 1);
-      }
-      if (res.statusCode !== 200) { res.resume(); return reject(new Error(`HTTP ${res.statusCode}`)); }
-      const total = Number(res.headers['content-length'] || expected || 0);
-      let got = 0, last = 0;
-      fs.mkdirSync(path.dirname(dest), { recursive: true });
-      const out = fs.createWriteStream(dest);
-      res.on('data', (c) => {
-        got += c.length;
-        const now = Date.now();
-        if (onProgress && now - last > 200) { last = now; onProgress(total ? Math.min(1, got / total) : 0); }
-      });
-      res.pipe(out);
-      out.on('finish', () => out.close(() => resolve(dest)));
-      out.on('error', reject);
-    });
-    get(url).on('timeout', function () { this.destroy(new Error('timeout')); }).on('error', reject);
-  });
-}
-
-// drop the new build over this one after we are gone, then start it again
-function installAndRestart(file) {
-  const exe = process.execPath;
-  const dir = path.dirname(exe);
+// a portable .exe unpacks itself into a temp folder to run: process.execPath is that copy, and replacing it changes
+// nothing. The file the player launched is PORTABLE_EXECUTABLE_FILE — that is the one to put the new build over.
+function swapPortable(file, restart) {
+  const exe = process.env.PORTABLE_EXECUTABLE_FILE;
+  if (!exe) return false;
+  fs.accessSync(path.dirname(exe), fs.constants.W_OK); // (a read-only folder: say so instead of a silent nothing)
   const bat = path.join(app.getPath('temp'), `hush-update-${Date.now()}.cmd`);
   const script = [
     '@echo off',
@@ -199,20 +246,71 @@ function installAndRestart(file) {
     '  ping 127.0.0.1 -n 2 > nul',
     '  goto again',
     ')',
-    `start "" "${exe}"`,
+    restart ? `start "" "${exe}"` : 'rem (no restart: the player was quitting)',
     'del "%~f0"',
   ].join('\r\n');
-  try {
-    fs.writeFileSync(bat, script, 'utf8');
-    spawn('cmd.exe', ['/c', bat], { detached: true, stdio: 'ignore', windowsVerbatimArguments: true }).unref();
-    // the folder may be read-only (a stick, Program Files): say so instead of leaving a silent black window
-    fs.accessSync(dir, fs.constants.W_OK);
-    setTimeout(() => app.quit(), 250);
+  fs.writeFileSync(bat, script, 'utf8');
+  spawn('cmd.exe', ['/c', bat], { detached: true, stdio: 'ignore', windowsVerbatimArguments: true }).unref();
+  return true;
+}
+
+function wireLauncherIpc() {
+  const fromLauncher = (e) => !!launcherWin && e.sender === launcherWin.webContents;
+  ipcMain.handle('hush:ln:state', (e) => (fromLauncher(e) ? updater.snapshot() : null));
+  ipcMain.handle('hush:ln:play', (e, force) => (fromLauncher(e) ? play(!!force) : null));
+  ipcMain.handle('hush:ln:retry', (e) => (fromLauncher(e) ? updater.check() : null));
+  ipcMain.handle('hush:ln:shell', (e) => (fromLauncher(e) ? applyShell(true) : false));
+  ipcMain.handle('hush:ln:prefs', (e) => (fromLauncher(e) ? { ...prefs } : null));
+  ipcMain.handle('hush:ln:pref', (e, key, value) => {
+    if (!fromLauncher(e) || !['autoplay', 'fullscreen'].includes(key) || typeof value !== 'boolean') return false;
+    prefs[key] = value;
+    savePrefs();
     return true;
-  } catch (e) {
-    say({ phase: 'error', error: `cannot replace the build here: ${e.message}` });
-    return false;
-  }
+  });
+  ipcMain.handle('hush:ln:open', (e, what) => {
+    if (!fromLauncher(e)) return false;
+    if (what === 'folder') shell.openPath(app.getPath('userData'));
+    else if (what === 'site') shell.openExternal(SITE);
+    else if (what === 'issues') shell.openExternal(ISSUES);
+    else if (what === 'releases') shell.openExternal(PAGE);
+    else return false;
+    return true;
+  });
+  ipcMain.handle('hush:ln:win', (e, action) => {
+    if (!fromLauncher(e)) return false;
+    if (action === 'min') launcherWin.minimize();
+    else if (action === 'close') launcherWin.close();
+    return true;
+  });
+}
+
+// ---------------------------------------------------------------- inside the game (3.0m → 3.1d)
+// The game's own corner line (src/ui/desktopUpdate.js): which build is running, and — when the launcher has
+// downloaded a newer game while you played — a button that reloads onto it.
+function gameView(s) {
+  return {
+    phase: s.phase,
+    version: gameCopy.version,
+    latest: s.latest,
+    latestGame: s.latestGame,
+    updateReady: !!updater && updater.current().version !== gameCopy.version,
+    shell: s.shell?.phase || 'none',
+    dev: s.phase === 'dev',
+  };
+}
+
+function wireGameIpc() {
+  const fromGame = (e) => !!gameWin && e.sender === gameWin.webContents;
+  ipcMain.handle('hush:version', () => gameCopy.version);
+  ipcMain.handle('hush:update:check', async (e) => (fromGame(e) && updater ? gameView(await updater.check()) : null));
+  ipcMain.handle('hush:update:page', () => { shell.openExternal(PAGE); return true; });
+  // reload the game window onto the newest copy (only between shifts: the button lives in the menu)
+  ipcMain.handle('hush:update:restart', (e) => {
+    if (!fromGame(e) || !updater) return false;
+    gameCopy = updater.current();
+    gameWin.webContents.reload();
+    return true;
+  });
 }
 
 // (3.1a) «Войти через Google»: begin → a loopback redirect for Supabase; finish → open the authorize URL in the
@@ -239,58 +337,59 @@ function wireOAuthIpc() {
   });
 }
 
-function wireUpdateIpc() {
-  ipcMain.handle('hush:version', () => app.getVersion());
-  ipcMain.handle('hush:update:check', () => checkUpdate());
-  ipcMain.handle('hush:update:page', () => { shell.openExternal(state.page || PAGE); return true; });
-  ipcMain.handle('hush:update:download', async () => {
-    if (!app.isPackaged) return say({ phase: 'idle', dev: true });
-    const fresh = await checkUpdate();
-    if (!fresh.asset) return fresh;
-    const file = path.join(UPD_DIR(), fresh.asset.name);
-    say({ phase: 'downloading', progress: 0, error: '' });
-    try {
-      await downloadTo(fresh.asset.url, file, fresh.asset.size, (p) => say({ progress: p }));
-      say({ phase: 'downloaded', progress: 1, file });
-      // the new file is on disk whatever happens next: install, or launch it by hand
-      if (process.platform === 'win32') installAndRestart(file);
-      else shell.showItemInFolder(file);
-      return { ...state };
-    } catch (e) {
-      return say({ phase: 'error', error: String(e.message || e) });
-    }
-  });
-}
-
 // one copy at a time: a second launch focuses the first (two windows would fight over the microphone)
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
   app.on('second-instance', () => {
-    const win = BrowserWindow.getAllWindows()[0];
-    if (win) { if (win.isMinimized()) win.restore(); win.focus(); }
+    const win = gameWin || launcherWin;
+    if (win) { if (!win.isVisible()) win.show(); if (win.isMinimized()) win.restore(); win.focus(); }
   });
 
   app.whenReady().then(() => {
     app.setAppUserModelId('ru.hush.echolocation');
     Menu.setApplicationMenu(null);
     gatePermissions();
-    if (!DEV_URL) {
-      if (!fs.existsSync(path.join(DIST, 'index.html'))) {
-        dialog.showErrorBox('ТИШЕ / HUSH', 'Сборки нет: сначала `npm run build`.');
-        app.quit();
-        return;
-      }
-      serveBuildRequests();
+    loadPrefs();
+    if (!DEV_URL && !fs.existsSync(path.join(DIST, 'index.html'))) {
+      dialog.showErrorBox('ТИШЕ / HUSH', 'Сборки нет: сначала `npm run build`.');
+      app.quit();
+      return;
     }
-    wireOAuthIpc();
-    wireUpdateIpc(); // before the window: the page asks for its version the moment it loads
-    createWindow();
-    // check once, quietly, a few seconds in; a portable build is often launched for one shift
-    if (app.isPackaged) setTimeout(() => { checkUpdate().catch(() => {}); }, 3500);
-    app.on('activate', () => {
-      if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    updater = new Updater({
+      net,
+      userData: app.getPath('userData'),
+      bundledDir: DIST,
+      bundledVersion: app.getVersion(),
+      shellId: content.shellId(__dirname, process.versions.electron),
+      mode: DEV_URL ? 'dev' : shellMode(),
+      emit: sendState,
     });
+    gameCopy = updater.current();
+    if (!DEV_URL) serveBuildRequests();
+    wireOAuthIpc();
+    wireGameIpc();
+    wireLauncherIpc();
+    // a copy of the game from before the launcher existed has no launcher.html: straight into the game then
+    const hasLauncher = !!DEV_URL || fs.existsSync(path.join(gameCopy.dir, 'launcher.html'));
+    if (hasLauncher) launcherWin = createLauncher();
+    const first = updater.check();
+    if (!hasLauncher || process.argv.includes('--play')) openGame();
+    else if (prefs.autoplay) {
+      // «сразу запускать игру»: look for an update for a moment, then go (a download in progress is waited for)
+      Promise.race([first, new Promise((r) => setTimeout(r, 6000))]).then(() => { if (!gameWin) play(false); });
+    }
+    // a window that stays open all evening still hears about new builds
+    setInterval(() => { updater.check(); }, 3 * 3600 * 1000).unref?.();
+  });
+
+  // a new shell downloaded in the background installs on the way out (no restart: the player was quitting)
+  app.on('before-quit', (e) => {
+    quitting = true;
+    if (!shellApplied && updater?.state.shell.phase === 'ready' && updater.shellFile) {
+      e.preventDefault();
+      if (!applyShell(false)) { shellApplied = true; app.quit(); }
+    }
   });
 
   app.on('window-all-closed', () => {

@@ -1,0 +1,93 @@
+/* 3.1d: the desktop launcher. The game's palette (ash, bone, amber, red), the mono everywhere, the wet paint
+   for the one word that matters. A frameless 980×600 window: the top strip is the handle to drag it by. */
+:root {
+  --bg: #050607;
+  --ash: #a7b4b6;
+  --ash-dim: rgba(167, 180, 182, 0.5);
+  --ash-faint: rgba(167, 180, 182, 0.14);
+  --bone: #d6cdc0;
+  --amber: #d6a04c;
+  --red: #b8423a;
+  --mono: 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
+  --horror: 'Rubik Wet Paint', 'JetBrains Mono', serif;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; } /* (the flex rows below would otherwise win over `hidden`) */
+html, body { margin: 0; height: 100%; }
+body {
+  background: radial-gradient(ellipse at 30% 60%, #101314 0%, var(--bg) 70%);
+  color: var(--bone); font: 14px/1.55 var(--mono); overflow: hidden; user-select: none;
+}
+#lnSonar { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+
+.ln-bar {
+  position: relative; z-index: 2; height: 38px; display: flex; align-items: center; justify-content: space-between;
+  padding-left: 16px; border-bottom: 1px solid var(--ash-faint); -webkit-app-region: drag;
+}
+.ln-brand { font-size: 12px; letter-spacing: 0.24em; color: var(--ash); }
+.ln-win { display: flex; height: 100%; -webkit-app-region: no-drag; }
+.ln-wbtn {
+  width: 46px; height: 100%; border: 0; background: none; color: var(--ash); font: 16px var(--mono); cursor: pointer;
+}
+.ln-wbtn:hover, .ln-wbtn:focus-visible { background: rgba(214, 205, 192, 0.08); color: var(--bone); outline: none; }
+.ln-close:hover, .ln-close:focus-visible { background: var(--red); color: #fff; }
+
+.ln-main { position: relative; z-index: 1; display: grid; grid-template-columns: minmax(0, 1fr) 360px; height: calc(100% - 38px); }
+.ln-left { padding: 34px 40px 22px; display: flex; flex-direction: column; min-width: 0; }
+.ln-title { font: 112px/0.9 var(--horror); margin: 0; letter-spacing: 0.04em; color: var(--bone); text-shadow: 0 0 40px rgba(214, 205, 192, 0.12); }
+.ln-tag { margin: 8px 0 30px; font-size: 13px; letter-spacing: 0.3em; text-transform: uppercase; color: var(--ash); }
+
+.ln-play {
+  align-self: flex-start; min-width: 280px; min-height: 64px; padding: 0 34px; cursor: pointer;
+  background: rgba(214, 205, 192, 0.08); color: var(--bone); border: 1px solid var(--bone); border-radius: 3px;
+  font: 700 22px var(--mono); letter-spacing: 0.5em; text-indent: 0.5em; transition: background 0.15s, transform 0.15s;
+}
+.ln-play:hover:not(:disabled), .ln-play:focus-visible { background: rgba(214, 205, 192, 0.18); outline: none; transform: translateY(-1px); }
+.ln-play:focus-visible { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--bone); }
+.ln-play:disabled { cursor: wait; opacity: 0.6; }
+.ln-play.wait { font-size: 14px; letter-spacing: 0.2em; text-indent: 0.2em; border-color: var(--amber); color: var(--amber); }
+
+.ln-status { margin-top: 14px; min-height: 52px; }
+.ln-status p { margin: 0; font-size: 13px; color: var(--ash); }
+.ln-status p.warn { color: var(--amber); }
+.ln-status p.ok { color: var(--bone); }
+.ln-bar-track { margin-top: 8px; width: 280px; height: 4px; background: var(--ash-faint); border-radius: 2px; overflow: hidden; }
+.ln-bar-track i { display: block; height: 100%; width: 0; background: var(--bone); transition: width 0.2s; }
+.ln-bar-track[hidden] { display: none; }
+
+.ln-shell { margin-top: 4px; padding: 10px 12px; border: 1px dashed var(--ash-dim); border-radius: 3px; max-width: 460px; }
+.ln-shell p { margin: 0; font-size: 12px; color: var(--ash); }
+.ln-btn {
+  margin-top: 8px; min-height: 36px; padding: 0 14px; cursor: pointer; background: none; color: var(--amber);
+  border: 1px solid var(--amber); border-radius: 3px; font: 12px var(--mono); letter-spacing: 0.1em;
+}
+.ln-btn:hover, .ln-btn:focus-visible { background: rgba(214, 160, 76, 0.12); outline: none; }
+
+.ln-link {
+  background: none; border: 0; padding: 6px 0; cursor: pointer; color: var(--ash); font: 12px var(--mono);
+  text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--ash-dim);
+}
+.ln-link:hover, .ln-link:focus-visible { color: var(--bone); outline: none; }
+#lnPlayNow { align-self: flex-start; margin-top: 6px; }
+
+.ln-prefs { margin-top: auto; display: flex; gap: 22px; flex-wrap: wrap; font-size: 13px; color: var(--ash); }
+.ln-prefs label { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; min-height: 32px; }
+.ln-prefs input { width: 16px; height: 16px; accent-color: var(--bone); cursor: pointer; }
+.ln-links { display: flex; gap: 20px; margin-top: 6px; }
+.ln-ver { margin: 8px 0 0; font-size: 11px; color: var(--ash-dim); letter-spacing: 0.06em; }
+.ln-browser { margin: 0 0 16px; font-size: 13px; color: var(--ash); max-width: 440px; }
+.ln-browser a { color: var(--amber); }
+
+.ln-news {
+  border-left: 1px solid var(--ash-faint); background: rgba(5, 6, 7, 0.55); padding: 26px 24px; overflow-y: auto;
+  scrollbar-width: thin; scrollbar-color: var(--ash-dim) transparent;
+}
+.ln-news h2 { margin: 0 0 14px; font-size: 12px; font-weight: 400; letter-spacing: 0.24em; color: var(--ash); }
+.ln-news article { padding: 0 0 16px; margin-bottom: 16px; border-bottom: 1px solid var(--ash-faint); }
+.ln-news h3 { margin: 0 0 8px; font-size: 14px; color: var(--bone); }
+.ln-news h3 b { color: var(--amber); margin-right: 6px; }
+.ln-news time { display: block; font-size: 11px; font-weight: 400; color: var(--ash-dim); margin-top: 2px; }
+.ln-news ul { margin: 0; padding-left: 16px; }
+.ln-news li { font-size: 12px; line-height: 1.55; color: var(--ash); margin-bottom: 6px; }
+
+@media (prefers-reduced-motion: reduce) { .ln-play, .ln-bar-track i { transition: none; } }

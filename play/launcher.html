@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#000000" />
+    <title>ТИШЕ / HUSH</title>
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+    <script type="module" crossorigin src="./assets/launcher-Ctkf1qnW.js"></script>
+    <link rel="modulepreload" crossorigin href="./assets/news-WLII5qIi.js">
+    <link rel="stylesheet" crossorigin href="./assets/news-BQxFqynA.css">
+    <link rel="stylesheet" crossorigin href="./assets/launcher-UsLc9o5O.css">
+  </head>
+  <body>
+    <canvas id="lnSonar" aria-hidden="true"></canvas>
+    <header class="ln-bar">
+      <span class="ln-brand">ТИШЕ / HUSH</span>
+      <span class="ln-win">
+        <button type="button" data-win="min" class="ln-wbtn"><span aria-hidden="true">—</span></button>
+        <button type="button" data-win="close" class="ln-wbtn ln-close"><span aria-hidden="true">×</span></button>
+      </span>
+    </header>
+    <main class="ln-main">
+      <section class="ln-left">
+        <h1 class="ln-title">ТИШЕ</h1>
+        <p class="ln-tag" data-t="lnTag"></p>
+        <div class="ln-browser" hidden>
+          <p data-t="lnBrowser"></p>
+          <a href="./" data-t="lnBrowserLink"></a>
+        </div>
+        <button type="button" id="lnPlay" class="ln-play"></button>
+        <button type="button" id="lnPlayNow" class="ln-link" hidden data-t="lnPlayNow"></button>
+        <div class="ln-status" role="status" aria-live="polite">
+          <p id="lnLine"></p>
+          <div class="ln-bar-track" hidden><i id="lnFill"></i></div>
+          <button type="button" id="lnRetry" class="ln-link" hidden data-t="lnRetry"></button>
+        </div>
+        <div class="ln-shell" hidden>
+          <p id="lnShellLine"></p>
+          <button type="button" id="lnShellApply" class="ln-btn" hidden data-t="lnShellApply"></button>
+        </div>
+        <div class="ln-prefs">
+          <label><input type="checkbox" id="lnAuto" /> <span data-t="lnAuto"></span></label>
+          <label><input type="checkbox" id="lnFull" /> <span data-t="lnFull"></span></label>
+        </div>
+        <nav class="ln-links">
+          <button type="button" class="ln-link" data-open="folder" data-t="lnFolder"></button>
+          <button type="button" class="ln-link" data-open="site" data-t="lnSite"></button>
+          <button type="button" class="ln-link" data-open="issues" data-t="lnBug"></button>
+        </nav>
+        <p class="ln-ver" id="lnVer"></p>
+      </section>
+      <aside class="ln-news">
+        <h2 data-t="lnNews"></h2>
+        <div id="lnNewsList"></div>
+      </aside>
+    </main>
+  </body>
+</html>

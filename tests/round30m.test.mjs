@@ -73,11 +73,12 @@ test('the shell can actually reach the page: preload bridge, IPC, and the swap',
   const main = readFileSync(here('../electron/main.cjs'), 'utf8');
   assert.match(main, /preload: path\.join\(__dirname, 'preload\.cjs'\)/, 'the window gets the bridge');
   assert.match(main, /ipcMain\.handle\('hush:update:check'/);
-  assert.match(main, /ipcMain\.handle\('hush:update:download'/);
+  assert.match(main, /ipcMain\.handle\('hush:update:restart'/); // (3.1d: the launcher downloads; the game reloads onto it)
   assert.match(main, /ipcMain\.handle\('hush:version'/);
   assert.match(main, /app\.isPackaged/, 'a dev window does not try to replace itself');
   assert.match(main, /copy \/y "\$\{file\}" "\$\{exe\}"/, 'the new build goes over the old one');
-  assert.match(main, /start "" "\$\{exe\}"/, 'and it starts again');
+  assert.match(main, /const exe = process\.env\.PORTABLE_EXECUTABLE_FILE;/, '(3.1d) the file the player launched, not the temp copy it runs from');
+  assert.match(main, /restart \? `start "" "\$\{exe\}"`/, 'and it starts again (unless the player was quitting)');
   const preload = readFileSync(here('../electron/preload.cjs'), 'utf8');
   assert.match(preload, /contextBridge\.exposeInMainWorld\('hushDesktop'/);
   assert.doesNotMatch(preload, /require\('fs'\)|require\('child_process'\)/, 'the page gets no file system');
