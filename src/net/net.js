@@ -5,7 +5,7 @@
 // The same friend can turn up on both; everything we send goes out once, over the link that came up
 // first (receiving needs no dedupe for that reason). Game traffic itself never touches the relays:
 // it flows directly between the browsers, end-to-end encrypted.
-import { ICE_SERVERS } from './ice.js';
+import { ICE_SERVERS, getIceServers } from './ice.js';
 
 const APP_ID = 'hush-echolocation-horror'; // must stay stable: relay selection is derived from it
 export const PROTOCOL = 20; // 2: doors, flares · 3: the garage (the car starts the night), the calm at the start · 4: going down and the first-aid hut, glow sticks · 5: shadows, the forestry yard, the УАЗ's parts and the way out · 6: cupboards, the шкафандр · 7: flashlights (and batteries in the cupboards), shared shards, the host's car · 8: a weaker flashlight (its dark moments go over the wire; a friend's light draws them too) · 9: Zarya, lookout, physical field kit and locked cupboards · 10: four-pocket inventory, watch, complete voice phrases, lobby rules · 11: deterministic overgrown trail corridors (forest collision layout) · 12: Zarya local grid/colliders and bounded CRT display art · 13: expanded huts/cabinets, host capture grants, unique parts map · 14: the four-day shift (dawn carries the day), the adrenaline syringe, the departure film and the training ground with its bikes · 15: the Angler — a fifth monster on the snapshots, the capture slice in 'sn', struggle and untie messages · 16: generators can be broken (a break revision rides the objectives state) · 17: shift length in the lobby rules, the sovkhoz in the generator chain, stall chains and the Watcher's grip go over the wire · 18: the Stray — her own state stream and the voice she takes (2.1v) · 19: the bog is earned — who has cleared the forest rides the hello and the roster, and the host asks the rest (mq/ma, 3.0s) · 20: ready ticks in the lobby (rd), the host waits for them (3.0y)
@@ -48,12 +48,17 @@ export class Net {
 
   // relays: optional list of ws(s):// URLs — local testing / self-hosted relay (Nostr protocol)
   // only: 'nostr' | 'torrent' — use just one signalling network (diagnostics: ?net=torrent)
-  async join(code, { relays = null, test = false, only = null } = {}) {
+  // ice: the relay list to use (default: fixed ICE_SERVERS + fresh TURN credentials from hush-turn, 3.1e)
+  async join(code, { relays = null, test = false, only = null, ice = null } = {}) {
     if (this.connected) await this.leave();
     this.code = code;
     const roomId = 'hush-' + code;
     const base = { appId: APP_ID, password: 'hush:' + code };
-    if (ICE_SERVERS.length) base.turnConfig = ICE_SERVERS;
+    // (3.1e) a TURN relay for friends behind strict NAT — fetched (≤3.5 s, cached for hours); never blocks a join
+    const turn = ice ?? (test ? ICE_SERVERS : await getIceServers());
+    if (this.code !== code) return; // left while asking
+    if (turn.length) base.turnConfig = turn;
+    this.turn = turn.some((s) => [].concat(s.urls).some((u) => String(u).startsWith('turn')));
     if (test) base._test_only_mdnsHostFallbackToLoopback = true;
     let plan = relays && relays.length
       ? [['nostr', { relayConfig: { urls: relays, warnOnRelayFailure: false } }]]

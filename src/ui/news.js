@@ -7,6 +7,21 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v:'3.1e',date:'2026-11-01',
+    ru:{title:'Друг издалека',items:[
+      'Игроки соединяются напрямую. Если у друга мобильный интернет или «серый» IP у провайдера — часто это и есть «друг в другой стране не может зайти», — напрямую соединение не пробивается. Теперь в таком случае игра соединяется через ретранслятор: он только пересылает зашифрованные пакеты.',
+      'В лобби видно, есть ли ретранслятор: «ретранслятор есть — подключится и издалека».',
+      'Кнопка «Пауза фона» в профиле убрана.',
+      'Привязки клавиш больше не появляются внутри расширенных настроек графики.',
+    ]},
+    en:{title:'A friend far away',items:[
+      'Players connect directly. If a friend is on mobile internet or behind their provider\'s shared IP — which is usually what «my friend abroad can\'t get in» is — a direct link cannot get through. Now the game connects through a relay instead, which only forwards the encrypted packets.',
+      'The lobby shows whether a relay is ready: «relay ready — friends far away can connect».',
+      'The «Pause backdrop» button is gone from the profile.',
+      'Key bindings no longer show up inside the advanced graphics settings.',
+    ]},
+  },
+  {
     v:'3.1d',date:'2026-11-01',
     ru:{title:'Лаунчер и автообновление',items:[
       'Игру для Windows теперь можно установить: скачай HUSH-Setup со страницы релизов и запусти. Права администратора не нужны, ярлыки появятся на рабочем столе и в «Пуске».',

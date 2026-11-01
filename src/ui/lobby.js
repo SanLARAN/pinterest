@@ -5,6 +5,7 @@ import { t } from '../core/i18n.js';
 import { settings, saveSettings } from '../core/storage.js';
 import { PLAYER_COLORS } from '../game/remote.js';
 import { cleanCode, MAX_PLAYERS } from '../net/net.js';
+import { getIceServers } from '../net/ice.js'; // 3.1e: the TURN relay, fetched before anyone presses a button
 import { cleanName } from '../net/coop.js';
 import { wt, myFit } from '../game/outfit.js';
 import {currentIdentity} from '../core/identity.js';
@@ -80,6 +81,7 @@ export class Lobby {
 
   open() {
     if (this.beforeOpen) this.beforeOpen();
+    getIceServers().catch(() => {}); // (3.1e) warm the relay credentials: joining then does not wait for them
     this.garage?.gatesAnswer(true); // in the room the gates are a door again (2.1t)
     $('coopName').value = settings.name || '';
     this.el.classList.add('show');
@@ -543,6 +545,8 @@ export class Lobby {
     if (r.total > 0 && !this.starting) {
       if (r.open === 0 && since > 6) sub = `<span class="dim warn">${esc(t('coopNoRelays'))}</span>`;
       else sub = `<span class="dim">${esc(t('coopRelays'))} ${r.open}/${r.total}</span>`;
+      // (3.1e) is there a TURN relay for a friend whose network will not let a direct link through?
+      sub += ` <span class="dim">· ${esc(t(c.net?.turn ? 'coopTurnOn' : 'coopTurnOff'))}</span>`;
     }
     const html = main + sub;
     const el = $('coopStatus');

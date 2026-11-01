@@ -424,7 +424,7 @@ const account=new AccountUI({cloud,canOpen:()=>state==='menu'&&!wardrobe.isOpen(
  if(state!=='menu'||lobby.starting)throw new Error('leave_room');account.close();lobby.open();if(coop.active&&coop.code===room.room_code)return;await coop.join(room.room_code,{strategy:room.strategy});lobby.render();
 }});
 // (3.0y) rebinding keys, in the settings, above «back»
-const keysHost=document.createElement('div');$('btnSettingsBack').before(keysHost);
+const keysHost=document.createElement('div');keysHost.className='keys-host';$('btnSettingsBack').before(keysHost); // (3.1e: hidden with the basic settings while advanced graphics is open)
 keysPanel=new KeysPanel({host:keysHost,input,uiSound:(k)=>{if(audio.ready)audio.uiClick();}});
 $('btnSettingsBack').addEventListener('click',()=>keysPanel.refresh());
 const portraitOf=(fit,canvas)=>{if(!wardrobe.mq)return false;wardrobe.mq.still(fit,'head',canvas);return true;};

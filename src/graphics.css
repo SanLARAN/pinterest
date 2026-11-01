@@ -3,7 +3,7 @@
 .gx-open { display: flex; align-items: center; justify-content: space-between; padding: 15px; border-color: var(--ash-dim); font-size: 11px; letter-spacing: .08em; text-align: left; }
 .gx-open b { color: var(--amber); font-size: 20px; font-weight: 400; }
 #settingsPanel .graphics-expanded { width: min(1280px, 100%); height: min(940px, 100%); padding: clamp(16px, 2.5vw, 36px); gap: 16px; }
-.graphics-expanded > .settings-basic-title, .graphics-expanded > .settings-basic { display: none; }
+.graphics-expanded > .settings-basic-title, .graphics-expanded > .settings-basic, .graphics-expanded > .keys-host { display: none; } /* (3.1e: the keys are not a graphics setting) */
 #graphicsAdvanced { min-height: 0; overflow-y: auto; scrollbar-width: thin; padding-right: 10px; flex: 1; }
 .gx-header { display: flex; justify-content: space-between; gap: 20px; border-bottom: 1px solid var(--ash-faint); padding-bottom: 20px; }
 .gx-kicker { display: block; color: var(--amber); font-size: 10px; letter-spacing: .22em; margin-bottom: 12px; }

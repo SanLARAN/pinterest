@@ -6,8 +6,8 @@
 // not your friend gets their name and an «add to friends» button. Without an account your own profile still
 // works, from this machine: the stats are local, and the banner is kept in this browser (IndexedDB).
 //
-// Motion: a video banner does not autoplay under prefers-reduced-motion, a GIF is frozen to its first frame, and
-// the «pause» button stops either at any time. The banner never carries sound.
+// Motion: a video banner does not autoplay under prefers-reduced-motion and a GIF is frozen to its first frame.
+// (3.1e: the «pause the backdrop» button is gone — the author did not want it.) The banner never carries sound.
 import { t } from '../core/i18n.js';
 import { atlasLog, getScores } from '../core/storage.js';
 import { wallet } from '../game/wallet.js';
@@ -187,7 +187,7 @@ export class ProfileScreen {
     this.renderActions();
   }
 
-  // a GIF cannot be paused: its first frame goes on a canvas instead (reduced motion, or the pause button)
+  // a GIF cannot be paused: its first frame goes on a canvas instead (reduced motion)
   freezeGif(img) {
     if (!img || img.tagName !== 'IMG' || this.el.querySelector('.pf-frozen')) return;
     try {
@@ -207,18 +207,6 @@ export class ProfileScreen {
     box.replaceChildren();
     this.media = null;
     if (this.url) { URL.revokeObjectURL(this.url); this.url = null; }
-  }
-
-  togglePause() {
-    this.paused = !this.paused;
-    const m = this.media;
-    if (m && m.tagName === 'VIDEO') { if (this.paused) m.pause(); else m.play().catch(() => {}); }
-    else if (m && m.tagName === 'IMG') {
-      const frozen = this.el.querySelector('.pf-frozen');
-      if (this.paused && !frozen) this.freezeGif(m);
-      else if (!this.paused && frozen) { frozen.remove(); m.hidden = false; }
-    }
-    this.renderActions();
   }
 
   async setBanner(file) {
@@ -275,7 +263,6 @@ export class ProfileScreen {
     if (a === 'close') this.close();
     else if (a === 'banner') this.file.click();
     else if (a === 'unbanner') this.removeBanner();
-    else if (a === 'pause') this.togglePause();
     else if (a === 'account') { this.close(); this.onAccount(); }
     else if (a === 'join') { this.close(); this.onJoin(id); }
     else if (a === 'invite' && this.onInvite) { try { await this.onInvite(id); this.say(t('pfInvited')); } catch (e) { this.say(cloudError(e), true); } }
@@ -357,7 +344,6 @@ export class ProfileScreen {
       if (pres?.state === 'lobby') html += b('join', t('pfJoin'), 'primary', d.id);
       if (this.onInvite && this.onInvite.available?.()) html += b('invite', t('pfInvite'), '', d.id);
     }
-    if (this.media) html += b('pause', t(this.paused ? 'pfPlay' : 'pfPause'));
     const foot = this.el.querySelector('.pf-actions');
     if (foot._html !== html) { foot._html = html; foot.innerHTML = html; }
     if (d?.self) this.el.querySelector('.pf-status').textContent = this.message || (this.cloud.user ? t('pfBannerHint') : t('pfBannerHintLocal'));
