@@ -6,8 +6,12 @@
 // hands them to the game, which adds them to its ICE servers (src/net/ice.js). Traffic stays end-to-end
 // encrypted: a TURN server only forwards it.
 //
-// Secrets (Supabase → Edge Functions → Secrets): CF_TURN_KEY_ID, CF_TURN_API_TOKEN (Cloudflare → Realtime → TURN).
-// Without them the function answers { iceServers: [], configured: false } and the game connects as before.
+// Two ways to configure it (Supabase → Edge Functions → Secrets):
+//   • a fixed login, any provider (ExpressTURN, a coturn of your own…): TURN_URLS (comma-separated, e.g.
+//     «turn:relay1.expressturn.com:3478,turn:relay1.expressturn.com:3478?transport=tcp»), TURN_USERNAME,
+//     TURN_CREDENTIAL — this one wins when set;
+//   • Cloudflare Realtime TURN: CF_TURN_KEY_ID, CF_TURN_API_TOKEN (short-lived credentials per request).
+// Without either the function answers { iceServers: [], configured: false } and the game connects as before.
 const ORIGINS = [/^https:\/\/sanlaran\.github\.io$/, /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/, /^hush:\/\/app$/];
 const TTL = 6 * 3600;
 
@@ -28,6 +32,15 @@ Deno.serve(async (req) => {
   const origin = req.headers.get('origin');
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors(origin) });
   if (req.method !== 'GET') return json({ error: 'method' }, origin, 405);
+
+  // (a fixed login: ExpressTURN and the like; a bare host:port gets the turn: prefix)
+  const fixedUrls = (Deno.env.get('TURN_URLS') || '').split(',').map((u) => u.trim()).filter(Boolean)
+    .map((u) => (/^(stun|turn|turns):/.test(u) ? u : `turn:${u}`));
+  const user = Deno.env.get('TURN_USERNAME');
+  const pass = Deno.env.get('TURN_CREDENTIAL');
+  if (fixedUrls.length && user && pass) {
+    return json({ iceServers: [{ urls: fixedUrls, username: user, credential: pass }], configured: true, ttl: TTL }, origin);
+  }
 
   const keyId = Deno.env.get('CF_TURN_KEY_ID');
   const token = Deno.env.get('CF_TURN_API_TOKEN');

@@ -561,10 +561,11 @@
 - `src/net/ice.js`: `getIceServers()` → `ICE_SERVERS` + `cleanIce(ответ hush-turn)`; кэш до `ttl − 1 ч`, пустой ответ — на
   10 мин; таймаут 3,5 с; `relayReady()`. `Net.join({ice})` ждёт его (кроме `test`) и кладёт в `turnConfig`; `net.turn`.
   `Lobby.open()` прогревает. Статус в лобби: `coopTurnOn/Off`.
-- `supabase/functions/hush-turn/index.ts` (Deno): секреты `CF_TURN_KEY_ID`, `CF_TURN_API_TOKEN` → POST Cloudflare
+- `supabase/functions/hush-turn/index.ts` (Deno): секреты `TURN_URLS`, `TURN_USERNAME`, `TURN_CREDENTIAL` (ExpressTURN,
+  coturn — фиксированный логин, приоритетный) или `CF_TURN_KEY_ID`, `CF_TURN_API_TOKEN` → POST Cloudflare
   `generate-ice-servers` (ttl 6 ч), выкидывает URL с портом 53; без секретов `{iceServers: [], configured: false}`.
   CORS — только свои origin'ы; `verify_jwt` выключен (гостям без аккаунта тоже нужен ретранслятор).
-  **На момент 3.1e функция ещё не развёрнута** — см. `docs/COOP_RELAY.md`.
+  Функция развёрнута (v2); секреты ExpressTURN кладёт владелец — см. `docs/COOP_RELAY.md`.
 - Профиль: кнопки «Пауза фона» нет (`togglePause`, `pfPause/pfPlay` удалены); при reduced motion фон по-прежнему стоит.
 - Настройки: обёртка клавиш `.keys-host` прячется вместе с базовыми настройками (`.graphics-expanded`).
 - **Тесты:** `tests/round31e.test.mjs` (5).

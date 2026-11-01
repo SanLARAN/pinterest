@@ -75,6 +75,9 @@ test('the room uses it: net.join hands the relay to Trystero, the lobby warms it
   assert.match(fn, /rtc\.live\.cloudflare\.com\/v1\/turn\/keys\/\$\{encodeURIComponent\(keyId\)\}\/credentials\/generate-ice-servers/);
   assert.match(fn, /Deno\.env\.get\('CF_TURN_API_TOKEN'\)/, 'the Cloudflare token lives in the function\'s secrets, never in the game');
   assert.match(fn, /configured: false/);
+  assert.match(fn, /Deno\.env\.get\('TURN_URLS'\)/, 'any provider with a fixed login (ExpressTURN, coturn) — and it wins over Cloudflare');
+  assert.ok(fn.indexOf("Deno.env.get('TURN_URLS')") < fn.indexOf("Deno.env.get('CF_TURN_KEY_ID')"));
+  assert.match(fn, /`turn:\$\{u\}`/, 'a bare host:port is a turn: URL');
   assert.match(fn, /!\/:53\(\\\?\|\$\)\/\.test\(u\)/, 'port 53 URLs dropped (browsers refuse them)');
   assert.doesNotMatch(src('src/net/ice.js'), /CF_TURN|Bearer/);
 });
