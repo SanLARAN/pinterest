@@ -140,74 +140,61 @@ const BODY = {
     hands(R);
   },
 
-  // The Stray's own (2.1v): a tee two sizes too big, slipping off one shoulder, hanging past the shorts,
-  // bare arms, socks and sneakers. White, grey and a little too clean for this forest.
+  // The Stray's coat (3.0t; the id is still 'bigtee' so saved outfits keep it): someone else's ватник, too big,
+  // its hem torn into tongues, quilted in stitched rows, the right sleeve gone at the elbow and the arm under it
+  // bare. Faded trousers and kirza boots. The same coat the Дворняжка wears (game/strayBody.js), cut for a person.
   bigtee(R) {
     const n = R.nodes;
-    // One garment, one piece of cloth: an oversized tee from the shoulders down past the hips to mid-thigh. It all
-    // hangs on the chest, so there is no separate skirt to read as a skirt — the shirt itself covers the lower body.
-    // The profile runs bottom → top (the winding of the lathe depends on it), and the hem is folded up inside, so
-    // looking under it shows cloth instead of the inside of a shell.
-    const SEG = 9;
+    const rnd = new RNG(612);
     part(R, n.chest, (b) => {
-      b.place(0, 0, 0, 0, 0, 0, 1.1, 1, 0.82);
-      lathe(b, [
-        [0.186, -0.5],   // the hem: mid-thigh, wider than the hips under it
-        [0.188, -0.46],
-        [0.184, -0.38],
-        [0.176, -0.28],
-        [0.168, -0.18],
-        [0.16, -0.08],
-        [0.154, 0.02],
-        [0.158, 0.14],
-        [0.166, 0.26],
-        [0.172, 0.38],
-        [0.171, 0.45],
-        [0.157, 0.51],
-        [0.126, 0.548],
-        [0.094, 0.568],
-      ], SEG, BA, { phase: PI / SEG, hide: 5 });
-      // the hem, turned up inside: two rings, so the edge has thickness and the garment is never see-through
-      lathe(b, [
-        [0.185, -0.496],
-        [0.176, -0.462],
-        [0.166, -0.462],
-      ], SEG, BB, { phase: PI / SEG, hide: 1 | 2 | 4 | 8 });
-      b.identity();
-      // the collar: two rings of ribbing, flopping open to one side
-      b.place(0, 0.518, 0.004, 0.05, 0, 0, 1.1, 1, 0.86);
-      lathe(b, [[0.096, 0], [0.098, 0.028], [0.088, 0.055], [0.074, 0.07]], 8, BA, { phase: PI / 8 });
-      b.identity();
-      // the neckline slipping off her left shoulder: one seam
-      b.limb([-0.185, 0.57, 0.03], [-0.232, 0.42, 0.055], 0.009, 0.007, BB, 3);
-      // the print on the chest (the accent colour): a wolf skull in marker, four strokes and two holes
-      b.place(0, 0.3, 0.13); b.box(0.104, 0.1, 0.004, BB);
-      b.place(0, 0.256, 0.134); b.box(0.048, 0.042, 0.004, BA); // the muzzle: the shirt showing through
-      for (const s of [-1, 1]) {
-        b.place(s * 0.035, 0.352, 0.131, 0, 0, s * 0.5); b.box(0.046, 0.019, 0.004, BB); // the ears
-        b.place(s * 0.021, 0.292, 0.133); b.box(0.017, 0.015, 0.004, BA); // the eye sockets
+      b.place(0, -0.36, -0.005); b.taper(0.5, 0.34, 0.42, 0.28, 0.66, BA); // hips to chest: an A-line, the hem off the legs
+      b.place(0, 0.3, -0.005); b.taper(0.42, 0.28, 0.46, 0.28, 0.2, BA);
+      b.place(0, 0.5, -0.008); b.taper(0.46, 0.28, 0.26, 0.2, 0.07, BA); // the shoulder line, sloping in
+      // the quilting: stitched rows round the coat, and the front where it does not quite close
+      for (let k = 0; k < 7; k++) {
+        const y = -0.28 + k * 0.12, w = 0.48 - Math.max(0, y) * 0.05;
+        b.place(0, y, -0.15 + Math.max(0, y) * 0.02); b.box(w * 0.92, 0.011, 0.006, BB);
+        for (const sd of [-1, 1]) b.place(sd * 0.13, y, 0.152 - Math.max(0, y) * 0.02), b.box(w * 0.36, 0.011, 0.006, BB);
       }
-      b.identity();
+      b.place(0, 0.05, 0.156); b.box(0.022, 0.8, 0.006, KIND.ROCK); // the gap down the front
+      // the collar, turned up round the back of the neck
+      for (let i = 0; i < 7; i++) {
+        const a = PI + (i / 6 - 0.5) * 2.6;
+        b.place(Math.sin(a) * 0.13, 0.6, Math.cos(a) * 0.1 - 0.01, -0.25 * Math.cos(a), a, 0);
+        b.box(0.07, 0.08, 0.02, BA);
+      }
+      // a pocket hanging by one corner
+      b.place(0.13, -0.12, 0.165, 0, 0, 0.35); b.box(0.09, 0.08, 0.008, BB);
+      // the hem, torn into tongues
+      for (let i = 0; i < 12; i++) {
+        const a = (i / 12) * PI * 2 + 0.13;
+        spike(b, Math.sin(a) * 0.24, -0.35, Math.cos(a) * 0.165, a, PI - 0.08, 0.04, 0.05 + rnd.next() * 0.08, BA, 3);
+      }
     });
     limbs(R, {
-      // short slack sleeves on their own bones, then the bare arm
       upper: (b) => {
-        b.place(0, 0, 0, 0, 0, 0, 1, 1, 0.96);
-        lathe(b, [[0.001, 0.055], [0.046, 0.05], [0.067, 0.026], [0.07, -0.02], [0.066, -0.062], [0.062, -0.095]], 8, BA, { phase: PI / 8, hide: 5 });
-        lathe(b, [[0.063, -0.105], [0.061, -0.09]], 8, BB, { phase: PI / 8, hide: 5 }); // the cuff
-        b.identity();
-        b.limb([0, -0.04, 0.004], ARM, 0.052, 0.042, KIND.FLESH, 5);
+        b.identity(); b.limb([0, 0.04, 0], ARM, 0.074, 0.064, BA, 5); // a sleeve with room in it
+        for (let k = 1; k < 4; k++) { b.place(0, -k * 0.075, k * 0.005); b.cylinder(6, 0.073 - k * 0.002, 0.073 - k * 0.002, 0.01, BB, { capTop: false }); }
       },
-      fore: (b) => { b.identity(); b.limb([0, 0, 0], FORE, 0.041, 0.033, KIND.FLESH, 5); },
-      thigh: (b) => { b.identity(); b.limb([0, 0, 0], THIGH, 0.068, 0.055, KIND.FLESH, 5); },
+      fore: (b, sd) => {
+        if (sd < 0) {
+          b.identity(); b.limb([0, 0, 0], FORE, 0.062, 0.055, BA, 5);
+          b.place(0, -0.26, 0.058); b.cylinder(6, 0.057, 0.059, 0.028, BB); // the cuff, frayed
+        } else {
+          // torn off at the elbow: a ring of rags, and the bare arm under it
+          for (let i = 0; i < 6; i++) { const a = (i / 6) * PI * 2; spike(b, Math.sin(a) * 0.058, -0.01, Math.cos(a) * 0.058, a, PI - 0.35, 0.028, 0.05 + rnd.next() * 0.04, BA, 3); }
+          b.identity(); b.limb([0, 0, 0], FORE, 0.042, 0.034, KIND.FLESH, 5);
+        }
+      },
+      thigh: (b) => { b.identity(); b.limb([0, 0.02, 0], THIGH, 0.08, 0.064, BB, 5); },
       shin: (b) => {
-        b.identity(); b.limb([0, 0, 0], [0, -0.3, 0], 0.052, 0.042, KIND.FLESH, 5);
-        b.identity(); b.limb([0, -0.3, 0], SHIN, 0.048, 0.044, BB, 5); // the sock
-        b.place(0, -0.44, 0.045); b.box(0.1, 0.075, 0.235, BA); // the sneaker
-        b.place(0, -0.46, 0.05); b.box(0.105, 0.02, 0.24, KIND.BONE); // its sole
+        b.identity(); b.limb([0, 0, 0], [0, -0.22, 0], 0.062, 0.056, BB, 5);
+        b.identity(); b.limb([0, -0.2, 0], SHIN, 0.062, 0.058, KIND.ROCK, 5); // the kirza boot-leg
+        b.place(0, -0.44, 0.04); b.box(0.105, 0.075, 0.24, KIND.ROCK); // the boot
+        b.place(0, -0.475, 0.04); b.box(0.11, 0.02, 0.25, KIND.WOOD); // its sole
       },
     });
-    hands(R, KIND.FLESH, 0.038, 0.052);
+    hands(R, KIND.FLESH, 0.04, 0.055);
   },
 
   // Taiga: knee-length sheepskin, fleece collar and cuffs, a red sash, felt boots, mittens
@@ -857,50 +844,43 @@ const HEAD = {
     }
   },
 
-  // The Stray (2.1v). From the reference: white hair to the hips, one eye behind the fringe, ears on their
-  // own bones. The ears turn toward whatever she is listening to (see poseStrayEars), and the eyes are lit —
-  // HG, not a dye, so they shine in the dark like everything else in this forest.
+  // The Stray's muzzle (3.0t; the id is still 'strayhead'): a dog's head made into a mask — the hide over the
+  // skull, the long grey muzzle with its dried teeth, the ears hanging on their own bones (poseFur twitches them),
+  // a strap at the back, and the wearer's own eyes in two holes. The skin of the Дворняжка, worn.
   strayhead(R) {
     const n = R.nodes;
+    const rnd = new RNG(58);
+    const r = () => rnd.next();
     part(R, n.head, (b) => {
-      // the face: small, pale, still
-      b.place(0, 0, 0.004);
-      lathe(b, [[0, -0.132], [0.048, -0.122], [0.086, -0.09], [0.104, -0.04], [0.112, 0.012], [0.108, 0.066], [0.09, 0.114], [0.052, 0.144], [0, 0.152]], 12, KIND.FLESH, { phase: PI / 12 });
-      b.place(0, -0.086, 0.096); b.box(0.024, 0.0035, 0.005, KIND.ROCK); // a mouth that is not smiling
-      // the crown of the hair, tipped back
-      b.place(0, 0, 0, -0.34, 0, 0);
-      lathe(b, [[0.126, -0.02], [0.138, 0.04], [0.133, 0.1], [0.108, 0.15], [0.062, 0.182], [0, 0.196]], 12, HA, { phase: PI / 12 });
-      b.place(0, -0.13, -0.055); b.taper(0.2, 0.085, 0.245, 0.12, 0.19, HA); // the back of it, close to the nape
-      // a heavy fringe, longer on the right: the left eye is behind it
-      for (const [a, hh] of [[-0.9, 0.135], [-0.55, 0.125], [-0.2, 0.115], [0.16, 0.09], [0.52, 0.075], [0.88, 0.07]]) {
-        spike(b, Math.sin(a) * 0.115, 0.07 - Math.abs(a) * 0.012, Math.cos(a) * 0.115, PI - a, 2.94, 0.045, hh, HA, 4);
-      }
-      // locks down past the collarbones, narrowing to points
-      const fz = Math.max(0.112, reach(R, n.chest, 0.3, 0.62, 1)) + 0.01;
+      b.place(0, 0.02, -0.01); b.rock(0.138, r, HA, 0.16, 0.92); // the hide over the skull
+      b.place(0, 0.055, 0.07, 0, 0, 0, 1.15, 0.5, 0.9); b.rock(0.07, r, HA, 0.18, 0.7); // the brow
+      // the muzzle: long, narrowing, a little down, bare along the bridge
+      b.place(0, -0.035, 0.08, PI / 2 - 0.16, 0, 0); b.taper(0.135, 0.11, 0.065, 0.058, 0.22, HA);
+      b.place(0, -0.01, 0.13, PI / 2 - 0.24, 0, 0); b.taper(0.07, 0.03, 0.04, 0.02, 0.15, HB);
+      b.place(0, -0.065, 0.31); b.octa(0.03, 0.023, KIND.ROCK); // the nose, dry
+      // the teeth along the lip, yellow and uneven; the jaw is gone — it is a mask
+      for (let i = 0; i < 5; i++) for (const s of [-1, 1]) spike(b, s * (0.045 - i * 0.005), -0.085, 0.12 + i * 0.035, 0, PI, 0.007, 0.018 + (i === 0 ? 0.02 : 0), KIND.BONE, 3);
+      // the eye holes, and the wearer's eyes in them
       for (const s of [-1, 1]) {
-        b.identity();
-        b.limb([s * 0.1, 0.04, 0.045], [s * 0.112, -0.14, fz - 0.006], 0.03, 0.023, HA, 5);
-        b.limb([s * 0.112, -0.14, fz - 0.006], [s * 0.12, -0.33, fz + 0.03], 0.023, 0.011, HA, 5);
-        spike(b, s * 0.12, -0.326, fz + 0.03, PI, PI - 0.1, 0.011, 0.05, HA, 4);
+        b.place(s * 0.05, 0.015, 0.118, 0, s * 0.4, 0, 1, 0.75, 0.5); b.octa(0.026, 0.02, KIND.ROCK);
+        b.place(s * 0.048, 0.015, 0.11, 0, s * 0.4, 0, 1, 0.8, 0.5); b.octa(0.012, 0.009, KIND.BONE);
       }
-    });
-    // the one eye you can see: pink, and lit
-    const eyes = node(R, 'eyes', n.head, 0, -0.012, 0);
-    part(R, eyes, (b) => {
-      for (const s of [-1, 1]) {
-        const x = s * 0.045, a = s * 0.34;
-        b.place(x, -0.018, 0.095, PI / 2, a, 0, 1, 1, 1.32); b.cylinder(8, 0.023, 0.023, 0.009, KIND.ROCK);
-        b.place(x, -0.018, 0.1, PI / 2, a, 0, 1, 1, 1.08); b.cylinder(8, 0.016, 0.016, 0.01, HG); // the iris, lit
-        b.place(x + 0.007, -0.006, 0.106, 0, a, 0, 1, 1, 0.45); b.octa(0.005, 0.005, KIND.BONE);
+      // the hide hangs down over the neck and the shoulders, ragged
+      for (let i = 0; i < 9; i++) {
+        const a = PI + (i / 8 - 0.5) * 3.4;
+        spike(b, Math.sin(a) * 0.12, -0.08, Math.cos(a) * 0.1, a, PI - 0.25, 0.04, 0.08 + r() * 0.07, HA, 3);
       }
+      // the strap round the back of the head, and mange on the crown
+      b.place(0, -0.01, -0.02, 0.15, 0, 0); b.cylinder(8, 0.142, 0.142, 0.025, HB, { capTop: false });
+      b.place(0.04, 0.12, -0.03, 0.3, 0, 0); b.box(0.06, 0.004, 0.05, HB);
     });
-    // ears on their own bones: they turn (poseStrayEars in stray.js)
+    // the ears, hanging: one of them torn
     for (const s of [-1, 1]) {
-      const ear = node(R, s < 0 ? 'earL' : 'earR', n.head, s * 0.082, 0.108, -0.012);
+      const ear = node(R, s < 0 ? 'earL' : 'earR', n.head, s * 0.088, 0.075, -0.02);
       part(R, ear, (b) => {
-        b.place(0, 0, 0, 0.06, 0, -s * 0.26, 1, 1, 0.62); b.cone(5, 0.072, 0.17, HA, { phase: PI / 5 });
-        b.place(0, 0.014, 0.02, 0.06, 0, -s * 0.26, 0.66, 0.8, 0.3); b.cone(5, 0.072, 0.17, HB, { phase: PI / 5 });
-        for (const [x, y] of [[-s * 0.012, 0.05], [s * 0.012, 0.08]]) spike(b, x, y, 0.026, PI, 0.62, 0.012, 0.05, HA, 3); // fur
+        b.place(0, 0, 0, 0, 0, s * 0.4); b.taper(0.075, 0.025, 0.05, 0.012, -0.18, HA);
+        b.place(0, -0.01, 0.012, 0, 0, s * 0.4); b.taper(0.048, 0.004, 0.03, 0.004, -0.14, HB);
+        if (s > 0) { b.place(s * 0.08, -0.14, 0, 0, 0, s * 0.4); b.box(0.03, 0.04, 0.03, KIND.ROCK); }
       });
     }
   },

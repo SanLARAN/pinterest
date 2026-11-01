@@ -173,13 +173,13 @@ test('she is on the frame loop, in the echo, and the host keeps her on the wire'
   assert.match(src('src/net/net.js'), /PROTOCOL = (18|19)/); // (3.0s moved it to 19 for the bog question)
 });
 
-test('her body is the two pieces of her skin, and the echo and the atlas can both use it', () => {
+test('her body is her own rig (3.0t), her skin is two survivor pieces, and the echo and the atlas can both use it', () => {
   const survivor = src('src/game/survivor.js');
   assert.match(survivor, /  strayhead\(R\) \{/);
   assert.match(survivor, /  bigtee\(R\) \{/);
   assert.match(survivor, /earL' : 'earR'/, 'the ears are on their own bones');
   const stray = src('src/game/stray.js');
-  assert.match(stray, /buildSurvivor\(STRAY_FIT\)/);
+  assert.match(stray, /buildStrayBody\(\)/); // (2.1v: buildSurvivor(STRAY_FIT) — 3.0t gave her a dog's legs, see round30t)
   assert.match(stray, /uEcho\.value = 1/);
   assert.match(stray, /ghosts\.spawn\(this\.rig/);
   const atlas = src('src/ui/atlasData.js');

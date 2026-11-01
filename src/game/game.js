@@ -42,8 +42,7 @@ import { WaveField, waterKick } from './waves.js'; // (3.0n) the water answers w
 import {PartMap} from './partMap.js';
 import { Angler } from './angler.js'; // 2.1o: the man with the lantern (see CFG.ANGLER)
 import { Stray } from './stray.js'; // 2.1v: the girl who takes the voice (see CFG.STRAY)
-import { buildSurvivor } from './survivor.js'; // 2.1v: her face, for the death close-up
-import { STRAY_FIT } from './stray.js';
+import { buildStrayBody, poseStrayLunge } from './strayBody.js'; // 3.0t: her muzzle, for the death close-up
 import { echoOf, mistScale } from './water.js'; // 3.0b: what water does to a sound
 import { inert } from '../core/inert.js'; // 3.0: a system the current map does not have
 import { syncPumps } from '../world/bog.js'; // 3.0c: a running pump drains its sector
@@ -1629,8 +1628,8 @@ export class Game {
   }
 
   scareRig(type) {
-    // 2.1v: she is not one of the monster rigs — the close-up is her own survivor rig, unposed by any AI
-    if (type === 'stray') return (this.scareRigs.stray ||= buildSurvivor({ ...STRAY_FIT }));
+    // 2.1v: she is not one of the monster rigs — (3.0t) the close-up is her own body, posed by its own code
+    if (type === 'stray') return (this.scareRigs.stray ||= buildStrayBody());
     return (this.scareRigs[type] ||= buildRig(type));
   }
 
@@ -1730,14 +1729,8 @@ export class Game {
       n.shoulderL.rotation.x = -1.6; n.shoulderR.rotation.x = -1.6;
       n.shoulderL.rotation.z = -0.9; n.shoulderR.rotation.z = 0.9;
     } else if (type === 'stray') {
-      // she does not lunge: she leans in, unhurried, and takes the voice out of you
-      n.head.rotation.set(-.1 + Math.sin(tt * 21) * .05, Math.sin(tt * 17) * .1, Math.sin(tt * 29) * .06);
-      if (n.earL) n.earL.rotation.set(-.55, 0, .18);
-      if (n.earR) n.earR.rotation.set(-.55, 0, -.18);
-      n.chest.rotation.x = .16 - .1 * smoothstep(0, .6, tt);
-      n.shL.rotation.x = 1.1; n.shR.rotation.x = 1.1; // both hands up, toward your face
-      n.elL.rotation.x = -.75; n.elR.rotation.x = -.75;
-      n.head.position.y = .66 - .02 * smoothstep(0, .5, tt);
+      // (3.0t) she rises off her toes in front of you, the jaw open and both hands coming up to your face
+      poseStrayLunge(rig, tt);
     } else {
       n.head.rotation.set(-.18+Math.sin(tt*38)*.06,Math.sin(tt*23)*.12,Math.sin(tt*50)*.13);
       n.jaw.rotation.x = .95 + Math.sin(tt * 40) * .2;
@@ -1758,7 +1751,7 @@ export class Game {
     const dist = (type === 'listener' ? 1.05 : type === 'howler' ? 1.3 : type === 'watcher' ? 0.9 : 0.95) + lunge * 1.8;
     r.position.set(p.x + fx * dist - _v.x, camY - _v.y + 0.12, p.z + fz * dist - _v.z);
     const strobe = reduced ? 1 : (Math.floor(tt * 14) % 2 === 0 ? 1.6 : 0.35);
-    if (!this.jsGhost) this.jsGhost = this.ghosts.spawn(rig, this.time, { sticky: true, strength: strobe, full: 1, color: type === 'watcher' ? 0xe8eef4 : type === 'howler' ? 0xff5a18 : type === 'stray' ? 0xe9e6df : 0xff3020 });
+    if (!this.jsGhost) this.jsGhost = this.ghosts.spawn(rig, this.time, { sticky: true, strength: strobe, full: 1, color: type === 'watcher' ? 0xe8eef4 : type === 'howler' ? 0xff5a18 : type === 'stray' ? 0xcdbf9f : 0xff3020 });
     else {
       this.ghosts.refresh(this.jsGhost, rig);
       this.jsGhost.strength = strobe;

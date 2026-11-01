@@ -1,6 +1,7 @@
-// The Stray (Дворняжка, 2.1v): a girl in a tee two sizes too big, white hair, wolf ears, and one pink eye
-// behind the fringe. She is the fourth night's answer to a forest that has taught you to read silhouettes:
-// for once the shape in the echo is a person.
+// The Stray (Дворняжка, 2.1v; body and voice remade in 3.0t): a mongrel that learned to stand like the people
+// it followed, in a ватник off a dead shift. She is the fourth night's answer to a forest that has taught you to
+// read silhouettes: from far off, the shape in the echo is a man in a coat too big for him. Closer, the knees
+// bend the wrong way, the arms hang to the knees, and the head is a muzzle. She stops and smells the air.
 //
 // She does not hunt by sound and she does not tear or eat. She follows — walking, at a pace slower than your
 // own — and she only ever wakes up if you RUN near her. Walking past her is allowed; that is the whole rule.
@@ -8,20 +9,24 @@
 // is the end of you. In co-op she does not kill: she wears you. Your friends keep hearing a figure with
 // your shape walk up to them and answer them in your voice, while your own microphone is dead to them.
 //
-// The whole body is an ordinary survivor rig in the two pieces her skin is made of (see outfit.js), so the
-// echo, the lamp ghosts and daylight need nothing new. The decisions are host-side (solo: the only machine);
-// guests replay her from the host's 'sy' state and her 'sw' wear messages.
+// The body is her own rig (game/strayBody.js) in the same shape as a survivor's, so the echo, the lamp ghosts
+// and daylight need nothing new. Her skin for the player — the muzzle and the ватник — is two survivor pieces
+// (strayhead, bigtee in survivor.js). The decisions are host-side (solo: the only machine); guests replay her
+// from the host's 'sy' state and her 'sw' wear messages.
 import * as THREE from 'three';
 import { CFG } from '../core/config.js';
 import { clamp } from '../core/rng.js';
 import { t } from '../core/i18n.js';
-import { buildSurvivor, poseSurvivor } from './survivor.js';
+import { buildStrayBody, poseStray } from './strayBody.js';
 import { createPersonMaterial, dressPerson, undressPerson } from '../render/people.js';
 import { noteStrayMeeting, STRAY_MEET } from '../core/strayLog.js';
 
 const S = () => CFG.STRAY;
 export const STRAY_PHASES = ['away', 'follow', 'anger', 'chase', 'grab', 'wear', 'leave'];
-export const STRAY_FIT = { head: 'strayhead', body: 'bigtee', hc: ['#e9e6df', '#e8a0b4'], bc: ['#d9d5c8', '#8a8a86'], car: 'uaz', cc: ['#4e6b3c', '#8a6a48'] };
+// her skin, as the player wears it after ten meetings (the muzzle and the ватник: survivor pieces, see outfit.js)
+export const STRAY_FIT = { head: 'strayhead', body: 'bigtee', hc: ['#6e6252', '#8e766c'], bc: ['#434c3e', '#7f765f'], car: 'uaz', cc: ['#4e6b3c', '#8a6a48'] };
+// how often she stops to smell the air while she follows (s between stops, s a stop lasts)
+export const STRAY_SNIFF = { every: [3.5, 7], hold: [1.1, 2.2], hey: 0.16 }; // hey: the share of stops where it speaks instead
 
 // ---------------- pure pieces (the tests ride on these) ----------------
 
@@ -97,9 +102,9 @@ export class Stray {
     this.wear = null; // { pid, t, x, z, yaw, line, name }
     this.worn = false; // this machine's player is the one being worn
     this.wornBy = null;
-    this.earTurn = 0;
-    this.earTwitch = 0;
-    this.lastEarT = 0;
+    this.look = 0; // her head turned toward you (radians, relative to the body)
+    this.sniff = 0; // 0..1: stopped to smell the air
+    this.sniffT = 4; // until the next stop
     this.reset();
   }
 
@@ -115,6 +120,8 @@ export class Stray {
     this.worn = false;
     this.wornBy = null;
     this.speed = 0;
+    this.sniff = 0;
+    this.sniffT = 4;
     if (this.g.player) this.g.player.heldByStray = false;
     if (this.lampGhost) { this.g.ghosts.release(this.lampGhost); this.lampGhost = null; }
     this.hide();
@@ -124,10 +131,10 @@ export class Stray {
   ensureRig() {
     if (this.rig) return;
     const g = this.g;
-    const rig = buildSurvivor(STRAY_FIT);
-    const mat = createPersonMaterial(rig.dyes, 0xe9e6df);
-    // no culling on her: a garment that is a single piece of cloth (a tee over the hips, the hem folded up
-    // inside) must read as solid from any angle, and a reversed triangle must never turn into a hole in her
+    const rig = buildStrayBody();
+    const mat = createPersonMaterial(rig.dyes, 0xb9ad97);
+    // no culling on her: the coat is open and torn, the ears are single sheets, and a reversed triangle must
+    // never turn into a hole in her
     mat.side = THREE.DoubleSide;
     mat.uniforms.uEcho.value = 1; // she is seen the way everything else is: as an echo, and in real light
     const meshes = dressPerson(rig, mat);
@@ -215,8 +222,10 @@ export class Stray {
       return;
     }
     if (this.phase === 'chase' && d > s.chaseR) { this._setPhase('follow'); this.anger = 0; this.calm = 0; }
+    // (3.0t) following, she stops now and then to smell the air: head up, nose working, then on again
+    this._sniffTick(dt, d);
     // walk toward the player (she keeps her distance) or straight at them
-    const sp = straySpeed(d, this.phase, s);
+    const sp = this.sniff > 0.5 && this.phase === 'follow' ? 0 : straySpeed(d, this.phase, s);
     this.speed = sp;
     if (sp > 0) {
       const want = Math.atan2(p.x - this.x, p.z - this.z);
@@ -432,10 +441,28 @@ export class Stray {
   _walkStep(dt, sp) {
     const g = this.g;
     this._stepT = (this._stepT || 0) + dt * sp;
-    if (this._stepT > 0.72 && sp > 0.25) {
+    if (this._stepT > (this.phase === 'chase' ? 0.95 : 0.72) && sp > 0.25) {
       this._stepT = 0;
       const d = g.distToEars(this.x, this.z);
-      if (d < 22) g.audio?.strayStep(this.x, this.y + 0.1, this.z, 0.55);
+      // nails on the ground; on all fours (a chase) the four feet land as one
+      if (d < 22) g.audio?.strayStep(this.x, this.y + 0.1, this.z, this.phase === 'chase' ? 0.9 : 0.55, this.phase === 'chase');
+    }
+  }
+
+  // the stops to smell the air (host; the guests see the speed fall to nothing and the head come up)
+  _sniffTick(dt, d) {
+    const g = this.g, S2 = STRAY_SNIFF;
+    if (this.phase !== 'follow') { this.sniff = Math.max(0, this.sniff - dt * 3); return; }
+    this.sniffT -= dt;
+    if (this.sniffT <= 0) {
+      if (this.sniff > 0) { this.sniff = 0; this.sniffT = g.rng.float(S2.every[0], S2.every[1]); }
+      else {
+        this.sniff = 1;
+        this.sniffT = g.rng.float(S2.hold[0], S2.hold[1]);
+        // mostly it smells the air; now and then, instead, it says the word it took from someone — «эй»
+        if (d < 26 && g.rng.next() < STRAY_SNIFF.hey) g.audio?.strayHey?.(this.x, this.y + 1.6, this.z, d < 10 ? 0.9 : 0.6);
+        else if (d < 30) g.audio?.straySniff?.(this.x, this.y + 1.45, this.z, d < 10 ? 0.9 : 0.6);
+      }
     }
   }
 
@@ -479,33 +506,34 @@ export class Stray {
     this.rig.root.rotation.y = this.yaw;
     const day = ['dawn', 'morning', 'dusk', 'training', 'won'].includes(g.state);
     const lit = day || g.glowAt(this.x, this.y + 1.1, this.z) > 0.03;
-    this.rig.root.visible = show && lit && g.state === 'play';
+    // (3.0t) wearing someone, she is not seen in the light — they see their friend. The echo still finds her.
+    this.rig.root.visible = show && lit && g.state === 'play' && this.phase !== 'wear';
     if (show) {
-      poseSurvivor(this.rig, g.time * 0.9, this.phase === 'grab' ? 0 : this.speed, false, this.phase === 'grab');
-      this._ears(dt);
+      // a guest has no host clock for her stops: a standing follower is a sniffing one
+      const sniff = g.auth ? this.sniff : this.phase === 'follow' && this.speed < 0.15 ? 1 : 0;
+      // (a guest hears the stop it sees: the host's sniff is a sound on the host's machine only)
+      if (!g.auth && sniff && !this._guestSniff && g.distToEars(this.x, this.z) < 30) g.audio?.straySniff?.(this.x, this.y + 1.45, this.z, 0.7);
+      this._guestSniff = sniff;
+      this._look(dt);
+      poseStray(this.rig, { t: g.time, dt, mode: this.phase, speed: this.phase === 'grab' ? 0 : this.speed, sniff, anger: this.anger, look: this.look });
     }
     // in a lamp's light: a sticky afterimage, the way a teammate in the dark is drawn
     if (this.rig.root.visible) {
       const str = Math.min(0.85, 0.25 + g.glowAt(this.x, this.y + 1.2, this.z) * 1.2);
-      if (!this.lampGhost) this.lampGhost = g.ghosts.spawn(this.rig, g.time, { sticky: true, strength: str, full: 0.25, color: 0xe9e6df, jitter: 0.5 });
+      if (!this.lampGhost) this.lampGhost = g.ghosts.spawn(this.rig, g.time, { sticky: true, strength: str, full: 0.25, color: 0xcdbf9f, jitter: 0.5 });
       else { g.ghosts.refresh(this.lampGhost, this.rig); this.lampGhost.strength = str; }
     } else if (this.lampGhost) { g.ghosts.release(this.lampGhost); this.lampGhost = null; }
   }
 
-  // her ears: they turn toward you while she is close, and twitch now and then
-  _ears(dt) {
-    const n = this.rig?.nodes;
-    if (!n || !n.earL || !n.earR) return;
+  // her head: she does not look at you so much as point her nose at you, while you are close
+  _look(dt) {
     const g = this.g;
     const d = Math.hypot(g.player.x - this.x, g.player.z - this.z);
-    const want = d < 16 ? clamp(Math.atan2(g.player.x - this.x, g.player.z - this.z) - this.yaw, -0.6, 0.6) : Math.sin(g.time * 0.6) * 0.25;
-    this.earTurn += (want - this.earTurn) * Math.min(1, dt * 4);
-    this.earTwitch = Math.max(0, this.earTwitch - dt);
-    if (g.time - this.lastEarT > 1.6 + (this.x % 1) * 2) { this.lastEarT = g.time; if (Math.random() < 0.45) this.earTwitch = 0.16; }
-    const tw = this.earTwitch > 0 ? Math.sin(this.earTwitch * 90) * 0.22 : 0;
-    n.earL.rotation.y = this.earTurn - tw;
-    n.earR.rotation.y = this.earTurn + tw;
-    if (n.head) n.head.rotation.y = this.earTurn * 0.35;
+    let a = Math.atan2(g.player.x - this.x, g.player.z - this.z) - this.yaw;
+    while (a > Math.PI) a -= Math.PI * 2;
+    while (a < -Math.PI) a += Math.PI * 2;
+    const want = d < 16 ? clamp(a, -0.9, 0.9) : Math.sin(g.time * 0.5) * 0.3;
+    this.look += (want - this.look) * Math.min(1, dt * (this.sniff > 0.5 ? 9 : 3)); // sniffing, the nose snaps to it
   }
 
   // a sound wave reached her: she answers with a shape in the echo, like everything else does
@@ -515,7 +543,7 @@ export class Stray {
     const d = Math.hypot(this.x - front.x, this.y + 1.4 - front.y, this.z - front.z);
     if (d > front.prevR && d <= front.curR && d <= front.radius) {
       const fall = 1 - Math.min(1, d / Math.max(1, front.radius));
-      g.ghosts.spawn(this.rig, g.time, { strength: clamp(0.6 + fall * 0.8, 0.6, 1.5), color: 0xe9e6df, life: 2.9, decay: 0.85 });
+      g.ghosts.spawn(this.rig, g.time, { strength: clamp(0.6 + fall * 0.8, 0.6, 1.5), color: 0xcdbf9f, life: 2.9, decay: 0.85 });
       g.stats.seen.stray = 1;
     }
   }

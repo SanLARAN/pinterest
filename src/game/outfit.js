@@ -281,8 +281,8 @@ const TEXT = {
       keanusuit: { name: 'Чёрный костюм', parts: ['Костюм', 'Рубашка'], desc: 'Чёрная двойка, белая рубашка, галстук ослаблен две ночи назад. Этот костюм видал леса и похуже.' },
       pigeonhead: { name: 'Голова голубя', parts: ['Оперение', 'Переливы'], desc: 'Сизый голубь: глаз-бусина, восковица над клювом, шея переливается на свету — и лобное зеркальце на ремешке. Он не воркует. Он слушает.' },
       doctorcoat: { name: 'Халат доктора', parts: ['Халат', 'Стетоскоп'], desc: 'Белый халат до колен, накрахмаленный воротник, стетоскоп и ручка в кармане. Под халатом перья, в ботинках — голубиные лапы, в кармане — крошки. Диплом никто не спрашивает.' },
-      strayhead: { name: 'Дворняжка', parts: ['Волосы', 'Уши'], desc: 'Белые волосы до пояса, тяжёлая чёлка на один глаз, волчьи уши на макушке и розовый зрачок, который светится в темноте. Уши поворачиваются на звук раньше, чем ты успеваешь подумать. В этом лесу это единственное, что работает.' },
-      bigtee: { name: 'Футболка не по размеру', parts: ['Ткань', 'Принт'], desc: 'Оверсайз, сползает с одного плеча, подол ниже шорт, на груди — волчий череп, нарисованный маркером. Она была не её. Сними её с себя, когда сможешь.' },
+      strayhead: { name: 'Морда', parts: ['Шкура', 'Подкладка'], desc: 'Собачья голова, снятая и надетая как маска: облезлая шкура на темени, длинная серая морда с сухими зубами, уши висят. Глаза в прорезях — твои. Ремень на затылке затянут кем-то до тебя.' },
+      bigtee: { name: 'Чужой ватник', parts: ['Ватник', 'Стёжка'], desc: 'Стёганый, на два размера больше, подол разорван на языки, правый рукав оторван по локоть. Пахнет не тобой. Его сняли с кого-то из прошлой смены — и кто-то носил его до тебя.' },
     },
   },
   en: {
@@ -349,8 +349,8 @@ const TEXT = {
       keanusuit: { name: 'Black suit', parts: ['Suit', 'Shirt'], desc: 'A black two-piece, a white shirt, the tie loosened two nights ago. This suit has seen worse forests.' },
       pigeonhead: { name: 'Pigeon head', parts: ['Plumage', 'Iridescence'], desc: "A city pigeon: a bead eye, a cere over the beak, a neck that shifts colour in the light — and the doctor's head mirror on a strap. It doesn't coo. It listens." },
       doctorcoat: { name: "Doctor's coat", parts: ['Coat', 'Stethoscope'], desc: 'A white coat to the knee, a starched collar, a stethoscope and a pen in the pocket. Feathers under the coat, pigeon feet in the shoes, crumbs in the pocket. Nobody asks about the diploma.' },
-      strayhead: { name: 'Stray', parts: ['Hair', 'Ears'], desc: 'White hair to the waist, a heavy fringe over one eye, wolf ears on top and a pink pupil that shines in the dark. The ears turn toward a sound before you have decided anything. In this forest it is the only thing that works.' },
-      bigtee: { name: 'Tee two sizes too big', parts: ['Cotton', 'Print'], desc: 'Oversized, slipping off one shoulder, the hem below the shorts, a wolf skull drawn on the chest in marker. It was never hers. Take it off yourself when you can.' },
+      strayhead: { name: 'Muzzle', parts: ['Hide', 'Lining'], desc: 'A dog\'s head, taken off and worn as a mask: mangy hide over the crown, a long grey muzzle with dry teeth, the ears hanging. The eyes in the holes are yours. The strap at the back was pulled tight by someone before you.' },
+      bigtee: { name: 'Someone else\'s coat', parts: ['Padding', 'Stitching'], desc: 'Quilted, two sizes too big, the hem torn into tongues, the right sleeve gone at the elbow. It does not smell of you. It came off someone from a shift before — and someone wore it before you.' },
     },
   },
 };

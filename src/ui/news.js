@@ -7,6 +7,23 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v:'3.0t',date:'2026-11-01',
+    ru:{title:'Дворняжка',items:[
+      'Найдёныш переделан целиком. Это больше не девочка в футболке, а дворняжка, которая научилась стоять как люди, за которыми ходила. Издалека и в эхе это сутулый человек в чужом ватнике. Ближе видно, что колени гнутся назад, ходит она на носках, руки висят до колен и кончаются когтями, а вместо лица — длинная облезлая морда с висячими ушами.',
+      'Она двигается не как человек: идёт рывками, как плохо снятое кино, то и дело останавливается и нюхает воздух, задрав морду. Злится — шерсть на загривке встаёт, губы ползут с зубов. В погоне бежит на четырёх. Хватает — поднимается на носки и тянет руки к горлу.',
+      'Новый голос: сопение, скулёж, рык, который всё время срывается, хриплый лай в погоне и стук когтей по земле. А иногда из темноты, где никого нет, звучит человеческое «эй».',
+      'В компании, когда она «надевает» друга, при свете её не видно — видно друга. Но эхо показывает, что идёт на самом деле.',
+      'Её вещи после десяти встреч — тоже новые: собачья морда-маска с висячими ушами и чужой рваный ватник с оторванным рукавом. Уже надетые наряды переоденутся сами.',
+    ]},
+    en:{title:'The mongrel',items:[
+      'The Stray is remade from the ground up. No longer a girl in a tee: a mongrel that learned to stand like the people it followed. From far off and in the echo it is a stooping man in someone else\'s quilted coat. Closer, the knees bend backwards, it walks on its toes, the arms hang to the knees and end in nails, and where the face should be there is a long mangy muzzle with its ears hanging.',
+      'It does not move like a person: it walks in jerks, like a badly shot film, and keeps stopping to smell the air with its muzzle up. Angry, the hackles rise and the lips come off the teeth. On the chase it runs on all fours. When it takes you it rises on its toes and reaches for your throat.',
+      'A new voice: sniffing, whining, a growl that keeps catching, hoarse barks on the chase and nails on the ground. And sometimes, from the dark where nobody is, a human "hey".',
+      'In company, while it wears a friend, it is not seen in the light — you see your friend. But the echo shows what is really walking.',
+      'Its things after ten meetings are new too: a dog\'s muzzle worn as a mask, ears hanging, and someone else\'s torn coat with a sleeve missing. Outfits already wearing them change by themselves.',
+    ]},
+  },
+  {
     v:'3.0s',date:'2026-11-01',
     ru:{title:'Торфяник надо заслужить',items:[
       'Торфяник открывается после победы на Лесхозе: уедь на УАЗе или доживи до последнего рассвета. Пока этого не было, карточка участка в «Одному» заперта и говорит, что её откроет. Старые победы засчитаны: если ты уже выигрывал смену, болото открыто.',

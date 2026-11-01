@@ -11,8 +11,7 @@ import { MeshBuilder, KIND } from '../world/builder.js';
 import { RNG, clamp, lerp, angleDiff } from '../core/rng.js';
 import { World, LANDMARKS } from '../world/world.js';
 import { buildListener, buildCrawler, buildWatcher, buildHowler, buildAngler, buildShade, ANIMS } from '../game/monsters.js';
-import { buildSurvivor, poseSurvivor } from '../game/survivor.js';
-import { STRAY_FIT } from '../game/stray.js';
+import { buildStrayBody, poseStray } from '../game/strayBody.js'; // 3.0t: Дворняжка
 import { placer, buildCorpse, buildToolBag, buildFlareGun } from '../game/objectives.js';
 import { buildDoorLeaf } from '../game/doors.js';
 import { buildForestCar, buildPart, WHEELS, MISSING, HOOD_HINGE, HOOD_OPEN, PARTS } from '../game/uaz.js';
@@ -189,26 +188,24 @@ function angler(mat) {
   };
 }
 
-// The Stray (2.1v): a survivor's rig in her own two pieces, walking her slow round. She turns her head
-// toward the page when it is opened (she heard it), and her ears follow.
+// The Stray (3.0t): Дворняжка — her own body (game/strayBody.js), walking her slow round on her toes. Every few
+// seconds she stops and smells the air; the page turn reaches her and she points her muzzle at the reader.
 function stray(mat) {
-  const rig = buildSurvivor(STRAY_FIT);
+  const rig = buildStrayBody();
   const root = rigMeshes(rig, mat);
-  const n = rig.nodes;
-  let speed = 0.55, turn = 0;
+  let speed = 0.9, look = 0, sniffT = 3, sniff = 0, t0 = 0;
   return {
-    root, base: 0.05, view: { yaw: 0.35, pitch: 0.03 },
-    poses: [() => { poseSurvivor(rig, 1.2, 0.9, false, false); }],
+    root, base: 0.0, view: { yaw: 0.55, pitch: 0.03 },
+    poses: [() => { poseStray(rig, { t: 1.3, dt: 1, mode: 'follow', speed: 0.9 }); }],
     tick(S) {
-      // the page turn reaches her: she stops and looks
-      const attend = S.react < 5;
-      speed = lerp(speed, attend ? 0 : 1.05, 1 - Math.exp(-2.2 * S.dt));
-      poseSurvivor(rig, S.t * 1.1, speed, false, false);
-      turn = lerp(turn, attend ? 0.42 : Math.sin(S.t * 0.4) * 0.16, 1 - Math.exp(-3.2 * S.dt));
-      if (n.head) n.head.rotation.y = turn;
-      const tw = Math.sin(S.t * 3.1) > 0.94 ? Math.sin(S.t * 42) * 0.2 : 0;
-      if (n.earL) n.earL.rotation.y = turn - tw;
-      if (n.earR) n.earR.rotation.y = turn + tw;
+      const attend = S.react < 5; // (she heard the page)
+      sniffT -= S.dt;
+      if (sniffT <= 0) { sniff = sniff ? 0 : 1; sniffT = sniff ? 1.6 : 3.4; }
+      const stop = attend || sniff;
+      speed = lerp(speed, stop ? 0 : 1.1, 1 - Math.exp(-3 * S.dt));
+      look = lerp(look, attend ? 0.7 : Math.sin(S.t * 0.4) * 0.2, 1 - Math.exp(-(attend ? 8 : 2.5) * S.dt));
+      t0 += S.dt;
+      poseStray(rig, { t: t0, dt: S.dt, mode: 'follow', speed, sniff: stop ? 1 : 0, look });
     },
   };
 }
