@@ -7,6 +7,21 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v:'3.0v',date:'2026-11-01',
+    ru:{title:'Мышь как мышь',items:[
+      'Камера больше не переходит в режим «зажми ЛКМ и тяни». Раньше хватало двух неудачных попыток захватить мышь — например, дважды закрыть рюкзак клавишей Esc, — и до перезагрузки страницы взгляд водился только с зажатой кнопкой. Теперь следующий клик просто снова захватывает мышь.',
+      'Мышь больше не идёт рывками: игра перестала просить у браузера «сырой» ввод — в Chrome на Windows он приходит пачками, и камера дёргалась, особенно там, где кадр тяжелее, под лампами. Кому нужен сырой ввод — можно включить его, добавив к адресу ?rawmouse.',
+      'Автонастройка графики больше не качается туда-сюда: разрешение снижается только после двух медленных секунд подряд и не пытается вернуться целую минуту — каждый такой шаг был заметным рывком.',
+      'Смена и полигон из гаража захватывают мышь сразу по клику, а не после фильма — больше не нужно кликать, чтобы начать смотреть.',
+    ]},
+    en:{title:'A mouse is a mouse',items:[
+      'The camera no longer drops into "hold the left button and drag". Two failed attempts to take the mouse used to be enough — closing the backpack with Esc twice, say — and until a reload you could only look with the button held. Now the next click simply takes the mouse again.',
+      'The mouse no longer moves in steps: the game stopped asking the browser for raw input, which on Windows Chrome arrives in bursts and made the camera jerk, worst where frames are heavy — under the lamps. If you want raw input, add ?rawmouse to the address.',
+      'The automatic graphics setting no longer seesaws: it lowers the resolution only after two slow seconds in a row and does not try to climb back for a whole minute — every such step was a visible hitch.',
+      'A shift or the range started from the garage takes the mouse on your click, not after the film — no extra click to start looking.',
+    ]},
+  },
+  {
     v:'3.0u',date:'2026-11-01',
     ru:{title:'По машинам',items:[
       'Любой выезд из гаража теперь начинается с того, что все садятся в машину, и только потом поворачивается ключ. У каждого из четырёх мест своя манера: водитель перемахивает через дверь, тот, что на стуле, обходит машину и перелезает через задний борт, курильщик бросает окурок, разбегается и ныряет на переднее сиденье прямо над головой водителя, а тот, что с рюкзаком, забрасывает рюкзак, спотыкается на бетоне, встаёт и карабкается через борт.',

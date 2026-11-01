@@ -23,7 +23,12 @@ export class Input {
     this.peekTouchUntil = 0;
     this.events = [];
     this.locked = false;
-    this.lockFailed = false;
+    this.lockFailed = false; // (3.0v) only where the lock can never be had: no API, or a frame that keeps refusing it
+    // (3.0v) a page inside someone else's frame may be refused the lock for good; a page of its own never is
+    this.inFrame = (() => { try { return typeof window !== 'undefined' && window.self !== window.top; } catch { return true; } })();
+    // (3.0v) raw, unaccelerated mouse movement is opt-in (?rawmouse): on Windows Chrome it arrives in uneven
+    // bursts and the camera stepped — worst when the frame rate dips, which is to say under the lamps
+    this.rawMouse = typeof location !== 'undefined' && new URLSearchParams(location.search || '').has('rawmouse');
     this.touch = false;
     this.uiMode = false; // the live backpack: a cursor, no movement or accidental use
     this.gameActive = false; // true while a run is being played (not paused)
@@ -169,10 +174,7 @@ export class Input {
     });
     document.addEventListener('pointerlockerror', () => {
       // only count here for browsers whose requestPointerLock() doesn't return a promise
-      if (this._reqFromClick && !this._reqPromise) {
-        this.lockFails = (this.lockFails || 0) + 1;
-        if (this.lockFails >= 2) this.lockFailed = true;
-      }
+      if (this._reqFromClick && !this._reqPromise) this._lockRefused();
     });
 
     // ---- touch (pointer events) ----
@@ -188,12 +190,10 @@ export class Input {
       return;
     }
     const fail = () => {
-      if (!fromClick) return;
-      this.lockFails = (this.lockFails || 0) + 1;
-      if (this.lockFails >= 2) this.lockFailed = true;
+      if (fromClick) this._lockRefused();
     };
     try {
-      const p = c.requestPointerLock({ unadjustedMovement: true });
+      const p = this.rawMouse ? c.requestPointerLock({ unadjustedMovement: true }) : c.requestPointerLock();
       this._reqPromise = !!(p && p.catch);
       if (p && p.catch) {
         p.catch((err) => {
@@ -212,6 +212,15 @@ export class Input {
       this._reqPromise = false;
       try { c.requestPointerLock(); } catch { fail(); }
     }
+  }
+
+  // (3.0v) a refused lock. The browser refuses for ordinary reasons — no click behind the request, Esc (which is
+  // never a gesture: closing the backpack with it used to count), or the second after you left the lock — and
+  // none of those may turn the mouse into drag-to-look for the rest of the session: the next click asks again.
+  // Only a page in someone else's frame, refused twice, falls back to dragging.
+  _lockRefused() {
+    this.lockFails = (this.lockFails || 0) + 1;
+    if (this.inFrame && this.lockFails >= 2) this.lockFailed = true;
   }
 
   exitLock() {

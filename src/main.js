@@ -266,19 +266,23 @@ function perfTick(dt) {
     const [lo, hi] = scaleBounds();
     const target = renderPlan().targetFPS;
     const slow = avg > 1 / (target * 5 / 6);
+    const awful = avg > 1 / (target * 35 / 60);
     perf.slow = slow ? perf.slow + 1 : 0;
-    if (slow && perf.slow >= 1 && perf.scale > lo + 0.001) {
+    // (3.0v) every step of the scale is a resize of the targets — a hitch you feel as a jerk. Under a lamp the frame
+    // rate sits right on the line, and one slow second at a time the scale went down, up after 5 s, down again…
+    // Now: two slow seconds in a row (or one awful one) before a step down, and a step down holds for a minute
+    if (slow && (perf.slow >= 2 || awful) && perf.scale > lo + 0.001) {
       perf.ceiling = perf.scale - 0.05;
-      perf.ceilT = 30;
+      perf.ceilT = 60;
       // a device far from the adaptive target takes a bigger first step, so the first seconds on a weak phone
       // stop stuttering instead of walking down one notch per second
-      perf.scale = Math.max(lo, perf.scale - (avg > 1 / (target * 35 / 60) ? 0.2 : 0.12));
-      perf.cool = 4;
+      perf.scale = Math.max(lo, perf.scale - (awful ? 0.2 : 0.12));
+      perf.cool = 6;
       perf.slow = 0;
       resize();
     } else if (avg < 1 / (target * .95) && perf.scale < Math.min(hi, perf.ceiling) - 0.001 && perf.cool <= 0) {
       perf.scale = Math.min(hi, perf.ceiling, perf.scale + 0.06);
-      perf.cool = 5;
+      perf.cool = 8;
       perf.slow = 0;
       resize();
     }
@@ -773,6 +777,9 @@ function startSoloShift() {
 
 // the garage's departure film, alone: then `done`
 function playGarageFilm(done) {
+  // (3.0v) the mouse is taken now, while the click that started this still counts as one: asked for after the film,
+  // the browser refuses (no gesture), and you used to land in the night with a «click to look» hint
+  if (!input.touch) input.requestLock(true);
   if (!garage && !ensureGarage()) { done(); return; }
   audio.init();
   audio.setVolume(settings.volume);
