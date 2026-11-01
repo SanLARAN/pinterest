@@ -2,81 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { IntroCutscene } from '../src/game/intro.js';
-import { CAMP_TENT, tentPoint } from '../src/world/campLayout.js';
 import { Backpack } from '../src/game/inventory.js';
 import { Post } from '../src/render/post.js';
 
-// (no map in the stub: the dispatcher hands back the forestry film, the 2.1j one)
-function film(seats = 4) {
-  const o = new IntroCutscene({ scene: new THREE.Scene(), online: false,
-    world: { terrain: { height: () => 0 } }, audio: { fire: () => null }, fire: { stream() {} } });
-  o.forceSeats = seats;
-  o._build();
-  return o;
-}
+// (3.1h: the forestry's 2.1j film — beds, a tent crawl, the fall from the sky — was replaced by campFilm.js;
+// its tests are tests/round31h.test.mjs. The bog's arrival below is unchanged.)
 const near = (a, b, eps = 1e-8) => assert.ok(Math.abs(a - b) < eps, `${a} != ${b}`);
-const faceDot = (a, dx, dz) => (Math.sin(a.yawCur) * dx + Math.cos(a.yawCur) * dz) / Math.hypot(dx, dz);
-
-test('every actor (including solo) faces the fire with the rig +Z, not the camera -Z', () => {
-  for (const count of [1, 4]) {
-    const o = film(count);
-    o._actors(1, 0, true);
-    for (const a of o.cast) assert.ok(faceDot(a, -a.x, -a.z) > 0.999);
-    for (const a of o.cast) {
-      o._actors(a.plan.tAct + 0.5, 0, true);
-      assert.ok(faceDot(a, -a.x, -a.z) > 0.999, `slot ${a.slot} douses forwards`);
-    }
-  }
-});
-
-test('turn to bed completes before moving; the entire walk is forwards and deterministic', () => {
-  const o = film();
-  for (const a of o.cast) {
-    const p = a.plan;
-    o._actors(p.tWalk + p.turn * 0.5, 0, true);
-    near(a.x, a.work.x); near(a.z, a.work.z);
-    const tt = p.tWalk + p.turn + p.walk2 * 0.4;
-    o._actors(tt, 1 / 60, true);
-    assert.ok(faceDot(a, a.seat.bed.x - a.work.x, a.seat.bed.z - a.work.z) > .999);
-    const x = a.x, z = a.z, phase = a.phase;
-    o._actors(p.tBed + p.lie, 0, true); // seek backwards after an unrelated pose
-    o._actors(tt, .1, true);
-    near(a.x, x); near(a.z, z); near(a.phase, phase);
-  }
-});
-
-test('tent route kneels outside, then goes through the centre of its rotated open +Z end', () => {
-  const o = film(), a = o.cast.find(a => a.seat.sleep === 'tent'), p = a.plan;
-  const local = () => {
-    const dx = a.x - CAMP_TENT.x, dz = a.z - CAMP_TENT.z;
-    return { x: dx * Math.cos(CAMP_TENT.yaw) - dz * Math.sin(CAMP_TENT.yaw),
-      z: dx * Math.sin(CAMP_TENT.yaw) + dz * Math.cos(CAMP_TENT.yaw) };
-  };
-  for (const k of [.01, .15, .31]) {
-    o._actors(p.tBed + p.lie * k, 0, true);
-    near(local().z, 2.45);
-  }
-  for (const k of [.4, .6, .8, 1]) {
-    o._actors(p.tBed + p.lie * k, 0, true);
-    near(local().x, 0);
-    assert.ok(local().z > 0 && local().z < 2.45);
-    assert.ok(faceDot(a, a.seat.inside.x - a.seat.bed.x, a.seat.inside.z - a.seat.bed.z) > .999);
-    near(a.rig.nodes.hips.position.y, .3);
-    assert.equal(a.show, 1, 'cloth, not an arbitrary fade, hides the body');
-  }
-  near(a.x, tentPoint(0, .05).x);
-  assert.ok(o.tFade >= p.tBed + p.lie, 'the film does not cut off the crawl');
-});
-
-test('lying pitch is local to the actor heading (YXZ), not a world-axis roll', () => {
-  const o = film(1), a = o.cast[0];
-  o._actors(a.plan.tBed + a.plan.lie, 0, true);
-  assert.equal(a.rig.root.rotation.order, 'YXZ');
-  a.rig.root.updateMatrixWorld(true);
-  const up = new THREE.Vector3(0, 1, 0).applyQuaternion(a.rig.root.quaternion);
-  near(up.y, 0);
-  assert.ok(up.x * -Math.sin(a.yaw) + up.z * -Math.cos(a.yaw) > .999);
-});
 
 // ---------------- the bog's arrival (3.0l) ----------------
 globalThis.document ||= { body: { classList: { add() {}, remove() {} } } };

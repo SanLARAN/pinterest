@@ -1,5 +1,5 @@
-// The bog's opening cut scene (3.0l). The forestry keeps the 2.1j film (see duskFilm.js); which one runs is
-// decided by the map you chose, in the dispatcher at the bottom of this file.
+// The bog's opening cut scene (3.0l). The forestry has its own (3.1h: campFilm.js, «Последний свет»); which one
+// runs is decided by the map you chose, in the dispatcher at the bottom of this file.
 //
 // It used to open on a camera falling out of the sky onto a camp fire, while four people put the fire out
 // and went to bed. That film did not fit the shift any more: nobody arrives at a bog by falling on it. Now it
@@ -23,7 +23,7 @@ import { MeshBuilder, KIND } from '../world/builder.js';
 import { createWorldMaterial, shared } from '../render/sonar.js';
 import { CAMP_TRACK } from '../world/bog.js';
 import { buildCrewCar } from './uaz.js';
-import { DuskFilm } from './duskFilm.js';
+import { CampFilm } from './campFilm.js';
 import { buildSurvivor, poseSurvivor, poseFur } from './survivor.js';
 import { createPersonMaterial, dressPerson, undressPerson } from '../render/people.js';
 import { PLAYER_HEX } from './remote.js';
@@ -810,13 +810,13 @@ function ground(g, x, z) {
 }
 
 // ---------------- which film opens the shift (3.0l) ----------------
-// Two участка, two ways of arriving. The forestry still begins with the last light over the camp fire (2.1j); the
-// bog begins on the road, at the flooded проезд. `new IntroCutscene(game)` returns the right one for the map, so
+// Two участка, two ways of arriving. The forestry begins with the camp's last evening (3.1h: each player's own job
+// before the night, then the generator dies); the bog begins on the road, at the flooded проезд. `new IntroCutscene(game)` returns the right one for the map, so
 // Game keeps talking to a single object with begin/update/applyCamera/cancel/seek on it.
 export class IntroCutscene {
   constructor(game) {
-    return game.map === 'bog' ? new BogArrival(game) : new DuskFilm(game);
+    return game.map === 'bog' ? new BogArrival(game) : new CampFilm(game);
   }
 }
 
-export { DuskFilm } from './duskFilm.js';
+export { CampFilm } from './campFilm.js';

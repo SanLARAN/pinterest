@@ -404,6 +404,7 @@ const STR = {
     // the opening cut scene (2.1j)
     introBig: 'последний свет',
     introSmall: 'УАЗ встал у затопленного проезда',
+    introSmallCamp: 'последний вечер в лагере', // 3.1h: the forest's film (introSmall is the bog's road)
     // morning
     morningBig: 'утро',
     morningBigN: 'утро {n}-го дня',
@@ -1397,6 +1398,7 @@ const STR = {
     tutScream: 'and whatever happens — do not scream',
     introBig: 'the last light',
     introSmall: 'the UAZ is stopped by the flood',
+    introSmallCamp: "the camp's last evening",
     morningBig: 'morning',
     morningBigN: 'morning, day {n}',
     trainingBig: 'THE RANGE',

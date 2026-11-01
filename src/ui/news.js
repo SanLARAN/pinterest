@@ -7,6 +7,19 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v:'3.1h',date:'2026-11-01',
+    ru:{title:'Новая заставка в лесу',items:[
+      'Фильм перед сменой в лесу снят заново. Камера опускается на лагерь в последний светлый вечер, и у каждого игрока своё дело: один проверяет фонарь и светит в лес, другой закрывает палатку, третий доливает бензин в генератор, четвёртый заливает костёр водой из ведра.',
+      'Каждого показывают отдельным планом. Люди встают со скамеек, обходят костёр, палатку и рюкзак, а не идут сквозь них. Шаги совпадают с ходьбой, ведро и канистра висят в руке, фонарь светит туда, куда смотрит игрок.',
+      'Костёр гаснет по-настоящему, генератор глохнет, и все поворачиваются к темноте. В одиночку фильм идёт около 17 секунд, вчетвером около 23. Enter по-прежнему пропускает его.',
+    ]},
+    en:{title:'A new opening in the forest',items:[
+      'The film before a forest shift is shot from scratch. The camera comes down onto the camp on its last light evening, and every player has a job: one checks a flashlight and shines it into the woods, one closes the tent, one tops up the generator, one puts the fire out with a bucket of water.',
+      'Each of them gets a shot of their own. People get up from the benches and walk around the fire, the tent and the backpack instead of through them. Footsteps match the walk, the bucket and the can hang from a hand, and the flashlight shines where its owner looks.',
+      'The fire really goes out, the generator dies, and everyone turns to the dark. Alone the film runs about 17 seconds, with four about 23. Enter still skips it.',
+    ]},
+  },
+  {
     v:'3.1g',date:'2026-11-01',
     ru:{title:'Звук и Bluetooth',items:[
       'Если в Bluetooth-наушниках звук пропадал на всём компьютере на несколько секунд (например, после запуска генератора) — в настройках появился пункт «Звук». Вариант «Bluetooth (без обрывов)» даёт звуковой карте запас побольше: эхо приходит на долю секунды позже, зато звук не обрывается.',
