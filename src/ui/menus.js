@@ -5,6 +5,7 @@ import { settings, saveSettings, getScores } from '../core/storage.js';
 import { fmtTime, fmtScore } from './hud.js';
 import {currentIdentity} from '../core/identity.js';
 import { cleanMap } from '../core/maps.js'; // 3.0g: which участок the solo panel is offering
+import { mapOpen } from '../core/mapUnlock.js'; // 3.0s: the bog is earned on the forestry
 
 const $ = (id) => document.getElementById(id);
 
@@ -47,11 +48,11 @@ export class Menus {
     document.querySelectorAll('[data-i18n]').forEach((el) => {
       el.textContent = t(el.dataset.i18n);
     });
-    $('howBody').innerHTML = t('howtoBody');
+    $('howBody').innerHTML = t('howtoBody') + t('howtoBog'); // (3.0s) the bog has its own page of the rules
     const title = $('titleText');
     title.textContent = t('title');
     title.dataset.text = t('title');
-    $('bootText').textContent = t('loading');
+    $('bootText').textContent = t(cleanMap(new URLSearchParams(location.search).get('map')) === 'bog' ? 'loadingBog' : 'loading'); // (3.0s: the bog does not grow a forest)
     document.title = `${t('title')} — ${t('subtitle')}`;
     this.renderScores();
     if (this.graphics.opened) this.graphics.render();
@@ -91,6 +92,12 @@ export class Menus {
       for (const b of nights.querySelectorAll('[data-map]')) {
         b.addEventListener('click', (e) => {
           e.preventDefault();
+          // (3.0s) a locked ground says what opens it and stays unpicked
+          if (!mapOpen(cleanMap(b.dataset.map)) && !this.h.unlockAll?.()) {
+            this.h.uiSound && this.h.uiSound('deny');
+            b.classList.remove('shake'); void b.offsetWidth; b.classList.add('shake');
+            return;
+          }
           this.h.uiSound && this.h.uiSound('click');
           settings.shiftMap = cleanMap(b.dataset.map);
           saveSettings();
@@ -102,8 +109,17 @@ export class Menus {
       // 3.0h: the plate above the cards is the chosen ground — the real plan of it, printed from the terrain
       const plate = $('soloMapPreview'), note = $('soloMapNote');
       this.paintSoloMap = () => {
-        const want = cleanMap(settings.shiftMap);
-        for (const b of nights.querySelectorAll('[data-map]')) b.setAttribute('aria-pressed', String(b.dataset.map === want));
+        const open = (m) => mapOpen(m) || !!this.h.unlockAll?.();
+        // (3.0s) a remembered bog on a profile that has not earned it (a new device, a wiped atlas) is the forest
+        const want = open(cleanMap(settings.shiftMap)) ? cleanMap(settings.shiftMap) : 'forest';
+        for (const b of nights.querySelectorAll('[data-map]')) {
+          const locked = !open(b.dataset.map);
+          b.setAttribute('aria-pressed', String(b.dataset.map === want));
+          b.setAttribute('aria-disabled', String(locked));
+          b.classList.toggle('locked', locked);
+          const hint = b.querySelector('span');
+          if (hint) hint.textContent = t(locked ? 'mapBogLocked' : b.dataset.map === 'bog' ? 'mapBogHint' : 'mapForestHint');
+        }
         if (plate) {
           const src = `maps/${want}.png`;
           if (!plate.getAttribute('src')?.endsWith(src)) {

@@ -9,6 +9,7 @@ import { cleanName } from '../net/coop.js';
 import { wt, myFit } from '../game/outfit.js';
 import {currentIdentity} from '../core/identity.js';
 import {socialWords} from './socialWords.js';
+import { roomMapOpen } from '../core/mapUnlock.js'; // 3.0s: the bog is earned on the forestry
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>\"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', "'": '&#39;' }[c]));
@@ -48,6 +49,12 @@ export class Lobby {
     this.rulesPanel.setAttribute('role','dialog');this.rulesPanel.setAttribute('aria-modal','true');this.rulesPanel.setAttribute('aria-labelledby','lobbyRulesTitle');
     this.rulesPanel.innerHTML='<div class="lobby-rules-backdrop"></div><div class="lobby-rules-card"><div class="rules-kicker">HUSH / GARAGE</div><h2 id="lobbyRulesTitle"></h2><p class="rule-authority"></p><div class="rules-line"><span></span><div class="rule-choices"><button type="button" data-hide="yes"></button><button type="button" data-hide="no"></button></div></div><div class="rules-line days-line"><span></span><div class="rule-choices"><button type="button" data-days="2"></button><button type="button" data-days="4"></button><button type="button" data-days="6"></button></div></div><div class="rules-line map-line"><span></span><div class="rule-choices"><button type="button" data-lmap="forest"></button><button type="button" data-lmap="bog"></button></div></div><p class="rules-map-note"></p><p class="rules-explain"></p><p class="rule-place"></p><button type="button" class="rules-close"></button></div>';
     this.el.append(this.rulesPanel);
+    // (3.0s) the host picked the bog and this player has not cleared the forest: the room waits for their word
+    this.askPanel=document.createElement('section');this.askPanel.id='lobbyMapAsk';this.askPanel.hidden=true;
+    this.askPanel.setAttribute('role','alertdialog');this.askPanel.setAttribute('aria-modal','true');this.askPanel.setAttribute('aria-labelledby','mapAskTitle');
+    this.askPanel.innerHTML='<div class="lobby-rules-backdrop"></div><div class="lobby-rules-card map-ask-card"><div class="rules-kicker"></div><h2 id="mapAskTitle"></h2><p class="map-ask-body"></p><div class="rule-choices"><button type="button" data-ans="yes"></button><button type="button" data-ans="no"></button></div></div>';
+    this.el.append(this.askPanel);
+    for(const button of this.askPanel.querySelectorAll('[data-ans]')) button.addEventListener('click',()=>{if(this.uiSound)this.uiSound('click');this.coop.answerMap(button.dataset.ans==='yes');this.render();});
     this.rulesPanel.addEventListener('keydown',e=>{
       if(!this.rulesOpen) return;
       if(e.code==='Escape') { e.preventDefault();e.stopPropagation();this.closeRules(); }
@@ -249,13 +256,21 @@ export class Lobby {
     const mapLine = this.rulesPanel.querySelector('.map-line');
     if (mapLine) {
       mapLine.querySelector('span').textContent = t('ruleMap');
+      // (3.0s) the bog opens for a room only if someone in it cleared the forest, and waits for the rest to agree
+      const open = roomMapOpen('bog', c.players()), ask = c.ask;
       for (const b of mapLine.querySelectorAll('[data-lmap]')) {
         b.textContent = t(b.dataset.lmap === 'bog' ? 'mapBog' : 'mapForest');
-        b.disabled = !host;
+        b.disabled = !host || (b.dataset.lmap === 'bog' && !open);
         b.setAttribute('aria-pressed', String((r.map || 'forest') === b.dataset.lmap));
+        b.classList.toggle('asking', !!ask && ask.map === b.dataset.lmap);
       }
       const note = this.rulesPanel.querySelector('.rules-map-note');
-      if (note) note.textContent = t(host ? 'ruleMapHost' : 'ruleMapGuest');
+      const refused = c.refused && performance.now() - c.refused.at < 8000 ? c.refused.name : '';
+      if (note) note.textContent = ask ? t('ruleMapWait').replace('{names}', c.askNames().join(', ') || '…')
+        : refused ? t('ruleMapRefused').replace('{name}', refused)
+        : !open ? t('ruleMapLocked')
+        : t(host ? 'ruleMapHost' : 'ruleMapGuest');
+      if (note) note.classList.toggle('warn', !!ask || !!refused);
     }
     this.rulesPanel.querySelector('.rules-close').textContent=`${t('bagClose')} [ ESC ]`;
     for(const b of this.rulesPanel.querySelectorAll('[data-hide]')) { const yes=b.dataset.hide==='yes';b.textContent=t(yes?'ruleYes':'ruleNo');b.disabled=!host;b.setAttribute('aria-pressed',String(r.hideNames===yes)); }
@@ -361,8 +376,23 @@ export class Lobby {
     $('btnCoopMic').textContent = t('coopMicAsk');
     const start = $('btnStart');
     start.classList.toggle('hidden-host', !c.isHost);
-    start.disabled = !c.isHost || c.status === 'joining' || this.starting;
+    start.disabled = !c.isHost || c.status === 'joining' || this.starting || !!c.ask; // (3.0s) not while the bog is being asked about
+    start.title = c.ask ? t('ruleMapWait').replace('{names}', c.askNames().join(', ') || '…') : '';
+    this._renderAsk();
     this._measure();
+  }
+
+  // (3.0s) the host's question about the bog, on this machine
+  _renderAsk() {
+    const q = this.coop.question, show = !!q && this._inRoom() && !this.starting;
+    const was = !this.askPanel.hidden;
+    this.askPanel.hidden = !show;
+    if (!show) return;
+    this.askPanel.querySelector('.rules-kicker').textContent = t('mapAskKicker');
+    this.askPanel.querySelector('h2').textContent = t(q.map === 'bog' ? 'mapBog' : 'mapForest');
+    this.askPanel.querySelector('.map-ask-body').textContent = t('mapAskBody');
+    for (const b of this.askPanel.querySelectorAll('[data-ans]')) b.textContent = t(b.dataset.ans === 'yes' ? 'mapAskYes' : 'mapAskNo');
+    if (!was) this.askPanel.querySelector('[data-ans="yes"]')?.focus();
   }
 
   // tell the garage how much of the screen the top bar and the dock take

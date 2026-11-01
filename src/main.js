@@ -25,6 +25,7 @@ import { effectiveGraphics } from './render/graphicsSettings.js';
 import './graphics.css';
 import { OmniShadows } from './render/shadows.js';
 import { cleanMap, runUrl, needsReload } from './core/maps.js'; // 3.0g: the two участка and how the menu switches
+import { mapOpen } from './core/mapUnlock.js'; // 3.0s: the bog is earned on the forestry
 import { Ghosts } from './render/ghosts.js';
 import { Eyes } from './render/eyes.js';
 import { Particles } from './render/particles.js';
@@ -80,6 +81,7 @@ const DEBUG = {
   map: params.get('map') || '', // ?map=bog: walk the peat bog (3.0: the second участок)
   days: +params.get('days') || 0, // ?days=2|4|6: the shift length a pick in the menu asked for
   shelter: params.has('shelter'), // (3.0q) start on the peat works' camp with the cap unlocked: the shelter, without five pumps
+  unlock: params.has('unlock') || params.has('shelter'), // (3.0s) the bog without a forest win: for the harness and for testing a build
 };
 
 const $ = (id) => document.getElementById(id);
@@ -298,6 +300,7 @@ document.addEventListener('visibilitychange', () => { perf.sampleT = 0; perf.mea
 installDesktopUpdate(); // (no-op in a browser: it needs the desktop shell's bridge)
 
 const menus = new Menus({
+  unlockAll: () => DEBUG.unlock,
   graphicsStats: () => ({ w: post.w, h: post.h, ow: canvas.width, oh: canvas.height, fps: perf.measured ? perf.fps : 0, fxaa: post.u.uAA.value }),
   onPlay: () => startRun(),
   onResume: () => resume(),
@@ -425,6 +428,8 @@ onWallet(()=>{if(state==='over')renderOverWallet();});cloud.on(()=>{if(state==='
 
 coop.on('change', () => {lobby.render();cloud.presenceChanged();cloud.safePoint();});
 coop.on('start', (d) => beginCoopRun(d));
+coop.on('mapRefused', () => { lobby.render(); if (audio.ready) audio.uiClick(); }); // (3.0s) someone said no to the bog
+coop.on('mapLocked', () => lobby.render());
 coop.on('hostLost', () => {
   if (runOnline && game && (state === 'playing' || state === 'paused')) game.hostLost();
   if (garage && garage.starting) {
@@ -654,7 +659,10 @@ function startRun(opts = {}) {
   if (!game) return;
   // 3.0g: the участок is a whole piece of ground, so it is decided before the shift starts — if the menu
   // picked the one that is not loaded, this is a reload with it in the URL (and the shift starts on arrival)
-  const wantMap = cleanMap(opts.map || opts.coop?.rules?.map || settings.shiftMap);
+  let wantMap = cleanMap(opts.map || opts.coop?.rules?.map || settings.shiftMap);
+  // (3.0s) solo, the bog is earned on the forestry. A room's ground is the host's, and the players who have not
+  // earned it agreed to it in the lobby (net/coop.js) — so only a solo shift is turned back to the forest here
+  if (!opts.coop && !mapOpen(wantMap) && !DEBUG.unlock) wantMap = 'forest';
   if (needsReload(wantMap, world.mapId)) {
     settings.shiftMap = wantMap;
     saveSettings();
@@ -906,6 +914,7 @@ function teamSummary() {
 }
 
 function onEnd(res) {
+  res = { map: game.map, ...res }; // (3.0s) which ground the shift was won on: the atlas opens the bog by it
   const online = runOnline;
   const stats = {
     ...game.stats,
@@ -943,7 +952,7 @@ function onEnd(res) {
   const hlEnd = res.escaped ? (res.won ? 'escape' : 'left') : (res.won ? 'win' : 'death');
   highlights.note(hlEnd, { cause: res.cause });
   highlights.stop();
-  menus.showOver({ map: game.map, ...res }, stats, rank, list, team); // (3.0r: the end screen speaks the ground's words)
+  menus.showOver(res, stats, rank, list, team); // (3.0r: res.map — the end screen speaks the ground's words)
   paintReelButton();
   // the night's own trailer: solo, a few moments to speak of, and you have not touched the results yet
   overTouched = false;

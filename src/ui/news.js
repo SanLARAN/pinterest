@@ -7,6 +7,21 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v:'3.0s',date:'2026-11-01',
+    ru:{title:'Торфяник надо заслужить',items:[
+      'Торфяник открывается после победы на Лесхозе: уедь на УАЗе или доживи до последнего рассвета. Пока этого не было, карточка участка в «Одному» заперта и говорит, что её откроет. Старые победы засчитаны: если ты уже выигрывал смену, болото открыто.',
+      'С друзьями хозяин может выбрать Торфяник, если его прошёл хотя бы кто-то в комнате. Остальным приходит вопрос «Поедешь туда с командой?» — и пока все не согласились, смена не начинается. Один отказ — и комната остаётся на Лесхозе, а все видят, кто отказался.',
+      'Кто зашёл в комнату, где уже выбран Торфяник, и ещё не прошёл Лесхоз, получает тот же вопрос.',
+      'На загрузке болота больше не «лес растёт», а «торф проседает». В «Как играть» появился раздел про Торфяник: насосы, вода, лебёдка и как отсюда уехать.',
+    ]},
+    en:{title:'The Bog is earned',items:[
+      'The Bog opens after a won shift on the Forestry: drive out on the UAZ or live to the last dawn. Until then its card in Solo is locked and says what opens it. Old wins count: if you have ever won a shift, the Bog is open.',
+      'With friends, the host can pick the Bog if anyone in the room has cleared the Forestry. Everyone else gets a question — "Will you go there with the team?" — and the shift does not start until they all agree. One "no" keeps the room on the Forestry, and everyone sees who said it.',
+      'A player who joins a room already set to the Bog without having cleared the Forestry gets the same question.',
+      'Loading the Bog no longer says the forest is growing — the peat is settling. How to Play has a section on the Bog: pumps, water, the winch and how to get out.',
+    ]},
+  },
+  {
     v:'3.0r',date:'2026-11-01',
     ru:{title:'Свои слова',items:[
       'Торфяник больше не говорит лесными словами. Подсказка в начале смены — «у насоса лежит тело», а не у генератора; утром «насос чавкает», а не «генератор тарахтит»; на часах и в паузе — насосы, а не генераторы.',

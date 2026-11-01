@@ -170,7 +170,7 @@ test('she is on the frame loop, in the echo, and the host keeps her on the wire'
   assert.match(net, /case 'sy':/);
   assert.match(net, /case 'sw':/, 'the wear goes over the event channel');
   assert.ok(PROTOCOL >= 18, `the wire changed, so the protocol did (${PROTOCOL})`);
-  assert.match(src('src/net/net.js'), /PROTOCOL = 18/);
+  assert.match(src('src/net/net.js'), /PROTOCOL = (18|19)/); // (3.0s moved it to 19 for the bog question)
 });
 
 test('her body is the two pieces of her skin, and the echo and the atlas can both use it', () => {

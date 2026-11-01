@@ -10,8 +10,10 @@ import { myFit, cleanFit } from '../game/outfit.js';
 import { cleanLobbyRules } from './lobbyRules.js';
 import { cleanMap } from '../core/maps.js';
 import {currentIdentity} from '../core/identity.js';
+import { forestCleared, mapAskList, roomMapOpen } from '../core/mapUnlock.js';
 
-const LOBBY_TYPES = new Set(['hi', 'roster', 'full', 'start', 'bye', 'nm', 'lobby']);
+// (3.0s) mq: the host asks a player who has not cleared the forest whether the room may go to the bog; ma: the answer
+const LOBBY_TYPES = new Set(['hi', 'roster', 'full', 'start', 'bye', 'nm', 'lobby', 'mq', 'ma']);
 
 export function cleanName(s) {
   return String(s || '').replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 14) || '???';
@@ -50,6 +52,9 @@ export class Coop {
     this.net.onPeerStream = (pid, stream) => this._onStream(pid, stream);
     this.net.onError = (e) => console.warn('[coop]', e);
     this.lastStreamOf = new Map();
+    this.ask = null; // (3.0s) host: { id, map, wait: Set } — who still has to agree to the bog; guest: the host's { map, wait }
+    this.question = null; // (3.0s) guest: the host's open question to this machine { id, map }
+    this.refused = null; // (3.0s) the last «no»: { name, at }
   }
 
   get selfId() {
@@ -100,6 +105,9 @@ export class Coop {
     this.roster.clear();
     this.queue = [];
     this.inRun = false;
+    this.ask = null;
+    this.question = null;
+    this.refused = null;
     this.joinedAt = performance.now();
     this.emit('change');
     const params = new URLSearchParams(location.search);
@@ -116,7 +124,7 @@ export class Coop {
       throw e;
     }
     if (this.code !== code) return;
-    this.roster.set(this.selfId, { id: this.selfId, name: myName(), slot: host ? 0 : -1, host, mic: this.mic.state === 'on', inRun: false, self: true, fit: myFit() });
+    this.roster.set(this.selfId, { id: this.selfId, name: myName(), slot: host ? 0 : -1, host, mic: this.mic.state === 'on', inRun: false, self: true, fit: myFit(), cleared: forestCleared() });
     if (host) this.hostId = this.selfId;
     this.status = host ? 'waiting' : 'searching';
     this.syncVoice();
@@ -135,6 +143,8 @@ export class Coop {
     this.hostId = null;
     this.roster.clear();
     this.queue = [];
+    this.ask = null;
+    this.question = null;
     this.lastStreamOf.clear();
     this.audio.voiceDetachAll();
     await this.net.leave();
@@ -163,7 +173,7 @@ export class Coop {
 
   // ---------------- handshake ----------------
   _hello() {
-    return { v: PROTOCOL, name: myName(), host: this.isHost, mic: this.mic.state === 'on', fit: myFit() };
+    return { v: PROTOCOL, name: myName(), host: this.isHost, mic: this.mic.state === 'on', fit: myFit(), cleared: forestCleared() };
   }
 
   _onPeerJoin(pid) {
@@ -198,12 +208,24 @@ export class Coop {
       case 'bye':
         this._onPeerLeave(pid);
         break;
+      case 'mq':
+        if (!this.isHost && pid === this.hostId && d && Number.isInteger(d.id)) {
+          this.question = { id: d.id, map: cleanMap(d.map) };
+          this.emit('change');
+        }
+        break;
+      case 'ma':
+        if (this.isHost && d) this._onMapAnswer(pid, d);
+        break;
       case 'nm': {
         const r = this.roster.get(pid);
         if (r && d) {
           r.name = cleanName(d.name);
           r.mic = !!d.mic;
           if (d.fit) r.fit = cleanFit(d.fit);
+          if (typeof d.cleared === 'boolean') r.cleared = d.cleared;
+          // (3.0s: a player who wins the forest while being asked has nothing left to agree to)
+          if (this.isHost && r.cleared && this.ask?.wait.has(pid)) { this._onMapAnswer(pid, { id: this.ask.id, yes: true }); break; }
           if (this.isHost) this._broadcastRoster();
           this.emit('change');
         }
@@ -227,6 +249,7 @@ export class Coop {
     r.host = !!d.host;
     r.mic = !!d.mic;
     r.fit = cleanFit(d.fit); // what they wear (an older client sends nothing: the standard kit)
+    r.cleared = d.cleared === true; // (3.0s) has won a shift on the forestry
     if (d.host && !this.isHost) {
       this.hostId = pid;
       if (this.status === 'searching') this.status = 'ready';
@@ -243,6 +266,9 @@ export class Coop {
         }
         r.slot = s;
       }
+      // (3.0s) the room is on the bog (or about to be) and this one has not cleared the forest: they are asked too
+      const bog = this.ask ? this.ask.map === 'bog' : this.rules.map === 'bog';
+      if (bog && !r.cleared && this.phase === 'lobby') this._askMore('bog', [pid]);
       this._broadcastRoster();
     }
     this.emit('change');
@@ -265,25 +291,93 @@ export class Coop {
 
   // (3.0n) the host picks the участок from the lobby's own settings: it is the room's ground, so it belongs
   // with the other rules instead of being whatever URL the host happened to open
+  //
+  // (3.0s) the bog is earned on the forestry. The room can go there only if someone in it has cleared the
+  // forest, and everyone who has not must agree first: the pick becomes a question (`mq`) to each of them,
+  // and the rule changes when the last one says yes (`ma`). One «no» and the room stays on the forest.
   setMap(value) {
     if (!this.active || !this.isHost || this.phase !== 'lobby') return false;
     const map = cleanMap(value);
-    if (map === this.rules.map) return false;
+    if (map !== 'bog' && this.ask) this._endAsk(); // picking the forest withdraws the question
+    if (map === this.rules.map) { this.emit('change'); return false; }
+    if (!roomMapOpen(map, this.players())) { this.emit('mapLocked'); this.emit('change'); return false; }
+    const wait = mapAskList(map, this.players(), this.selfId);
+    if (wait.length) { this._askMore(map, wait); return true; }
+    this._applyMap(map);
+    return true;
+  }
+
+  _applyMap(map) {
+    this.ask = null;
     this.rules = cleanLobbyRules({ ...this.rules, map });
     settings.shiftMap = map; saveSettings();
-    this._broadcastRoster(); this.emit('change'); return true;
+    this._broadcastRoster(); this.emit('change');
+  }
+
+  // ask these players (and keep asking whoever was already being asked)
+  _askMore(map, pids) {
+    if (!this.ask || this.ask.map !== map) this.ask = { id: (Math.random() * 2 ** 31) >>> 0, map, wait: new Set() };
+    for (const pid of pids) {
+      this.ask.wait.add(pid);
+      this.net.send('mq', { id: this.ask.id, map }, pid);
+    }
+    this._broadcastRoster(); this.emit('change');
+  }
+
+  _endAsk() {
+    this.ask = null;
+    this._broadcastRoster(); this.emit('change');
+  }
+
+  _onMapAnswer(pid, d) {
+    const a = this.ask;
+    if (!a || d.id !== a.id || !a.wait.has(pid)) return;
+    if (!d.yes) {
+      // one «no»: the room stays on (or goes back to) the forest, and everyone sees who said it
+      const name = this.roster.get(pid)?.name || '???';
+      this.refused = { name, at: performance.now() };
+      this.emit('mapRefused', name);
+      this._applyMap('forest');
+      return;
+    }
+    a.wait.delete(pid);
+    if (a.wait.size === 0) this._applyMap(a.map);
+    else { this._broadcastRoster(); this.emit('change'); }
+  }
+
+  // guest: say yes or no to the host's question
+  answerMap(yes) {
+    const q = this.question;
+    if (!q || this.isHost || !this.hostId) return false;
+    this.question = null;
+    this.net.send('ma', { id: q.id, yes: !!yes }, this.hostId);
+    this.emit('change');
+    return true;
+  }
+
+  // the names still holding the bog back (for the lobby's note)
+  askNames() {
+    const wait = this.ask ? [...this.ask.wait] : [];
+    return wait.map((id) => this.roster.get(id)?.name).filter(Boolean);
   }
 
   _broadcastRoster() {
     if (!this.isHost) return;
-    const list = this.players().map((p) => ({ id: p.id, name: p.name, slot: p.slot, host: !!p.host, mic: !!p.mic, inRun: !!p.inRun, fit: p.fit }));
-    this.net.send('roster', { host: this.selfId, phase: this.phase, list, rules: this.rules });
+    const list = this.players().map((p) => ({ id: p.id, name: p.name, slot: p.slot, host: !!p.host, mic: !!p.mic, inRun: !!p.inRun, fit: p.fit, cleared: !!p.cleared }));
+    const ask = this.ask ? { map: this.ask.map, wait: [...this.ask.wait] } : null;
+    const refused = this.refused && performance.now() - this.refused.at < 8000 ? this.refused.name : null;
+    this.net.send('roster', { host: this.selfId, phase: this.phase, list, rules: this.rules, ask, refused });
   }
 
   _onRoster(d) {
     this.hostId = d.host;
     this.rules = cleanLobbyRules(d.rules);
     this.phase = d.phase === 'game' ? 'game' : 'lobby';
+    // (3.0s) the host's open question about the bog, and the last «no»
+    this.ask = d.ask && Array.isArray(d.ask.wait) ? { map: cleanMap(d.ask.map), wait: new Set(d.ask.wait.filter((x) => typeof x === 'string')) } : null;
+    if (this.question && !this.ask?.wait.has(this.selfId)) this.question = null; // withdrawn, or answered
+    if (d.refused && (!this.refused || this.refused.name !== cleanName(d.refused))) { this.refused = { name: cleanName(d.refused), at: performance.now() }; this.emit('mapRefused', this.refused.name); }
+    else if (!d.refused) this.refused = null;
     const keep = new Set([this.selfId]);
     for (const e of d.list || []) {
       keep.add(e.id);
@@ -295,6 +389,7 @@ export class Coop {
       r.slot = e.slot | 0;
       if (!r.self) r.name = cleanName(e.name);
       r.host = !!e.host;
+      if (!r.self) r.cleared = !!e.cleared;
       if (!r.self) r.mic = !!e.mic;
       if (!r.self && e.fit) r.fit = cleanFit(e.fit);
       r.inRun = !!e.inRun;
@@ -311,6 +406,8 @@ export class Coop {
     this.roster.delete(pid);
     this.lastStreamOf.delete(pid);
     this.audio.voiceDetach(pid);
+    // (3.0s) someone who was being asked left: the rest of the room can still agree
+    if (this.isHost && this.ask?.wait.delete(pid) && this.ask.wait.size === 0) this._applyMap(this.ask.map);
     if (this.inRun) this.queue.push(['_left', null, pid]);
     if (!this.isHost && pid === this.hostId) {
       this.hostId = null;
@@ -329,7 +426,8 @@ export class Coop {
     me.name = myName();
     me.mic = this.mic.state === 'on';
     me.fit = myFit();
-    this.net.send('nm', { name: me.name, mic: me.mic, fit: me.fit });
+    me.cleared = forestCleared();
+    this.net.send('nm', { name: me.name, mic: me.mic, fit: me.fit, cleared: me.cleared });
     if (this.isHost) this._broadcastRoster();
     this.emit('change');
   }
@@ -339,6 +437,7 @@ export class Coop {
   // cut: from the garage — everyone watches the car start before the night begins (a restart is instant)
   startRun({ cut = false } = {}) {
     if (!this.isHost) return null;
+    if (this.ask && cut !== 2) return null; // (3.0s) the night waits until the bog question is answered (the gates to the range do not)
     const list = this.players();
     for (const p of list) p.inRun = true;
     this.phase = 'game';

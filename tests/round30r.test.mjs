@@ -150,7 +150,8 @@ test('the call sites pick the bog line by map (tutorial, morning, pause, end scr
   assert.match(game, /t\(this\.map === 'bog' \? 'tutUseBog' : 'tutUse'\)/);
   assert.match(game, /t\(this\.map === 'bog' \? 'morningGenBog' : 'morningGen'\)/);
   assert.match(main, /t\(game\.map === 'bog' \? 'pumps' : 'generators'\)/);
-  assert.match(main, /menus\.showOver\(\{ map: game\.map, \.\.\.res \}/);
+  assert.match(main, /res = \{ map: game\.map, \.\.\.res \}/); // (3.0s: onEnd stamps the ground once, for the atlas and the end screen)
+  assert.match(main, /menus\.showOver\(res, /);
   assert.match(hud, /t\(g\.map === 'bog' \? 'pumps' : 'generators'\)/);
   // the end screen: the bog's escape words, no «детали УАЗа» row on a ground that has no parts
   assert.match(menus, /const B = \(k\) => t\(bog \? k \+ 'Bog' : k\)/);

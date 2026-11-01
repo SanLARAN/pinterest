@@ -77,6 +77,7 @@ export function freshAtlas() {
     carFit: [0, 0, 0, 0], // the УАЗ's parts you fitted yourself (wheel, battery, carburettor, can)
     torches: 0, tapes: 0, crowbars: 0, pried: 0, surveys: 0, lookouts: 0, camps: 0, farms: 0,
     carParts: 0, escapes: 0, // ...all of them, and the nights you drove out of the forest
+    bogWins: 0, // (3.0s) shifts won on the peat bog: wins − bogWins > 0 is «the forestry is cleared» (see core/mapUnlock.js)
     sites: {}, // site id -> generators started there
     read: {}, // atlas entries you've opened
     fresh: true, // a red dot by the menu link: there's something new to read
@@ -103,6 +104,7 @@ export function recordNight(stats, res, started = []) {
   const a = atlasLog;
   a.nights++;
   if (res.won) a.wins++;
+  if (res.won && res.map === 'bog') a.bogWins++;
   a.best = Math.max(a.best, Math.round(stats.time || 0));
   for (const type of Object.keys(stats.seen || {})) {
     if (!a.seen[type] && !a.read[type]) a.fresh = true; // a first meeting: the atlas has a page for it

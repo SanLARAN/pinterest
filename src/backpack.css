@@ -254,3 +254,20 @@ body.bag-3d .bag-world { display: none; }
   .bp-name { font-size: 17px; }
   .bp-desc { font-size: 10px; }
 }
+
+/* 3.0s: the bog is earned on the forestry. A locked card is a stamped-over card, not a missing one. */
+.solo-map.locked { cursor: not-allowed; border-style: dashed; border-color: #3a4234; background: repeating-linear-gradient(-45deg, #0d1511 0 6px, #111a14 6px 12px); color: #5c6656; }
+.solo-map.locked b { color: #7a826c; }
+.solo-map.locked:hover, .solo-map.locked:focus-visible { border-color: #6a4a40; background: repeating-linear-gradient(-45deg, #0d1511 0 6px, #141c16 6px 12px); }
+.solo-map.shake { animation: map-deny .32s ease; }
+@keyframes map-deny { 0%, 100% { transform: none; } 25% { transform: translateX(-4px); } 60% { transform: translateX(3px); } }
+@media (prefers-reduced-motion: reduce) { .solo-map.shake { animation: none; } }
+/* the room: the bog button while the room waits for a yes, and the yes/no card for a player who is asked */
+.rule-choices button.asking { border-style: dashed; color: #d8b26a; }
+.rules-map-note.warn { color: #d8b26a; }
+#lobbyMapAsk[hidden] { display: none !important; }
+#lobbyMapAsk { position: fixed; inset: 0; z-index: 26; display: grid; place-items: center; color: #bcbfad; font-family: 'JetBrains Mono',monospace; }
+.map-ask-card { border-color: #4f6a74; box-shadow: 0 20px 90px #000c, inset 0 2px #6f93a055; }
+.map-ask-card h2 { color: #9fc3cf; }
+.map-ask-body { font-size: 12px; line-height: 1.7; color: #a9b2a0; margin: 0 0 22px; }
+.map-ask-card .rule-choices { justify-content: flex-end; }
