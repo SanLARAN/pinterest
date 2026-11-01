@@ -7,6 +7,25 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v:'3.0u',date:'2026-11-01',
+    ru:{title:'По машинам',items:[
+      'Любой выезд из гаража теперь начинается с того, что все садятся в машину, и только потом поворачивается ключ. У каждого из четырёх мест своя манера: водитель перемахивает через дверь, тот, что на стуле, обходит машину и перелезает через задний борт, курильщик бросает окурок, разбегается и ныряет на переднее сиденье прямо над головой водителя, а тот, что с рюкзаком, забрасывает рюкзак, спотыкается на бетоне, встаёт и карабкается через борт.',
+      'Водитель в лобби больше не сидит за рулём: он стоит у своей двери, держась рукой за раму, крутит ключи на пальце и поглядывает на часы.',
+      'Смена одному тоже начинается в гараже: ты запрыгиваешь в машину, она выезжает за ворота — и дальше начинается сама смена.',
+      'Исправлено: «Полигон» после смены на Торфянике запускал обычную ночь. Полигон теперь всегда на Лесхозе, а выбранный для смен участок он не трогает.',
+      'Исправлено: у страницы Найдёныша в атласе кнопка «Голос» молчала с самого его появления. Теперь он нюхает воздух, скулит, говорит «эй» откуда-то сбоку и рычит.',
+      'Исправлено: после фильма отъезда пассажиры оставались сидеть в машине и при следующем открытии лобби занимались там своими делами.',
+    ]},
+    en:{title:'Everybody in',items:[
+      'Every drive out of the garage now opens with everyone getting into the car, and only then does the key turn. Each of the four places does it its own way: the driver vaults in over his door, the one on the chair walks round and climbs over the tailgate, the smoker flicks his cigarette, sprints and dives into the front seat right over the driver\'s head, and the one with the pack slings it in, trips on the concrete, gets up and scrambles in over the side.',
+      'The driver no longer sits at the wheel in the lobby: he stands at his door with a hand on the frame, spinning his keys on a finger and checking his watch.',
+      'A solo shift starts in the garage too: you get into the car, it drives out through the gates — and then the shift itself begins.',
+      'Fixed: the Range after a shift on the Bog started an ordinary night. The Range is always on the Forestry now, and it leaves the ground you play shifts on alone.',
+      'Fixed: the Stray\'s atlas page had a Voice button that stayed silent since the Stray first appeared. Now it smells the air, whines, says "hey" from off to one side and growls.',
+      'Fixed: after the departure film the passengers stayed sitting in the car and went about their lobby business in it the next time the lobby opened.',
+    ]},
+  },
+  {
     v:'3.0t',date:'2026-11-01',
     ru:{title:'Дворняжка',items:[
       'Найдёныш переделан целиком. Это больше не девочка в футболке, а дворняжка, которая научилась стоять как люди, за которыми ходила. Издалека и в эхе это сутулый человек в чужом ватнике. Ближе видно, что колени гнутся назад, ходит она на носках, руки висят до колен и кончаются когтями, а вместо лица — длинная облезлая морда с висячими ушами.',

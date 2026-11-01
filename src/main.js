@@ -73,6 +73,7 @@ const DEBUG = {
   t: parseFloat(params.get('t')) || 0,
   speed: parseFloat(params.get('speed')) || 1,
   autostart: params.has('autostart'),
+  range: params.has('range'), // (3.0u) a reload that was on its way to the training ground: play its film, not a shift
   night: params.has('night'), // skip the morning
   nointro: params.has('nointro'), // ...and the opening cut scene
   seats: parseInt(params.get('seats'), 10) || 0, // preview a lobby's four goodnights alone
@@ -302,7 +303,7 @@ installDesktopUpdate(); // (no-op in a browser: it needs the desktop shell's bri
 const menus = new Menus({
   unlockAll: () => DEBUG.unlock,
   graphicsStats: () => ({ w: post.w, h: post.h, ow: canvas.width, oh: canvas.height, fps: perf.measured ? perf.fps : 0, fxaa: post.u.uAA.value }),
-  onPlay: () => startRun(),
+  onPlay: () => startSoloShift(), // (3.0u: through the garage — you get in, the car drives out)
   onResume: () => resume(),
   onRestart: () => restartRun(),
   onRange: () => startTrainingSolo(),
@@ -445,7 +446,7 @@ function beginCoopRun(d) {
   account.close();
   // 3.0g: the host's участок is the room's. A guest standing somewhere else gets sent there (with the room code,
   // so it walks straight back into the lobby) rather than into a forest the others are not in
-  const rmap = cleanMap(d.rules?.map || 'forest');
+  const rmap = d.tr ? 'forest' : cleanMap(d.rules?.map || 'forest'); // (3.0u: the gates lead to the forest's range)
   if (needsReload(rmap, world.mapId)) {
     settings.shiftMap = rmap;
     saveSettings();
@@ -659,20 +660,22 @@ function startRun(opts = {}) {
   if (!game) return;
   // 3.0g: the участок is a whole piece of ground, so it is decided before the shift starts — if the menu
   // picked the one that is not loaded, this is a reload with it in the URL (and the shift starts on arrival)
-  let wantMap = cleanMap(opts.map || opts.coop?.rules?.map || settings.shiftMap);
+  // (3.0u) the training ground is the forest's, in daylight, whatever ground the shifts are played on: «ПОЛИГОН»
+  // after a bog shift used to reload onto the bog with autostart — and start an ordinary night
+  const toRange = !!(opts.training || opts.coop?.tr);
+  let wantMap = toRange ? 'forest' : cleanMap(opts.map || opts.coop?.rules?.map || settings.shiftMap);
   // (3.0s) solo, the bog is earned on the forestry. A room's ground is the host's, and the players who have not
   // earned it agreed to it in the lobby (net/coop.js) — so only a solo shift is turned back to the forest here
   if (!opts.coop && !mapOpen(wantMap) && !DEBUG.unlock) wantMap = 'forest';
   if (needsReload(wantMap, world.mapId)) {
-    settings.shiftMap = wantMap;
-    saveSettings();
-    location.href = runUrl(wantMap, opts.days || settings.shiftDays);
+    if (!toRange) { settings.shiftMap = wantMap; saveSettings(); } // (the range does not change where you play shifts)
+    location.href = runUrl(wantMap, opts.days || settings.shiftDays, '', { range: toRange && !opts.coop });
     return;
   }
   if (opts.coop?.rules?.map && needsReload(opts.coop.rules.map, world.mapId)) return; // (a friend on the bog, you in the forest)
   account.close();overReward=null;
   const online = !!opts.coop;
-  const training = !!(opts.training || opts.coop?.tr); // the departure film's destination
+  const training = toRange; // the departure film's destination
   if (!online && state === 'over' && performance.now() - overAt < 450) return;
   if (!online && coop.active) coop.leave(); // a solo night: you leave the room
   clearTimeout(reelAutoT);
@@ -753,10 +756,24 @@ function startRun(opts = {}) {
 }
 
 // ---------------- the training ground ----------------
-// the menu's «ПОЛИГОН»: the same departure film, played alone — gates, engine, everyone in (that's you)
+// the menu's «ПОЛИГОН»: the same departure film, played alone — you get in, the gates, the engine, gone
 function startTrainingSolo() {
   if (state !== 'menu') return;
-  if (!garage && !ensureGarage()) return;
+  // (3.0u) the range is the forest's: from the bog, go there first (the film plays once, on arrival)
+  if (world.mapId !== 'forest') { location.href = runUrl('forest', settings.shiftDays, '', { range: true }); return; }
+  playGarageFilm(() => startRun({ training: true }));
+}
+
+// (3.0u) a solo shift starts in the garage too: you get into the car and it drives out through the gates, and the
+// shift's own opening (the УАЗ at the flooded проезд, the camp) picks it up from there. Debug jumps skip it.
+function startSoloShift() {
+  if (state !== 'menu' || DEBUG.nointro || DEBUG.night || DEBUG.t > 0 || DEBUG.shelter) { startRun(); return; }
+  playGarageFilm(() => startRun());
+}
+
+// the garage's departure film, alone: then `done`
+function playGarageFilm(done) {
+  if (!garage && !ensureGarage()) { done(); return; }
   audio.init();
   audio.setVolume(settings.volume);
   menuMusic.stop();
@@ -764,20 +781,21 @@ function startTrainingSolo() {
   home.leave();
   lobby.close();
   document.body.classList.add('cutscene');
-  const done = () => {
+  const finish = () => {
     document.body.classList.remove('cutscene');
     garage.close();
-    startRun({ training: true });
+    done();
   };
   ensureSoloFig();
   garage.open('room');
-  if (!garage.startDepart(done)) done();
+  if (!garage.startDepart(finish)) finish();
 }
 
-// your figure at the wheel, for the solo film (the lobby keeps its own figures)
+// your figure at his door, for the solo film (the lobby keeps its own figures)
 function ensureSoloFig() {
   if (!garage) return;
   if (!garage.figs[0]) garage.setPlayers([{ id: 'me', name: settings.name || '???', slot: 0, self: true, fit: myFit() }]);
+  if (garage.figs[0]) garage.figs[0].appear = 1; // (already standing there when the film opens, not fading in on the jump)
 }
 
 // "again": solo restarts at once; in co-op only the host can call a new night (for everyone)
@@ -1248,7 +1266,8 @@ function boot() {
     // 3.0g: a link that names the ground wins over the remembered one — otherwise ?map=bog would bounce the
     // player back to the forest the moment the shift started
     if (DEBUG.map === 'bog' || DEBUG.shelter) { settings.shiftMap = 'bog'; saveSettings(); } // (3.0q: the shelter is on the bog)
-    if (DEBUG.autostart) startRun();
+    if (DEBUG.range) startTrainingSolo(); // (3.0u) arrived from the bog on the way to the range: its film, then the range
+    else if (DEBUG.autostart) startRun();
     if (params.has('sfx')) import('./ui/sfxtest.js').then((m) => m.mountSfxPanel(audio));
     lobby.menuLabel();
     cloud.start();social.update();syncIdentityFields();

@@ -20,7 +20,8 @@ import {
   buildRoom, buildCeiling, buildWicket, buildProps, buildBulb, buildBulb2, buildSteering, CAR_MODELS, GPAL_GLSL,
   buildItems, buildPack, buildPackFlap, buildCigarette, buildCup, buildLighter, buildFlame, buildPasser, buildGateLeaf,
 } from './garageSet.js';
-import { DEPART, DOORS, GRAB_POINT, departPlan, faceYaw } from './departure.js';
+import { departPlan } from './departure.js';
+import { BOARD, boardingPlan, poseBoarding } from './boarding.js'; // 3.0u: everyone gets in before the key turns
 
 const PI = Math.PI;
 const VERT = /* glsl */ `
@@ -460,6 +461,8 @@ const ease = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
 const seg = (t, a, b) => ease((t - a) / (b - a)); // 0 → 1 between a and b
 const bell = (t, a, b, c, d) => seg(t, a, b) * (1 - seg(t, c, d)); // up over a→b, down over c→d
 const rnd = (a, b) => a + Math.random() * (b - a);
+// (3.0u) the driver's place in the lobby: on his feet at his door, not already at the wheel (car-local)
+const DRIVER_STAND = [0.32, 0, 1.3], DRIVER_STAND_YAW = 0.45;
 function geometryFrom(arr) {
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(arr.pos, 3));
@@ -879,15 +882,15 @@ export class Garage {
     this.figs[s] = f;
     this._dress(f, fit);
     const spot = SPOTS[s];
-    mat.uniforms.uAppearY.value.set(s === 0 ? 0.55 : -0.05, 2.15);
+    mat.uniforms.uAppearY.value.set(-0.05, 2.15);
     if (s === 0) {
       this.carMesh.add(f.rig.root);
-      f.rig.root.position.set(...this.model.driver.pos);
+      f.rig.root.position.set(...DRIVER_STAND); // (3.0u: at his door; he gets in when the film starts)
     } else {
       this.scene.add(f.rig.root);
       f.rig.root.position.set(...spot.pos);
     }
-    f.rig.root.rotation.y = spot.yaw;
+    f.rig.root.rotation.y = s === 0 ? DRIVER_STAND_YAW : spot.yaw;
     if (s === 3) this._resetPacker();
     // a little echo where they sit down
     const at = this._headWorld(f, _w);
@@ -1055,12 +1058,15 @@ export class Garage {
     this.u.uCarBox.value.set(CAR.x, CAR.z, M.len / 2 + 0.05, M.wid / 2 + 0.02);
     // the driver changes cars too
     const f = this.figs && this.figs[0];
-    if (f && f.rig) f.rig.root.position.set(...M.driver.pos);
+    if (f && f.rig) f.rig.root.position.set(...(f.board?.seated ? M.driver.pos : DRIVER_STAND));
   }
 
+  // (3.0u) the film's clock starts below zero: first everyone gets in (boarding.js), and the key — and every
+  // beat after it, timed from zero as before — waits for the last of them
   startCar(onDone) {
     if (this.cut) return false;
-    this.cut = { t: 0, onDone, keyed: false, caught: false, honk: 0, fired: false, done: false };
+    const dur = this._beginBoarding();
+    this.cut = { t: -dur, boardDur: dur, onDone, keyed: false, caught: false, honk: 0, fired: false, done: false };
     return true;
   }
 
@@ -1072,10 +1078,7 @@ export class Garage {
     this.u.uHeadI.value = 0;
     this.u.uDash.value.w = 0;
     this.u.uTail.value.w = 0;
-    if (this.figs[2]) this.figs[2].rig.root.rotation.y = SPOTS[2].yaw;
-    for (const f of this.figs) if (f) f.st = { phase: 'idle', t: 0, next: rnd(1, 3), nextTap: 5 };
-    this._resetPacker();
-    this.cup.position.copy(this.cupHome);
+    this._homeFigs();
   }
 
   // ---------------- the departure film ----------------
@@ -1085,25 +1088,10 @@ export class Garage {
     if ((this.cut && !this.cut.done) || this.depart) return false;
     this.cut = null;
     this._stopEngine(0.2);
-    this.depart = { t: 0, onDone, fired: false, clanked: false, keyed: false, gate: 0, drive: 0, walk: 0 };
-    // who boards, who lingers: derived from occupancy alone, so the whole room stages the same film
-    const plan = departPlan(this.figs.map((f) => !!(f && !f.leaving)));
-    this.depart.plan = plan;
-    this.depart.stragglerSeated = plan.solo;
-    for (const s of [...plan.boarders, ...(plan.straggler > 0 ? [plan.straggler] : [])]) {
-      const f = this.figs[s];
-      if (!f) continue;
-      f.dep = {
-        role: s === plan.straggler ? 'straggler' : 'board',
-        seat: plan.seats[s], door: DOORS[s],
-        from: { x: SPOTS[s].pos[0], z: SPOTS[s].pos[2] },
-        attached: false, grabbed: false, grabT: 0, trip: null,
-      };
-      if (f.dep.role === 'straggler') {
-        const gp = this._carPoint(GRAB_POINT, _w);
-        f.dep.trip = { x: lerp(f.dep.from.x, gp.x, 0.55), z: lerp(f.dep.from.z, gp.z, 0.55) }; // down he goes, most of the way there
-      }
-    }
+    // (3.0u) everyone gets in first — the latch, the gates, the key and the wheels all wait for the last one
+    const dur = this._beginBoarding();
+    this.depart = { t: -dur, boardDur: dur, onDone, fired: false, clanked: false, keyed: false, gate: 0, drive: 0, walk: 0 };
+    this.depart.plan = departPlan();
     this.wheelSpin = 0;
     for (const w of this.wheelMeshes) w.rotation.z = 0;
     this.carRoot.position.set(CAR.x, 0, CAR.z);
@@ -1128,7 +1116,7 @@ export class Garage {
     this.carRoot.position.set(CAR.x, 0, CAR.z);
     this.wheelSpin = 0;
     for (const w of this.wheelMeshes) w.rotation.z = 0;
-    for (const f of this.figs) if (f) { f.st = { phase: 'idle', t: 0, next: rnd(1, 3), nextTap: 5, i: -1 }; }
+    this._homeFigs(); // (3.0u: they used to stay seated in the car, doing their lobby business in it)
   }
 
   // a click on the gates: are they on screen where the pointer is? (the lobby asks)
@@ -1196,13 +1184,11 @@ export class Garage {
     if (t >= 2.9) this.idle = 1;
     this.u.uHeadI.value = t >= 2.9 ? Math.min(1, (t - 2.9) * 3) : 0;
     this.u.uTail.value.w = t >= 2.9 ? 0.7 : 0;
-    // the team boards (see _depPose, driven from _figures): everybody but one is seated before this
-    const plan = c.plan || { solo: true, driveAt: DEPART.solo.driveAt, fadeAt: DEPART.solo.fadeAt, doneAt: DEPART.solo.doneAt };
-    // and the car rolls out through the gates — creeping, while the straggler is still behind it
+    // the team boarded below zero (boarding.js): everyone is in before the latch, so the car simply goes
+    const plan = c.plan || departPlan();
     if (t >= plan.driveAt) {
       c.drive = Math.min(1, (t - plan.driveAt) / 2.4);
-      let v = 0.4 + 2.6 * c.drive * c.drive;
-      if (!plan.solo && !c.stragglerSeated) v = Math.min(v, DEPART.crawlV);
+      const v = 0.4 + 2.6 * c.drive * c.drive;
       this.carRoot.position.x -= v * dt;
       this.wheelSpin += (v / this.CP.wheelR) * dt; // the tyres roll with the road, not the body
       for (const w of this.wheelMeshes) w.rotation.z = this.wheelSpin;
@@ -1210,9 +1196,9 @@ export class Garage {
       if (Math.random() < dt * 18) this.smoke.emit(ex.x + 0.05, ex.y, ex.z, rnd(0.6, 1.4), rnd(0, 0.4), rnd(-0.3, 0.3), { life: 2.4, s0: 0.1, s1: 0.8, a: 0.3, rise: 0.22, drag: 1.6, col: [0.42, 0.42, 0.44], jitter: 0.5 });
       this.shake.vy += dt * 0.4 * c.drive;
     }
-    // into the night (nobody is left standing in the yard: the film waits for its straggler, briefly)
-    if (t > plan.fadeAt && (plan.solo || c.stragglerSeated)) this.fade = Math.max(0, 1 - (t - plan.fadeAt) / 0.7);
-    if (!c.fired && t >= plan.doneAt && (plan.solo || c.stragglerSeated || t > plan.doneAt + 2.5)) {
+    // into the night (nobody is left standing in the yard: they all got in before the gates opened)
+    if (t > plan.fadeAt) this.fade = Math.max(0, 1 - (t - plan.fadeAt) / 0.7);
+    if (!c.fired && t >= plan.doneAt) {
       c.fired = true;
       const fn = c.onDone;
       this._endDepart();
@@ -1222,131 +1208,120 @@ export class Garage {
     }
   }
 
-  // a walk (or a run) in the legs and shoulders, on top of the clean base _figures just set
-  _depGait(f, run) {
-    const n = f.rig.nodes;
-    const ph = f.t * (run ? 11 : 7.5) + f.slot;
-    const a = run ? 0.75 : 0.55;
-    n.thL.rotation.x = Math.sin(ph) * a;
-    n.thR.rotation.x = -Math.sin(ph) * a;
-    n.knL.rotation.x = Math.max(0, -Math.sin(ph)) * (run ? 1.0 : 0.7);
-    n.knR.rotation.x = Math.max(0, Math.sin(ph)) * (run ? 1.0 : 0.7);
-    n.shL.rotation.x = -Math.sin(ph) * (run ? 0.55 : 0.3);
-    n.shR.rotation.x = Math.sin(ph) * (run ? 0.55 : 0.3);
-    if (run) { n.elL.rotation.x = -0.9; n.elR.rotation.x = -0.9; n.chest.rotation.x = 0.28; }
-    n.hips.position.y = 0.94 - Math.abs(Math.cos(ph)) * (run ? 0.05 : 0.03);
-  }
-
-  // sitting in the car like the driver does, without the wheel to hold
-  _depSeatPose(f) {
-    const n = f.rig.nodes;
-    const D = this.model.driver;
-    n.hips.position.set(0, D.hips, 0);
-    n.hips.rotation.x = D.recline;
-    n.chest.rotation.x = -0.02 + Math.sin(this.t * 1.6 + f.slot) * 0.012;
-    n.head.rotation.y = Math.sin(this.t * 0.4 + f.slot * 2) * 0.18;
-    for (const [A, s] of [['L', -1], ['R', 1]]) {
-      n['th' + A].rotation.set(D.thigh, 0, s * 0.07);
-      n['kn' + A].rotation.x = D.knee;
-      n['sh' + A].rotation.set(-0.32, 0, s * 0.14);
-      n['el' + A].rotation.x = -0.85;
+  // ---------------- the boarding (3.0u) ----------------
+  // who gets in: everyone in the room, each place its own way (boarding.js). Returns how long it takes.
+  _beginBoarding() {
+    const plan = boardingPlan(this.figs.map((f) => !!(f && !f.leaving)));
+    for (const s of plan.slots) {
+      const f = this.figs[s];
+      f.board = { slot: s, attached: false, seated: false, packed: false, flicked: false, P: { from: [0, 0], fromYaw: 0, seat: s === 0 ? this.model.driver.pos : null, D: this.model.driver } };
     }
+    this.boarding = plan;
+    return plan.dur;
   }
 
-  _depAttach(f) {
-    f.dep.attached = true;
-    this.carMesh.add(f.rig.root); // from here the car carries them, like the driver
-    f.rig.root.position.set(f.dep.seat[0], f.dep.seat[1], f.dep.seat[2]);
-    f.rig.root.rotation.set(0, -Math.PI / 2, 0);
-    if (f.dep.role === 'straggler' && this.depart) this.depart.stragglerSeated = true;
+  // the film's boarding clock: seconds since the boarding began
+  _boardClock() {
+    const c = this.depart || this.cut;
+    return c ? c.t + (c.boardDur || 0) : 99;
   }
 
-  // one figure's part in the departure film (called from _figures in place of its lobby spot, once
-  // its moment comes: the boarders file in and sit; the straggler runs late, trips, and chases)
-  _depPose(f, dt) {
-    const c = this.depart, dep = f.dep, n = f.rig.nodes, root = f.rig.root;
-    if (!c || !dep) return;
-    const t = c.t, T = DEPART;
-    if (dep.attached) { this._depSeatPose(f); return; }
-    const faceTo = (x, z) => { root.rotation.y = faceYaw(root.position.x, root.position.z, x, z); };
-    if (dep.role === 'board') {
-      const door = this._carPoint(dep.door, _w);
-      if (t < T.boardTo) {
-        const k = clamp((t - T.boardFrom) / (T.boardTo - T.boardFrom), 0, 1);
-        const e = k * k * (3 - 2 * k);
-        root.position.x = lerp(dep.from.x, door.x, e);
-        root.position.z = lerp(dep.from.z, door.z, e);
-        faceTo(door.x, door.z);
-        this._depGait(f, false);
-      } else {
-        const k = clamp((t - T.boardTo) / T.climbFor, 0, 1);
-        const seat = this._carPoint(dep.seat, _w2);
-        root.position.x = lerp(door.x, seat.x, k);
-        root.position.z = lerp(door.z, seat.z, k);
-        root.position.y = Math.sin(k * Math.PI) * 0.18;
-        root.rotation.y = lerp(root.rotation.y, -Math.PI / 2 + (this.carRoot.rotation.y || 0), k);
-        n.thL.rotation.x = lerp(0, this.model.driver.thigh, k);
-        n.thR.rotation.x = n.thL.rotation.x;
-        n.knL.rotation.x = n.knR.rotation.x = lerp(0.2, this.model.driver.knee, k);
-        if (k >= 1) { root.position.y = 0; this._depAttach(f); this._depSeatPose(f); }
-      }
-      return;
+  // one figure in the boarding: its lobby life until its moment, then its way in, then its seat
+  _boardFig(f, dt) {
+    const b = f.board, s = f.slot, bt = this._boardClock();
+    if (!b.attached) {
+      if (bt < BOARD[s].at) return false; // (not yet: the caller keeps their lobby business going)
+      b.attached = true;
+      const root = f.rig.root;
+      if (root.parent !== this.carMesh) this.carMesh.attach(root); // the car is the frame of the whole move
+      b.P.from = [root.position.x, root.position.z];
+      b.P.fromYaw = root.rotation.y;
+      root.rotation.x = root.rotation.z = 0;
+      if (s === 1) { this.cup.position.copy(this.cupHome); this.cup.rotation.set(0, 0, 0); } // the tea stays on the drum
     }
-    // the straggler
-    if (t < T.tripAt) {
-      const k = clamp((t - T.runAt) / (T.tripAt - T.runAt), 0, 1);
-      const e = k * (2 - k); // off like a shot
-      root.position.x = lerp(dep.from.x, dep.trip.x, e);
-      root.position.z = lerp(dep.from.z, dep.trip.z, e);
-      faceTo(dep.trip.x, dep.trip.z);
-      this._depGait(f, true);
-    } else if (t < T.upBy) {
-      // down: the concrete, a breath, then up on one knee and away
-      const fall = clamp((t - T.tripAt) / 0.28, 0, 1);
-      const rise = clamp((t - T.downUntil) / (T.upBy - T.downUntil), 0, 1);
-      const down = fall * (1 - rise * rise * (3 - 2 * rise));
-      root.position.set(dep.trip.x, lerp(0, -0.02, down), dep.trip.z);
-      root.rotation.x = 1.32 * down;
-      n.hips.position.y = lerp(0.94, 0.3, down);
-      n.shL.rotation.x = lerp(0, -1.7, down); // hands thrown out in front
-      n.shR.rotation.x = lerp(0, -1.45, down);
-      n.elL.rotation.x = n.elR.rotation.x = lerp(-0.2, -0.5, down);
-      n.thL.rotation.x = lerp(0, -1.5 * rise * (1 - rise) * 4 * 0.4, 1); // the knee that gets him up
-      n.knL.rotation.x = Math.sin(rise * Math.PI) * 1.6;
-      n.head.rotation.x = lerp(0, -0.7, down); // chin up off the concrete, looking for the car
-      if (t >= T.upBy - 0.01) root.rotation.x = 0;
-    } else if (!dep.grabbed) {
-      const gp = this._carPoint(GRAB_POINT, _w);
-      const dx = gp.x - root.position.x, dz = gp.z - root.position.z;
-      const d = Math.hypot(dx, dz);
-      const step = Math.min(d, 4.5 * dt);
-      if (d > 0.01) { root.position.x += (dx / d) * step; root.position.z += (dz / d) * step; }
-      faceTo(gp.x, gp.z);
-      this._depGait(f, true);
-      n.shR.rotation.x = -1.9; // reaching for it
-      if (d < 0.55 || t > T.catchAt + 2.5) { dep.grabbed = true; dep.grabT = t; }
-    } else {
-      const gp = this._carPoint(GRAB_POINT, _w);
-      const since = t - dep.grabT;
-      if (since < 0.55) {
-        // alongside, one hand on the car, legs still going
-        root.position.x = gp.x; root.position.z = gp.z;
-        root.rotation.y = -Math.PI / 2 + (this.carRoot.rotation.y || 0); // with the car, toward the gates (the seated yaw)
-        this._depGait(f, true);
-        n.shL.rotation.x = -1.15; n.shL.rotation.z = -0.5; // holding on
-        dep.climbFrom = { x: gp.x, z: gp.z };
+    const res = poseBoarding(f.rig, s, bt, b.P);
+    // the things that go with them
+    if (s === 2 && !b.flicked && bt >= BOARD[2].at + BOARD[2].flick * 0.5) {
+      b.flicked = true; // the cigarette, flicked away: a spark on the concrete
+      const tip = this.cig.localToWorld(new THREE.Vector3(0, 0, 0.066));
+      this.cig.visible = false;
+      if (this.lighter) this.lighter.visible = false;
+      this.u.uEmber.value.w = 0;
+      this.u.uFlame.value.w = 0;
+      this.ping(tip.x - 0.6, 0.05, tip.z + 0.4, 1.2, 0.18);
+      for (let i = 0; i < 6; i++) this.smoke.emit(tip.x - 0.6, 0.04, tip.z + 0.4, rnd(-0.4, 0.4), rnd(0.2, 0.6), rnd(-0.4, 0.4), { life: 0.5, s0: 0.01, s1: 0.03, a: 0.6, rise: 0, drag: 2, col: [1, 0.6, 0.25], jitter: 0.1 });
+    }
+    if (s === 2 && !b.flicked) this.cig.visible = false;
+    if (s === 3 && !b.packed && bt >= BOARD[3].at + BOARD[3].sling * 0.6) {
+      b.packed = true; // the pack goes over the side first
+      this._resetPacker();
+      this.carMesh.attach(this.pack);
+      this.pack.position.set(1.55, 0.55, -0.12);
+      this.pack.rotation.set(0.2, 0.6, 0.1);
+      if (this.audio?.ready && this.audio.garageArrive) this.audio.garageArrive();
+    }
+    if (res === 'seated') {
+      b.seated = true;
+      if (s === 0) this._driver(f, dt); // his hands find the wheel; the key, the honk and the look are his
+    }
+    return true;
+  }
+
+  // the film ended or was called off: everyone back to their places, their things back to theirs
+  _homeFigs() {
+    for (const f of this.figs) {
+      if (!f) continue;
+      f.board = null;
+      const root = f.rig.root;
+      root.rotation.set(0, 0, 0);
+      if (f.slot === 0) {
+        if (root.parent !== this.carMesh) this.carMesh.add(root);
+        root.position.set(...DRIVER_STAND);
+        root.rotation.y = DRIVER_STAND_YAW;
       } else {
-        const k = clamp((since - 0.55) / 0.65, 0, 1);
-        const seat = this._carPoint(dep.seat, _w2);
-        const from = dep.climbFrom || { x: gp.x, z: gp.z };
-        root.position.x = lerp(from.x, seat.x, k);
-        root.position.z = lerp(from.z, seat.z, k);
-        root.position.y = Math.sin(k * Math.PI) * 0.42; // over the side and in
-        n.thL.rotation.x = lerp(-0.4, this.model.driver.thigh, k);
-        n.thR.rotation.x = n.thL.rotation.x;
-        n.knL.rotation.x = n.knR.rotation.x = lerp(0.6, this.model.driver.knee, k);
-        if (k >= 1) { root.position.y = 0; this._depAttach(f); this._depSeatPose(f); }
+        if (root.parent !== this.scene) this.scene.add(root);
+        root.position.set(...SPOTS[f.slot].pos);
+        root.rotation.y = SPOTS[f.slot].yaw;
       }
+      f.st = { phase: 'idle', t: 0, next: rnd(1, 3), nextTap: 5, i: -1 };
+    }
+    this.boarding = null;
+    this.cup.position.copy(this.cupHome);
+    this.cup.rotation.set(0, 0, 0);
+    this._resetPacker();
+  }
+
+  // ---- slot 0 in the lobby (3.0u): on his feet at his door, a hand on the frame, the keys on a finger ----
+  _driverOut(f, dt) {
+    const n = f.rig.nodes, t = this.t, st = f.st;
+    const root = f.rig.root;
+    root.position.set(...DRIVER_STAND);
+    root.rotation.set(0, DRIVER_STAND_YAW, 0);
+    // his weight on one leg, leaning on the car
+    n.hips.position.set(Math.sin(t * 0.7) * 0.012, 0.93, 0);
+    n.hips.rotation.z = 0.05;
+    n.chest.rotation.set(0.03 + Math.sin(t * 1.6 + 1) * 0.012, 0, -0.04);
+    n.thR.rotation.set(0.14, 0, 0.08);
+    n.knR.rotation.x = 0.22;
+    n.thL.rotation.z = -0.05;
+    if (st.phase === 'intro' && st.t > 1.8) { st.phase = 'idle'; st.t = 0; st.next = rnd(2, 5); }
+    if (st.phase === 'idle') {
+      st.next -= dt;
+      if (st.next <= 0) { st.phase = ['keys', 'tap', 'keys', 'watch'][Math.floor(Math.random() * 4)]; st.t = 0; }
+    } else if (st.phase !== 'intro' && st.t > 2.2) { st.phase = 'idle'; st.t = 0; st.next = rnd(3, 6); }
+    // the left hand on the door frame, tapping it now and then
+    const tap = st.phase === 'tap' ? Math.max(0, Math.sin(st.t * 14)) * 0.035 * bell(st.t, 0, 0.2, 1.6, 2.0) : 0;
+    const frame = this._carPoint([0.05, 1.12 + tap, 0.92], new THREE.Vector3());
+    reach(f.rig, 'L', frame, new THREE.Vector3(-1, -0.6, -0.4), 1);
+    // the right: the keys spun round a finger, or a look at his watch
+    if (st.phase === 'keys') {
+      n.shR.rotation.set(-0.55, 0, 0.18);
+      n.elR.rotation.set(-1.15 + Math.sin(st.t * 12) * 0.12, 0, 0);
+    } else if (st.phase === 'watch') {
+      const k = bell(st.t, 0, 0.4, 1.6, 2.1);
+      n.shR.rotation.set(-0.7 * k, 0, 0.25 * k);
+      n.elR.rotation.set(-0.3 - 1.5 * k, 0, 0);
+      n.head.rotation.x += 0.35 * k;
     }
   }
 
@@ -1365,9 +1340,7 @@ export class Garage {
     this.u.uHeadI.value = 0;
     this.u.uDash.value.w = 0;
     this.u.uTail.value.w = 0;
-    for (const f of this.figs) if (f) f.st = { phase: 'idle', t: 0, next: rnd(1, 3), nextTap: 5, i: -1 };
-    if (this.figs[2]) this.figs[2].rig.root.rotation.y = SPOTS[2].yaw;
-    this._resetPacker();
+    this._homeFigs(); // (3.0u) everyone out of the car and back at their places for the next time the lobby opens
     this.cup.position.copy(this.cupHome);
     this.smoke.clear();
     this.butt = null;
@@ -1646,11 +1619,9 @@ export class Garage {
       n.shL.rotation.z = -0.07;
       n.shR.rotation.z = 0.07;
       n.elL.rotation.x = n.elR.rotation.x = -0.2;
-      // in the departure film a figure keeps its lobby life until its moment (that's why one of them
-      // is late), then the film owns it outright — root, legs and all
-      const depLive = f.dep && this.depart && this.depart.t >= (f.dep.role === 'board' ? DEPART.boardFrom : DEPART.runAt);
-      if (depLive) this._depPose(f, dt);
-      else if (s === 0) this._driver(f, dt);
+      // (3.0u) in a film a figure keeps its lobby life until its moment to get in, then the boarding owns it
+      if (f.board && this._boardFig(f, dt)) { /* posed by the boarding */ }
+      else if (s === 0) this._driverOut(f, dt);
       else if (s === 1) this._chair(f, dt);
       else if (s === 2) this._smoker(f, dt);
       else this._packer(f, dt);

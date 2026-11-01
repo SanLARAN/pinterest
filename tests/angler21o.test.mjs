@@ -256,20 +256,13 @@ test('the Keanu set is free, dyed and complete — and travels without a guitar 
 });
 
 // ---------- the film ----------
-test('the departure film boards everyone but one before the car dares move', () => {
-  const solo = departPlan([true, false, false, false]);
-  assert.equal(solo.solo, true);
-  assert.equal(solo.driveAt, DEPART.solo.driveAt, 'alone, the short film');
-  const duo = departPlan([true, true, false, false]);
-  assert.equal(duo.straggler, 1, 'with one passenger, he is the one who lingers');
-  assert.deepEqual(duo.boarders, []);
-  const full = departPlan([true, true, true, true]);
-  assert.equal(full.straggler, 3);
-  assert.deepEqual(full.boarders, [1, 2]);
-  const seats = Object.values(full.seats).map((s) => s.join(','));
-  assert.equal(new Set(seats).size, 3, 'a seat each, none shared');
-  assert.ok(full.driveAt >= DEPART.boardTo + DEPART.climbFor, 'the car waits until the boarders are seated');
-  assert.ok(DEPART.tripAt > DEPART.runAt && DEPART.upBy < DEPART.catchAt, 'he trips, rises, and still has a car to catch');
+test('the departure film: one schedule, and the car moves only once everyone is in (3.0u)', () => {
+  // (2.1o staged one passenger left behind to chase the rolling car; 3.0u boards everyone before the latch —
+  // see tests/round30u for the boarding itself — so the film's schedule no longer depends on who is in the room)
+  const plan = departPlan();
+  assert.equal(plan.driveAt, DEPART.driveAt);
+  assert.ok(DEPART.keyAt < DEPART.idleAt && DEPART.idleAt < DEPART.driveAt && DEPART.driveAt < DEPART.fadeAt && DEPART.fadeAt < DEPART.doneAt);
+  assert.ok(DEPART.gateTo <= DEPART.idleAt, 'the gates are open before the car catches');
 });
 
 // ---------- words ----------

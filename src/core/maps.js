@@ -9,12 +9,13 @@ export const cleanMap = (v) => (v === 'bog' ? 'bog' : 'forest');
 // what the menu calls them
 export const MAP_KEY = { forest: 'mapForest', bog: 'mapBog' };
 
-// the shift's length is a setting, the map is not: it decides the world, so it goes in the URL
-export function runUrl(map, days, base = '') {
-  const m = cleanMap(map);
+// the shift's length is a setting, the map is not: it decides the world, so it goes in the URL.
+// (3.0u) range: arrive at the training ground (its film), not in a shift — the range is the forest's, in daylight
+export function runUrl(map, days, base = '', { range = false } = {}) {
+  const m = range ? 'forest' : cleanMap(map);
   const q = new URLSearchParams();
   if (m === 'bog') q.set('map', 'bog');
-  q.set('autostart', '');
+  q.set(range ? 'range' : 'autostart', '');
   if ([2, 4, 6].includes(+days)) q.set('days', String(+days));
   return `${base}?${q.toString()}`.replace('?&', '?');
 }

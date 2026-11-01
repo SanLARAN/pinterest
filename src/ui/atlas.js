@@ -630,6 +630,15 @@ export class Atlas {
         A.whisper(...at(-1.1, 0, 0.9));
         dur = 2.8;
         break;
+      // (3.0u) the Stray's page had a «голос» button and no voice behind it since 2.1v: it smells the air in
+      // front of you, whines, says the word from off to the side — and growls when you turn to it
+      case 'stray':
+        A.straySniff(...at(-1, 0.2, 2.2), 0.9);
+        later(900, () => A.strayHum(...at(-1.1, 0.2, 2.4), 0.8));
+        later(2900, () => A.strayHey(...at(2.2, 0.3, 1.6), 0.85));
+        later(4200, () => A.strayAnger(...at(-0.6, 0, 1.6), 0.8));
+        dur = 5.6;
+        break;
       // chapter V, the bog (3.0i): the two things that live there
       case 'drowned':
         // water running off a body, then the hand closing on an ankle
