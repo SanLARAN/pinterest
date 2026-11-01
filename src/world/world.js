@@ -15,6 +15,7 @@ import { FIRETOWER, ZARYA, buildFiretower, buildZarya, buildWaymarks } from './e
 export { CAP } from './caps.js'; // (re-exported: everything that imported it from here keeps working)
 import { CAP } from './caps.js';
 import { BOG, buildBog } from './bog.js';
+const _pm = new THREE.Matrix4(), _pv = new THREE.Vector3(), _pq = new THREE.Quaternion(), _pe = new THREE.Euler(), _ps = new THREE.Vector3(); // (3.1c) perch spots
 
 // the cupboards in the buildings (game/cabinets.js opens them): body size and, for a wall cabinet, how high it hangs
 export const CABINET_DIMS = {
@@ -118,6 +119,7 @@ export class World {
     this.props = []; // { cx, cz, build(b) }
     this.lake = null;
     this.spawn = { x: 0, z: 0, yaw: 0 };
+    this.perches = []; // (3.1c) dead trees with branch spots, for the magpies (game/magpies.js)
     this.effigies = [];
     this.navBuildings=[]; // open-door camp buildings, for indoor/outdoor navigation
     this.doors = []; // cabin doors (the game hangs and swings them)
@@ -138,6 +140,7 @@ export class World {
     this.landmarks = this.map ? this.map.landmarks : LANDMARKS;
     this.lake = null;
     this.spawn = { x: 0, z: 0, yaw: 0 };
+    this.perches = []; // (3.1c) dead trees with branch spots, for the magpies (game/magpies.js)
     this.effigies = [];
     this.navBuildings = [];
     this.doors = [];
@@ -297,7 +300,7 @@ export class World {
         const roll = rng.next();
         const s = rng.float(0.8, 1.3);
         if (roll < 0.66) this.pine(x, y, z, s, rng);
-        else if (roll < 0.84) this.deadTree(x, y, z, s, rng);
+        else if (roll < 0.84) this.perches.push(this.deadTree(x, y, z, s, rng));
         else if (roll < 0.95) this.birch(x, y, z, s, rng);
         else this.stump(x, y, z, rng);
         count++;
@@ -349,7 +352,19 @@ export class World {
       }
     });
     this.col.circle(x, z, 0.32 * s, 8 * s, CAP.TREE);
-    return { x, z, h: h * s };
+    // (3.1c) where a bird can sit: three quarters of the way out along each branch, and the broken top — in world
+    // space, through the same transform the builder uses (no RNG here: the forest stays exactly the same)
+    _pm.compose(_pv.set(x, y - 0.3, z), _pq.setFromEuler(_pe.set(tilt, ry, tilt * 0.5, 'YXZ')), _ps.set(s, s, s));
+    const spots = [];
+    for (const [by, a, len, up] of branches) {
+      const rr = 0.3 * (1 - by / h) + 0.05;
+      const sx = Math.cos(a) * rr * 0.5, sz = Math.sin(a) * rr * 0.5, ex = Math.cos(a) * len, ez = Math.sin(a) * len;
+      _pv.set(sx + (ex - sx) * 0.75, by + len * up * 0.75 + 0.05, sz + (ez - sz) * 0.75).applyMatrix4(_pm);
+      spots.push([Math.round(_pv.x * 100) / 100, Math.round(_pv.y * 100) / 100, Math.round(_pv.z * 100) / 100]);
+    }
+    _pv.set(0, h, 0).applyMatrix4(_pm);
+    spots.push([Math.round(_pv.x * 100) / 100, Math.round(_pv.y * 100) / 100, Math.round(_pv.z * 100) / 100]);
+    return { x, z, h: h * s, spots };
   }
 
   birch(x, y, z, s, rng) {

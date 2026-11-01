@@ -48,6 +48,7 @@ import { inert } from '../core/inert.js'; // 3.0: a system the current map does 
 import { syncPumps } from '../world/bog.js'; // 3.0c: a running pump drains its sector
 import { Drowned } from './drowned.js'; // 3.0d: the one in the water
 import { Gnats } from './gnat.js'; // 3.0e: the swarm that eats your echo
+import { Magpies } from './magpies.js'; // 3.1c: the birds that tell
 import { Winch } from './winch.js'; // 3.0f: the way out of the bog
 import { Rain } from '../render/rain.js'; // 3.0i: the bog's own weather — a fine drizzle, nothing more
 
@@ -85,6 +86,7 @@ export class Game {
     this.stray = new Stray(this); // the fourth night's girl: walk past her, never run (see CFG.STRAY)
     this.drowned = new Drowned(this); // 3.0d: the bog's own — it waits in the water (see game/drowned.js)
     this.gnats = new Gnats(this); // 3.0e: the swarm that eats your echo (see game/gnat.js)
+    this.magpies = new Magpies(this); // 3.1c: flocks in the dead trees that go up rattling (see game/magpies.js)
     this.winch = new Winch(this); // 3.0f: the УАЗ in the bog, the cable and the drum (see game/winch.js)
     // (3.0i) the bog drizzles. It is scenery, not mechanics: no sound, no effect on the echo, no doused flares
     this.rain = this.map === 'bog' ? new Rain(this.scene) : null;
@@ -292,6 +294,7 @@ export class Game {
     this.stray.reset(); // she is not out there until the night puts her there (2.1v)
     this.drowned.reset(); // ...and neither is the one in the water (3.0d)
     this.gnats.reset(); // ...nor the midges (3.0e)
+    this.magpies.reset(); // ...nor the birds (3.1c)
     this.winch.reset(); // ...and the car is back in the water where it went down (3.0f)
     this.echoMul = 1; // how much longer an echo takes to come back (the Гнус: 2)
     this.echoMulT = 0;
@@ -618,6 +621,7 @@ export class Game {
     this.objectives.startNight(this.day, this.baseSeed);
     if (this.map === 'bog' && this.drowned) this.drowned.spawnNight(); // 3.0d: it is already in the water
     if (this.map === 'bog' && this.gnats) this.gnats.startNight();
+    if (this.map === 'forest' && this.magpies) this.magpies.startNight(this.day, this.baseSeed); // 3.1c
     this._resetNight();
     this.dread.reset();
     this.hud.setSkip(false);
@@ -797,6 +801,7 @@ export class Game {
   noise(x, z, loud, source, scream = false, pid = null) {
     if (loud <= 0 || this.state !== 'play' || !this.auth) return 0;
     if (this.map === 'bog') this.gnats.hear(x, z, loud, source); // 3.0e: the midges come to whatever is loudest
+    if (this.map === 'forest') this.magpies.hear(x, z, loud, source, pid); // 3.1c: a loud noise by their tree sends them up
     let n = 0;
     for (const m of this.monsters) {
       const r = m.hear(x, z, loud, source, scream, pid);
@@ -2238,6 +2243,7 @@ export class Game {
     this.stray.update(dt);
     this.drowned.update(dt); // the bog: it drags you out into the deep (3.0d)
     this.gnats.update(dt); // ...and the midges eat your echo (3.0e)
+    this.magpies.update(dt); // ...and the birds tell on you (3.1c)
     this.winch.update(dt); // ...and the water comes back unless the drum keeps turning (3.0f)
     if (this.state !== 'play') return; // killed this frame
     if (!this.player.alive) return; // co-op: caught this frame — the death plays from the next one

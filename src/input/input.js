@@ -34,6 +34,7 @@ export class Input {
     this.joy = { id: -1, ox: 0, oy: 0, x: 0, y: 0, mag: 0 };
     this.look = { id: -1, x: 0, y: 0 };
     this.mouseDrag = { down: false, x: 0, y: 0, moved: 0, t: 0 };
+    this.wheel = null; // (3.1c) {dx, dy} while the quick wheel is open (ui/quickWheel.js)
     this.capturing = false; // (3.0y) the settings are listening for a key to bind: the game ignores it
     this.setKeys(settings.keys);
     this._bind();
@@ -154,6 +155,16 @@ export class Input {
       if (md.moved < 6 && performance.now() - md.t < 300 && this.gameActive) this.emit('primary');
     });
     window.addEventListener('mousemove', (e) => {
+      // (3.1c) the quick wheel is open: the mouse points at a pocket instead of turning the head
+      if (this.wheel) {
+        const w = this.wheel;
+        if (this.locked) {
+          if (Math.abs(e.movementX) < 400 && Math.abs(e.movementY) < 400) { w.dx += e.movementX; w.dy += e.movementY; }
+        } else { w.dx = e.clientX - innerWidth / 2; w.dy = e.clientY - innerHeight / 2; }
+        const len = Math.hypot(w.dx, w.dy);
+        if (len > 140) { w.dx *= 140 / len; w.dy *= 140 / len; } // a stick, not a trackball: moving back works at once
+        return;
+      }
       if (this.locked) {
         // ignore absurd spikes some browsers produce on lock
         if (Math.abs(e.movementX) < 400 && Math.abs(e.movementY) < 400) {
@@ -342,7 +353,7 @@ export class Input {
         this.emit('pingUp');
       }
     });
-    btn('#tBag', () => this.emit('bag'));
+    btn('#tBag', () => { this.bagTouch = true; this.emit('bag'); }, () => { this.bagTouch = false; }); // (3.1c) a long press opens the quick wheel
     btn('#tItem', () => this.emit('primary'));
     btn('#tAlt', () => this.emit('secondary'));
     btn('#tCarry', () => this.emit('carry'));
@@ -403,8 +414,14 @@ export class Input {
     return { dx: dx * s, dy: dy * s * (settings.invertY ? -1 : 1) };
   }
 
+  // (3.1c) is the backpack key (or the touch button) still down? — a short press opens the pack, a hold the wheel
+  bagHeld() {
+    return this.held('bag') || !!this.bagTouch;
+  }
+
   reset() {
     this.keys.clear();
+    this.bagTouch = false;
     this.pingHeld = false;
     this.useHeld = false;
     this.peekHeld = false;

@@ -306,6 +306,27 @@ export class Backpack {
     this.el.hidden=true;
     if (this.el.contains(document.activeElement)) document.activeElement.blur();
   }
+  // (3.1c) the quick wheel (ui/quickWheel.js): may it open now? the same rules as the pack, but it never stops you
+  canQuick() {
+    const g=this.g;
+    if(this.opened || this.pending.size || !g.player.alive || g.inputMuted || !['play','morning','dawn','training'].includes(g.state)) return false;
+    return !(g.player.carrying || g.escape.held || g.escape.mySeat>=0 || g.cabinets.busy || g.expedition.onTower);
+  }
+  // pocket i into your hands (or, if it already is, out of them) — without opening the pack
+  quickEquip(i) {
+    if(!this.canQuick() || !this.slots[i]) return false;
+    this.equip(i);
+    if(this.g.audio?.ready && this.g.audio.paper) this.g.audio.paper();
+    return true;
+  }
+  // (3.1c) what a battery would do to the flashlight right now, for the pack's page and the wheel
+  batteryPreview() {
+    const g=this.g;
+    if(!(this.cells>0) || !g.torch.has) return null;
+    const from=Math.max(0,Math.min(1,g.torch.charge||0)), to=Math.min(1,from+TORCH.spare);
+    const pct=(v)=>Math.ceil(v*100-1e-6); // (like the charge chip, but 0.4 + 0.45 is 0.8500000000000001)
+    return { from:pct(from), to:pct(to), full:from>=.99 };
+  }
   equip(i) {
     const kind=this.slots[i]; if(!kind || this.pending.size) return;
     if(this.g.torch.on) this.g.torch.toggle();
@@ -594,6 +615,10 @@ export class Backpack {
       const i=this.slots.indexOf(k);
       if(i>=0) chips.push([t('bagSlot'), `${i+1} / ${BAG_SIZE}`]);
       if(k==='torch') chips.push([t('bagCharge'), `${Math.ceil((g.torch.charge || 0) * 100)}%`]);
+      if(k==='battery') { // (3.1c) the preview: what the flashlight will be after it
+        const pv=this.batteryPreview();
+        chips.push([t('bagTorchAfter'), pv ? (pv.full ? t('bagTorchFullShort') : `${pv.from}% → ${pv.to}%`) : t('bagNoTorchShort')]);
+      }
       if(k==='tape') chips.push([t('bagCharge'), `${g.tools.tapeHeld?.charges||0} / 2`]);
       if(k==='glow'&&g.glows.held) chips.push([t('bagState'), t('bagLit')]);
       if(this.equipped===k) chips.push([t('bagState'), t('bagInHands')]);

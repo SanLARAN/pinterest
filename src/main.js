@@ -68,6 +68,7 @@ import { Atlas } from './ui/atlas.js';
 import { Wardrobe } from './ui/wardrobe.js';
 import { ProfileScreen, myCard } from './ui/profile.js'; // 3.0x
 import { KeysPanel } from './ui/keysPanel.js'; // 3.0y
+import { QuickWheel } from './ui/quickWheel.js'; // 3.1c: hold the backpack key, point, let go
 
 setLang(settings.lang);
 
@@ -175,6 +176,7 @@ for (const id of ['micCalBtn', 'btnMicCal']) $(id).addEventListener('click', (e)
 // a modal over the menu hides the figure: don't draw it then
 const MENU_COVERS = ['settingsPanel', 'howPanel', 'scoresPanel', 'soloPanel', 'coopPanel'];
 let game = null;
+const quickWheel = new QuickWheel({ getGame: () => game, input }); // (3.1c)
 let runOnline = false; // the current / last run is a co-op night
 
 let state = 'boot'; // boot | menu | playing | paused | over
@@ -1041,9 +1043,10 @@ function handleEvents(events) {
   for (const e of events) {
     switch (e) {
       case 'bag':
-        if (state === 'playing') game.inventory.toggle();
+        if (state === 'playing') quickWheel.press(); // (3.1c) a short press is the pack, a hold the quick wheel
         break;
       case 'pause':
+        if (state === 'playing' && quickWheel.open) { quickWheel.close(); break; }
         if(state==='playing'&&game?.partMap?.active){game.partMap.fold(true);break;}
         if (state === 'playing' && game?.inventory.opened) { game.inventory.close(); break; }
         if(account.isOpen())account.close();
@@ -1120,6 +1123,8 @@ function step(now, render) {
   const events = input.consume();
   if (state === 'boot') return;
   handleEvents(events);
+  if (state === 'playing' && game) quickWheel.frame(now); // (3.1c)
+  else if (quickWheel.open || quickWheel.hold) quickWheel.close();
 
   const garageOn = state === 'menu' && !atlasOpen && !wardrobeOpen && !!garage;
   home.setActive(state==='menu'&&!atlasOpen&&!wardrobeOpen&&!lobby.isOpen()&&!['settingsPanel','howPanel','scoresPanel','soloPanel'].some(id=>menus.isOpen(id))&&!micCal.isOpen()&&!account.isOpen());

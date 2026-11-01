@@ -1303,6 +1303,45 @@ export class AudioEngine {
     n.start(t, Math.random()); n.stop(t + 0.15);
   }
 
+  // (3.1c) a magpie: the dry «чак-чак-чак» rattle, each «чак» a scrape of noise and a falling buzz
+  _magpieRattle(pn, t0, gain, pitch = 1, n = 6) {
+    for (let i = 0; i < n; i++) {
+      const tt = t0 + i * (0.075 + Math.random() * 0.02);
+      const nz = this._noise(); const bp = this._filter('bandpass', (2300 + Math.random() * 700) * pitch, 4); const g = this._gain();
+      nz.connect(bp).connect(g).connect(pn);
+      this._env(g, tt, 0.002, gain, 0.045);
+      nz.start(tt, Math.random()); nz.stop(tt + 0.07);
+      const o = this._osc('sawtooth', 1150 * pitch); o.frequency.exponentialRampToValueAtTime(680 * pitch, tt + 0.05);
+      const ob = this._filter('bandpass', 1600 * pitch, 3); const og = this._gain();
+      o.connect(ob).connect(og).connect(pn);
+      this._env(og, tt, 0.002, gain * 0.35, 0.05);
+      o.start(tt); o.stop(tt + 0.08);
+    }
+  }
+  // perched: one bird, quietly, now and then — how you know a flock is up there
+  magpieChatter(x, y, z, gain = 0.22) {
+    if (!this.ready) return;
+    const pn = this._panner(x, y, z, 4, 1.2);
+    pn.connect(this.sfx);
+    this._magpieRattle(pn, this.now, gain, 0.95 + Math.random() * 0.1, 3 + Math.floor(Math.random() * 3));
+  }
+  // the whole flock going up: several rattles over each other and the clatter of wings, with the forest's echo
+  magpieFlight(x, y, z) {
+    if (!this.ready) return;
+    const t = this.now;
+    const pn = this._panner(x, y, z, 6, 0.8);
+    pn.connect(this.sfx);
+    const s = this._gain(0.6); pn.connect(s); s.connect(this.revSend);
+    for (let k = 0; k < 3; k++) this._magpieRattle(pn, t + k * 0.11 + Math.random() * 0.05, 0.85 - k * 0.15, 0.9 + k * 0.08, 7 + Math.floor(Math.random() * 4));
+    for (let i = 0; i < 16; i++) {
+      const tt = t + i * (0.07 + Math.random() * 0.03);
+      const nz = this._noise(); const lp = this._filter('lowpass', 700 + Math.random() * 300, 1); const g = this._gain();
+      nz.connect(lp).connect(g).connect(pn);
+      this._env(g, tt, 0.008, 0.55 * (1 - i / 18), 0.06);
+      nz.start(tt, Math.random()); nz.stop(tt + 0.1);
+    }
+  }
+
   chitter(x, y, z, gain = 0.5) {
     if (!this.ready) return;
     const t = this.now;

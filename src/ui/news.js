@@ -7,6 +7,23 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v:'3.1c',date:'2026-11-01',
+    ru:{title:'Сороки',items:[
+      'В сухих деревьях у тропинок теперь сидят сороки — по четыре–семь птиц. Тронуть они не тронут, зато выдадут: пробеги под ними, подойди к самому стволу или нашуми рядом, и стая взлетит с треском. Этот стрекот слышат твари метров на пятьдесят вокруг, и считается он твоим шумом.',
+      'Как их заметить: если стоять неподалёку, иногда слышно тихое «чак-чак». Взлетевшая стая ещё и освещает дерево эхом. Мимо можно пройти шагом, а крадучись — хоть под самыми ветками. Через полторы минуты птицы возвращаются.',
+      'Гайка, брошенная в стаю, поднимет её — это тревога в другом конце леса, если она нужна тебе там.',
+      'Быстрое колесо: зажми I — вокруг прицела появятся четыре кармана. Поведи мышью и отпусти: предмет в руках. Если отпустить в центре, ничего не изменится. Чтобы убрать предмет из рук, выбери его карман ещё раз. Ты не останавливаешься, пока выбираешь. Короткое нажатие I по-прежнему открывает рюкзак. На телефоне: долгое нажатие на РЮКЗАК и касание кармана.',
+      'Предпросмотр: у батарейки — и в рюкзаке, и на колесе — видно, каким станет фонарь, например «40% → 85%». Одна батарейка добавляет 45%.',
+    ]},
+    en:{title:'Magpies',items:[
+      'Magpies now sit in the dead trees by the paths, four to seven birds each. They will not touch you, but they will give you away: run under them, walk up to the trunk or make a noise nearby, and the flock goes up rattling. Monsters within about fifty metres hear it, and it counts as your noise.',
+      'How to spot them: stand nearby and now and then you hear a quiet chak-chak. A flock taking off also lights the tree up with its echo. You can walk past, and sneaking you can pass right under the branches. They are back in a minute and a half.',
+      'A stone thrown into a flock sends it up: an alarm at the other end of the forest, if that is where you want one.',
+      'Quick wheel: hold I and four pockets appear around the crosshair. Point with the mouse and let go: the item is in your hands. Let go in the middle and nothing changes; pick the pocket of what you hold to put it away. You keep moving while you choose. A short press of I still opens the backpack. On a phone: long-press BACKPACK and tap a pocket.',
+      'Preview: a battery shows what your flashlight will become, both in the backpack and on the wheel, e.g. 40% → 85%. One battery adds 45%.',
+    ]},
+  },
+  {
     v:'3.1b',date:'2026-11-01',
     ru:{title:'Политика конфиденциальности',items:[
       'В меню появилась ссылка «Конфиденциальность»: на одной странице по-русски и по-английски написано, какие данные хранит игра, зачем, кто их видит и как удалить аккаунт.',
