@@ -7,6 +7,17 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v:'3.1a',date:'2026-11-01',
+    ru:{title:'Google в настольной версии',items:[
+      'В настольной версии (.exe) кнопка «Войти через Google» теперь открывает твой обычный браузер: Google не пускает вход во встроенные окна. После входа вкладка скажет «Готово», а игра войдёт в аккаунт сама — ничего копировать не нужно.',
+      'На сайте вход через Google работает как раньше — по кнопке в профиле, без пароля и письма. Он заработает, как только автор включит Google в настройках сервера.',
+    ]},
+    en:{title:'Google on desktop',items:[
+      'In the desktop build (.exe) Continue with Google now opens your own browser, because Google does not allow sign-in inside embedded windows. Once you are in, the tab says Done and the game signs in by itself; nothing to copy.',
+      'On the site Google sign-in works as before, from the button in your profile, with no password or email. It goes live as soon as the author switches Google on in the server settings.',
+    ]},
+  },
+  {
     v:'3.0z',date:'2026-11-01',
     ru:{title:'Рывки, попытка третья',items:[
       'Полоска ?perf показала, откуда они: десять раз в секунду сборник смены фотографировал экран, и на быстрых мониторах каждый такой снимок давал кадр в 18–25 мс вместо 5 — под лампой заметнее всего.',

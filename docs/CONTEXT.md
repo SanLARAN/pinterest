@@ -4,7 +4,7 @@
 > Он написан для человека и для агента: любой новый чат начинается с чтения `AGENTS.md`, а тот отправляет
 > сюда. Если код и этот файл расходятся — прав код, а файл надо поправить в том же коммите.
 >
-> Последнее обновление: раунд **3.0z** (снимки сборника без ожидания видеокарты — рывки на быстрых мониторах).
+> Последнее обновление: раунд **3.1a** (вход через Google в настольной версии через системный браузер).
 
 ---
 
@@ -489,6 +489,20 @@
   ориентация верная. Реальный тайминг проверяет только автор (`?perf`): панель браузера агента скрыта.
 - **Тесты:** `tests/round30z.test.mjs` (2); `round30w` — порядок путей обновлён.
 
+### 3.1a — Google в настольной версии
+
+- **Состояние сервера:** `/auth/v1/settings` → `google: false`. Провайдера включает владелец (свои OAuth Client ID/Secret
+  из Google Cloud) — пошагово в `docs/GOOGLE_LOGIN.md`, включая Redirect URLs (`…/pinterest/**`, `localhost:5173/**`,
+  `http://127.0.0.1:47615/**`). Кодом этого не сделать: у MCP Supabase нет настроек Auth, секрет — только у владельца.
+- **Сайт** — без изменений: `signInWithOAuth({redirectTo: authRedirect(), skipBrowserRedirect})`, проверка URL, `location.assign`.
+- **`.exe`** — `CloudController({desktopAuth})` (по умолчанию `window.hushDesktop`, если есть `oauthBegin`):
+  `oauthBegin(lang)` → `{redirect}` (сервер `electron/oauth.cjs` на 127.0.0.1:47615, путь `/hush-auth/<36 hex>`, 5 минут,
+  один ответ); `signInWithOAuth` с этим redirect; `oauthFinish(url)` — оболочка проверяет `safeAuthorizeUrl` (https,
+  `<ref>.supabase.co/auth/v1/authorize`, `provider=google`, `redirect_to` ровно наш) и открывает его в системном браузере;
+  страница на loopback шлёт `access_token`/`refresh_token` из hash в `POST …/done`; игра — `auth.setSession`.
+  Ошибки: `google_port`, `google_desktop`, `google_cancelled` (ru/en в `cloud/words.js`). `electron-builder.yml` включает `oauth.cjs`.
+- **Тесты:** `tests/round31a.test.mjs` (5) — настоящий loopback-сервер на порту 47690/47691, проверка URL, поток контроллера.
+
 ## 2. Петля игры (и это надо понимать буквально)
 
 ```
@@ -738,7 +752,7 @@ src/
   ui/              hud.js, menus.js, graphics.js (расширенная графика), garage*.js (3D-гараж), lobby.js, wardrobe.js, mannequin.js, atlas*.js,
                    bag3d.js, touchButtons.js, radar.js, news.js, miccal.js, socialDock/Toasts/Words, account.js,
                    beyond.js, voicemix.js, sfxtest.js, reel.js (2.1u: plays the shift's highlights, writes .webm)
-tests/             node:test, 53 файла / 457 тестов (на 3.0z)
+tests/             node:test, 54 файла / 462 теста (на 3.1a)
 play/              собранная игра для GitHub Pages (артефакт сборки, коммитится)
 ```
 
@@ -752,7 +766,7 @@ play/              собранная игра для GitHub Pages (артефа
 
 ## 6. Проверка: как убедиться, что не сломал
 
-1. `npm test` — 457 тестов (3.0z), все должны проходить (правка теста допустима только если изменилось **поведение по
+1. `npm test` — 462 теста (3.1a), все должны проходить (правка теста допустима только если изменилось **поведение по
    замыслу**, и тогда в коммит-сообщении надо сказать, какое).
 2. `npm run build:pages` — сборка в `play/`; без неё деплой покажет старую версию.
 3. Живой прогон в браузере (headless-харнесс, рецепт ниже) на **конкретной сцене**, а не «в целом работает».

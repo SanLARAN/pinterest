@@ -8,8 +8,8 @@ import {BANNER_BUCKET,BANNER_MAX,BANNER_EXT,bannerKind} from './banner.js';
 const emptySocial=()=>({friends:[],requests:[],invites:[],blocked:[]});
 const err=e=>e instanceof Error?e:Object.assign(new Error(e?.message||'cloud_error'),{code:e?.code,status:e?.status});
 export class CloudController {
- constructor({clientFactory=createCloudClient,providers=readAuthProviders,navigate=url=>globalThis.location.assign(url),canApply=()=>true,onApplied=()=>{},getPresence=()=>({state:'online',room:null,strategy:'default'}),onNotice=()=>{}}={}){
-  this.providers=providers;this.navigate=navigate;this.clientFactory=clientFactory;this.canApply=canApply;this.onApplied=onApplied;this.getPresence=getPresence;this.onNotice=onNotice;
+ constructor({clientFactory=createCloudClient,providers=readAuthProviders,navigate=url=>globalThis.location.assign(url),desktopAuth=globalThis.hushDesktop?.oauthBegin?globalThis.hushDesktop:null,canApply=()=>true,onApplied=()=>{},getPresence=()=>({state:'online',room:null,strategy:'default'}),onNotice=()=>{}}={}){
+  this.providers=providers;this.navigate=navigate;this.desktopAuth=desktopAuth;this.clientFactory=clientFactory;this.canApply=canApply;this.onApplied=onApplied;this.getPresence=getPresence;this.onNotice=onNotice;
   this.user=null;this.profile=null;this.client=null;this.ready=false;this.status=isAccountScope()?'cached':'guest';this.epoch=0;this.version=0;this.serverVersion=0;this.dirty=false;this.revision=0;this.social=emptySocial();this.listeners=new Set();this.clientId=newSaveId();this.lastSync=null;this.lastError=null;this.pendingSnapshot=null;this.importPending=false;this.conflict=null;this.recovery=false;this.disposed=false;this.fromEmailLink=isAuthReturn();
   this.unsubscribe=onSave(e=>this.changed(e));setPurchaseBackend(id=>this.purchase(id));
  }
@@ -130,9 +130,18 @@ export class CloudController {
   if(!this.canApply())throw new Error('leave_room');const c=await this.ensure();if(this.user)return;
   const epoch=this.epoch,info=await this.providers();if(epoch!==this.epoch)throw new Error('stale_session');
   if(!info.external?.google)throw new Error('google_setup_required');
-  const{data,error}=await c.auth.signInWithOAuth({provider:'google',options:{redirectTo:authRedirect(),skipBrowserRedirect:true,queryParams:{prompt:'select_account'}}});if(error)throw err(error);
+  // (3.1a) the desktop build: Google refuses embedded windows, so the sign-in opens in the player's own browser and
+  // comes back to a one-shot loopback server in the shell (electron/oauth.cjs), which hands the tokens over
+  const desk=this.desktopAuth;let redirectTo=authRedirect();
+  if(desk){const b=await desk.oauthBegin(globalThis.document?.documentElement?.lang==='en'?'en':'ru');if(!b?.redirect)throw new Error(b?.error==='port_busy'?'google_port':'google_desktop');redirectTo=b.redirect;}
+  const{data,error}=await c.auth.signInWithOAuth({provider:'google',options:{redirectTo,skipBrowserRedirect:true,queryParams:{prompt:'select_account'}}});if(error)throw err(error);
   const url=new URL(data.url);if(url.origin!==new URL(SUPABASE_URL).origin||url.pathname!=='/auth/v1/authorize'||url.searchParams.get('provider')!=='google')throw new Error('google_redirect');
-  if(epoch!==this.epoch)throw new Error('stale_session');if(!this.canApply())throw new Error('leave_room');this.navigate(url.href);
+  if(epoch!==this.epoch)throw new Error('stale_session');if(!this.canApply())throw new Error('leave_room');
+  if(!desk){this.navigate(url.href);return;}
+  const r=await desk.oauthFinish(url.href);
+  if(!r?.access_token)throw new Error(r?.error==='timeout'||r?.error==='replaced'?'google_cancelled':'google_desktop');
+  if(epoch!==this.epoch)throw new Error('stale_session');
+  const{error:e2}=await c.auth.setSession({access_token:r.access_token,refresh_token:r.refresh_token});if(e2)throw err(e2);
  }
  async authenticate(kind,{email,password,name}={}){
   if(!this.canApply())throw new Error('leave_room');const c=await this.ensure();let r;

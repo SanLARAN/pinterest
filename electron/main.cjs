@@ -16,6 +16,8 @@ const https = require('node:https');
 const { spawn } = require('node:child_process');
 // (3.0m) which release is newer and what to download from it: pure, and tested without Electron
 const { API, PAGE, bestRelease } = require('./update.cjs');
+// (3.1a) Google sign-in in the player's own browser, back through a one-shot loopback server
+const oauth = require('./oauth.cjs');
 // the part that decides *what* may be read and *who* may speak: pure, and tested in tests/round21x.test.mjs
 const { allowsPermission, isOwnOrigin, serveBuild } = require('./serve.cjs');
 
@@ -213,6 +215,30 @@ function installAndRestart(file) {
   }
 }
 
+// (3.1a) «Войти через Google»: begin → a loopback redirect for Supabase; finish → open the authorize URL in the
+// system browser and wait for the tokens. Only our own page may ask, and only for Supabase's Google URL.
+function wireOAuthIpc() {
+  let pending = null;
+  const ours = (e) => isOwnOrigin(e.senderFrame?.url || e.sender.getURL(), SCHEME, DEV_URL);
+  ipcMain.handle('hush:oauth:begin', async (e, lang) => {
+    if (!ours(e)) return { error: 'origin' };
+    const b = oauth.begin({ lang: lang === 'en' ? 'en' : 'ru' });
+    try { await b.listening; } catch { return { error: 'port_busy' }; }
+    pending = b;
+    return { redirect: b.redirect };
+  });
+  ipcMain.handle('hush:oauth:finish', async (e, url) => {
+    const b = pending;
+    pending = null;
+    if (!ours(e) || !b || !oauth.safeAuthorizeUrl(url, b.redirect)) { oauth.cancel('bad_url'); return { error: 'bad_url' }; }
+    shell.openExternal(url);
+    const r = await b.result;
+    const win = BrowserWindow.fromWebContents(e.sender);
+    if (win) { if (win.isMinimized()) win.restore(); win.focus(); }
+    return r;
+  });
+}
+
 function wireUpdateIpc() {
   ipcMain.handle('hush:version', () => app.getVersion());
   ipcMain.handle('hush:update:check', () => checkUpdate());
@@ -257,6 +283,7 @@ if (!app.requestSingleInstanceLock()) {
       }
       serveBuildRequests();
     }
+    wireOAuthIpc();
     wireUpdateIpc(); // before the window: the page asks for its version the moment it loads
     createWindow();
     // check once, quietly, a few seconds in; a portable build is often launched for one shift
