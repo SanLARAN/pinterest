@@ -113,6 +113,7 @@ body:not(.in-menu) #noise-overlay { animation: none; visibility: hidden; }
   background: none; border: none; padding: 6px 2px; cursor: pointer; color: var(--ash);
   font-size: 12px; letter-spacing: 0.24em; text-transform: uppercase; position: relative; transition: color 0.2s;
 }
+a.link { text-decoration: none; font-family: inherit; display: inline-block; } /* (3.1b) the privacy link is a real link */
 .link::after { content: ''; position: absolute; left: 2px; right: 2px; bottom: 2px; height: 1px; background: var(--red); transform: scaleX(0); transition: transform 0.25s; }
 .link:hover, .link:focus-visible { color: var(--bone); outline: none; }
 .link:hover::after, .link:focus-visible::after { transform: scaleX(1); }

@@ -13,6 +13,13 @@
     </script>
   </head>
   <body>
+    <noscript>
+      <main style="max-width:720px;margin:40px auto;padding:0 18px;color:#d6cdc0;font:16px/1.6 monospace">
+        <h1>ТИШЕ / HUSH</h1>
+        <p>Бесплатный браузерный кооперативный хоррор: ночью в лесу ты слеп, а мир проявляется только эхом твоего голоса. Free co-op echolocation horror in the browser. Нужен JavaScript и WebGL2 · Needs JavaScript and WebGL2.</p>
+        <p><a href="./about.html" style="color:#d6a04c">Об игре · About</a> · <a href="./privacy.html" style="color:#d6a04c">Политика конфиденциальности · Privacy policy</a></p>
+      </main>
+    </noscript>
     <canvas id="gl" tabindex="-1"></canvas>
 
     <!-- boot -->
@@ -122,6 +129,8 @@
             <button class="link" id="btnScores"><span data-i18n="scores"></span></button>
             <i>·</i>
             <button class="link" id="btnSettings"><span data-i18n="settings"></span></button>
+            <i>·</i>
+            <a class="link" id="lnkPrivacy" href="./privacy.html" target="_blank" rel="noopener"><span data-i18n="privacyLink"></span></a>
           </nav>
           <div id="micPanel">
             <div class="mic-row">

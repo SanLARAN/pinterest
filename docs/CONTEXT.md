@@ -4,7 +4,7 @@
 > Он написан для человека и для агента: любой новый чат начинается с чтения `AGENTS.md`, а тот отправляет
 > сюда. Если код и этот файл расходятся — прав код, а файл надо поправить в том же коммите.
 >
-> Последнее обновление: раунд **3.1a** (вход через Google в настольной версии через системный браузер).
+> Последнее обновление: раунд **3.1b** (политика конфиденциальности и страница «Об игре» для проверки Google).
 
 ---
 
@@ -503,6 +503,19 @@
   Ошибки: `google_port`, `google_desktop`, `google_cancelled` (ru/en в `cloud/words.js`). `electron-builder.yml` включает `oauth.cjs`.
 - **Тесты:** `tests/round31a.test.mjs` (5) — настоящий loopback-сервер на порту 47690/47691, проверка URL, поток контроллера.
 
+### 3.1b — страницы для проверки Google
+
+- Проверка бренда Google (OAuth consent screen) вернула: главная «unresponsive» (холодный кэш Pages ответил за 16,5 с; игра —
+  WebGL без текста), домен «not registered to you» (нужна проверка владения в Search Console), политики нет.
+- `public/privacy.html`, `public/about.html` — статика без скриптов, ru+en, в стиле игры; Vite кладёт их в корень сборки →
+  `/pinterest/privacy.html`, `/pinterest/about.html`. Политика описывает реальные потоки: localStorage/IndexedDB, Supabase
+  (почта, профиль, сохранение, друзья, присутствие, фон), Google `openid/email/profile` (имя → позывной по умолчанию),
+  WebRTC + Nostr/BitTorrent-сигналинг, голос без записи, Тень (≤ 2 фразы в памяти), удаление через Issues за 30 дней.
+  **Менять политику, когда меняется сбор данных.**
+- Меню: `<a class="link" id="lnkPrivacy">` (ключ `privacyLink`), `a.link` без подчёркивания; `<noscript>` в `index.html`.
+- Владение доменом подтверждает только владелец (Search Console, свой токен) — см. `docs/GOOGLE_LOGIN.md`.
+- **Тесты:** `tests/round31b.test.mjs` (2).
+
 ## 2. Петля игры (и это надо понимать буквально)
 
 ```
@@ -752,7 +765,7 @@ src/
   ui/              hud.js, menus.js, graphics.js (расширенная графика), garage*.js (3D-гараж), lobby.js, wardrobe.js, mannequin.js, atlas*.js,
                    bag3d.js, touchButtons.js, radar.js, news.js, miccal.js, socialDock/Toasts/Words, account.js,
                    beyond.js, voicemix.js, sfxtest.js, reel.js (2.1u: plays the shift's highlights, writes .webm)
-tests/             node:test, 54 файла / 462 теста (на 3.1a)
+tests/             node:test, 55 файлов / 464 теста (на 3.1b)
 play/              собранная игра для GitHub Pages (артефакт сборки, коммитится)
 ```
 
@@ -766,7 +779,7 @@ play/              собранная игра для GitHub Pages (артефа
 
 ## 6. Проверка: как убедиться, что не сломал
 
-1. `npm test` — 462 теста (3.1a), все должны проходить (правка теста допустима только если изменилось **поведение по
+1. `npm test` — 464 теста (3.1b), все должны проходить (правка теста допустима только если изменилось **поведение по
    замыслу**, и тогда в коммит-сообщении надо сказать, какое).
 2. `npm run build:pages` — сборка в `play/`; без неё деплой покажет старую версию.
 3. Живой прогон в браузере (headless-харнесс, рецепт ниже) на **конкретной сцене**, а не «в целом работает».

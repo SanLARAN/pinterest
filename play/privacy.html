@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ТИШЕ / HUSH — политика конфиденциальности · Privacy policy</title>
+<meta name="description" content="Какие данные собирает игра ТИШЕ / HUSH, зачем и как их удалить. What data the game HUSH collects, why, and how to delete it.">
+<link rel="icon" href="./favicon.svg" type="image/svg+xml">
+<style>
+  :root { --bg: #050607; --card: #0b0d0e; --bone: #d6cdc0; --ash: #9aa3a5; --line: #2a3033; --amber: #d6a04c; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--bone); font: 16px/1.65 "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace; }
+  main { max-width: 780px; margin: 0 auto; padding: 32px 18px 64px; }
+  h1 { font-size: 26px; letter-spacing: .08em; margin: 0 0 6px; }
+  h2 { font-size: 18px; margin: 32px 0 8px; color: var(--amber); }
+  h3 { font-size: 15px; margin: 20px 0 6px; }
+  p, li { color: var(--bone); }
+  .muted { color: var(--ash); font-size: 14px; }
+  a { color: var(--amber); }
+  nav { display: flex; gap: 16px; flex-wrap: wrap; margin: 14px 0 26px; font-size: 14px; }
+  section { border-top: 1px solid var(--line); margin-top: 36px; padding-top: 6px; }
+  ul { padding-left: 20px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>ТИШЕ / HUSH</h1>
+  <p class="muted">Политика конфиденциальности · Privacy policy · действует с 1 ноября 2026 / effective 1 November 2026</p>
+  <nav><a href="./">Играть / Play</a><a href="./about.html">Об игре / About</a><a href="#ru">Русский</a><a href="#en">English</a></nav>
+
+  <section id="ru" lang="ru">
+    <h2>Коротко</h2>
+    <ul>
+      <li>Играть можно без аккаунта. Тогда всё хранится только в твоём браузере или на компьютере.</li>
+      <li>Аккаунт нужен только для облачного сохранения, друзей и профиля.</li>
+      <li>Рекламы, аналитики и сторонних трекеров в игре нет. Данные не продаются и не передаются для рекламы.</li>
+      <li>Голос из микрофона идёт напрямую другим игрокам твоей комнаты и нигде не записывается на сервер.</li>
+    </ul>
+
+    <h2>1. Кто отвечает за данные</h2>
+    <p>Игру ТИШЕ / HUSH («игра») делает независимый автор, владелец репозитория <a href="https://github.com/SanLARAN/pinterest">github.com/SanLARAN/pinterest</a>. Связаться — через <a href="https://github.com/SanLARAN/pinterest/issues">раздел Issues</a> этого репозитория.</p>
+
+    <h2>2. Без аккаунта (гостевой режим)</h2>
+    <p>Настройки, прогресс, рекорды, гардероб, привязки клавиш и фон профиля хранятся в хранилище браузера (localStorage и IndexedDB) или в папке настольного приложения. На наши серверы они не отправляются. Удаляются очисткой данных сайта в браузере или удалением приложения.</p>
+
+    <h2>3. С аккаунтом</h2>
+    <p>Аккаунт обслуживает Supabase (supabase.com) — облачная база данных и сервис входа. Хранится:</p>
+    <ul>
+      <li><b>Данные входа:</b> адрес почты. Пароль хранится Supabase Auth только в виде хеша, игра его не видит.</li>
+      <li><b>Вход через Google:</b> Google передаёт нам адрес почты, имя и ссылку на аватар (доступы <code>openid</code>, <code>email</code>, <code>profile</code>). Они нужны только для входа и показа позывного по умолчанию. Других данных Google игра не запрашивает и не получает.</li>
+      <li><b>Профиль:</b> позывной, тег для поиска друзей, статистика профиля (ночи, победы, рекорды, пройденные участки), фон профиля (картинка или видео, которое ты загрузил сам).</li>
+      <li><b>Сохранение:</b> прогресс, игровая валюта («осколки») и купленные за неё вещи, результаты смен.</li>
+      <li><b>Друзья:</b> заявки, список друзей, блокировки, приглашения в комнату, статус «в сети / в лобби / в игре» и код комнаты для приглашения.</li>
+    </ul>
+    <p>Профиль и фон видят только твои друзья. Чужим игрокам виден только позывной и тег.</p>
+
+    <h2>4. Игра с друзьями и голос</h2>
+    <ul>
+      <li>Игроки соединяются напрямую (WebRTC, peer-to-peer). Чтобы найти друг друга, браузеры используют публичные сети сигналинга: Nostr-реле и трекеры BitTorrent. Через них проходит только служебная информация для соединения, не игра и не голос. Как при любом прямом соединении, другие игроки комнаты технически могут видеть твой IP-адрес.</li>
+      <li><b>Микрофон</b> включается только с твоего разрешения. Звук идёт в реальном времени игрокам твоей комнаты и на сервер не записывается.</li>
+      <li><b>Тень</b> (игровой монстр) повторяет фразы игроков. Для этого в памяти игры у участников комнаты хранятся не более двух последних фраз каждого игрока. Они удаляются, когда ты выходишь из игры или комнаты, и никуда не сохраняются. В меню и гараже фразы не записываются.</li>
+      <li><b>Сборник смены</b> (повтор лучших моментов) хранится только в памяти твоего устройства.</li>
+    </ul>
+
+    <h2>5. Зачем это нужно</h2>
+    <p>Только чтобы игра работала: сохранять прогресс между устройствами, находить друзей и звать их в комнату, показывать профиль. Правовое основание — исполнение того, что ты сам запросил, создав аккаунт.</p>
+
+    <h2>6. Кому передаются данные</h2>
+    <p>Supabase хранит данные аккаунта как обработчик. Google участвует только во входе, если ты выбрал вход через Google. Сайт размещён на GitHub Pages, настольная версия проверяет обновления через GitHub. Больше никому данные не передаются и не продаются.</p>
+
+    <h2>7. Сколько хранятся и как удалить</h2>
+    <p>Данные аккаунта хранятся, пока существует аккаунт. Чтобы удалить аккаунт и все связанные данные (профиль, сохранение, друзей, фон), напиши запрос через <a href="https://github.com/SanLARAN/pinterest/issues">Issues</a> и укажи свой тег. Публиковать почту не нужно. Удаление выполняется в течение 30 дней. Фон профиля можно убрать сам в профиле, а выйти из аккаунта — в «Личном деле».</p>
+
+    <h2>8. Дети</h2>
+    <p>Это хоррор-игра, она не предназначена для детей младше 13 лет. Мы сознательно не собираем их данные.</p>
+
+    <h2>9. Изменения</h2>
+    <p>Если политика изменится, новая версия появится на этой странице с новой датой.</p>
+  </section>
+
+  <section id="en" lang="en">
+    <h2>In short</h2>
+    <ul>
+      <li>You can play without an account. Then everything stays in your browser or on your computer.</li>
+      <li>An account is only needed for cloud saves, friends and the profile.</li>
+      <li>The game has no ads, no analytics and no third-party trackers. Data is never sold or shared for advertising.</li>
+      <li>Microphone audio goes directly to the other players in your room and is never recorded on a server.</li>
+    </ul>
+
+    <h2>1. Who is responsible</h2>
+    <p>HUSH (ТИШЕ, “the game”) is made by an independent developer, the owner of <a href="https://github.com/SanLARAN/pinterest">github.com/SanLARAN/pinterest</a>. Contact: the repository’s <a href="https://github.com/SanLARAN/pinterest/issues">Issues</a> page.</p>
+
+    <h2>2. Without an account (guest mode)</h2>
+    <p>Settings, progress, records, wardrobe, key bindings and the profile backdrop are stored in your browser’s storage (localStorage and IndexedDB) or in the desktop app’s folder. They are not sent to our servers. Clear the site’s data in your browser or uninstall the app to delete them.</p>
+
+    <h2>3. With an account</h2>
+    <p>Accounts are run by Supabase (supabase.com), a cloud database and sign-in service. We store:</p>
+    <ul>
+      <li><b>Sign-in data:</b> your email address. Supabase Auth stores passwords only as a hash; the game never sees them.</li>
+      <li><b>Google Sign-In:</b> Google shares your email address, name and avatar link (scopes <code>openid</code>, <code>email</code>, <code>profile</code>). They are used only to sign you in and to suggest a default callsign. The game does not request or receive any other Google data.</li>
+      <li><b>Profile:</b> callsign, friend tag, profile statistics (nights, wins, records, grounds cleared), and the profile backdrop (an image or video you uploaded yourself).</li>
+      <li><b>Save:</b> progress, the in-game currency (“shards”) and items bought with it, shift results.</li>
+      <li><b>Friends:</b> requests, friends list, blocks, room invitations, your online / in lobby / in game status, and the room code used for invitations.</li>
+    </ul>
+    <p>Only your friends can see your profile and backdrop. Other players see only your callsign and tag.</p>
+
+    <h2>4. Playing together and voice</h2>
+    <ul>
+      <li>Players connect directly (WebRTC, peer-to-peer). To find each other, browsers use public signalling networks: Nostr relays and BitTorrent trackers. Only connection set-up messages pass through them, never game traffic or voice. As with any direct connection, other players in the room can technically see your IP address.</li>
+      <li>The <b>microphone</b> is used only with your permission. Audio is streamed live to the players in your room and is not recorded on any server.</li>
+      <li>The <b>Shade</b> (an in-game monster) repeats players’ phrases. For that, the game keeps at most the two latest phrases of each player in the memory of the room’s participants. They are deleted when you leave the game or the room and are never saved anywhere. Nothing is recorded in the menu or the garage.</li>
+      <li>The <b>shift reel</b> (highlight replay) is kept only in your device’s memory.</li>
+    </ul>
+
+    <h2>5. Why</h2>
+    <p>Only to make the game work: keeping progress across devices, finding friends and inviting them to a room, showing the profile. The legal basis is performing the service you asked for by creating an account.</p>
+
+    <h2>6. Who receives data</h2>
+    <p>Supabase stores account data as a processor. Google is involved only in sign-in, if you choose Google. The site is hosted on GitHub Pages, and the desktop app checks GitHub for updates. Data is not shared with or sold to anyone else.</p>
+
+    <h2>7. Retention and deletion</h2>
+    <p>Account data is kept while the account exists. To delete your account and all related data (profile, save, friends, backdrop), open a request on <a href="https://github.com/SanLARAN/pinterest/issues">Issues</a> with your friend tag; you do not need to post your email. Deletion is completed within 30 days. You can remove the backdrop yourself in the profile and sign out in the personnel file.</p>
+
+    <h2>8. Children</h2>
+    <p>This is a horror game and is not intended for children under 13. We do not knowingly collect their data.</p>
+
+    <h2>9. Changes</h2>
+    <p>If this policy changes, the new version will be published on this page with a new date.</p>
+
+    <h2>Google API Services</h2>
+    <p>The game’s use of information received from Google APIs adheres to the <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>, including the Limited Use requirements.</p>
+  </section>
+</main>
+</body>
+</html>

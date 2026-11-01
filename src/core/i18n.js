@@ -297,6 +297,7 @@ const STR = {
     play: 'ИГРАТЬ',
     scores: 'РЕКОРДЫ',
     settings: 'НАСТРОЙКИ',
+    privacyLink: 'КОНФИДЕНЦИАЛЬНОСТЬ', // (3.1b) static page, public/privacy.html
     howto: 'КАК ИГРАТЬ',
     atlas: 'АТЛАС',
     shop: 'МАГАЗИН',
@@ -1241,6 +1242,7 @@ const STR = {
     play: 'PLAY',
     scores: 'HIGH SCORES',
     settings: 'SETTINGS',
+    privacyLink: 'PRIVACY',
     howto: 'HOW TO PLAY',
     atlas: 'ATLAS',
     shop: 'SHOP',

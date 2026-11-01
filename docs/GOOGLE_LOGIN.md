@@ -29,6 +29,24 @@ https://supabase.com/dashboard/project/ppylutuhhmvhgqqqnldm
      - `http://localhost:5173/**`
      - `http://127.0.0.1:47615/**` ← для настольной версии (`.exe`)
 
+## Нужна ли проверка Google (verification)?
+
+**Для входа — нет.** С доступами `openid`, `email`, `profile` приложение в статусе «In production» пускает любого
+пользователя Google без проверки и без предупреждения «непроверенное приложение». Проверка бренда нужна только чтобы на
+экране входа было «ТИШЕ / HUSH» с логотипом вместо адреса `ppylutuhhmvhgqqqnldm.supabase.co`.
+Если загружен логотип, Google требует проверку — тогда проще **удалить логотип** и не подавать на проверку.
+
+Если хочется имя на экране входа (проверка бренда):
+- **Application home page:** `https://sanlaran.github.io/pinterest/about.html` (статичная, открывается мгновенно);
+- **Privacy policy link:** `https://sanlaran.github.io/pinterest/privacy.html`;
+- **Владение:** https://search.google.com/search-console → «Префикс URL» → `https://sanlaran.github.io/pinterest/` →
+  способ «HTML-тег» → прислать строку `<meta name="google-site-verification" content="…">` (она не секретная) — её
+  добавят в `index.html`, `about.html` и `privacy.html`. Подтверждать тем же Google-аккаунтом, что владеет проектом в Cloud.
+  Если Google не примет подпуть `/pinterest/`, нужен корень `https://sanlaran.github.io/` — это отдельный репозиторий
+  `SanLARAN.github.io` с тем же тегом.
+- Домен `supabase.co` в списке Authorized domains ты подтвердить не сможешь; если проверка упрётся в него, остаётся
+  либо жить без проверки бренда, либо свой домен для Supabase (платная опция Custom Domain).
+
 ## 3. Проверка
 
 - `https://ppylutuhhmvhgqqqnldm.supabase.co/auth/v1/settings` (с заголовком `apikey`) → `"google": true`.

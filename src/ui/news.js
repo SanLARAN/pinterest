@@ -7,6 +7,17 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v:'3.1b',date:'2026-11-01',
+    ru:{title:'Политика конфиденциальности',items:[
+      'В меню появилась ссылка «Конфиденциальность»: на одной странице по-русски и по-английски написано, какие данные хранит игра, зачем, кто их видит и как удалить аккаунт.',
+      'Коротко: без аккаунта всё остаётся в браузере. Рекламы и аналитики нет. Голос идёт напрямую игрокам комнаты и нигде не записывается.',
+    ]},
+    en:{title:'Privacy policy',items:[
+      'The menu now has a Privacy link: one page, in Russian and English, says what data the game keeps, why, who can see it and how to delete your account.',
+      'In short: without an account everything stays in your browser. There are no ads and no analytics. Voice goes directly to the players in your room and is never recorded.',
+    ]},
+  },
+  {
     v:'3.1a',date:'2026-11-01',
     ru:{title:'Google в настольной версии',items:[
       'В настольной версии (.exe) кнопка «Войти через Google» теперь открывает твой обычный браузер: Google не пускает вход во встроенные окна. После входа вкладка скажет «Готово», а игра войдёт в аккаунт сама — ничего копировать не нужно.',
