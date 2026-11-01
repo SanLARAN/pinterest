@@ -242,10 +242,12 @@ export class Input {
   // (3.0v) a refused lock. The browser refuses for ordinary reasons — no click behind the request, Esc (which is
   // never a gesture: closing the backpack with it used to count), or the second after you left the lock — and
   // none of those may turn the mouse into drag-to-look for the rest of the session: the next click asks again.
-  // Only a page in someone else's frame, refused twice, falls back to dragging.
+  // Only a page in someone else's frame, refused twice, falls back to dragging — and (3.1f) the desktop build:
+  // a shell from before 3.1f refuses the lock outright (its permission list had no 'pointerLock'), and there the
+  // camera must still turn while the new shell is on its way.
   _lockRefused() {
     this.lockFails = (this.lockFails || 0) + 1;
-    if (this.inFrame && this.lockFails >= 2) this.lockFailed = true;
+    if ((this.inFrame || !!globalThis.hushDesktop) && this.lockFails >= 2) this.lockFailed = true;
   }
 
   exitLock() {

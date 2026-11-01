@@ -24,8 +24,10 @@ function resolveRequest(requestUrl, dist) {
   return { file: path.join(dist, 'index.html'), fallback: true };
 }
 
-// Only sound: the game is a microphone, nothing else it asks for is its business.
-const PERMISSIONS = new Set(['media', 'audioCapture', 'speaker-selection']);
+// Sound, and the mouse: the game is a microphone and a first-person camera — nothing else it asks for is its
+// business. (3.1f) Electron routes pointer lock and fullscreen through this same handler; without 'pointerLock'
+// every click on «кликни, чтобы управлять взглядом» was refused and the camera never turned in the .exe.
+const PERMISSIONS = new Set(['media', 'audioCapture', 'speaker-selection', 'pointerLock', 'fullscreen']);
 function allowsPermission(permission) {
   return PERMISSIONS.has(permission);
 }

@@ -7,6 +7,17 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v:'3.1f',date:'2026-11-01',
+    ru:{title:'Камера в приложении',items:[
+      'В версии для Windows не вертелась камера: «кликни, чтобы управлять взглядом» — и ничего. Приложение запрещало игре захватывать мышь, разрешало только микрофон. Теперь разрешено.',
+      'Исправление придёт двумя шагами. Сначала, через обычное маленькое обновление игры: если старая программа всё ещё не отдаёт мышь, после двух кликов камера начнёт вертеться перетаскиванием с зажатой кнопкой. Потом лаунчер в фоне скачает новую версию программы и поставит её при выходе — после этого мышь будет как в браузере.',
+    ]},
+    en:{title:'The camera in the app',items:[
+      'In the Windows app the camera did not turn: «click to look around», and nothing. The app refused the game the mouse and allowed only the microphone. Now it allows both.',
+      'The fix comes in two steps. First, through the usual small game update: if the old program still refuses, after two clicks you can turn the camera by dragging with the button held. Then the launcher downloads the new program in the background and installs it when you quit — after that the mouse works as in the browser.',
+    ]},
+  },
+  {
     v:'3.1e',date:'2026-11-01',
     ru:{title:'Друг издалека',items:[
       'Игроки соединяются напрямую. Если у друга мобильный интернет или «серый» IP у провайдера — часто это и есть «друг в другой стране не может зайти», — напрямую соединение не пробивается. Теперь в таком случае игра соединяется через ретранслятор (ExpressTURN): он только пересылает зашифрованные пакеты.',
