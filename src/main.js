@@ -70,6 +70,7 @@ import { Wardrobe } from './ui/wardrobe.js';
 import { ProfileScreen, myCard } from './ui/profile.js'; // 3.0x
 import { KeysPanel } from './ui/keysPanel.js'; // 3.0y
 import { QuickWheel } from './ui/quickWheel.js'; // 3.1c: hold the backpack key, point, let go
+import { Splash } from './ui/splash.js'; // 3.1q: «Лось» in the dark before the menu
 
 setLang(settings.lang);
 
@@ -82,6 +83,7 @@ const DEBUG = {
   range: params.has('range'), // (3.0u) a reload that was on its way to the training ground: play its film, not a shift
   night: params.has('night'), // skip the morning
   nointro: params.has('nointro'), // ...and the opening cut scene
+  nosplash: params.has('nosplash'), // (3.1q) straight to the menu, no «Лось» first
   seats: parseInt(params.get('seats'), 10) || 0, // preview a lobby's four goodnights alone
   nomic: params.has('nomic'),
   fps: params.has('fps'),
@@ -194,7 +196,8 @@ let game = null;
 const quickWheel = new QuickWheel({ getGame: () => game, input }); // (3.1c)
 let runOnline = false; // the current / last run is a co-op night
 
-let state = 'boot'; // boot | menu | playing | paused | over
+let state = 'boot'; // boot | splash | menu | playing | paused | over
+let splash = null; // (3.1q) the one before the menu
 let overAt = 0;
 let menuTime = 0;
 const perf = { acc: 0, n: 0, scale: 1, cool: 3, ceiling: 9, ceilT: 0, fpsEl: null, fps: 60 };
@@ -576,6 +579,20 @@ $('btnStart').addEventListener('click', () => { audio.init(); menuMusic.retry();
 const unlockAudio = () => { audio.init(); menuMusic.retry(); };
 window.addEventListener('pointerdown', unlockAudio, { capture: true });
 window.addEventListener('keydown', unlockAudio, { capture: true });
+// (3.1q) the splash takes the first keys and taps: in the dark before the piano one starts it, after that one skips it
+const splashKey = (e) => {
+  if (state !== 'splash' || !splash) return;
+  if (splash.input()) { e.preventDefault(); e.stopImmediatePropagation(); }
+};
+window.addEventListener('keydown', splashKey, { capture: true });
+window.addEventListener('pointerdown', splashKey, { capture: true });
+// once a launch, not on every reload (a map switch reloads the page), never for an invite link, a debug start
+// or a browser driven by a test
+function wantSplash() {
+  if (DEBUG.nosplash || DEBUG.range || DEBUG.autostart || DEBUG.night || DEBUG.nointro || DEBUG.t > 0 || DEBUG.shelter) return false;
+  if (cleanCode(params.get('room')).length >= 4 || (typeof navigator !== 'undefined' && navigator.webdriver)) return false;
+  try { return !sessionStorage.getItem('hush.splash'); } catch { return true; }
+}
 
 // ---------------- attract mode (menu background) ----------------
 const attract = { rig: null, yaw: 0.6, nextPing: 0.4, nextGlint: 2.2 };
@@ -1138,7 +1155,7 @@ function step(now, render) {
   const look = input.poll();
   const events = input.consume();
   if (state === 'boot') return;
-  handleEvents(events);
+  if (state !== 'splash') handleEvents(events);
   if (state === 'playing' && game) quickWheel.frame(now); // (3.1c)
   else if (quickWheel.open || quickWheel.hold) quickWheel.close();
 
@@ -1187,6 +1204,8 @@ function step(now, render) {
       document.body.classList.toggle('needlock', !!lockMsg);
       document.body.classList.toggle('crouching', input.crouch);
     }
+  } else if (state === 'splash') {
+    splash.update(rawDt);
   } else if (state === 'over' && game && game.state === 'won') {
     // behind the results: the УАЗ's taillights going away down the highway (or, the old way, the morning forest)
     game.afterWon(rawDt, camera, now / 1000);
@@ -1399,14 +1418,25 @@ function boot() {
     }
     // warm up shaders so the first ping doesn't hitch
     renderer.compile(scene, camera);
-    window.__hush = { world, game, shared, pulses, ghosts, eyes, renderer, perf, mic, audio, music: menuMusic, input, hud, post, shadows, coop, lobby, atlas, wardrobe, micCal, news, home, debug: DEBUG, profile, startRun, pause, resume, toMenu, highlights, reel, get opening() { return game && game.opening; }, ensureGarage, cloud, account, social, notifications, get garage() { return garage; }, get state() { return state; } };
-    state = 'menu';
-    menuTime = 0;
-    post.u.uFade.value = 0;
-    menuMusic.applyVolume();
-    menuMusic.start(); // the browser may hold it until the first tap: a gesture calls retry()
-    menus.only('menu');
-    home.enter();
+    window.__hush = { world, game, shared, pulses, ghosts, eyes, renderer, perf, mic, audio, music: menuMusic, input, hud, post, shadows, coop, lobby, atlas, wardrobe, micCal, news, home, debug: DEBUG, profile, startRun, pause, resume, toMenu, highlights, reel, get opening() { return game && game.opening; }, ensureGarage, cloud, account, social, notifications, get garage() { return garage; }, get state() { return state; }, get splash() { return splash; } };
+    const enterMenu = () => {
+      state = 'menu';
+      menuTime = 0;
+      post.u.uFade.value = 0;
+      menuMusic.applyVolume();
+      menuMusic.start(); // the browser may hold it until the first tap: a gesture calls retry()
+      menus.only('menu');
+      home.enter();
+    };
+    // (3.1q) once a launch: «Лось» in the dark, the piano, the scream — then the menu
+    if (wantSplash()) {
+      try { sessionStorage.setItem('hush.splash', '1'); } catch { /* private mode: it plays every time */ }
+      splash = new Splash({ world, camera, pulses, ghosts, eyes, audio, post, shared, pixScale });
+      state = 'splash';
+      menus.only('splash'); // (no screen has that id: the boot loader and everything else go)
+      audio.init(); // (a desktop shell plays sound without a gesture; a browser will say no until one)
+      splash.begin(enterMenu);
+    } else enterMenu();
     updateMicUI();
     // 3.0g: a link that names the ground wins over the remembered one — otherwise ?map=bog would bounce the
     // player back to the forest the moment the shift started

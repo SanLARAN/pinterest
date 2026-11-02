@@ -542,6 +542,8 @@ const STR = {
     // glow sticks
     touchGlow: 'СВЕТ',
     aGlowDay: 'прибереги палочку до темноты',
+    splashGate: 'нажми любую клавишу',
+    splashSkip: 'любая клавиша — пропустить',
     aFlareDay: 'ракету — на ночь: днём её никто не увидит',
     tapeDay: 'днём выманивать некого — магнитофон на ночь',
     aNoGlow: 'палочек больше нет',
@@ -1576,6 +1578,8 @@ const STR = {
     flareGun: 'flare gun',
     touchGlow: 'LIGHT',
     aGlowDay: 'save the glow stick for the dark',
+    splashGate: 'press any key',
+    splashSkip: 'any key to skip',
     aFlareDay: 'save the flare for the night: nobody sees it by day',
     tapeDay: 'nothing to lure out by day — the tape is for the night',
     aNoGlow: 'no glow sticks left',

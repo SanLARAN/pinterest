@@ -34,7 +34,7 @@
 
 ```bash
 npm install
-npm test            # node:test, 69 файлов, 547 тестов (3.1p) — все должны быть зелёными
+npm test            # node:test, 70 файлов, 552 теста (3.1q) — все должны быть зелёными
 npm run dev         # http://localhost:5173
 npm run build:pages # сборка в play/ — без неё деплой покажет старую версию
 ```
@@ -42,7 +42,7 @@ npm run build:pages # сборка в play/ — без неё деплой по�
 - Менял картинку — **скриншот в кадре**, а не описание шейдера.
 - Headless-браузер (SwiftShader) даёт ~4 fps: не ждать таймером, а прыгать по состоянию
   (`window.__hush.opening.seek(t)`, `game.startDawn()`) и шагать кадры вручную.
-- Полезные URL: `?nointro`, `?night`, `?t=500`, `?nomic`, `?fps`, `?sfx`, `?speed=2`, `?room=КОД`.
+- Полезные URL: `?nosplash` (без заставки перед меню, 3.1q), `?nointro`, `?night`, `?t=500`, `?nomic`, `?fps`, `?sfx`, `?speed=2`, `?room=КОД`.
 - Ловушки и рецепты харнесса — `docs/CONTEXT.md` §6.
 
 ## Чего не делать

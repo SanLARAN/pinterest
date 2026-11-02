@@ -7,6 +7,17 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v:'3.1q',date:'2026-11-02',
+    ru:{title:'Лось в темноте',items:[
+      'Перед главным меню теперь заставка. Ночной лес, вдалеке среди сосен один стоит Лось — Слушатель с рогами. Играет «Detuned Piano». Каждый удар пианино — эхо, а эхо показывает только то, где он БЫЛ, поэтому каждый раз он ближе: на обрыве нарастания, потом на самом громком аккорде. На долгом аккорде он медленно поворачивает голову, и это видно — красный контур в темноте. Ещё рывок, и он в пяти шагах. Пианино стихает, секунда тишины — и он у тебя перед лицом.',
+      'Любая клавиша или касание пропускает заставку. Она идёт один раз за запуск: при перезагрузке из-за смены карты и по ссылке-приглашению её нет. Если браузер не даёт звуку играть без нажатия, заставка ждёт в темноте с надписью «нажми любую клавишу»: без пианино это только половина. С настройкой «щадящие скримеры» крик тише и без вспышки.',
+    ]},
+    en:{title:'The elk in the dark',items:[
+      'A splash now plays before the main menu. The forest at night, and far off among the pines, alone, stands the Elk — the antlered Listener. «Detuned Piano» plays. Every piano accent is an echo, and an echo shows only where it WAS, so each time it is nearer: when the swell cuts off, then on the loudest chord. On the long chord it slowly turns its head, and you see that: a red outline in the dark. One more jump and it is five steps away. The piano dies away, a second of silence — and it is in your face.',
+      'Any key or tap skips it. It plays once per launch: not on the reload a map switch makes, not from an invite link. If the browser will not play sound before a key press, it waits in the dark with «press any key»: without the piano it is only half of itself. With reduced scares the scream is quieter and there is no flash.',
+    ]},
+  },
+  {
     v:'3.1p',date:'2026-11-02',
     ru:{title:'Утро для дела, Удильщик за работой, хватка Дворняжки',items:[
       'Утром снова можно всё, что не ночная работа: подбирать вещи с земли (инструменты, фонарь, палочки, выпавшее из рюкзака, карту деталей), обыскивать тела и убирать записку на E, открывать шкафы, лезть на вышку, бросать камни, включать фонарь, колоть шприц, писать на магнитофон. Генераторы, бункер, громкоговоритель лагеря и сиденья УАЗа по-прежнему ждут ночи. Ракета и магнитофон днём честно говорят, что они на ночь, а не молчат.',
