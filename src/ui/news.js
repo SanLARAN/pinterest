@@ -7,6 +7,19 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v:'3.1p',date:'2026-11-02',
+    ru:{title:'Утро для дела, Удильщик за работой, хватка Дворняжки',items:[
+      'Утром снова можно всё, что не ночная работа: подбирать вещи с земли (инструменты, фонарь, палочки, выпавшее из рюкзака, карту деталей), обыскивать тела и убирать записку на E, открывать шкафы, лезть на вышку, бросать камни, включать фонарь, колоть шприц, писать на магнитофон. Генераторы, бункер, громкоговоритель лагеря и сиденья УАЗа по-прежнему ждут ночи. Ракета и магнитофон днём честно говорят, что они на ночь, а не молчат.',
+      'Удильщик снова похищает. Он подходил, клал руку тебе на плечо и уходил: место у дерева, где он привязывает, в полуметре от коры, а проверка «свободно ли» брала 0,8 м и упиралась в тот же ствол. Ни одно из ~130 деревьев рядом не проходило. Теперь он хватает, тащит к дереву и привязывает, как задумано.',
+      'Хватка Дворняжки убивает и в коопе. Раньше она «надевала» тебя: ты 45 секунд стоял на месте живой и не мог шевельнуться. Теперь, как от любой твари, ты падаешь, а друг ещё может донести тебя до койки. И только потом она идёт к живым и говорит твоим именем. Твоё тело остаётся лежать, где упало.',
+    ]},
+    en:{title:'The morning is for work, the Angler at work, the Stray\'s hand',items:[
+      'The morning lets you do everything that is not the night\'s work again: pick things up off the ground (tools, the torch, glow sticks, what fell out of a bag, the parts map), search bodies and put the page away with E, open cupboards, climb the lookout, throw stones, switch the torch on, use the needle, record on the tape. Generators, the shelter, the camp loudspeaker and the UAZ\'s seats still wait for the night. The flare gun and the tape now say they are for the night instead of doing nothing.',
+      'The Angler takes people again. He walked up, put his hand on you and walked away: the spot by the tree where he ties you is half a metre off the bark, and the check for room asked for 0.8 m and hit the trunk itself. Not one of the ~130 trees in reach passed. Now he takes you, hauls you to a tree and ties you there, as he was meant to.',
+      'The Stray\'s hand kills in co-op too. She used to "wear" you: you stood there for 45 seconds, alive and unable to move. Now you go down as with any creature, and a friend may still carry you to the cot. Only then does she walk to the living and speak in your name. Your body stays where it fell.',
+    ]},
+  },
+  {
     v:'3.1o',date:'2026-11-02',
     ru:{title:'Ровный шаг, дорога без края, новый УАЗ',items:[
       'Ходьба больше не дёргается. Голова качалась на шагах так, что в каждом шаге камера разворачивалась вниз-вверх за один кадр, четыре раза в секунду. В темноте этого не видно, а на полигоне, утром и у ламп весь мир вздрагивал на каждом шаге. Теперь голова плавно проседает в шаг и поднимается, а переход на бег углубляет качку постепенно. У мотоцикла качки нет, поэтому на нём всё и было ровно.',

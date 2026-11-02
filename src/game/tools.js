@@ -54,7 +54,7 @@ export class ForestTools {
   get hasCrowbar() { return this.items.some((it) => it.kind === 'crowbar' && it.state === 'held' && it.owner === this.g.player.id); }
   get handsFree() {
     const g = this.g;
-    return g.player.alive && (g.state === 'play' || g.state === 'training') && !g.inputMuted && !g.player.carrying && !g.escape.held && g.escape.mySeat < 0 && !g.cabinets.busy && !g.expedition?.onTower;
+    return g.player.alive && (g.state === 'play' || g.state === 'training' || g.state === 'morning') && !g.inputMuted && !g.player.carrying && !g.escape.held && g.escape.mySeat < 0 && !g.cabinets.busy && !g.expedition?.onTower;
   }
   get clock() { return this.g.auth ? this.g.time : this.g.netT; }
   groundHeight(x, z) {
@@ -125,7 +125,7 @@ export class ForestTools {
   // Only the host calls this. Validate ownership, reach and free hands on the host's last player state.
   grant(action, i, pid, clip = null) {
     const g = this.g, p = g.playerById(pid);
-    if (!Number.isInteger(i) || i < 0 || !g.auth || g.state !== 'play' && g.state !== 'training' || !p || !p.alive || p.carrying || g.escape.load(pid) || g.cabinets.locked(pid) || g.escape.seatOf(pid) >= 0) return false;
+    if (!Number.isInteger(i) || i < 0 || !g.auth || g.state !== 'play' && g.state !== 'training' && g.state !== 'morning' || !p || !p.alive || p.carrying || g.escape.load(pid) || g.cabinets.locked(pid) || g.escape.seatOf(pid) >= 0) return false;
     if (action === 'pry') {
       const c = g.cabinets.list[i | 0];
       if (!c || !c.locked || Math.hypot(c.front.x - p.x, c.front.z - p.z) > 2.5 || Math.abs(c.spec.y - p.y) > 2) return false;
@@ -149,7 +149,7 @@ export class ForestTools {
       it.x = p.x + f.x * 0.4; it.z = p.z + f.z * 0.4; it.y = this.groundHeight(it.x, it.z) + 0.025;
       it.yaw = p.yaw; it.state = 'ground'; it.owner = null; it.start = it.end = 0;
     } else if (action === 'play') {
-      if (it.kind !== 'tape' || it.state !== 'held' || it.owner !== pid) return false;
+      if (it.kind !== 'tape' || it.state !== 'held' || it.owner !== pid || g.state === 'morning') return false; // (a lure by day lures nothing)
       const f = p.forward();
       let spot = null;
       for (const d of [1.05, 0.8, 0.5, 0]) {
@@ -226,6 +226,7 @@ export class ForestTools {
   play() {
     const it = this.tapeHeld;
     if (!it || !this.handsFree) return;
+    if (this.g.state === 'morning') { this.g.hud.popup(t('tapeDay'), 'dim'); return; } // (3.1p)
     this.cancelRecord();
     const charged = it.charges > 0;
     if (this.request('play', it.i, it.clip)) this.g.hud.popup(t(charged ? 'tapePlaced' : 'tapeFlat'), 'amber');

@@ -55,6 +55,7 @@ function bare(shift = {}) {
   g.world = { terrain: { height: () => 0 } };
   g.rescue = { dawnPeace() { return false; }, update() {} };
   g.escape = { held: null, mySeat: -1, update() {} }; // (2.1q: the yard lives through the morning too)
+  g.stones = { update() {} }; g.flares = { update() {} }; // (3.1p: a stone thrown by day lands by day)
   g.stats = { revives: 0, syringes: 0 };
   g.onEnd = null;
   g.dread = { reset() {} };

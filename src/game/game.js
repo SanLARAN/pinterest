@@ -421,9 +421,25 @@ export class Game {
         }
         this.coop.toHost('sk', 1); // a guest asks; the host's word starts the dusk for everyone
       } else if (e === 'carry') this.carryKey(); // R: set the part down (2.1q: hauling is morning work too)
-      else if (e === 'primary' && (this.escape.held || this.inventory.equipped === 'syringe')) this.inventory.primary(); // ...throw it down ahead — or the needle, in daylight too (2.1r)
+      // (3.1p) the whole kit by day: a part thrown down, the needle (2.1r), a stone, the torch, the map, a battery,
+      // the tape's record button. (A glow stick and the flare gun say they are for the dark; see glows.use, fireFlare)
+      else if (e === 'primary') this.inventory.primary();
+      else if (e === 'secondary') this.inventory.secondary();
     }
     if (this.state !== 'morning') return;
+    // E puts a page away (a body can be searched by day now)
+    if (this.objectives.note && raw.events.includes('useDown')) {
+      this.objectives.closeNote();
+      this.events = raw.events.filter((e) => e !== 'useDown');
+    }
+    // the morning's own timeline: the hints a find schedules (the night clears it when it starts)
+    for (let i = this.timeline.length - 1; i >= 0; i--) {
+      if (this.time >= this.timeline[i].at) {
+        const ev = this.timeline[i];
+        this.timeline.splice(i, 1);
+        ev.fn();
+      }
+    }
     // (2.1r: down at dawn is a state of its own now — the body lies where it fell until hands move it;
     // Player.update has no alive-guard and would happily walk the corpse around by keyboard)
     const pev = !p.alive ? { step: null, bump: null, breath: null }
@@ -447,6 +463,8 @@ export class Game {
     this.objectives.update(dt, false);
     if (this.map === 'bog') syncPumps(this.world, this.objectives.gens); // the bog's water (3.0c)
     this.doors.update(dt);
+    this.stones.update(dt, this); // (3.1p: a stone thrown by day has to land)
+    this.flares.update(dt);
     this.rescue.update(dt); // the bleed clock and the carrying shoulder do not stop for the sun (2.1r)
     this.escape.update(dt); // the parts live and roll in daylight too (2.1q)
     this.cabinets.update(dt);
@@ -1073,6 +1091,7 @@ export class Game {
   // Q: up it goes. it lights the forest red for a quarter of a minute — and calls everything in it
   fireFlare() {
     const p = this.player;
+    if (p.alive && this.state === 'morning') { this.hud.popup(t('aFlareDay'), 'dim'); return; } // (3.1p: say so, not nothing)
     if (!p.alive || (this.state !== 'play' && this.state !== 'training')) return;
     if (p.flares <= 0 || !p.hasFlare) {
       this.hud.popup(t(p.hasFlare ? 'aNoFlares' : 'aNoFlareGun'), 'dim');
@@ -2042,15 +2061,7 @@ export class Game {
     const watched = this.spectate && this.spectate.target;
     for (const r of this.remotes.values()) {
       r.update(dt);
-      // she is wearing them (2.1v): their shape on this machine walks where she walks, so the watch,
-      // the voices and the echo of them all follow her instead of the body she left standing
-      const wear = this.stray?.wear;
-      if (wear && wear.pid === r.id && this.stray.present) {
-        r.x = this.stray.x;
-        r.z = this.stray.z;
-        r.y = this.stray.y;
-        r.yaw = this.stray.yaw;
-      }
+      // (3.1p) she no longer drags their shape about with her: the one she took is down, and lies where they fell
       // the dead are heard only by the dead — and by each other from anywhere: close, everywhere at once
       this.audio.voiceMode(r.id, !meAlive && !r.alive ? 'beyond' : 'forest');
       this.audio.voiceSet(r.id, r.x, r.y + (r.alive ? r.eyeCur : 0.35), r.z, r.alive || !meAlive ? 1 : 0);
@@ -2365,6 +2376,7 @@ export class Game {
     this.glows.update(dt);
     this.rescue.update(dt);
     this.angler.update(dt); // a dead host still keeps his rope and his clock
+    this.stray.update(dt); // (3.1p) ...and she goes on walking under the name of the one she took
     this.escape.update(dt);
     this.cabinets.update(dt);
     if (this.player.alive) return; // brought back this frame

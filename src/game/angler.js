@@ -362,9 +362,12 @@ export class Angler {
 
   _grab(target) {
     const g = this.g, a = A();
+    // (3.1p) the spot is half a metre off the trunk's bark, so it is only asked to hold a body (the player's
+    // 0.35 m): asked for 0.8 m, the tree itself was "in the way" of every spot — not one of the ~130 trees in
+    // reach ever passed, and every hunt ended with his hand on you and him walking off
     const tree = chooseTree(g.world.col.caps, target.x, target.z, () => g.rng.next(), a, (x, z) => {
       const L = g.world.lake;
-      return g.world.inYard(x, z, 1) || !g.world.col.free(x, z, 0.8) || (L && Math.hypot(x - L.x, z - L.z) < L.r + 1.5);
+      return g.world.inYard(x, z, 1) || !g.world.col.free(x, z, CFG.PLAYER.radius) || (L && Math.hypot(x - L.x, z - L.z) < L.r + 1.5);
     });
     if (!tree) { // no tree worth the walk: tonight he lets this one go with a warning
       this.hunt = null; this.huntTarget = null;

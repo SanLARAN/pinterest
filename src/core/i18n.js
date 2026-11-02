@@ -542,6 +542,8 @@ const STR = {
     // glow sticks
     touchGlow: 'СВЕТ',
     aGlowDay: 'прибереги палочку до темноты',
+    aFlareDay: 'ракету — на ночь: днём её никто не увидит',
+    tapeDay: 'днём выманивать некого — магнитофон на ночь',
     aNoGlow: 'палочек больше нет',
     hintGlow: "ЛКМ — бросить палочку · E — подобрать · I — убрать в рюкзак",
     hintGlowTouch: "ПРЕДМЕТ — бросить палочку · РУКИ — подобрать",
@@ -1574,6 +1576,8 @@ const STR = {
     flareGun: 'flare gun',
     touchGlow: 'LIGHT',
     aGlowDay: 'save the glow stick for the dark',
+    aFlareDay: 'save the flare for the night: nobody sees it by day',
+    tapeDay: 'nothing to lure out by day — the tape is for the night',
     aNoGlow: 'no glow sticks left',
     hintGlow: "LMB — throw stick · E — pick up · I — put in backpack",
     hintGlowTouch: "ITEM — throw stick · HANDS — pick up",

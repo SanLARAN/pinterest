@@ -158,13 +158,14 @@ test('following, she stops to smell the air — and sometimes, instead, says «�
   assert.ok(c2.includes('strayHey'));
 });
 
-test('wearing someone, she is not seen in the light — but the echo still finds her', () => {
+// (3.1p) she kills first now: the one she took lies where they fell, so in the light she is seen as what she is
+test('wearing someone, she is seen in the light as herself — and the echo finds her too', () => {
   const { g } = fakeGame();
   const s = new Stray(g);
   s.ensureRig();
   s.phase = 'wear';
   s._present(1 / 30);
-  assert.equal(s.rig.root.visible, false, 'in the light the friends see their friend');
+  assert.equal(s.rig.root.visible, true, 'their body lies where it fell: what walks in the light is her');
   const before = g.ghosts.spawned;
   s.reveal({ x: 0, y: 1.4, z: 0, prevR: -1, curR: 5, radius: 20 });
   assert.equal(g.ghosts.spawned, before + 1, 'a wave reaching her draws what she really is');

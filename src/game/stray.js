@@ -297,16 +297,18 @@ export class Stray {
     g.addTrauma(0.5);
     g.fx.glitch = Math.max(g.fx.glitch, 0.5);
     p.heldByStray = true;
-    if (g.online) this._startWear(p);
   }
 
-  // 1.4 s in her hands: solo, that is the end; the reel will want to see it, so it goes through g.kill
+  // 1.4 s in her hands, and that is the end — alone or not; the reel will want to see it, so it goes through g.kill.
+  // (3.1p) In co-op her hand used to close and keep you standing there for 45 s, «worn», alive, unable to move:
+  // a death that never came. Now you go down like anyone else a thing takes (a friend may still reach the cot),
+  // and only then does she walk off under your name toward the others.
   _take(p) {
     const g = this.g, s = S();
     this.grabT = 0;
     p.heldByStray = false;
-    if (g.online && this.wear) return; // already wearing them
-    g.kill({ type: 'stray', x: this.x, y: this.y, z: this.z, feed() {}, huntCause: null }, p);
+    g.kill({ type: 'stray', id: -1, x: this.x, y: this.y, z: this.z, feed() {}, huntCause: null }, p);
+    if (g.online && !p.alive && g.livePlayers().length) { this._startWear(p); return; }
     this._away();
     this.coolT = g.rng.float(s.gap[0], s.gap[1]);
   }
@@ -333,7 +335,8 @@ export class Stray {
     if (!w) return;
     w.t += dt;
     const victim = g.playerById(w.pid);
-    if (!victim || !victim.alive || w.t > s.wear) { this._endWear(); return; }
+    // (3.1p) the one she took is down: back on their feet (the cot, the needle) and the game is up
+    if (!victim || victim.alive || w.t > s.wear) { this._endWear(); return; }
     // the impostor walks toward the nearest friend
     let best = null, bd = 1e9;
     for (const q of g.livePlayers()) {
@@ -390,22 +393,16 @@ export class Stray {
     }
   }
 
-  // this machine's player is the one she is wearing: hands off the keys, and the mic goes dead to the team
+  // this machine's player is the one she walks about as. (3.1p) They are down already — their keys and their
+  // voice are a downed player's, as with any other death; they only learn what she is doing with their name.
   _becomeWorn(on, line = 0) {
     const g = this.g;
     this.worn = !!on;
-    g.strayWorn = !!on;
     g.wornLine = line;
     if (on) {
-      g.audio?.strayTake(g.player.x, g.player.y + 1.4, g.player.z);
       g.fx.glitch = Math.max(g.fx.glitch, 0.9);
-      g.addTrauma(0.6);
       g.hud?.flashAlert(t('strayWornSelf'), 'danger', 4);
-      g.hud?.flashAlert(t('strayMicDead'), 'warn', 4);
-    } else {
-      g.hud?.flashAlert(t('strayVoiceBack'), 'dawn', 3);
     }
-    muteOwnVoice(g, !!on);
   }
 
   // ---------------- the guest replays her ----------------
@@ -506,8 +503,9 @@ export class Stray {
     this.rig.root.rotation.y = this.yaw;
     const day = ['dawn', 'morning', 'dusk', 'training', 'won'].includes(g.state);
     const lit = day || g.glowAt(this.x, this.y + 1.1, this.z) > 0.03;
-    // (3.0t) wearing someone, she is not seen in the light — they see their friend. The echo still finds her.
-    this.rig.root.visible = show && lit && g.state === 'play' && this.phase !== 'wear';
+    // (3.1p) wearing someone she is seen in the light as what she is: the one she took lies where they fell
+    // (it was hidden while their own shape walked with her — and the body walked off with it)
+    this.rig.root.visible = show && lit && g.state === 'play';
     if (show) {
       // a guest has no host clock for her stops: a standing follower is a sniffing one
       const sniff = g.auth ? this.sniff : this.phase === 'follow' && this.speed < 0.15 ? 1 : 0;

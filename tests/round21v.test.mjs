@@ -277,27 +277,44 @@ test('the loop itself: she comes out, follows, wakes when you run near her, and 
   assert.equal(st.phase, 'away', 'and then she is gone again');
 });
 
-test('in co-op she does not kill: she starts wearing, and the host sends the word out', () => {
+// (3.1p) «когда тебя убивает волчица, ты просто стоишь на месте, а не умираешь»: in co-op her hand used to keep you
+// standing, alive and frozen, for 45 s. Now it kills as it does alone — and only then she walks off under your name.
+test('in co-op her hand kills too: you go down like anyone else, then she walks to your friends under your name', () => {
   const g = fakeGame();
   g.online = true;
   g.sync = { sent: [], ev(...a) { this.sent.push(a); } };
   g.hud.flashAlert = () => {};
+  const mate = { id: 'mate', x: 20, z: 0, y: 0, alive: true };
+  g.livePlayers = function () { return [this.player, mate].filter((p) => p.alive); };
+  g.playerById = function (id) { return id === 'me' ? this.player : id === 'mate' ? mate : null; };
+  g.kill = function (m, v) { this.kills.push({ type: m.type, who: v.id }); v.alive = false; };
   const st = new Stray(g);
   g.stray = st;
-  g.player.sprinting = true; g.player.speed = 5;
   st.x = g.player.x + 1.5; st.z = g.player.z;
   st.phase = 'chase';
-  // her hand closes, and in co-op that is immediately "wearing", not "grab" with a body count
   st._grab(g.player);
+  assert.equal(st.phase, 'grab', 'the same hold as alone, not «worn» at once');
+  assert.equal(g.kills.length, 0);
+  for (let i = 0; i < 120 && st.phase === 'grab'; i++) { g.time += 1 / 60; st.update(1 / 60); }
+  assert.deepEqual(g.kills, [{ type: 'stray', who: 'me' }], 'the hand kills, in co-op too');
+  assert.equal(g.player.heldByStray, false);
   assert.equal(st.phase, 'wear');
-  assert.equal(g.kills.length, 0, 'in co-op she takes the voice, not the life');
   assert.ok(st.wear && st.wear.pid === 'me');
-  assert.deepEqual(g.sync.sent[0].slice(0, 2), ['sw', 'me']);
-  assert.equal(g.sync.sent[0][2], 'start');
-  // and it ends by itself
-  g.wearT = 0;
-  st.wear.t = S.wear + 0.1;
-  st._hostWear(0.016);
+  assert.deepEqual(g.sync.sent.find((e) => e[0] === 'sw').slice(0, 3), ['sw', 'me', 'start']);
+  const d0 = Math.hypot(mate.x - st.x, mate.z - st.z);
+  for (let i = 0; i < 60; i++) { g.time += 1 / 60; st.update(1 / 60); }
+  assert.ok(Math.hypot(mate.x - st.x, mate.z - st.z) < d0 - 0.5, 'she walks toward the one still standing');
+  // the cot (or the needle) puts you back on your feet, and the game is up
+  g.player.alive = true;
+  st.update(1 / 60);
   assert.equal(st.phase, 'leave');
   assert.equal(g.sync.sent.at(-1)[2], 'end');
+  // ...and it also ends by itself
+  const g2 = fakeGame(); const st2 = new Stray(g2); g2.stray = st2;
+  g2.sync = { sent: [], ev(...a) { this.sent.push(a); } };
+  g2.player.alive = false;
+  st2.wear = { pid: 'me', t: S.wear + 0.1, line: 0 }; st2.phase = 'wear';
+  st2._hostWear(0.016);
+  assert.equal(st2.phase, 'leave');
+  assert.equal(g2.sync.sent.at(-1)[2], 'end');
 });

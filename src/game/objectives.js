@@ -502,8 +502,16 @@ export class Objectives {
       if (!wantHum && g.hum && !g.dying) { g.hum.stop(); g.hum = null; }
     }
     if (!night) {
-      // the morning: nothing to do yet — but a door opens (the first-aid hut is right by the camp)
-      if (game.state === 'morning' && p.alive) this._interact(dt, true);
+      // (3.1p) the morning is for work too: what lies about is picked up, a body searched, a cupboard opened, the
+      // kit used. Only the generators, the shelter and the camp's loudspeaker are the night's — and the car stays
+      // shut (its parts can be hauled and fitted, 2.1q). It used to be doors only, and «nothing picks up».
+      if (game.state === 'morning' && p.alive) {
+        if (this.note) {
+          this.note.t -= dt;
+          if (this.note.t <= 0) this.closeNote();
+        }
+        this._interact(dt, 'day');
+      }
       return;
     }
 
@@ -571,7 +579,11 @@ export class Objectives {
     }
   }
 
+  // mode: false — the night, everything; true — doors (and a part, a friend, a cupboard: dawn's winch); 'day' — the
+  // morning: everything but the night's own work (generators, the shelter, the loudspeaker, the car's seats)
   _interact(dt, doorsOnly = false) {
+    const day = doorsOnly === 'day';
+    if (day) doorsOnly = false;
     const game = this.g;
     // the page you just found lies over everything: while it is open nothing asks for your hands
     // (the prompt used to keep searching for a target under it and stayed after it closed)
@@ -612,7 +624,7 @@ export class Objectives {
       game.motos.consider(consider); // the machine under you: E steps off
     } else if (hands) {
       for (const body of this.bodies) if (!body.searched && body.mesh.visible) consider(body, body.x, body.z, USE_R_BODY, 'body');
-      for (const g of this.gens) if (!g.running) consider(g, g.x, g.z, USE_R_GEN, 'gen');
+      if (!day) for (const g of this.gens) if (!g.running) consider(g, g.x, g.z, USE_R_GEN, 'gen');
       for (const s of this.scrap || []) consider(s, s.x, s.z, USE_R_GEN, 'genScrap'); // this shift's stood-down machine: look, don't touch
       if (game.rescue) game.rescue.consider(consider);
       if (game.glows) game.glows.consider(consider);
@@ -622,18 +634,18 @@ export class Objectives {
       game.partMap?.consider(consider);
       if (game.training) { game.train?.consider(consider); game.motos?.consider(consider); }
       for (const body of this.bodies) if (body.searched && body.gun?.visible) consider(body, body.x, body.z, USE_R_BODY, 'bodyGun');
-      if (game.expedition) game.expedition.consider(consider);
-      if (game.bunker) game.bunker.consider(consider); // the shelter's cap, its ladder, its breaker
+      if (game.expedition) game.expedition.consider(day ? (o, x, z, r, k) => { if (k !== 'campSpeaker') consider(o, x, z, r, k); } : consider);
+      if (game.bunker && !day) game.bunker.consider(consider); // the shelter's cap, its ladder, its breaker
     }
     // (2.1q: the morning is for hauling too — a part may be picked up, carried and fitted in daylight;
     // sitting in the car and driving off still belong to the night)
-    if (es && !riding) es.consider(doorsOnly ? (o, x, z, r, k) => { if (k === 'part' || k === 'carFit') consider(o, x, z, r, k); } : consider);
+    if (es && !riding) es.consider(doorsOnly || day ? (o, x, z, r, k) => { if (k === 'part' || k === 'carFit') consider(o, x, z, r, k); } : consider);
     if (game.doors && !seated && !riding) game.doors.consider(consider);
     if (game.winch && !seated && !riding) game.winch.consider(consider); // 3.0f: the drum, and the car
     // cupboards (in the morning too: the first-aid hut is right by the camp) — and someone caught in one
     if (game.cabinets && !seated && !riding) game.cabinets.consider(consider, !p.carrying && !(es && es.held));
     // (2.1r: and in the morning, a friend on the ground or on the cot — dawn raised nobody, so hands do it)
-    if (doorsOnly && game.rescue && !seated && !riding) game.rescue.consider(consider);
+    if ((doorsOnly || (day && !hands)) && game.rescue && !seated && !riding) game.rescue.consider(consider);
     if (best && this.target && best.obj !== this.target.obj) this.searchT = 0;
     this.target = best;
     if (!best || best.kind !== 'lookout') game.expedition?.idle();
