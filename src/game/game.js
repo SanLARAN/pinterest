@@ -29,7 +29,7 @@ import { Expedition } from './expedition.js';
 import { Backpack } from './inventory.js';
 import { FieldView } from './fieldView.js';
 import { Bag3D } from '../ui/bag3d.js';
-import { MotoPark, MOTO } from './moto.js';
+import { MotoPark, MOTO, riderEye } from './moto.js';
 import { Training } from './training.js';
 import { VoiceMimic } from './voiceMimic.js';
 import { Dread } from './dread.js';
@@ -526,10 +526,14 @@ export class Game {
     }
     this.motos.update(dt, input);
     if (this.motos.rider >= 0) {
-      // the eye line sits on the seat, and the camera leans with the machine
-      p.eyeCur = damp(p.eyeCur, MOTO.seat, 12, dt);
-      p.roll = (this.motos.bikes[this.motos.rider]?.roll || 0) * 0.55;
-      p.pitch = damp(p.pitch, 0, 8, dt);
+      // (3.1r) your eyes ride the machine: up and back in a wheelie, down on the nose under the front brake, over
+      // in the lean — and your weight back with Shift
+      const b = this.motos.bikes[this.motos.rider];
+      if (b) {
+        p.eyeCur = riderEye(b, input.sprint ? MOTO.back : 0) - (p.y || 0);
+        p.roll = b.roll * 0.75;
+        p.pitch = damp(p.pitch, b.pitch * 0.8 - 0.07, 14, dt);
+      }
     }
 
     // the same lamps, doors, cupboards and kit as a night — just without the night

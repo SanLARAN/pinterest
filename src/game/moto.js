@@ -1,9 +1,20 @@
-// Enduro bikes for the training ground: one per player, standing by the camp rack. The controls are
-// the walker's — W/S is throttle and brake, A/D leans it over — but the physics is a dirt bike's:
-// sprung wheels that leave the ground over crests, grip that lets the back step out, and stops dead
-// against trees hard enough to throw you off. Each rider simulates their own bike; the wire carries
-// nothing new — a rider's machine sends the usual position, and a mount/dismount event ('mb') tells
-// the others which bike to draw under whom.
+// Enduro bikes for the training ground: one per player, standing by the camp rack. (3.1r) They are the owner's
+// Kugoo Wish 01 now — a small electric pit bike, modelled in Blender (kugooModel.js) — and they ride on a physics
+// meant to feel like the real thing rather than a sliding box:
+//
+//  • a pitching chassis on two sprung wheels (a fork that slides along its rake, a swingarm that swings), each wheel
+//    reading the hill under itself; landings compress the springs, bottom out, and a crest at speed lets go of you;
+//  • an electric motor — force-limited off the line, power-limited above that — through a rear tyre that can only push
+//    as hard as its load and the dirt allow: open it up from a crawl and the front lifts (a wheelie you hold with the
+//    throttle and Shift, your weight back); too much in a turn and the back steps out;
+//  • two brakes (S): the front does most of the stopping, pitches the bike onto its nose and can lock; a locked front
+//    in a lean washes out;
+//  • turning by lean at speed (A/D lean it; the yaw is what a leaned bike does, g·tanφ/v) and by the bar at a crawl,
+//    with a friction circle shared between the two jobs — grip spent braking or driving is grip not there for the turn;
+//  • in the air the wheels are gyros: gas lifts the nose, the brake drops it;
+//  • and the ways it ends: over the bars off a nose-first landing, a loop-out, a lowside, a tree head-on.
+// Each rider simulates their own bike (240 Hz inside the frame); the wire carries nothing new — a rider's machine
+// sends the usual position, and 'mb' tells the others which bike to draw under whom.
 import * as THREE from 'three';
 import { clamp, damp, lerp } from '../core/rng.js';
 import { t } from '../core/i18n.js';
@@ -11,255 +22,339 @@ import { MeshBuilder, KIND } from '../world/builder.js';
 import { GK } from '../ui/garageSet.js';
 import { geometryOf } from './uaz.js';
 import { GroundShade } from './groundShade.js';
+import { KUGOO_GROUPS, KUGOO_PIVOTS, KUGOO_STEER_AXIS, KUGOO_Q } from './kugooModel.js';
 
 const PI = Math.PI;
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+const smooth = (a, b, x) => { const k = clamp((x - a) / (b - a), 0, 1); return k * k * (3 - 2 * k); };
+
+// The machine and its rider, in SI. The geometry is the model's: 1.005 m between the axles, 0.222 m wheels.
 export const MOTO = {
-  max: 17, // m/s flat out (~60 km/h through the trees)
-  accel: 7.5,
-  brake: 13,
-  engineBrake: 2.2,
-  drag: 0.028, // v²
-  steer: 2.4, // rad/s of bar at a crawl
-  steerFade: 0.55, // ...and this much left at top speed
-  grip: 7.5, // how hard the tyre fights sliding sideways
-  lean: 0.52, // rad of lean for a full-bar turn at speed
-  hop: 5.2, // m/s of lift a crest gives the front wheel
-  gravity: 17,
-  seat: 1.24, // the rider's eye line on the seat
-  throwAt: 5.5, // a head-on hit faster than this dumps the rider
-  radius: 0.55,
-  wheelbase: 0.62, // half the distance between the axles: where the two wheels read the hill
+  mass: 123, // 48 kg of bike, 75 of you
+  inertia: 24, // kg·m² about the pitch axis
+  half: 0.5023, // half the wheelbase (axles at z = ∓half, ground at y = 0 in the model)
+  R: 0.2218, // wheel radius
+  cog: [0.74, 0.03], // height, and how far behind the middle of the wheelbase (+z is back)
+  back: 0.09, // m your weight moves back with Shift
+  travel: [0.16, 0.14], // suspension travel, front / rear
+  sag: [0.052, 0.046], // ...and how much of it the bike sits in, standing
+  damp: [620, 680], // N·s/m
+  power: 2600, // W at the rear wheel
+  force: 800, // N off the line: just past what lifts the front (m·g·b/H ≈ 770 N) — a wheelie you have to ask for
+  brake: [620, 440], // N front, rear at full lever: hard, just inside a stoppie (Shift back is safer still)
+  squeeze: 0.25, // s to pull the levers in
+  mu: 0.9, // tyre on forest dirt
+  air: 0.42, // ½ρC_dA
+  roll: 0.022, // rolling resistance
+  gravity: 9.81,
+  leanMax: 0.85, // rad
+  steerMax: 0.55, // rad of bar at a crawl
+  gyro: [45, 70], // N·m of pitch the spinning wheels give in the air: gas, brake (a real wheel's spin-up, not a rocket)
+  max: 17, // m/s (61 km/h): the power and the drag meet about here
+  reverse: 1.3, // m/s: paddling it backwards with the brake held at a standstill
+  throwAt: 5.5, // m/s into a trunk head-on
+  radius: 0.48, // its footprint against trees
+  seat: 0.7,
+  eye: [1.38, 0.1], // your eyes on it: height, and how far behind the middle
 };
+const K = [0, 1].map((i) => (MOTO.mass * MOTO.gravity * (i === 0 ? 0.5 - MOTO.cog[1] / (2 * MOTO.half) : 0.5 + MOTO.cog[1] / (2 * MOTO.half))) / MOTO.sag[i]);
+MOTO.spring = K; // N/m, from the static load and the sag
 
 // the bike itself: a plain state object the park moves around (pure math, tested without a scene)
 export function newBike(i, x, z, yaw) {
-  return { i, x, z, y: 0, yaw, vx: 0, vz: 0, vy: 0, roll: 0, pitch: 0, steer: 0, air: 0, spin: 0, speed: 0, hit: 0, grounded: true, sus: 0, lastGh: null };
+  return {
+    i, x, z, y: 0, yaw, vx: 0, vz: 0, vy: 0, roll: 0, pitch: 0, wp: 0, steer: 0, air: 0, spin: 0, spinR: 0, speed: 0, hit: 0,
+    grounded: true, sus: 0, comp: [MOTO.sag[0], MOTO.sag[1]], load: [0, 0], slip: 0, wheelie: 0, down: 0, downSide: 1, lastGh: null,
+  };
 }
 
-// one step of a rider's bike. input: { move: {x,y}, brake } with y>0 throttle, x steering; world:
-// { terrain: { height }, col: { resolve } }. Returns what happened this step (for sounds and throws)
+// a point of the model (y up, z back) at the bike's pitch: [forward distance, height] relative to its origin
+function at(b, py, pz) {
+  const c = Math.cos(b.pitch), s = Math.sin(b.pitch);
+  return [-s * py - c * pz, c * py - s * pz]; // (Rx(pitch) of (0, py, pz); forward is −z)
+}
+
+// one step of a rider's bike. input: { move: {x,y}, sprint } — y>0 gas, y<0 brakes, x lean/bar, sprint: weight back.
+// world: { terrain: { height }, col: { resolve } }. Returns what happened (for sounds and throws)
 export function stepBike(b, input, world, dt) {
-  const ev = { throttle: 0, brake: 0, landed: 0, threw: false, bump: 0 };
-  const ground = world.terrain.height(b.x, b.z);
-  const onGround = b.grounded !== false;
-  b.air = onGround ? Math.max(0, b.air - dt * 4) : Math.min(1, b.air + dt * 4);
+  const ev = { throttle: 0, brake: 0, landed: 0, threw: false, bump: 0, cause: null };
+  const n = Math.max(1, Math.ceil(dt / (1 / 240)));
+  const h = dt / n;
+  for (let k = 0; k < n && !ev.threw; k++) _sub(b, input, world, h, ev);
+  b.air = b.grounded ? Math.max(0, b.air - dt * 4) : Math.min(1, b.air + dt * 4);
+  b.hit = Math.max(0, b.hit - dt);
+  b.sus = Math.max(0, b.sus - dt * 2.2);
+  return ev;
+}
 
-  // the bar: quick at a crawl, heavy at speed
-  const steerRate = MOTO.steer * lerp(1, MOTO.steerFade, clamp(Math.abs(b.speed) / MOTO.max, 0, 1));
-  b.steer = damp(b.steer, clamp(input.move.x, -1, 1), 8, dt);
-  const moving = clamp(Math.abs(b.speed) / 2, 0, 1) * (onGround ? 1 : 0.22); // in the air the bar hardly bites
-  const yawRate = b.steer * steerRate * clamp(1 - 0.25 * Math.abs(b.speed) / MOTO.max, 0.6, 1) * moving;
-  b.yaw -= yawRate * dt * (b.speed >= 0 ? 1 : -1);
-
-  // thrust along the heading
-  const fx = -Math.sin(b.yaw), fz = -Math.cos(b.yaw);
-  const v = b.vx * fx + b.vz * fz; // signed forward speed
-  b.speed = v;
-  const throttle = clamp(input.move.y, 0, 1) * (onGround ? 1 : 0.15); // wheelspin in the air
-  const braking = clamp(-input.move.y, 0, 1) * 0.7; // S drags the back wheel; hard, but not a stoppie
-  let a = throttle * MOTO.accel - braking * (v > 0.5 ? MOTO.brake : MOTO.accel * 0.5);
-  if (!throttle && !braking) a = -Math.sign(v) * MOTO.engineBrake;
-  a -= MOTO.drag * v * Math.abs(v);
-  const nv = clamp(v + a * dt, -3.5, MOTO.max);
-  ev.throttle = throttle; ev.brake = braking;
+function _sub(b, input, world, h, ev) {
+  const M = MOTO, g = M.gravity;
+  const gas = clamp(input.move?.y || 0, 0, 1), u = clamp(input.move?.x || 0, -1, 1);
+  b.lever = clamp((b.lever || 0) + (input.move?.y < 0 ? h : -2 * h) / M.squeeze, 0, 1) * (input.move?.y < 0 ? 1 : 0.999);
+  const brk = clamp(-(input.move?.y || 0), 0, 1) * b.lever;
+  // your weight: back with Shift; otherwise forward over the bars as the front starts to come up (the way anyone rides
+  // a climb), and braced back a little on the brakes
+  const back = (input.sprint ? M.back : -0.12 * smooth(0.04, 0.25, b.rel || 0)) + (b.lever || 0) * 0.05;
+  const fx = -Math.sin(b.yaw), fz = -Math.cos(b.yaw), rx = -fz, rz = fx;
+  let v = b.vx * fx + b.vz * fz; // forward
+  // ---- the two wheels on the ground: where each one is, and what its spring pushes ----
+  const wasGrounded = b.grounded, vyIn = b.vy;
+  const cogZ = M.cog[1] + back;
+  const [dC, yC] = at(b, M.cog[0] - (back > 0 ? 0.04 : 0), cogZ);
+  let Ny = 0, tau = 0, any = false;
+  const gHs = [0, 0], load = [0, 0], ds = [0, 0];
+  for (let i = 0; i < 2; i++) {
+    const [d, y] = at(b, M.R, i === 0 ? -M.half : M.half); // the wheel's centre where it sits standing
+    const wx = b.x + fx * d, wz = b.z + fz * d;
+    const gh = world.terrain.height(wx, wz);
+    gHs[i] = gh;
+    ds[i] = d;
+    const pen = gh + M.R - (b.y + y); // how far the ground would push the wheel up from its standing place
+    let c = M.sag[i] + pen;
+    // deeper than the fork can take (a step, a spawn under the ground): the chassis is put back on its stops rather
+    // than fired off them by a spring compressed a metre
+    // and past the end of its travel it is bottomed out: metal on metal — the chassis goes up with the ground at that
+    // wheel, without a bounce (it was a stiff spring, and a roller face at speed fired the bike five metres up)
+    if (c > M.travel[i]) { const lift = c - M.travel[i]; b.y += lift; b.vy = Math.max(b.vy, Math.min(b.vy + lift / h, 6)); c -= lift; b.sus = 1; }
+    let c0 = b.comp[i];
+    if (Math.abs(c - c0) > 0.03) c0 = c; // a jump in it (a spawn, a teleport, the first touch of a step) is no speed for the damper
+    if (c <= 0) { b.comp[i] = 0; continue; } // that wheel hangs in the air
+    any = true;
+    const rate = clamp((c - c0) / h, -4, 4); // (a damper has a top speed: valves, not a wall)
+    let N = M.spring[i] * Math.min(c, M.travel[i]) + M.damp[i] * rate * (rate > 0 ? 1 : 1.6);
+    N = Math.max(0, N);
+    b.comp[i] = Math.min(c, M.travel[i] + 0.02);
+    load[i] = N;
+    Ny += N;
+    tau += N * (d - dC); // a push in front of the weight lifts the nose
+  }
+  b.load = load;
+  // the ground's own slope under the two wheels, and the bike's pitch against it (a wheelie is that, not the hill)
+  // (read only while both tyres are down: with one wheel over a lip, the ground between them is not a slope)
+  if (load[0] > 0 && load[1] > 0) b.gslope = Math.atan2(gHs[0] - gHs[1], 2 * M.half * Math.cos(b.pitch));
+  else if (b.gslope == null) b.gslope = b.pitch;
+  const slope = b.gslope;
+  const rel = b.pitch - slope;
+  b.rel = rel;
+  // ---- along the ground: the motor, the brakes, the air ----
+  const muF = M.mu * load[0], muR = M.mu * load[1];
+  // the rider's own hand on the gas: without Shift you ease off as the front climbs past ~10°; with your weight back
+  // you hold it short of the balance point (atan(b/H) ≈ 0.47 rad), where a keyboard can still ride it — S brings it down
+  // ...and either way you never hold it on past the balance point — the pitch at which the weight sits over the
+  // rear axle (on a climb that comes sooner: the hill has already tipped you back)
+  const margin = Math.atan2(M.half - cogZ, M.cog[0]) - b.pitch;
+  const ease = input.sprint ? smooth(0.04, 0.22, margin) : Math.min(1 - smooth(0.14, 0.3, rel), smooth(0.1, 0.3, margin));
+  const want = gas * ease * Math.min(M.force, M.power / Math.max(1.5, Math.abs(v)));
+  const drive = Math.min(want, muR);
+  const spin = want > muR + 1 ? clamp((want - muR) / 400, 0, 1) : 0; // the rear breaks loose
+  const pressF = brk * M.brake[0], pressR = brk * M.brake[1];
+  const lockF = pressF > muF && load[0] > 0, lockR = pressR > muR && load[1] > 0;
+  // at a crawl with the brake held you are paddling it backwards with your feet, not braking
+  const paddle = any && brk > 0.3 && !gas && v < 0.3;
+  const stopF = paddle ? 0 : Math.min(pressF, muF * (lockF ? 0.8 : 1)), stopR = paddle ? 0 : Math.min(pressR, muR * (lockR ? 0.8 : 1));
+  const sgn = v > 0.05 ? 1 : v < -0.05 ? -1 : 0;
+  let Fx = drive - (stopF + stopR) * sgn;
+  const drag = M.air * v * Math.abs(v) + M.roll * Ny * sgn;
+  // the hill under the wheels: the slope's own pull
+  let a = (Fx - drag) / M.mass - g * Math.sin(slope) * (any ? 1 : 0);
+  if (!any) a = -drag / M.mass;
+  let nv = v + a * h;
+  if (sgn > 0 && nv < 0 && !gas) nv = 0; // brakes stop it, they do not run it backwards
+  // at a standstill with the brake held: you paddle it back with your feet, at a walk
+  if (paddle) nv = Math.max(-M.reverse * brk, Math.min(v, 0) - 2.5 * h);
+  if (any && !gas && !brk && Math.abs(nv) < 0.05 && Math.abs(slope) < 0.12) nv = 0;
+  ev.throttle = gas; ev.brake = brk;
   b.vx += fx * (nv - v);
   b.vz += fz * (nv - v);
-
-  // grip: sideways velocity bleeds off — but never quite all of it (the back steps out a little)
-  const rx = -fz, rz = fx;
-  const side = b.vx * rx + b.vz * rz;
-  const keep = Math.exp(-MOTO.grip * (onGround ? 1 : 0.12) * dt);
-  const cut = side * (1 - keep);
-  b.vx -= rx * cut;
-  b.vz -= rz * cut;
-
-  // where it goes
-  const pos = { x: b.x + b.vx * dt, z: b.z + b.vz * dt };
-  const hit = world.col.resolve(pos, MOTO.radius);
+  v = nv;
+  // the longitudinal pushes act at the tyres, below the weight: gas lifts the front, the brakes put it down
+  // (each force at its own tyre: the height of the weight over THAT wheel's ground — over a lip the front has none)
+  // (and measured square to the ground's slope, not straight up: on a climb the rear tyre is under the weight's heel)
+  const cs = Math.cos(slope), sn = Math.sin(slope);
+  const Hf = clamp((b.y + yC - gHs[0]) * cs - (dC - ds[0]) * sn, 0.2, 1.2), Hr = clamp((b.y + yC - gHs[1]) * cs - (dC - ds[1]) * sn, 0.2, 1.2);
+  tau += (drive - stopR * sgn) * Hr - stopF * sgn * Hf;
+  // ---- up and down, and the pitch ----
+  b.vy += (Ny / M.mass - g) * h;
+  b.y += b.vy * h;
+  if (!any) tau += (gas * M.gyro[0] - brk * M.gyro[1]) + (back ? 25 : 0); // in the air the wheels are gyros
+  b.wp += (tau / M.inertia) * h;
+  b.wp *= Math.exp(-(any ? 3 : 0.4) * h);
+  b.pitch = wrap(b.pitch + b.wp * h); // (a full flip in the air lands you upright again: it is an angle, not a counter)
+  b.grounded = any;
+  if (any && !wasGrounded && vyIn < -2.5) {
+    ev.landed = Math.min(1, -vyIn / 9);
+    b.sus = Math.max(b.sus, clamp(-vyIn / 7, 0, 1));
+    // nose first, hard, at speed: over the bars
+    if (rel < -0.55 && vyIn < -4 && Math.abs(v) > 3) { ev.threw = true; ev.cause = 'bars'; }
+  }
+  b.wheelie = load[0] < 1 && load[1] > 0 ? Math.min(1, b.wheelie + h * 3) : Math.max(0, b.wheelie - h * 5);
+  if (rel > 1.2 && any) { ev.threw = true; ev.cause = 'loop'; } // looped it over backwards
+  if (rel < -0.95 && any) { ev.threw = true; ev.cause = 'bars'; } // on its nose: over the front
+  // ---- the lean, the turn, and how much grip there is for it ----
+  const speed = Math.abs(v);
+  const lean = smooth(2.5, 6, speed); // 0: steered by the bar at a crawl, 1: steered by lean
+  const leanT = any ? -u * Math.min(M.leanMax, Math.atan(M.mu * 0.92)) * lean : b.roll; // full lean sits just inside the grip
+  b.roll = damp(b.roll, leanT, any ? 5.5 : 1.2, h);
+  const bar = u * M.steerMax * (1 - lean);
+  b.steer = damp(b.steer, bar + -b.roll * 0.12, 10, h);
+  let r = -(v * Math.tan(bar)) / (2 * M.half) * (any ? 1 : 0.15);
+  if (speed > 0.5) r += lean * (g * Math.tan(b.roll)) / Math.max(3, speed) * (any ? 1 : 0.05);
+  // the back stepping out: wheelspin in a lean swings the tail round
+  if (spin > 0 && any) r += -u * spin * 1.6;
+  b.yaw += r * h;
+  // grip across: what the tyres can still hold sideways after driving and braking (the friction circle)
+  const along = Math.abs(drive - (stopF + stopR)) / M.mass;
+  const total = any ? (M.mu * Ny) / M.mass : 0;
+  let side = Math.sqrt(Math.max(0, total * total - along * along));
+  if (lockF) side *= 0.3;
+  if (spin) side *= 1 - 0.55 * spin;
+  const nfx = -Math.sin(b.yaw), nfz = -Math.cos(b.yaw), nrx = -nfz, nrz = nfx;
+  const vs = b.vx * nrx + b.vz * nrz;
+  const cut = clamp(vs, -side * h, side * h);
+  b.vx -= nrx * cut;
+  b.vz -= nrz * cut;
+  b.slip = damp(b.slip, Math.abs(vs - cut), 6, h);
+  // a lowside: leaned over, the tyres asked for an eighth more than they have for a third of a second — or a locked
+  // front in a lean — and the front tucks
+  const demand = Math.abs(speed * r);
+  b.wash = any && Math.abs(b.roll) > 0.4 && speed > 4 && demand > side * 1.12 ? (b.wash || 0) + h : Math.max(0, (b.wash || 0) - 2 * h);
+  if (any && speed > 4 && ((Math.abs(b.roll) > 0.45 && lockF) || b.wash > 0.3)) { ev.threw = true; ev.cause = 'lowside'; }
+  // ---- where it goes, and what is in the way ----
+  const pos = { x: b.x + b.vx * h, z: b.z + b.vz * h };
+  const hit = world.col.resolve(pos, M.radius);
   if (hit.hit) {
     const into = -(b.vx * hit.nx + b.vz * hit.nz);
     if (into > 0) {
-      // restitution below 1: the bark takes its share, a slide never builds up into a throw
-      b.vx -= into * hit.nx * 0.35;
-      b.vz -= into * hit.nz * 0.35;
-      ev.bump = Math.min(1, into / 7);
-      if (into > MOTO.throwAt && onGround) { ev.threw = true; b.hit = 1; }
+      b.vx += into * hit.nx * 1.35; // out of it, with a little bounce: the bark takes its share
+      b.vz += into * hit.nz * 1.35;
+      ev.bump = Math.max(ev.bump, Math.min(1, into / 7));
+      if (into > M.throwAt && any) { ev.threw = true; ev.cause = 'tree'; b.hit = 1; }
     }
   }
   b.x = clamp(pos.x, -286, 286);
   b.z = clamp(pos.z, -286, 286);
-
-  // ---- the ground: a sprung machine on a hill, not a decal sliding over it ----
-  // The wheels track whatever is under them, and a rise shoves the bike up at the speed the ground
-  // itself is rising. That upward speed is kept (gravity eats it, the hill does not), so the next crest
-  // simply lets go and the machine is in the air — which is what a jump over a bank is. Where the hill
-  // falls away faster than gravity can take the bike down, it flies there too; on anything smooth the
-  // suspension keeps it planted, and a landing compresses it (b.sus, drawn by place()).
-  // The hill is read under each wheel, not under the middle of the bike: over a crest the rear axle
-  // still has ground while the front has none, and that difference is both the pitch and the jump.
-  const ghF = world.terrain.height(b.x + fx * MOTO.wheelbase, b.z + fz * MOTO.wheelbase);
-  const ghB = world.terrain.height(b.x - fx * MOTO.wheelbase, b.z - fz * MOTO.wheelbase);
-  const gh = (ghF + ghB) / 2;
-  const vg = b.lastGh == null ? 0 : (gh - b.lastGh) / dt; // how fast the ground under it is moving
-  b.lastGh = gh;
-  if (b.grounded && vg > b.vy) b.vy = Math.min(vg, MOTO.hop); // the rise picks the bike up
-  b.vy -= MOTO.gravity * dt;
-  b.y += b.vy * dt;
-  if (b.y <= gh) {
-    if (!b.grounded && b.vy < -3) {
-      ev.landed = Math.min(1, -b.vy / 9);
-      b.sus = clamp(-b.vy / 7, 0, 1); // the suspension's travel on the way down
-    }
-    b.y = gh;
-    b.vy = Math.max(0, b.vy);
-    b.grounded = true;
-  } else if (b.y - gh > 0.03) {
-    b.grounded = false;
+  b.speed = b.vx * nfx + b.vz * nfz;
+  b.spin = (b.spin + (b.speed / M.R) * h) % (2 * PI);
+  b.spinR = (b.spinR + ((b.speed + spin * 6) / M.R) * h) % (2 * PI);
+  if (ev.threw) {
+    b.down = 1;
+    b.downSide = b.roll !== 0 ? Math.sign(-b.roll) || 1 : 1;
+    if (ev.cause === 'tree') b.hit = 1;
   }
-  // the chassis follows the slope on the ground and the arc in the air
-  if (b.grounded) {
-    const slope = Math.atan2(ghF - ghB, MOTO.wheelbase * 2) * (v >= 0 ? 1 : -1);
-    b.pitch = damp(b.pitch, clamp(slope, -0.7, 0.7), 10, dt);
-  } else {
-    b.pitch = damp(b.pitch, b.vy > 0 ? 0.22 : -0.3, 2.4, dt); // nose up on the way up, down on the way down
-  }
-  b.air = b.grounded ? Math.max(0, b.air - dt * 4) : Math.min(1, b.air + dt * 4);
-  b.sus = Math.max(0, b.sus - dt * 2.2);
-  b.compress = damp(b.compress || 0, b.grounded ? 0 : 1, 6, dt);
-
-  // the lean: into the turn at speed, upright in the air
-  const leanT = onGround ? -b.steer * MOTO.lean * clamp(Math.abs(v) / 6, 0, 1) : b.roll * 0.4;
-  b.roll = damp(b.roll, leanT, 6, dt);
-  b.spin = (b.spin + v * dt * 2.2) % (2 * PI);
-  b.hit = Math.max(0, b.hit - dt);
-  return ev;
 }
 
-// ---------------- the mesh ----------------
-// A lean enduro: two spoked wheels on long travel, a slim steel frame, a flat seat, high bars, a
-// headlight and a mudguard number plate. Everything is built in the bike's own frame — forward is -Z,
-// the ground is y = 0 — and `limb()` composes on top of the current matrix, so each tube is drawn from
-// an identity (a missing `identity()` is what turned these bikes into a pile of loose sticks).
-export function buildMoto(paint = GK.CARPAINT) {
-  const b = new MeshBuilder(512);
-  const RUBBER = GK.RUBBER, STEEL = GK.CHROME, DARK = GK.DARK, TIN = GK.TIN, SEAT = GK.SEAT;
-  const tube = (a, c, r0, r1, kind, segs) => b.identity().limb(a, c, r0, r1, kind, segs);
-  // a block at a point, optionally tipped nose-up (about X) or rolled (about Z)
-  const box = (x, y, z, w, h, d, k, rx = 0, rz = 0) => { b.identity().place(x, y, z, rx, 0, rz); b.box(w, h, d, k); };
-  // a tapered block standing on (x, y, z): its top face can slide back along +z
-  const wedge = (x, y, z, w0, d0, w1, d1, h, k, topZ = 0) => {
-    b.identity().place(x, y, z, 0, 0, 0);
-    b.taper(w0, d0, w1, d1, h, k, topZ);
-  };
-  const WZ = 0.68; // half the wheelbase
-  const R = 0.32; // wheel radius
+// where your eyes are on the bike (world height), as it pitches and leans
+export function riderEye(b, back = 0) {
+  const [, y] = at({ pitch: b.pitch || 0 }, MOTO.eye[0], MOTO.eye[1] + back);
+  return (b.y || 0) + y * Math.cos(b.roll || 0);
+}
 
-  // the wheels are separate meshes (see MotoPark.wheelGeo): the tyres have to turn with the road
+// a machine on its side (it threw you): it slides to a stop where it fell
+export function settleDown(b, world, dt) {
+  const k = Math.exp(-3.5 * dt);
+  b.vx *= k; b.vz *= k;
+  b.x += b.vx * dt; b.z += b.vz * dt;
+  b.roll = damp(b.roll, 1.42 * b.downSide, 6, dt);
+  b.pitch = damp(b.pitch, 0, 6, dt);
+  b.wp = 0;
+  b.y = world.terrain.height(b.x, b.z) - 0.12;
+  b.vy = 0;
+  b.speed = 0;
+}
 
-  // the frame: a headstock, one thick spine back to the seat rails, a down tube, the swingarm
-  box(0, 0.94, -0.46, 0.1, 0.18, 0.12, DARK); // headstock
-  tube([0, 0.88, -0.44], [0, 0.8, 0.06], 0.045, 0.05, DARK, 4); // spine
-  tube([0, 0.84, -0.4], [0, 0.48, 0.04], 0.03, 0.04, DARK, 4); // down tube
-  for (const x of [-0.08, 0.08]) tube([x, 0.54, 0.04], [x, R, WZ], 0.028, 0.022, DARK, 4); // swingarm
-  for (const x of [-0.08, 0.08]) tube([x, 0.52, 0.0], [x, 0.34, 0.3], 0.02, 0.016, DARK, 4); // the cradle under the engine
-  for (const x of [-0.08, 0.08]) tube([x, 0.78, 0.02], [x, 0.8, 0.66], 0.022, 0.018, DARK, 4); // seat rails
-  tube([0, 0.72, 0.08], [0, 0.44, 0.32], 0.032, 0.024, TIN, 5); // shock
-  // forks: two raked legs and the triple clamp
-  for (const x of [-0.09, 0.09]) tube([x, 0.98, -0.46], [x, R, -WZ], 0.03, 0.024, STEEL, 5);
-  box(0, 1.02, -0.46, 0.24, 0.05, 0.13, DARK);
-
-  // engine: a block with its cylinder and clutch cover; the exhaust runs down the right
-  box(0, 0.48, 0.0, 0.25, 0.3, 0.32, DARK);
-  box(0, 0.66, -0.14, 0.19, 0.14, 0.16, TIN);
-  box(0.14, 0.4, 0.06, 0.04, 0.2, 0.2, TIN);
-  tube([0.1, 0.54, 0.06], [0.16, 0.7, 0.46], 0.022, 0.03, STEEL, 4);
-  box(0.17, 0.72, 0.6, 0.09, 0.1, 0.3, STEEL, -0.08); // muffler
-  for (const x of [-0.2, 0.2]) box(x, 0.4, 0.0, 0.12, 0.025, 0.05, DARK); // pegs
-
-  // tank on the spine: wide at the knees, narrowing to the seat; the seat runs flat behind it
-  wedge(0, 0.84, -0.44, 0.32, 0.34, 0.2, 0.24, 0.14, paint, 0.06);
-  box(0, 0.84, 0.26, 0.21, 0.09, 0.52, SEAT); // the seat sits right on the rails
-  box(0, 0.82, 0.55, 0.2, 0.06, 0.1, paint); // the tail
-  // side panels under the seat and the airbox, and the tank's shrouds: the mass a frame alone lacks
-  for (const x of [-0.115, 0.115]) box(x, 0.7, 0.24, 0.02, 0.2, 0.34, paint);
-  for (const x of [-0.2, 0.2]) box(x, 0.92, -0.34, 0.03, 0.2, 0.3, paint, -0.12);
-  // the chain and the rear sprocket, on the left
-  b.identity().place(-0.115, 0.32, 0.66, 0, 0, PI / 2);
-  b.cylinder(12, 0.13, 0.13, 0.02, STEEL, { y0: -0.01 });
-  tube([-0.115, 0.44, 0.06], [-0.115, 0.44, 0.66], 0.012, 0.012, DARK, 4);
-  // fenders: close over the tyres
-  box(0, 0.66, -0.62, 0.16, 0.026, 0.34, paint, -0.36);
-  box(0, 0.66, 0.64, 0.17, 0.026, 0.3, paint, 0.3);
-  box(0, 0.68, 0.84, 0.12, 0.05, 0.02, GK.TAILLAMP); // the tail light on the fender's tip
-
-  // bars, grips, levers and guards
-  tube([0, 1.02, -0.46], [0, 1.12, -0.49], 0.024, 0.022, DARK, 4);
-  box(0, 1.12, -0.49, 0.62, 0.03, 0.03, STEEL);
-  for (const x of [-0.29, 0.29]) {
-    b.identity().place(x, 1.12, -0.49, 0, 0, PI / 2);
-    b.cylinder(6, 0.028, 0.028, 0.12, RUBBER, { y0: -0.06 });
-    tube([x * 0.72, 1.13, -0.48], [x * 0.9, 1.17, -0.6], 0.014, 0.01, STEEL, 3); // a guard over the lever
+// ---------------- the mesh: the Kugoo, in its own parts ----------------
+// (generated from the owner's .blend: see kugooModel.js) — the frame and the rest of the body; the swingarm round its
+// pivot; the steering (bars, plate, fender) round the raked steering axis; the fork's sliders along it; the two wheels.
+const _geo = new Map();
+function partGeometry(name, paint) {
+  const key = name + ':' + paint;
+  if (_geo.has(key)) return _geo.get(key);
+  const G = KUGOO_GROUPS[name];
+  const pos = decode(G.p, Int16Array), meta = decode(G.m, Uint8Array);
+  const b = new MeshBuilder(G.n + 8);
+  const q = 1 / KUGOO_Q;
+  for (let i = 0; i < G.n; i++) {
+    const o = i * 9;
+    const kind = meta[i * 2] === 255 ? paint : meta[i * 2];
+    b.tri([pos[o] * q, pos[o + 1] * q, pos[o + 2] * q], [pos[o + 3] * q, pos[o + 4] * q, pos[o + 5] * q], [pos[o + 6] * q, pos[o + 7] * q, pos[o + 8] * q], kind, meta[i * 2 + 1]);
   }
-  // headlight in its can, and the number plate above it
-  box(0, 1.0, -0.62, 0.17, 0.15, 0.09, DARK);
-  box(0, 1.0, -0.667, 0.13, 0.11, 0.02, GK.HEADLAMP);
-  box(0, 1.14, -0.56, 0.2, 0.15, 0.02, paint, 0.24);
-  return geometryOf(b.toArrays());
+  const geo = geometryOf(b.toArrays());
+  _geo.set(key, geo);
+  return geo;
+}
+function decode(b64, T) {
+  const bin = typeof atob === 'function' ? atob(b64) : Buffer.from(b64, 'base64').toString('binary');
+  const u8 = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+  return new T(u8.buffer);
+}
+
+const PV = KUGOO_PIVOTS;
+const AXIS = new THREE.Vector3(...KUGOO_STEER_AXIS);
+// the bike, assembled: { root, steer, fork, swing, wheelF, wheelR } — root is the model's origin, on the ground
+export function buildKugoo(paint = KIND.BONE, mat = null) {
+  const m = (name) => { const o = new THREE.Mesh(partGeometry(name, paint), mat); o.frustumCulled = false; return o; };
+  const root = new THREE.Group();
+  const body = m('body');
+  body.position.fromArray(PV.body); // (every group is stored around its own pivot: the body's is the rear axle's foot)
+  root.add(body);
+  const swing = new THREE.Group();
+  swing.position.fromArray(PV.swing);
+  swing.add(m('swing'));
+  const wheelR = new THREE.Group();
+  wheelR.position.set(PV.wheelR[0] - PV.swing[0], PV.wheelR[1] - PV.swing[1], PV.wheelR[2] - PV.swing[2]);
+  wheelR.add(m('wheelR'));
+  swing.add(wheelR);
+  root.add(swing);
+  const steer = new THREE.Group();
+  steer.position.fromArray(PV.steer);
+  steer.add(m('steer'));
+  const fork = new THREE.Group(); // the sliders and the front wheel: they ride up the axis as the fork compresses
+  fork.add(m('forkLow'));
+  const wheelF = new THREE.Group();
+  wheelF.position.set(PV.wheelF[0] - PV.steer[0], PV.wheelF[1] - PV.steer[1], PV.wheelF[2] - PV.steer[2]);
+  wheelF.add(m('wheelF'));
+  fork.add(wheelF);
+  steer.add(fork);
+  root.add(steer);
+  root.userData.kugoo = { steer, fork, swing, wheelF, wheelR };
+  return root;
+}
+
+// pose the parts from the state: the bar, the fork's travel, the swingarm's angle, the wheels turning
+const ARM = Math.hypot(PV.wheelR[1] - PV.swing[1], PV.wheelR[2] - PV.swing[2]);
+const ARM0 = Math.atan2(PV.wheelR[1] - PV.swing[1], PV.wheelR[2] - PV.swing[2]);
+const _q = new THREE.Quaternion();
+export function poseKugoo(root, b) {
+  const P = root?.userData?.kugoo;
+  if (!P) return;
+  P.steer.quaternion.setFromAxisAngle(AXIS, -(b.steer || 0));
+  const cf = (b.comp?.[0] ?? MOTO.sag[0]) - MOTO.sag[0], cr = (b.comp?.[1] ?? MOTO.sag[1]) - MOTO.sag[1];
+  P.fork.position.copy(AXIS).multiplyScalar(cf);
+  // the rear wheel rises by cr: the arm turns about its pivot by that much of its length
+  const ang = Math.asin(clamp(Math.sin(ARM0) + cr / ARM, -1, 1)) - ARM0;
+  P.swing.rotation.x = -ang; // (three's +x rotation turns +z down: the arm's angle in (z, y) runs the other way)
+  P.wheelR.rotation.x = -(b.spinR ?? b.spin ?? 0) + ang;
+  P.wheelF.rotation.x = -(b.spin || 0);
+  void _q;
 }
 
 // ---------------- the rider's own cockpit ----------------
-// The bike under you is a real object in the world, but at 1.24 m on the seat its bars fall below the
-// bottom of the screen and the machine reads as a floating camera. This is a small, local copy of the
-// cockpit — the bar, the grips, the tank's shoulders and a mudguard — drawn against the camera in the
-// same material as the forest, so you can see the bars turn and the machine lean. It is not part of the
-// world and never collides with anything.
-function buildCockpit(paint) {
-  // Coordinates are the camera's own: -z is forward, -y is down from your eye. The bar sits half a
-  // metre out and a hand's width below the eye line — where an enduro's bars actually are.
-  const b = new MeshBuilder(160);
-  const BAR_Y = -0.3, BAR_Z = -0.56;
-  b.identity().place(0, BAR_Y, BAR_Z);
-  b.box(0.62, 0.028, 0.034, GK.CHROME); // the bar
-  for (const x of [-0.3, 0.3]) {
-    b.identity().place(x, BAR_Y, BAR_Z, 0, 0, Math.PI / 2);
-    b.cylinder(6, 0.026, 0.026, 0.11, GK.RUBBER, { y0: -0.055 }); // the grips
-    b.identity().place(x * 0.92, BAR_Y - 0.02, BAR_Z - 0.01, 0, 0, 0.5);
-    b.box(0.16, 0.015, 0.02, GK.DARK); // the levers, angled in
-  }
-  b.identity().place(0, BAR_Y - 0.02, BAR_Z + 0.06);
-  b.box(0.16, 0.05, 0.1, GK.DARK); // the clamp, between the bar and the tank
-  b.identity().place(0, BAR_Y - 0.16, BAR_Z + 0.16, 0.2);
-  b.box(0.34, 0.05, 0.3, paint); // the tank's shoulders under the bars
-  b.identity().place(0, BAR_Y - 0.3, BAR_Z - 0.12, 0.5);
-  b.box(0.26, 0.02, 0.3, paint); // the front mudguard's tip, out past the bars
-  return geometryOf(b.toArrays());
-}
+// At the eye line on the seat the bars fall below the bottom of the screen, so you get a copy of the Kugoo's own
+// steering — bars, grips, the dash and the number plate — hung off the camera where the bars would sit in your view.
+const BAR = (() => {
+  // the middle of the grips, in the steering's own frame (from the model: its rubber, high up)
+  const G = KUGOO_GROUPS.steer, pos = decode(G.p, Int16Array), meta = decode(G.m, Uint8Array);
+  let x = 0, y = 0, z = 0, n = 0;
+  for (let i = 0; i < G.n; i++) if (meta[i * 2] === GK.RUBBER) { for (let v = 0; v < 3; v++) { y += pos[i * 9 + v * 3 + 1]; z += pos[i * 9 + v * 3 + 2]; n++; } }
+  return n ? [x, y / n / KUGOO_Q, z / n / KUGOO_Q] : [0, 0.3, -0.1];
+})();
 
 // ---------------- the park: four bikes by the camp ----------------
 export class MotoPark {
   constructor(game) {
     this.g = game;
-    this.paints = [GK.CARPAINT, GK.REDPAINT, GK.YELLOW, GK.GATE];
-    this.geos = this.paints.map((k) => buildMoto(k));
-    this.cockpits = this.paints.map((k) => buildCockpit(k));
-    // A whole wheel, axle along X: the tyre and the rim are geometry you can see turning, not a disc
-    // hidden inside the body. (The old spokes lived under the tyre, so a rolling bike looked parked.)
-    this.wheelGeo = (() => {
-      const b = new MeshBuilder(256), R = 0.32;
-      b.place(0, 0, 0, 0, 0, PI / 2);
-      b.cylinder(16, R, R, 0.11, GK.RUBBER, { y0: -0.055, capBottom: true });
-      b.place(0, 0, 0, 0, 0, PI / 2);
-      b.cylinder(12, 0.2, 0.2, 0.07, GK.TIN, { y0: -0.035 });
-      b.place(0, 0, 0, 0, 0, PI / 2);
-      b.cylinder(8, 0.055, 0.055, 0.09, GK.CHROME);
-      for (let i = 0; i < 6; i++) { // six spokes across the rim, in the wheel's plane
-        b.place(0, 0, 0, (i / 6) * PI, 0, 0);
-        b.box(0.018, 0.42, 0.018, GK.CHROME);
-      }
-      b.place(0, 0.23, 0.075, 0, 0, 0.2); b.box(0.03, 0.05, 0.028, GK.EFFIGY); // a bright valve: the turn reads
-      return geometryOf(b.toArrays());
-    })();
+    this.paints = [KIND.BONE, GK.REDPAINT, GK.GATE, GK.CARPAINT]; // the Kugoo's own white first
     this.bikes = [];
     this.cockpit = null;
     this.rider = -1; // which bike YOU sit on (-1 walking)
@@ -282,19 +377,13 @@ export class MotoPark {
     this._dropCockpit();
     const yaw = g.trainingYaw || 0.6;
     for (let i = 0; i < 4; i++) {
-      const off = (i - 1.5) * 1.5;
+      const off = (i - 1.5) * 1.3;
       const x = (g.rackX ?? 6) + Math.cos(yaw) * off, z = (g.rackZ ?? 14) - Math.sin(yaw) * off;
       const b = newBike(i, x, z, yaw);
-      b.y = g.world.terrain.height(x, z);
-      b.mesh = new THREE.Mesh(this.geos[i % this.geos.length], g.world.material);
-      b.mesh.frustumCulled = false;
-      b.wheels = [new THREE.Mesh(this.wheelGeo, g.world.material), new THREE.Mesh(this.wheelGeo, g.world.material)];
-      b.wheels[0].position.set(0, 0.32, -0.68);
-      b.wheels[1].position.set(0, 0.32, 0.68);
-      b.wheels[0].rotation.order = 'YXZ'; b.wheels[1].rotation.order = 'YXZ';
-      b.mesh.add(...b.wheels);
+      b.mesh = buildKugoo(this.paints[i % this.paints.length], g.world.material);
       b.mesh.rotation.order = 'YXZ'; // heading first: the lean and the slope belong to the machine
-      b.shade = new GroundShade({ rx: 0.44, rz: 1.08, strength: 0.52 }); // where it meets the grass
+      b.wheels = [b.mesh.userData.kugoo.wheelF, b.mesh.userData.kugoo.wheelR];
+      b.shade = new GroundShade({ rx: 0.34, rz: 0.82, strength: 0.52 }); // where it meets the grass
       b.shade.place(x, z, yaw, true);
       this._seat(b); // both wheels on the ground: the hill under the axles, not under the middle
       g.scene.add(b.mesh);
@@ -303,18 +392,19 @@ export class MotoPark {
     this.place();
   }
 
-  // stand a parked machine on the hill: the two axles are sampled on their own, so a bike left on a slope
-  // rests on both wheels instead of sinking into it (which is how it used to vanish when you stepped off)
+  // stand a machine on the hill: the two axles are sampled on their own, so a bike left on a slope rests on both
+  // wheels instead of sinking into it; a fallen one is picked up
   _seat(b) {
-    const t = this.g.world.terrain;
+    const tr = this.g.world.terrain;
     const fx = -Math.sin(b.yaw), fz = -Math.cos(b.yaw);
-    const hf = t.height(b.x + fx * 0.62, b.z + fz * 0.62);
-    const hb = t.height(b.x - fx * 0.62, b.z - fz * 0.62);
-    b.y = (hf + hb) / 2 + 0.01;
-    b.vy = 0;
+    const hf = tr.height(b.x + fx * MOTO.half, b.z + fz * MOTO.half);
+    const hb = tr.height(b.x - fx * MOTO.half, b.z - fz * MOTO.half);
+    b.y = (hf + hb) / 2 + 0.005;
+    b.vy = 0; b.wp = 0; b.roll = 0; b.down = 0;
     b.grounded = true;
     b.lastGh = null;
-    b.pitch = Math.atan2(hf - hb, 1.24);
+    b.comp = [MOTO.sag[0], MOTO.sag[1]];
+    b.pitch = Math.atan2(hf - hb, 2 * MOTO.half);
   }
 
   // the nearest mountable bike within reach (Objectives-style: what E can find) — or, in the saddle,
@@ -334,7 +424,7 @@ export class MotoPark {
 
   interact(best, dt, held, still, T) {
     const b = best.obj;
-    this.g.hud.setUse(T(this.rider >= 0 ? 'motoDismount' : 'motoMount'), 0, true);
+    this.g.hud.setUse(T(this.rider >= 0 ? 'motoDismount' : b.down ? 'motoLift' : 'motoMount'), 0, true);
     if (held && still) this.mount(b.i);
   }
 
@@ -348,6 +438,8 @@ export class MotoPark {
     this.rider = i;
     this.mountT = 0.45;
     b.x = g.player.x; b.z = g.player.z; b.yaw = g.player.yaw; // it stands where you found it; you ride from where you are
+    b.vx = b.vz = 0;
+    this._seat(b); // (a fallen one is stood back up)
     g.player.x = b.x; g.player.z = b.z; g.player.vx = g.player.vz = 0; // onto the seat
     if (!silent) {
       g.hud.popup(t('motoOn'), 'dim');
@@ -356,21 +448,22 @@ export class MotoPark {
     if (g.sync) g.sync.ev('mb', i, 1);
   }
 
-  dismount(silent = false) {
+  dismount(silent = false, fell = false) {
     const g = this.g;
     if (this.rider < 0) return;
     const b = this.bikes[this.rider];
     const i = this.rider;
     this.rider = -1;
     this.mountT = 0.45;
-    if (b) { // step off beside it and half a pace back — the machine stays in the corner of your eye;
-      // it stands where you left it, at rest, on both wheels
+    if (b) { // step off beside it and half a pace back — the machine stays in the corner of your eye
       g.player.x = b.x + Math.cos(b.yaw) * 1.05 + Math.sin(b.yaw) * 0.3;
       g.player.z = b.z - Math.sin(b.yaw) * 1.05 + Math.cos(b.yaw) * 0.3;
       g.player.vx = g.player.vz = 0;
-      b.vx = b.vz = 0;
-      b.speed = 0;
-      this._seat(b); // down on both wheels where you left it, even on a slope
+      if (!fell) {
+        b.vx = b.vz = 0;
+        b.speed = 0;
+        this._seat(b); // down on both wheels where you left it, even on a slope
+      }
     }
     if (!silent) g.hud.popup(t('motoOff'), 'dim');
     g.audio?.motoOff?.();
@@ -408,6 +501,7 @@ export class MotoPark {
     if (this.rider >= 0 && !this.bikes[this.rider]) this.rider = -1; // the ride was taken away under them
     if (this.rider >= 0 && g.state !== 'training') this.dismount(true); // the range ended under you
     this._reconcile();
+    for (const b of this.bikes) if (b.down && b.i !== this.rider && !this.riders.get(b.i)) settleDown(b, g.world, dt);
     if (this.rider < 0) {
       // on foot: a parked machine is a solid thing, not a picture — and your own must be back in
       // sight the moment you step off (place() is what makes it visible again)
@@ -417,7 +511,7 @@ export class MotoPark {
     }
     const b = this.bikes[this.rider];
     const muted = g.inputMuted || g.inventory?.active || g.state !== 'training';
-    const ev = stepBike(b, muted ? { move: { x: 0, y: 0 } } : { move: input.move }, g.world, dt);
+    const ev = stepBike(b, muted ? { move: { x: 0, y: 0 } } : { move: input.move, sprint: !!input.sprint }, g.world, dt);
     g.player.x = b.x;
     g.player.z = b.z;
     g.player.y = b.y;
@@ -425,14 +519,18 @@ export class MotoPark {
     g.player.vx = b.vx;
     g.player.vz = b.vz;
     g.player.speed = Math.hypot(b.vx, b.vz);
-    if (ev.landed > 0.35) g.audio?.bump?.();
+    if (ev.landed > 0.35) { g.audio?.bump?.(); g.addTrauma?.(ev.landed * 0.3); }
     if (ev.bump > 0.2) g.audio?.bump?.();
-    if (ev.threw) { // head-on: off you go
-      this.dismount(true);
-      g.player.x = b.x - Math.sin(b.yaw) * 1.4;
-      g.player.z = b.z - Math.cos(b.yaw) * 1.4;
-      g.addTrauma?.(0.5);
-      g.hud.popup(t('motoThrown'), 'warn');
+    if (ev.threw) { // off you go: the machine goes down where it is, you land past it
+      const fx = -Math.sin(b.yaw), fz = -Math.cos(b.yaw);
+      const vx = b.vx, vz = b.vz;
+      this.dismount(true, true);
+      const fly = ev.cause === 'loop' ? -1.2 : 1.4;
+      g.player.x = b.x + fx * fly;
+      g.player.z = b.z + fz * fly;
+      g.player.vx = vx * 0.3; g.player.vz = vz * 0.3;
+      g.addTrauma?.(0.55);
+      g.hud.popup(t(ev.cause === 'bars' ? 'motoBars' : ev.cause === 'loop' ? 'motoLoop' : ev.cause === 'lowside' ? 'motoLowside' : 'motoThrown'), 'warn');
       g.audio?.bump?.();
     }
     this._apart(b);
@@ -443,8 +541,8 @@ export class MotoPark {
   // the closest point on a bike's spine (a capsule along its heading), and how far you are from it
   _near(b, x, z, res) {
     const fx = -Math.sin(b.yaw), fz = -Math.cos(b.yaw);
-    const t = clamp((x - b.x) * fx + (z - b.z) * fz, -0.74, 0.74);
-    const cx = b.x + fx * t, cz = b.z + fz * t;
+    const tt = clamp((x - b.x) * fx + (z - b.z) * fz, -0.62, 0.62);
+    const cx = b.x + fx * tt, cz = b.z + fz * tt;
     const dx = x - cx, dz = z - cz;
     res.d = Math.hypot(dx, dz);
     res.nx = res.d > 1e-5 ? dx / res.d : 1;
@@ -460,7 +558,7 @@ export class MotoPark {
     for (const b of this.bikes) {
       if (this.riders.get(b.i)) continue; // a friend is sitting on it: their body does the colliding
       this._near(b, p.x, p.z, q);
-      const rr = 0.44 + 0.3; // half the machine's width, plus the walker
+      const rr = 0.36 + 0.3; // half the machine's width, plus the walker
       if (q.d >= rr) continue;
       p.x += q.nx * (rr - q.d);
       p.z += q.nz * (rr - q.d);
@@ -475,7 +573,7 @@ export class MotoPark {
     for (const o of this.bikes) {
       if (o === b) continue;
       this._near(o, b.x, b.z, q);
-      const rr = 0.72;
+      const rr = 0.62;
       if (q.d >= rr) continue;
       b.x += q.nx * (rr - q.d);
       b.z += q.nz * (rr - q.d);
@@ -490,7 +588,7 @@ export class MotoPark {
     for (const b of this.bikes) {
       if (!b.mesh) continue; // a bare bike state (the physics tests build those)
       const riderId = this.riders.get(b.i);
-      let x = b.x, z = b.z, yaw = b.yaw, y = b.y, roll = b.roll, pitch = b.pitch, spin = b.spin;
+      let x = b.x, z = b.z, yaw = b.yaw, y = b.y, roll = b.roll, pitch = b.pitch;
       if (b.i !== this.rider && riderId) {
         const r = g.remotes.get(riderId);
         if (r && Number.isFinite(r.x) && Number.isFinite(r.z)) {
@@ -500,21 +598,15 @@ export class MotoPark {
           b.x = x = r.x; b.z = z = r.z; b.y = y = r.y; b.yaw = yaw = r.yaw;
           b.roll = roll = damp(b.roll, clamp(-dyaw * 14, -0.45, 0.45), 6, 1 / 60);
           b.pitch = pitch = damp(b.pitch, 0, 4, 1 / 60);
-          spin = (r.moved || 0) * 2.2;
+          b.down = 0;
+          b.spin = b.spinR = (r.moved || 0) / MOTO.R;
         }
       }
       if (!b.mesh.parent && g.scene) g.scene.add(b.mesh); // a mesh that lost its parent comes home
-      // a landing compresses the suspension: the body sits a hand's width lower for a moment
-      const squat = (b.sus || 0) * 0.07;
-      b.mesh.position.set(x, y - squat, z);
+      b.mesh.position.set(x, y, z);
       b.mesh.rotation.set(pitch, yaw, roll, 'YXZ');
       b.mesh.visible = !(b.i === this.rider && this.rider >= 0 && g.state === 'training'); // yours is replaced by the cockpit (see placeCockpit)
-      // the front wheel also turns with the bars; both roll with the road
-      for (let k = 0; k < b.wheels.length; k++) {
-        const w = b.wheels[k];
-        w.rotation.x = spin;
-        w.rotation.y = k === 0 ? (b.steer || 0) * 0.55 : 0;
-      }
+      poseKugoo(b.mesh, b);
       b.shade?.place(x, z, yaw);
     }
   }
@@ -531,35 +623,44 @@ export class MotoPark {
   // the bars in front of you are one mesh, made on the first ride and reused: take it out of the scene
   // with the park (it used to stay behind, frozen at the last camera position)
   _dropCockpit() {
-    // (its geometry belongs to this.cockpits and is reused by the next ride: only the mesh goes)
     const m = this.cockpitMesh;
     if (m?.parent) m.parent.remove(m);
     this.cockpitMesh = null;
+    this.cockpitPaint = null;
   }
 
-  // the cockpit under the camera: built once, hidden while walking, leaning with the bike
+  // the cockpit under the camera: the Kugoo's own steering, built once, hidden while walking
   placeCockpit(camera, visible) {
     const g = this.g, i = this.rider;
     if (!visible || i < 0) {
       if (this.cockpitMesh) this.cockpitMesh.visible = false;
       return;
     }
-    if (!this.cockpitMesh) {
-      this.cockpitMesh = new THREE.Mesh(this.cockpits[i % this.cockpits.length], g.world.material);
-      this.cockpitMesh.frustumCulled = false;
-      this.cockpitMesh.renderOrder = 3;
-      g.scene.add(this.cockpitMesh);
+    const paint = this.paints[i % this.paints.length];
+    if (!this.cockpitMesh || this.cockpitPaint !== paint) {
+      this._dropCockpit();
+      const holder = new THREE.Group();
+      const steer = new THREE.Mesh(partGeometry('steer', paint), g.world.material);
+      steer.frustumCulled = false;
+      steer.renderOrder = 3;
+      steer.position.set(-BAR[0], -BAR[1], -BAR[2]); // the grips' middle at the holder's origin
+      const turn = new THREE.Group();
+      turn.add(steer);
+      holder.add(turn);
+      holder.userData.turn = turn;
+      this.cockpitMesh = holder;
+      this.cockpitPaint = paint;
+      g.scene.add(holder);
     }
     const b = this.bikes[i];
     const m = this.cockpitMesh;
     m.visible = true;
-    const roll = b?.roll || 0, pitch = b?.pitch || 0;
-    // the cockpit is laid out facing -Z like a bike; hang it off the camera, then lean it with the
-    // machine (its own pitch, plus a little of the rider's look-down so the bars never detach)
     m.position.copy(camera.position);
     m.quaternion.copy(camera.quaternion);
-    m.rotateZ(roll * 0.9); // lean with the machine, not with the view
-    m.rotateX(pitch * 0.5);
+    m.translateY(-0.36); // where an enduro's bars sit in your view: a hand below the eyes, half a metre out
+    m.translateZ(-0.5);
+    m.rotateZ((b?.roll || 0) * 0.3); // the view already leans with the machine: a little more for the bars
+    m.userData.turn.quaternion.setFromAxisAngle(AXIS, -(b?.steer || 0));
     m.updateMatrixWorld();
   }
 }

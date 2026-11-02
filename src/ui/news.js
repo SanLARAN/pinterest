@@ -7,6 +7,21 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v:'3.1r',date:'2026-11-03',
+    ru:{title:'Kugoo на полигоне',items:[
+      'Мотоциклы на полигоне теперь Kugoo Wish 01: электрический питбайк по модели из твоего Blender-файла. Белая рама (у четырёх байков четыре цвета), чёрное седло, золотая вилка, амортизатор, колёса со спицами и тормозными дисками. Вилка сжимается вдоль своей оси, маятник качается, руль поворачивается вокруг наклонной колонки. С седла видно его руль и приборку.',
+      'Физика теперь настоящая. Байк качается на двух пружинах, и каждое колесо чувствует землю под собой. Электромотор с места тянет так, что поднимается передок. Сам ты ловишь газ, а с Shift (вес назад) едешь на заднем колесе до точки баланса, и S опускает его обратно. Передний тормоз клюёт вилку. Поворот идёт наклоном. Сцепление общее на тормоз, газ и поворот: перегазуешь в повороте — заднее колесо срывается, тормознёшь в полном наклоне — переднее уходит, и ты ложишься.',
+      'В воздухе колёса работают как гироскопы: газ поднимает нос, тормоз опускает. Сел носом — летишь через руль, перевернулся назад — падаешь. Байк остаётся лежать на боку, E поднимает его. Пробой подвески на приземлении — металл о металл, без батута.',
+      'Заодно исправлено: удар о камень под углом больше не разгоняет байк (знак отражения был перевёрнут).',
+    ]},
+    en:{title:'The Kugoo on the training ground',items:[
+      'The bikes on the training ground are now the Kugoo Wish 01: an electric pit bike from your own Blender file. A white frame (four bikes, four colours), a black seat, a gold fork, the shock, spoked wheels with brake discs. The fork compresses along its own axis, the swingarm swings, the bars turn about the raked steering head. From the seat you see its own bars and dash.',
+      'The physics is real now. The bike rides on two springs, and each wheel feels the ground under it. The electric motor pulls the front up off the line; on your own you catch the gas, and with Shift (weight back) you ride the back wheel up to the balance point, with S to bring it down. The front brake dives the fork. You turn by leaning. Grip is shared between brakes, gas and the turn: too much gas in a corner and the rear steps out, a hard brake at full lean and the front tucks and you are down.',
+      'In the air the wheels are gyros: gas lifts the nose, the brake drops it. Land on the nose and you go over the bars; loop it and you are off the back. The bike stays on its side, and E picks it up. Bottoming out on a landing is metal on metal, not a trampoline.',
+      'Also fixed: an angled hit on a rock no longer speeds the bike up (the bounce had its sign flipped).',
+    ]},
+  },
+  {
     v:'3.1q',date:'2026-11-02',
     ru:{title:'Лось в темноте',items:[
       'Перед главным меню теперь заставка. Ночной лес, вдалеке среди сосен один стоит Лось — Слушатель с рогами. Играет «Detuned Piano». Каждый удар пианино — эхо, а эхо показывает только то, где он БЫЛ, поэтому каждый раз он ближе: на обрыве нарастания, потом на самом громком аккорде. На долгом аккорде он медленно поворачивает голову, и это видно — красный контур в темноте. Ещё рывок, и он в пяти шагах. Пианино стихает, секунда тишины — и он у тебя перед лицом.',

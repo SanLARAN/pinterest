@@ -3,23 +3,30 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { MOTO, newBike, stepBike, MotoPark } from '../src/game/moto.js';
+import { MOTO, newBike, stepBike, MotoPark, riderEye } from '../src/game/moto.js';
 import { Training } from '../src/game/training.js';
 import { BAG_LIMIT } from '../src/game/backpackData.js';
 
 const flat = () => ({ height: () => 0 });
 const world = (h = flat(), hit = null) => ({ terrain: h, col: { resolve: (p) => (hit ? hit(p) : p) } });
-const drive = (b, w, seconds, move = { x: 0, y: 1 }, dt = 1 / 60) => {
+const drive = (b, w, seconds, move = { x: 0, y: 1 }, dt = 1 / 60, sprint = false) => {
   let ev;
-  for (let i = 0; i < Math.round(seconds / dt); i++) ev = stepBike(b, { move }, w, dt);
+  for (let i = 0; i < Math.round(seconds / dt); i++) ev = stepBike(b, { move, sprint }, w, dt);
   return ev;
+};
+// (3.1r) a bike stood on both wheels on whatever ground, as MotoPark._seat does
+const seated = (h, x = 0, z = 0, yaw = 0) => {
+  const b = newBike(0, x, z, yaw), fx = -Math.sin(yaw), fz = -Math.cos(yaw);
+  const hf = h.height(x + fx * MOTO.half, z + fz * MOTO.half), hb = h.height(x - fx * MOTO.half, z - fz * MOTO.half);
+  b.y = (hf + hb) / 2; b.pitch = Math.atan2(hf - hb, 2 * MOTO.half);
+  return b;
 };
 
 test('the bike pulls away, caps at its top speed, and never runs backwards faster than a walk', () => {
   const b = newBike(0, 0, 0, 0); // facing -z
-  drive(b, world(), 6);
+  drive(b, world(), 14); // (3.1r: an electric motor, power-limited above ~3 m/s: the drag and the power meet near the top)
   assert.ok(b.speed > MOTO.max * 0.85, `flat out (got ${b.speed.toFixed(1)} m/s)`);
-  assert.ok(b.speed <= MOTO.max + 0.01);
+  assert.ok(b.speed <= MOTO.max * 1.04, `(got ${b.speed.toFixed(2)} m/s)`);
   assert.ok(Math.abs(b.x) < 0.05 && b.z < -60, `it travels along its heading (x ${b.x.toFixed(2)}, z ${b.z.toFixed(1)})`);
   const r = newBike(0, 0, 0, 0);
   drive(r, world(), 3, { x: 0, y: -1 });
@@ -53,8 +60,10 @@ test('a crest at speed throws it into the air; it lands, and the landing is an e
 });
 
 test('a rolling hill throws it into the air and lands it again; flat ground keeps it planted', () => {
-  const hill = { height: (x, z) => 2.2 * Math.sin(z * 0.1) + 0.8 * Math.sin(z * 0.33 + 1) };
-  const b = newBike(0, 0, 0, 0);
+  // (3.1r: a run-up, then 0.6 m rollers every 12.5 m. A bike on springs leaves a crest once v²·curvature > g — about
+  // 9 m/s here; the old gentle 63 m swell, sprung, simply rides through, and a standing start cannot climb 38% rollers)
+  const hill = { height: (x, z) => (z > -40 ? 0 : 0.6 * Math.sin(z * 0.5)) };
+  const b = seated(hill);
   let air = 0, landed = 0, gap = 0;
   for (let i = 0; i < 900; i++) {
     const ev = stepBike(b, { move: { x: 0, y: 1 } }, world(hill), 1 / 60);
@@ -64,10 +73,10 @@ test('a rolling hill throws it into the air and lands it again; flat ground keep
     }
     if (ev.landed > 0) landed++;
   }
-  assert.ok(air > 0.5, `it spends real time in the air over crests (${air.toFixed(2)} s)`);
+  assert.ok(air > 0.3, `it spends real time in the air over crests (${air.toFixed(2)} s)`);
   assert.ok(gap > 0.15, `and gets off the ground (${gap.toFixed(2)} m)`);
-  assert.ok(landed > 2, `coming down again is an event (${landed} landings)`);
-  assert.ok(Math.abs(b.y - hill.height(b.x, b.z)) < 0.1, 'and it is back on the hill, not floating');
+  assert.ok(landed >= 2, `coming down again is an event (${landed} landings)`);
+  assert.ok(gap < 2.5, `and never flung off into the sky (${gap.toFixed(2)} m at most)`);
   // the same bike on the flat never leaves the ground
   const f = newBike(1, 0, 0, 0);
   let flatAir = 0;
@@ -76,7 +85,7 @@ test('a rolling hill throws it into the air and lands it again; flat ground keep
     if (!f.grounded) flatAir += 1 / 60;
   }
   assert.equal(flatAir, 0, 'no phantom hops on level ground');
-  assert.equal(f.y, 0);
+  assert.ok(Math.abs(f.y) < 0.03, `on its springs (${f.y.toFixed(3)})`);
 });
 
 test('a tree head-on at speed throws the rider; a glancing blow only bumps', () => {
@@ -374,11 +383,12 @@ test('updateTraining walks, steps the park and the trainer, and lets E work the 
   // in the saddle the bike is the body: no walker, seat-height eye, camera leans with the machine
   calls.player = 0; calls.motos = 0;
   g.motos.rider = 0;
+  g.player.y = 0;
   g.updateTraining(1 / 60, { look: { dx: 0, dy: 0 }, events: [] });
   assert.equal(calls.player, 0, 'the walker stands down while riding');
   assert.equal(calls.motos, 1);
-  assert.ok(Math.abs(g.player.eyeCur - MOTO.seat) < Math.abs(1.62 - MOTO.seat), 'the eye line drops toward the seat');
-  assert.ok(Math.abs(g.player.roll - 0.4 * 0.55) < 1e-6, 'the camera leans with the bike');
+  assert.ok(Math.abs(g.player.eyeCur - riderEye(g.motos.bikes[0])) < 1e-6 && g.player.eyeCur < 1.5, `the eye rides the bike (${g.player.eyeCur.toFixed(2)})`);
+  assert.ok(Math.abs(g.player.roll - 0.4 * 0.75) < 1e-6, 'the camera leans with the bike (3.1r: three quarters of it)');
 });
 
 test('in the saddle E only steps off: the bike under you is the one offer', () => {
@@ -414,18 +424,18 @@ test('the stand is solid while the range is up, and the ground is clear again af
 
 // ---------------- 2.1f: the two-wheel contact, and a machine that never goes missing ----------------
 test('both wheels read the hill: the chassis follows the slope and rests between the axles', () => {
-  const slope = { height: (x, z) => -z * 0.28 }; // the ground falls away ahead (−z is forward)
-  const b = newBike(0, 0, 0, 0);
+  const slope = { height: (x, z) => -z * 0.28 }; // the ground rises ahead (−z is forward): a climb
+  const b = seated(slope);
   drive(b, world(slope), 3);
-  assert.ok(b.speed > 5, 'it rolls down a slope');
+  assert.ok(b.speed > 2, `it climbs a 28% bank from a standstill, its front kept down (${b.speed.toFixed(1)} m/s)`);
   const mid = slope.height(b.x, b.z);
-  assert.ok(Math.abs(b.y - mid) < 0.05, `the body sits on the surface between the wheels (${(b.y - mid).toFixed(3)} m off)`);
-  assert.ok(b.pitch > 0.2 && b.pitch < 0.4, `nose follows the fall line (pitch ${b.pitch.toFixed(2)})`);
-  // and up the other way the nose lifts, still without leaving the ground on a smooth bank
-  const up = { height: (x, z) => z * 0.3 };
-  const c = newBike(1, 0, 0, 0);
-  drive(c, world(up), 3);
-  assert.ok(c.pitch < -0.2, `uphill the nose rises (pitch ${c.pitch.toFixed(2)})`);
+  assert.ok(Math.abs(b.y - mid) < 0.08, `the body sits on its springs between the wheels (${(b.y - mid).toFixed(3)} m off)`);
+  assert.ok(b.pitch > 0.2 && b.pitch < 0.4, `nose follows the bank (pitch ${b.pitch.toFixed(2)})`);
+  // and down the other way the nose drops, still on both wheels on a smooth bank
+  const down = { height: (x, z) => z * 0.3 };
+  const c = seated(down);
+  drive(c, world(down), 3, { x: 0, y: 0.4 });
+  assert.ok(c.pitch < -0.2 && c.grounded, `downhill the nose drops (pitch ${c.pitch.toFixed(2)})`);
 });
 
 function riddenPark(scene) {

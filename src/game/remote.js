@@ -182,7 +182,7 @@ export class RemotePlayer {
     }
     this._equipment();
     // on a bike the root rides the seat (the machine itself is drawn by MotoPark, under this body)
-    const seat = this.riding >= 0 ? 0.86 : 0; // the seat's top, in the bike's own frame
+    const seat = this.riding >= 0 ? 0.7 : 0; // the seat's top, in the bike's own frame (3.1r: the Kugoo's)
     r.position.set(this.x, this.y + (this.alive ? seat : 0.2), this.z);
     r.rotation.set(this.alive ? 0 : -Math.PI / 2, this.yaw + Math.PI, 0); // the rig faces +z, players look down -z
   }
