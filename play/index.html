@@ -7,10 +7,10 @@
     <meta name="description" content="ТИШЕ — low-poly эхолокационный хоррор. Ты слеп в огромном лесу: твой микрофон — эхолокатор. Запусти пять генераторов и не закричи." />
     <title>ТИШЕ — эхолокационный хоррор</title>
     <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
-  <script type="module" crossorigin src="./assets/main-DQbAVMgv.js"></script>
-  <link rel="modulepreload" crossorigin href="./assets/news-CqZlyHpb.js">
+  <script type="module" crossorigin src="./assets/main-DgFYIDXd.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/news-Bv66eNVo.js">
   <link rel="stylesheet" crossorigin href="./assets/news-BQxFqynA.css">
-  <link rel="stylesheet" crossorigin href="./assets/main-BUndOCAu.css">
+  <link rel="stylesheet" crossorigin href="./assets/main-BRIkCKGX.css">
 </head>
   <body>
     <noscript>
@@ -110,27 +110,19 @@
           <div class="menu-shift" data-i18n="homeNight"></div>
         </div>
         <div class="menu-main">
-          <button class="btn primary" id="btnPlay"><span data-i18n="homeSolo">ОДНОМУ</span></button>
-          <button class="btn" id="btnRange"><span data-i18n="homeRange">ПОЛИГОН</span></button>
-          <button class="btn coop-btn" id="btnCoop"><span class="coop-ico" aria-hidden="true"><i></i><i></i></span><span id="btnCoopText" data-i18n="coopBtn">С ДРУЗЬЯМИ</span></button>
-                    <button id="btnWardrobe" class="btn fig" type="button" aria-label="wardrobe">
-            <span class="fig-stage" id="figStage"></span>
-            <span class="fig-cap"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7.2a1.9 1.9 0 1 0-1.9-1.9"/><path d="M12 7.2v1.3L3.2 15a1.3 1.3 0 0 0 .8 2.4h16a1.3 1.3 0 0 0 .8-2.4L12 8.5"/></svg><span></span></span>
-          </button>
-          <div class="book-clue" data-i18n="homeBookHint"></div>
-          <div id="bestLine"></div>
+          <!-- (3.1j) a game menu, not a stack of boxes: one list, the way to play first and biggest -->
+          <nav class="home-list" id="homeList">
+            <button class="home-item primary" id="btnPlay" type="button"><span class="hi-label" data-i18n="homeSolo">ОДНОМУ</span></button>
+            <button class="home-item coop-btn" id="btnCoop" type="button"><span class="hi-label" id="btnCoopText" data-i18n="coopBtn">С ДРУЗЬЯМИ</span><span class="hi-meta coop-ico" aria-hidden="true"><i></i><i></i></span></button>
+            <i class="home-rule" aria-hidden="true"></i>
+            <button class="home-item" id="btnRange" type="button"><span class="hi-label" data-i18n="homeRange">ПОЛИГОН</span></button>
+            <button class="home-item" id="btnWardrobe" type="button" aria-label="wardrobe"><span class="hi-label"></span><span class="fig-stage" id="figStage" hidden></span></button>
+            <button class="home-item shop-item" id="btnShop" type="button"><span class="hi-label" data-i18n="shop"></span><span class="hi-meta wallet"><svg class="gem-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l5.5 6.5L12 20.5 6.5 10z"/><path d="M6.5 10h11"/></svg><b id="walletMenu">0</b></span></button>
+          </nav>
           <nav class="menu-links">
-            <button class="link" id="btnHow"><span data-i18n="howto"></span></button>
-            <i>·</i>
-
-            <i>·</i>
-            <button class="link shop-link" id="btnShop"><svg class="gem-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l5.5 6.5L12 20.5 6.5 10z"/><path d="M6.5 10h11"/></svg><span data-i18n="shop"></span><b id="walletMenu">0</b></button>
-            <i>·</i>
-            <button class="link" id="btnScores"><span data-i18n="scores"></span></button>
-            <i>·</i>
-            <button class="link" id="btnSettings"><span data-i18n="settings"></span></button>
-            <i>·</i>
-            <a class="link" id="lnkPrivacy" href="./privacy.html" target="_blank" rel="noopener"><span data-i18n="privacyLink"></span></a>
+            <button class="link" id="btnHow" type="button"><span data-i18n="howto"></span></button>
+            <button class="link" id="btnScores" type="button"><span data-i18n="scores"></span></button>
+            <button class="link" id="btnSettings" type="button"><span data-i18n="settings"></span></button>
           </nav>
           <div id="micPanel">
             <div class="mic-row">
@@ -141,8 +133,8 @@
             <div id="micTest"><div class="bar"><div id="micTestFill"></div><div id="micTestTrig"></div></div><span data-i18n="micTest"></span></div>
             <div id="micWarn"></div>
           </div>
-          <!-- your survivor: click it for the wardrobe -->
-
+          <div class="book-clue" data-i18n="homeBookHint"></div>
+          <div id="bestLine"></div>
         </div>
         <section id="socialDock" aria-label="Friends">
           <div class="social-selfrow"><button id="btnAccount" class="social-portrait" data-portrait="true" type="button" aria-label="Личное дело"><canvas width="128" height="128"></canvas></button><div class="social-details"><strong class="social-name"></strong><span class="social-tag"></span><i class="social-sync"></i></div></div>
@@ -151,6 +143,7 @@
         </section>
         <div class="menu-foot">
           <div class="hp"><svg viewBox="0 0 24 24"><path d="M4 15v-3a8 8 0 0 1 16 0v3"/><rect x="3" y="14" width="4" height="7" rx="1.5"/><rect x="17" y="14" width="4" height="7" rx="1.5"/></svg><span data-i18n="headphones"></span></div>
+          <a class="link" id="lnkPrivacy" href="./privacy.html" target="_blank" rel="noopener"><span data-i18n="privacyLink"></span></a>
           <aside id="news" class="news" aria-label="news"></aside>
           <button id="langBtn" class="chip">RU · EN</button>
         </div>

@@ -1329,11 +1329,11 @@ body.touch .pg-keys { display: none; }
 .wr-head { gap: 12px; }
 .wr-wallet { margin-left: auto; display: inline-flex; align-items: baseline; gap: 6px; padding: 5px 11px; border: 1px solid rgba(240, 181, 82, 0.28); border-radius: 999px; color: #f0b552; font-size: 13px; letter-spacing: 0.08em; white-space: nowrap; }
 .wr-wallet i { font-style: normal; font-size: 11px; }
-.wr-wallet span { font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; color: rgba(240, 181, 82, 0.6); }
+.wr-wallet span { font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: rgba(240, 181, 82, 0.6); }
 .wr-slots .wr-slot.shop { color: #f0b552; }
 .wr-slots .wr-slot.shop svg { stroke: #f0b552; }
 .wr-card .wr-price { display: block; padding: 2px 3px 0; text-align: center; font-size: 10px; letter-spacing: 0.08em; color: #f0b552; }
-.wr-card.prod.owned .wr-price { color: var(--ash-dim); font-size: 8.5px; letter-spacing: 0.16em; }
+.wr-card.prod.owned .wr-price { color: var(--ash-dim); font-size: 10px; letter-spacing: 0.16em; }
 .wr-card.prod.poor .wr-price { color: rgba(240, 181, 82, 0.5); }
 #wardrobePanel.shop-tab .wr-paint, #wardrobePanel.shop-tab .wr-actions { display: none; }
 #wardrobePanel.shop-tab .wr-items { grid-template-columns: repeat(4, minmax(0, 1fr)); }
@@ -1346,7 +1346,7 @@ body.touch .pg-keys { display: none; }
 .wr-buy.worn { opacity: 0.45; cursor: default; }
 .wr-buy.nope { animation: wrNope 0.4s; }
 @keyframes wrNope { 20% { transform: translateX(-6px); } 40% { transform: translateX(5px); } 60% { transform: translateX(-3px); } 80% { transform: translateX(2px); } }
-.wr-short { font-size: 11px; letter-spacing: 0.1em; color: rgba(240, 181, 82, 0.7); }
+.wr-short { font-size: 12px; letter-spacing: 0.1em; color: rgba(240, 181, 82, 0.7); }
 .wr-toast { position: absolute; left: 50%; top: 18%; transform: translate(-50%, 0); padding: 9px 18px; border: 1px solid rgba(240, 181, 82, 0.4); border-radius: 3px; background: rgba(12, 9, 6, 0.86); color: #f0b552; font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; white-space: nowrap; opacity: 0; pointer-events: none; z-index: 3; }
 .wr-toast.show { animation: wrToast 2.6s ease-out; }
 @keyframes wrToast { 0% { opacity: 0; transform: translate(-50%, 8px); } 10% { opacity: 1; transform: translate(-50%, 0); } 80% { opacity: 1; } 100% { opacity: 0; } }

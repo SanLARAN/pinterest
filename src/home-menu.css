@@ -1,0 +1,231 @@
+/* (3.1j) The title screen's column: one list over the garage, the way a horror game's menu reads.
+   The way to play comes first and biggest; a red tick and a dark plate mark the line you are on (the mouse, the
+   keyboard, or — while you touch nothing — ОДНОМУ). Every size of this column lives here and nowhere else:
+   garage-home.css, social.css and cloud.css used to fight over it, down to 6 px type. Nothing here is under 11 px. */
+#menu {
+  --hm-left: clamp(24px, 5vw, 86px);
+  --hm-top: clamp(24px, 5vh, 45px);
+  --hm-ink: #c4c8af;
+  --hm-ink-hi: #f0e9d3;
+  --hm-dim: #a6ae9a;
+  --hm-faint: #909a87;
+  --hm-plate: #121a13;
+  --hm-rule: rgba(167, 180, 182, 0.17);
+  --hm-wallet: #e2b15e;
+  --hm-ease: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* the column flows: title, the list right under it, and the friends corner at the bottom of the same column.
+   Nothing is pinned to a guessed height, so nothing can slide under anything: on a window too short for all of
+   it the screen scrolls instead (the footer's own strip stays clear, --hm-foot). */
+#menu { padding: 0; --hm-foot: 64px; scrollbar-width: thin; scrollbar-color: rgba(167, 180, 182, 0.3) transparent; }
+#menu .menu-wrap {
+  position: relative; inset: auto; flex: 1 0 auto; width: 100%; min-height: 100%; height: auto;
+  display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-start; gap: 0;
+  padding: calc(var(--hm-top) + var(--safe-t)) 0 calc(var(--hm-foot) + var(--safe-b)) calc(var(--hm-left) + var(--safe-l));
+}
+#menu .menu-wrap > #socialDock { position: relative; inset: auto; flex: 0 0 auto; margin-top: auto; }
+#menu .title-block { position: static; text-align: left; margin: 0; }
+#menu .title { font-size: clamp(68px, 8vw, 104px); line-height: 1; letter-spacing: 0.055em; margin: 0 0 10px; animation: none; text-shadow: 0 6px 40px #0009; }
+#menu .title::before, #menu .title::after { display: none; }
+#menu .tagline { margin-top: 0; font-size: 13px; line-height: 1.35; letter-spacing: 0.14em; color: #b7baa6; }
+#menu .menu-shift { margin-top: 10px; font-size: 11px; line-height: 1.3; letter-spacing: 0.18em; color: #8b9380; }
+
+#menu .menu-main { position: static; margin: 26px 0 18px; padding: 0; width: 320px; max-width: calc(100vw - 2 * var(--hm-left)); display: flex; flex-direction: column; align-items: stretch; gap: 0; }
+
+/* ---- the list ---- */
+/* the lines hang their tick into the gutter, so the words start where the title does */
+.home-list { display: flex; flex-direction: column; margin-left: -18px; }
+.home-item {
+  position: relative; isolation: isolate; display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  width: 100%; min-height: 46px; margin: 0; padding: 0 12px 0 18px; border: 0; border-radius: 0; background: none; box-shadow: none;
+  color: var(--hm-ink); font: 400 17px/1.15 var(--mono); letter-spacing: 0.14em; text-transform: uppercase; text-align: left;
+  cursor: pointer; transition: color 0.18s ease-out;
+}
+/* the tick */
+.home-item::before {
+  content: ''; position: absolute; left: 4px; top: 50%; width: 3px; height: 22px; margin-top: -11px;
+  background: var(--red); transform: scaleY(0); transition: transform 0.24s var(--hm-ease);
+}
+/* the plate: dark on the left, gone by the right edge, so the garage still shows through */
+.home-item::after {
+  content: ''; position: absolute; inset: 0; z-index: -1; opacity: 0; transition: opacity 0.18s ease-out;
+  background: linear-gradient(90deg, rgba(18, 26, 19, 0.88), rgba(18, 26, 19, 0.5) 55%, rgba(18, 26, 19, 0) 100%);
+}
+.hi-label { position: relative; min-width: 0; white-space: nowrap; transition: transform 0.24s var(--hm-ease); }
+.hi-meta { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 7px; font-size: 13px; letter-spacing: 0.06em; color: var(--hm-dim); }
+
+.home-list:not(.kbd) .home-item:hover,
+.home-item:focus-visible,
+.home-list:not(:has(.home-item:focus-visible)):not(:has(.home-item:hover)) .home-item.primary { color: var(--hm-ink-hi); }
+.home-list:not(.kbd) .home-item:hover::before,
+.home-item:focus-visible::before,
+.home-list:not(:has(.home-item:focus-visible)):not(:has(.home-item:hover)) .home-item.primary::before { transform: scaleY(1); }
+.home-list:not(.kbd) .home-item:hover::after,
+.home-item:focus-visible::after,
+.home-list:not(:has(.home-item:focus-visible)):not(:has(.home-item:hover)) .home-item.primary::after { opacity: 1; }
+.home-list:not(.kbd) .home-item:hover .hi-label,
+.home-item:focus-visible .hi-label,
+.home-list:not(:has(.home-item:focus-visible)):not(:has(.home-item:hover)) .home-item.primary .hi-label { transform: translateX(6px); }
+.home-item:focus { outline: none; }
+.home-item:focus-visible { outline: 1px solid rgba(214, 205, 192, 0.5); outline-offset: -1px; }
+.home-item:active { color: #fff; }
+.home-item:active .hi-label { transform: translateX(10px); transition-duration: 0.08s; }
+
+/* the two ways to play */
+.home-item.primary { min-height: 64px; font-size: 30px; font-weight: 700; letter-spacing: 0.1em; color: #e2dbc2; }
+.home-item.primary::before { width: 4px; height: 34px; margin-top: -17px; }
+.home-item.coop-btn { width: 100%; min-height: 52px; padding: 0 12px 0 18px; font-size: 21px; letter-spacing: 0.12em; }
+.home-item.coop-btn::before { height: 26px; margin-top: -13px; }
+.home-item.coop-btn .coop-ico { width: 20px; height: 12px; opacity: 0.75; margin: 0; }
+.home-item.coop-btn.in-room { color: #bff6ff; }
+.home-rule { display: block; width: 62%; height: 1px; margin: 9px 0 9px 18px; background: var(--hm-rule); }
+
+/* the shop carries your shards, in the amber the shop itself uses */
+.shop-item .wallet { color: var(--hm-wallet); font-size: 14px; }
+.shop-item .wallet b { font-weight: 400; font-variant-numeric: tabular-nums; }
+.shop-item .gem-ico { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linejoin: round; }
+
+/* ---- under the list ---- */
+#menu .menu-links { display: flex; flex-wrap: wrap; justify-content: flex-start; align-items: center; gap: 0 22px; width: auto; max-width: none; margin: 16px 0 0; padding: 0; }
+#menu .menu-links .link { min-height: 36px; padding: 9px 0; font-size: 12px; letter-spacing: 0.14em; color: var(--hm-dim); }
+#menu .menu-links .link::after { left: 0; right: 0; bottom: 7px; }
+#menu .menu-links .link:hover, #menu .menu-links .link:focus-visible { color: var(--hm-ink-hi); }
+#menu .menu-links .link:focus-visible { outline: 1px solid rgba(214, 205, 192, 0.5); outline-offset: 2px; }
+
+#menu #micPanel { width: 100%; margin: 8px 0 0; align-items: flex-start; text-align: left; gap: 6px; font-size: 12px; }
+#menu .mic-row { justify-content: flex-start; gap: 12px; flex-wrap: nowrap; min-height: 32px; }
+#menu #micStatus { flex: 0 1 auto; font-size: 12px; line-height: 1.4; letter-spacing: 0.12em; }
+#menu #micPanel .chip { min-height: 32px; padding: 7px 12px; font-size: 12px; letter-spacing: 0.06em; border-color: rgba(167, 180, 182, 0.32); }
+#menu #micPanel .chip:focus-visible { outline: 1px solid rgba(214, 205, 192, 0.6); outline-offset: 2px; }
+#menu #micTest, #menu #micWarn, #menu #micCalBtn, #menu #bestLine { display: none; }
+
+#menu .book-clue { margin: 12px 0 0; max-width: 300px; font-size: 12px; line-height: 1.5; color: var(--hm-faint); opacity: 1; }
+
+/* the privacy page is the small print: the footer's right-hand group, never under the friends corner */
+#menu .menu-foot > #lnkPrivacy { margin-left: auto; padding: 8px 0; font-size: 11px; letter-spacing: 0.12em; color: var(--hm-faint); }
+#menu .menu-foot > #lnkPrivacy::after { bottom: 5px; }
+
+/* ---- shorter desktops: the same list, closer together (the friends corner keeps the bottom-left) ---- */
+@media (min-width: 761px) and (max-height: 940px) {
+  #menu .book-clue { display: none; }
+}
+@media (min-width: 761px) and (max-height: 880px) {
+  #menu .title { font-size: clamp(64px, 11vh, 92px); margin-bottom: 8px; }
+  #menu .menu-shift { margin-top: 8px; }
+  #menu .menu-main { margin-top: 18px; }
+  .home-item { min-height: 40px; font-size: 15px; }
+  .home-item.primary { min-height: 54px; font-size: 26px; }
+  .home-item.primary::before { height: 30px; margin-top: -15px; }
+  .home-item.coop-btn { min-height: 44px; font-size: 19px; }
+  .home-rule { margin: 6px 0 6px 18px; }
+  #menu .menu-links { margin-top: 8px; }
+  #menu .menu-links .link { min-height: 34px; padding: 8px 0; }
+  #menu #micPanel { margin-top: 2px; }
+  #menu .book-clue { display: none; }
+}
+/* a laptop (1366×768, or its browser window ≈650): the headphones line gives its strip to the friends corner */
+@media (min-width: 761px) and (max-height: 780px) {
+  #menu { --hm-top: 24px; --hm-foot: 16px; }
+  #menu .title { font-size: clamp(60px, 10vh, 76px); }
+  #menu .tagline { font-size: 12px; }
+  #menu .menu-shift { display: none; }
+  #menu .menu-main { margin: 14px 0 12px; }
+  .home-item { min-height: 38px; font-size: 15px; }
+  .home-item.primary { min-height: 50px; font-size: 24px; }
+  .home-item.primary::before { height: 28px; margin-top: -14px; }
+  .home-item.coop-btn { min-height: 42px; font-size: 18px; }
+  .home-rule { margin: 5px 0 5px 18px; }
+  #menu .menu-links { margin-top: 6px; }
+  #menu .menu-links .link { min-height: 32px; padding: 7px 0; }
+  #menu #micPanel { margin-top: 0; }
+  #menu .menu-foot > .hp { display: none; }
+}
+@media (min-width: 761px) and (max-height: 680px) {
+  #menu { --hm-top: 20px; }
+  #menu .title { font-size: 60px; }
+  #menu .menu-main { margin-top: 10px; }
+  .home-item { min-height: 34px; font-size: 14px; }
+  .home-item.primary { min-height: 44px; font-size: 22px; }
+  .home-item.primary::before { height: 26px; margin-top: -13px; }
+  .home-item.coop-btn { min-height: 38px; font-size: 17px; }
+  .home-rule { margin: 4px 0 4px 18px; }
+  #menu .menu-links { margin-top: 4px; }
+}
+@media (min-width: 761px) and (max-height: 620px) {
+  #menu .menu-wrap > #socialDock .social-heading, #menu .menu-wrap > #socialDock .social-list { display: none; }
+}
+
+/* ---- phones and tablets upright ---- */
+@media (max-width: 760px) and (min-height: 471px), (orientation: portrait) and (max-width: 1000px) and (min-height: 471px) {
+  #menu { --hm-left: 22px; --hm-top: calc(24px + var(--safe-t)); }
+  #menu .title { font-size: clamp(56px, 16vw, 80px); margin-bottom: 6px; }
+  #menu .tagline { font-size: 12px; }
+  #menu .menu-shift { margin-top: 8px; }
+  #menu .menu-main { margin-top: 20px; width: calc(100vw - 44px); max-width: 420px; }
+  .home-item { min-height: 46px; font-size: 16px; }
+  .home-item.primary { min-height: 58px; font-size: 26px; }
+  .home-item.coop-btn { min-height: 50px; font-size: 18px; }
+  #menu .menu-links { margin-top: 10px; gap: 0 20px; }
+  #menu .menu-links .link { min-height: 40px; }
+  #menu .book-clue { display: none; }
+  /* the footer is one line on a 360 px phone: no headphones glyph, the news tab shrinks to its version */
+  #menu .menu-foot { gap: 10px; }
+  #menu .menu-foot > .hp, #homeRoomCaption { display: none; }
+  #menu .menu-foot .news-tab span { display: none; }
+  #menu .menu-foot > #lnkPrivacy { letter-spacing: 0.04em; }
+}
+/* a phone shorter than ~790 px: the friends corner folds to your portrait (it opens the same panel, friends
+   included) — a touch screen does not scroll this menu, so everything has to fit */
+@media (orientation: portrait) and (max-width: 1000px) and (min-height: 471px) and (max-height: 790px) {
+  #menu .menu-wrap > #socialDock { width: 58px; height: 58px; max-height: 58px; padding: 4px; gap: 0; }
+  #menu .menu-wrap > #socialDock .social-selfrow { display: block; }
+  #menu .menu-wrap > #socialDock .social-portrait { width: 48px; height: 48px; flex-basis: 48px; }
+  #menu .menu-wrap > #socialDock :is(.social-details, .social-add, .social-heading, .social-list) { display: none; }
+  #menu .title { font-size: 54px; }
+  #menu .menu-shift { display: none; }
+  #menu .menu-main { margin-top: 14px; }
+  .home-item { min-height: 42px; font-size: 15px; }
+  .home-item.primary { min-height: 52px; font-size: 24px; }
+  .home-item.coop-btn { min-height: 46px; font-size: 17px; }
+  .home-rule { margin: 6px 0 6px 18px; }
+  #menu .menu-links { margin-top: 6px; }
+}
+
+/* an iPhone SE's browser (375×548) */
+@media (orientation: portrait) and (max-width: 1000px) and (min-height: 471px) and (max-height: 620px) {
+  #menu { --hm-top: calc(16px + var(--safe-t)); }
+  #menu .title { font-size: 46px; margin-bottom: 4px; }
+  #menu .menu-main { margin: 10px 0 8px; }
+  .home-item { min-height: 36px; font-size: 14px; }
+  .home-item.primary { min-height: 44px; font-size: 22px; }
+  .home-item.primary::before { height: 26px; margin-top: -13px; }
+  .home-item.coop-btn { min-height: 40px; font-size: 16px; }
+  .home-rule { margin: 4px 0 4px 18px; }
+  #menu .menu-links { margin-top: 2px; }
+  #menu .menu-links .link { min-height: 36px; }
+  #menu #micPanel { margin-top: 0; }
+}
+
+/* ---- phones on their side ---- */
+@media (max-height: 470px) {
+  #menu { --hm-left: 25px; --hm-top: 18px; --hm-foot: 8px; }
+  /* the column needs the whole height: your portrait waits in the empty top-right corner of the garage */
+  #menu .menu-wrap > #socialDock { position: fixed; top: calc(12px + var(--safe-t)); right: calc(12px + var(--safe-r)); left: auto; bottom: auto; margin: 0; }
+  #menu .title { font-size: 52px; margin-bottom: 4px; }
+  #menu .tagline { font-size: 11px; }
+  #menu .menu-shift, #menu .book-clue, #menu #micStatus { display: none; }
+  #menu .menu-main { margin: 12px 0 0; width: clamp(210px, 36vw, 270px); }
+  .home-item { min-height: 36px; font-size: 13px; }
+  .home-item.primary { min-height: 46px; font-size: 22px; }
+  .home-item.primary::before { height: 26px; margin-top: -13px; }
+  .home-item.coop-btn { min-height: 40px; font-size: 16px; }
+  .home-rule { margin: 4px 0 4px 18px; }
+  #menu .menu-links { margin-top: 4px; gap: 0 14px; flex-wrap: nowrap; }
+  #menu .menu-links .link { min-height: 34px; padding: 8px 0; font-size: 11px; letter-spacing: 0.06em; white-space: nowrap; }
+  #menu #micPanel { margin-top: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-item, .home-item::before, .home-item::after, .hi-label { transition: none; }
+}

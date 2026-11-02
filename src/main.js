@@ -12,6 +12,7 @@ import './garage-home.css';
 import './screen-editor.css';
 import './cloud.css';
 import './social.css';
+import './home-menu.css'; // 3.1j: the title screen's list — last, so it owns the column
 
 import * as THREE from 'three';
 import { CFG, fovFor } from './core/config.js';

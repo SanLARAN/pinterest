@@ -187,7 +187,7 @@ export class Wardrobe {
 
   applyI18n() {
     const T = wt();
-    const cap = this.btn.querySelector('.fig-cap span');
+    const cap = this.btn.querySelector('.hi-label'); // (3.1j) a line of the home list
     if (cap) cap.textContent = t('homeWardrobe');
     this.btn.setAttribute('aria-label', T.title);
     if (this.shown) this._renderAll();
@@ -445,7 +445,6 @@ export class Wardrobe {
   // ---------------- drawing the room ----------------
   _renderAll() {
     const T = wt();
-    $('wrTitle').textContent = T.title;
     $('wrSub').textContent = T.sub;
     $('wrNote').textContent = T.note;
     $('wrDone').textContent = T.done;
@@ -468,6 +467,8 @@ export class Wardrobe {
 
   _renderSlots() {
     const T = wt();
+    // (3.1j) came in through «Магазин»? the panel says so, not «Гардероб» over a shop
+    $('wrTitle').textContent = this.slot === 'shop' ? T.slot.shop : T.title;
     $('wrSlots').innerHTML = TABS.map((s, i) => `<button class="wr-slot${s === this.slot ? ' on' : ''}${s === 'shop' ? ' shop' : ''}" data-slot="${s}" role="tab" aria-selected="${s === this.slot}"><b>${i + 1}</b>${ICON[s]}<em>${esc(T.slot[s])}</em></button>`).join('');
   }
 

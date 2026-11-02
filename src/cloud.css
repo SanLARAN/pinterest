@@ -105,7 +105,5 @@
   .cloud-form { gap: 10px; }
 }
 @media (max-height: 470px) {
-  #menu .menu-links { gap: 6px 8px; }
-  #menu .menu-links .link { font-size: 11px; letter-spacing: 0; }
   #menu #btnAccount { gap: 3px; }
 }

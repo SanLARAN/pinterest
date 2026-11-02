@@ -7,6 +7,21 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v:'3.1j',date:'2026-11-02',
+    ru:{title:'Главное меню и магазин',items:[
+      'Главное меню стало одним списком: «Одному» первым и крупнее всех, под ним «С друзьями», ниже «Полигон», «Гардероб» и «Магазин». Строка, на которой ты стоишь, отмечена красной чертой.',
+      'По меню можно ходить стрелками ↑ и ↓ и выбирать Enter. Весь текст на главном экране стал крупнее: подписи в 6–8 пикселей больше не нужно разглядывать.',
+      'Магазин снова есть в главном меню, и рядом видно, сколько у тебя осколков. Вкладка «Магазин» больше не обрезается, у панели свой заголовок, а названия и цены читаются.',
+      'Панель друзей больше не наезжает на меню на ноутбуке. На невысоком экране телефона она сворачивается в твой портрет: нажми на него, и откроется та же панель с друзьями.',
+    ]},
+    en:{title:'Main menu and shop',items:[
+      'The main menu is now a single list: Solo first and biggest, With friends under it, then Range, Wardrobe and Shop. The line you are on is marked with a red bar.',
+      'You can walk the menu with the ↑ and ↓ keys and pick with Enter. All text on the title screen is larger: no more squinting at 6–8 pixel captions.',
+      'The shop is back in the main menu, with your shards shown beside it. The Shop tab is no longer cut off, the panel has its own title, and names and prices are readable.',
+      'The friends panel no longer covers the menu on a laptop. On a short phone screen it folds into your portrait: tap it to open the same panel, friends included.',
+    ]},
+  },
+  {
     v:'3.1i',date:'2026-11-02',
     ru:{title:'Мышь без «зажми и тяни»',items:[
       'Режим «зажми ЛКМ и тяни, чтобы смотреть» убран. Камера всегда управляется как обычно: кликнул, и мышь вертит взгляд без зажатой кнопки.',
@@ -1059,7 +1074,7 @@ export class News {
     const fresh = this.st.seen !== NEWS[0].v;
     this.el.classList.toggle('folded', !!this.st.folded);
     if (this.st.folded) {
-      this.el.innerHTML = `<button class="news-tab" data-act="unfold">${fresh ? '<i class="news-dot"></i>' : ''}<span>${esc(W.open)}</span><em>v${NEWS[0].v}</em></button>`;
+      this.el.innerHTML = `<button class="news-tab" data-act="unfold" aria-label="${esc(W.open)} v${NEWS[0].v}">${fresh ? '<i class="news-dot"></i>' : ''}<span>${esc(W.open)}</span><em>v${NEWS[0].v}</em></button>`;
       return;
     }
     // seen once it's been open on the screen

@@ -145,6 +145,22 @@ export class Menus {
     click('btnHowBack', () => this.show('howPanel', false));
     click('btnAtlas', () => this.h.onAtlas && this.h.onAtlas());
     click('btnShop', () => this.h.onShop && this.h.onShop());
+    // (3.1j) the home list walks like a game menu: ↑/↓ move between its lines, Enter/Space press (buttons do that).
+    // One line is lit at a time: while the keyboard drives, the line under a resting mouse stays dark (.kbd).
+    const homeList = $('homeList');
+    homeList?.addEventListener('pointermove', () => homeList.classList.remove('kbd'));
+    homeList?.addEventListener('focusin', (e) => { if (e.target.matches(':focus-visible')) homeList.classList.add('kbd'); });
+    homeList?.addEventListener('keydown', (e) => {
+      homeList.classList.add('kbd');
+      if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+      const items = [...e.currentTarget.querySelectorAll('.home-item')].filter((b) => b.offsetParent);
+      const i = items.indexOf(document.activeElement);
+      const next = items[(i + (e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length];
+      if (!next) return;
+      e.preventDefault();
+      next.focus();
+      this.h.uiSound && this.h.uiSound('hover');
+    });
     click('btnScores', () => {
       this.renderScores();
       this.show('scoresPanel');
