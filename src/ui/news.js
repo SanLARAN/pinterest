@@ -7,6 +7,21 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v:'3.1n',date:'2026-11-02',
+    ru:{title:'Дорога в лесхоз',items:[
+      'Смена в лесу начинается в дороге. УАЗ едет по шоссе на закате, пассажир ловит радио: сначала треск, потом песня CUPSIZE «вайфуу», как из старого автомобильного динамика.',
+      'У каждого в машине своё дело. Водитель ведёт и косится на соседа, пассажир крутит радио и высовывает руку в окно, один спит, привалившись к стеклу, другой читает карту. Все кивают в такт песне. Если играешь один, ведёшь и включаешь радио сам.',
+      'Машина сворачивает с шоссе в выемку, въезжает во двор лесхоза и встаёт на своё место. Ключ повёрнут, и песня обрывается на полуслове. Все выходят, сонный потягивается, и дальше начинается последний вечер в лагере.',
+      'Enter пропускает всё вступление сразу, и дорогу, и лагерь.',
+    ]},
+    en:{title:'The road to the forestry',items:[
+      'A forest shift now begins on the road. The UAZ drives along the highway at sunset and the passenger finds a station: static first, then CUPSIZE\'s «вайфуу», as if through an old car speaker.',
+      'Everyone in the car has something to do. The driver drives and glances across, the passenger tunes the radio and puts an arm out of the window, one sleeps against the glass, one reads the map. Everyone nods to the beat. Alone, you drive and turn the radio on yourself.',
+      'The car turns off the highway into the cut, pulls into the forestry yard and stops in its place. The key turns and the song stops mid-line. Everyone gets out, the sleeper stretches, and then the camp\'s last evening begins.',
+      'Enter skips the whole opening at once, the road and the camp.',
+    ]},
+  },
+  {
     v:'3.1m',date:'2026-11-02',
     ru:{title:'Лес: победа — уехать',items:[
       'В лесу побеждают только отъездом на УАЗе. Пережить смену — ещё не победа: рассвет последней ночи открывает «последнее утро». Это пять минут при свете, без монстров, чтобы доделать УАЗ и уехать. Не успел — смена кончилась, и это поражение.',

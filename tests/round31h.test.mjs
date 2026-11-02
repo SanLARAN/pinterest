@@ -10,7 +10,7 @@ import * as THREE from 'three';
 
 globalThis.document ||= { body: { classList: { add() {}, remove() {} } } };
 globalThis.localStorage ||= { getItem: () => null, setItem() {}, removeItem() {} };
-const { IntroCutscene, BogArrival } = await import('../src/game/intro.js');
+const { IntroCutscene, BogArrival, ForestOpening } = await import('../src/game/intro.js');
 const { CampFilm, choresFor, campObstacles, FIRE, BACKPACK, BENCH_A, BENCH_B, SEAT_OF } = await import('../src/game/campFilm.js');
 const { CAMP_TENT, tentPoint } = await import('../src/world/campLayout.js');
 const src = (p) => readFileSync(new URL('../' + p, import.meta.url), 'utf8');
@@ -28,7 +28,7 @@ function film(seats = 4) {
     input: { requestLock() {} },
     objectives: { gens: [{ x: GEN.x, z: GEN.z }], setMorning: (on) => log.morning.push(on), campFail: () => log.fail++, update() {} },
   };
-  const o = new IntroCutscene(game);
+  const o = new CampFilm(game); // (3.1n: the forest opens on the road first — ForestOpening — then this film)
   o.forceSeats = seats;
   o.begin();
   o._build();
@@ -47,8 +47,10 @@ function inTent(p) {
   return Math.abs(lx) < CAMP_TENT.halfWidth - 0.15 && Math.abs(lz) < CAMP_TENT.halfLength - 0.1;
 }
 
-test('the forestry gets the camp film, the bog keeps its arrival', () => {
-  assert.ok(new IntroCutscene({ map: 'forest', scene: new THREE.Scene() }) instanceof CampFilm);
+test('the forestry gets the road and then the camp film, the bog keeps its arrival', () => {
+  const forest = new IntroCutscene({ map: 'forest', scene: new THREE.Scene() });
+  assert.ok(forest instanceof ForestOpening);
+  assert.ok(forest.camp instanceof CampFilm);
   assert.ok(new IntroCutscene({ map: 'bog', scene: new THREE.Scene(), world: {} }) instanceof BogArrival);
   assert.match(src('src/game/intro.js'), /new CampFilm\(game\)/);
 });

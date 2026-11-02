@@ -446,6 +446,7 @@ const STR = {
     introBig: 'последний свет',
     introSmall: 'УАЗ встал у затопленного проезда',
     introSmallCamp: 'последний вечер в лагере', // 3.1h: the forest's film (introSmall is the bog's road)
+    introSmallRoad: 'лесхоз № 14 · вечер перед сменой', // (3.1n) over the road film
     // morning
     morningBig: 'утро',
     morningBigN: 'утро {n}-го дня',
@@ -1481,6 +1482,7 @@ const STR = {
     introBig: 'the last light',
     introSmall: 'the UAZ is stopped by the flood',
     introSmallCamp: "the camp's last evening",
+    introSmallRoad: "forestry no. 14 · the evening before the shift",
     morningBig: 'morning',
     morningBigN: 'morning, day {n}',
     trainingBig: 'THE RANGE',

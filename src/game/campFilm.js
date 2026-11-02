@@ -1030,6 +1030,7 @@ export class CampFilm {
 
   _hud(tt) {
     const off = Math.min(T0 - 0.2, (this.shots[1]?.t0 ?? T0) - 0.3);
+    if (this.afterRoad) return; // (3.1n) the road film before it had the title
     if (tt > 0.6 && tt < off && !this.titleShown) {
       this.titleShown = true;
       this.g.hud.setIntro(t('introBig'), t('introSmallCamp'));

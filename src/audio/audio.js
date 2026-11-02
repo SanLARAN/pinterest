@@ -3807,6 +3807,89 @@ export class AudioEngine {
     };
   }
 
+  // (3.1n) the УАЗ's radio in the forest's opening film: a real record (public/audio/road-radio.mp3 — CUPSIZE,
+  // «вайфуу», used with the owner's permission), streamed through an <audio> element (no 20 MB decode) and squeezed
+  // into a car speaker: a 260–3400 Hz band, the cabin's resonance, a little drive, a bed of hiss. tune(at, dur):
+  // static sweeps until the station locks and the song comes up; cabin(k): 1 heard inside the car, 0 from outside
+  // (duller, quieter); off(fade): the ignition is off. Its level follows the music setting, like the menu's record.
+  // Returns null where there is no audio (tests, a browser that refuses), and the film simply plays without it.
+  carRadio(src = 'audio/road-radio.mp3') {
+    if (!this.ready || typeof Audio === 'undefined' || typeof document === 'undefined') return null;
+    const ctx = this.ctx;
+    const el = new Audio();
+    el.preload = 'auto';
+    el.src = new URL(src, document.baseURI).href;
+    let node;
+    try { node = ctx.createMediaElementSource(el); } catch { return null; }
+    const vol = () => Math.pow(settings.music ?? 0.55, 1.15) * 1.6;
+    const out = this._gain(0);
+    out.connect(this.master);
+    const cabin = this._filter('lowpass', 3400, 0.7); // the car's own body between the speaker and you
+    cabin.connect(out);
+    const music = this._gain(0);
+    const hp = this._filter('highpass', 260, 0.75);
+    const peak = this._filter('peaking', 1350, 1.1);
+    peak.gain.value = 5;
+    const lp = this._filter('lowpass', 3400, 0.9);
+    const sh = this._shaper(this.distSoft);
+    const trim = this._gain(0.5);
+    node.connect(hp).connect(peak).connect(lp).connect(sh).connect(trim).connect(music).connect(cabin);
+    // the hiss under it, and the static of the tuning
+    const hiss = this._noise(this.pink);
+    const hissBand = this._filter('bandpass', 2600, 0.6);
+    const hissG = this._gain(0.012);
+    hiss.connect(hissBand).connect(hissG).connect(cabin);
+    const stat = this._noise(this.white);
+    const statBand = this._filter('bandpass', 1800, 2.5);
+    const statG = this._gain(0);
+    stat.connect(statBand).connect(statG).connect(cabin);
+    const t0 = this.now;
+    hiss.start(t0);
+    stat.start(t0);
+    out.gain.setValueAtTime(0.0001, t0);
+    out.gain.linearRampToValueAtTime(vol(), t0 + 0.4);
+    let off = false;
+    return {
+      el,
+      // static sweeping across the band for `dur` s, then the song: it starts from its first second
+      tune: (dur = 1.6) => {
+        if (off) return;
+        const n = this.now;
+        statG.gain.cancelScheduledValues(n);
+        statG.gain.setValueAtTime(0.0001, n);
+        statG.gain.linearRampToValueAtTime(0.16, n + 0.12);
+        for (let i = 0; i < 6; i++) statBand.frequency.setValueAtTime(900 + ((i * 1733) % 2600), n + (i * dur) / 6);
+        statG.gain.setValueAtTime(0.16, n + dur * 0.8);
+        statG.gain.linearRampToValueAtTime(0.0001, n + dur + 0.25);
+        music.gain.setValueAtTime(0.0001, n);
+        music.gain.setValueAtTime(0.0001, n + dur * 0.75);
+        music.gain.linearRampToValueAtTime(1, n + dur + 0.3);
+        try { el.currentTime = 0; } catch { /* not loaded yet: it starts at 0 anyway */ }
+        const pl = el.play();
+        if (pl && pl.catch) pl.catch(() => {});
+      },
+      cabin: (k) => {
+        if (off) return;
+        const n = this.now;
+        cabin.frequency.setTargetAtTime(1100 + 2300 * k, n, 0.12);
+        out.gain.setTargetAtTime(vol() * (0.45 + 0.55 * k), n, 0.12);
+      },
+      off: (fade = 0.15) => {
+        if (off) return;
+        off = true;
+        const n = this.now;
+        out.gain.cancelScheduledValues(n);
+        out.gain.setValueAtTime(out.gain.value, n);
+        out.gain.linearRampToValueAtTime(0.0001, n + fade);
+        setTimeout(() => {
+          try { el.pause(); el.removeAttribute('src'); el.load(); } catch { /* */ }
+          try { hiss.stop(); stat.stop(); } catch { /* */ }
+          try { out.disconnect(); node.disconnect(); } catch { /* */ }
+        }, (fade + 0.1) * 1000);
+      },
+    };
+  }
+
   // it catches: a bang through the pipe, a rev, then a lumpy idle — in the world, where the car is.
   // { stop(fade), rev(k 0..1, pos) } — rev: the engine's pitch, and where it is now (it drives away)
   uazStart(x, y, z) {

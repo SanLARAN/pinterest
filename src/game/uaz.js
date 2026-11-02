@@ -209,6 +209,7 @@ export function buildCrewCar(mat) {
   });
   const glass = new THREE.Mesh(geometryOf(buildCarGlass()), mat); // the windscreen: this one has all its glass
   glass.frustumCulled = false;
+  glass.name = 'glass'; // (3.1n: the road film's close shots take it out — up close it reads as a white board)
   g.add(glass);
   const st = new THREE.Mesh(geometryOf(buildSteering()), mat);
   st.position.set(...CARP_SPOT);
