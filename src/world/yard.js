@@ -352,10 +352,16 @@ export function roadHeight() {
   return CFG.ROAD.y; // (down in the lowland: from the yard you look down the cut onto it)
 }
 
+// (3.1o) past the built highway the land goes on into the haze: the road film opens on the highway and the
+// УАЗ drives off along it, and neither may find the end of the world. Coarser ground (5 m cells), the road,
+// its lamps and rails, pines thinning out with distance — from x0 to x1, from z0 (behind the forest's east and
+// west hills) to z1 (well past the far side of the road). The fog has all of it long before its edge.
+export const FAR = { x0: -520, x1: 640, z0: 0, z1: 560, cell: 5 };
+
 // the highway's lamps stand every lampEvery metres, one of them right where the road from the cut comes in
 export function lampFirst() {
   const R = CFG.ROAD;
-  return Y.x - R.lampEvery * Math.floor((Y.x - R.x0) / R.lampEvery);
+  return Y.x - R.lampEvery * Math.floor((Y.x - FAR.x0) / R.lampEvery);
 }
 
 // the ground out there (and in here: the same surface the forest's chunks are built from)
@@ -413,6 +419,85 @@ function farPine(b, x, y, z, s, r) {
   }
 }
 
+// the highway between x0 and x1: two lanes of asphalt, gravel shoulders, lines, guard rails, lamps on arms
+// (lamps: the sodium heads that get a glow — the stretch you see from the yard and in the road film; past it
+// the haze has them anyway)
+function highway(b, x0, x1, HY, lamps) {
+  const R = CFG.ROAD;
+  for (let x = x0; x < x1 - 0.01; x += 4) {
+    const xe = Math.min(x1, x + 4);
+    b.identity();
+    b.quadN([x, HY, R.z - 4.5], [xe, HY, R.z - 4.5], [xe, HY, R.z + 4.5], [x, HY, R.z + 4.5], [0, 1, 0], GK.CONCRETE);
+    for (const s of [-1, 1]) {
+      const z0 = R.z + s * 4.5, z1 = R.z + s * 6.4;
+      b.identity(); // (3.1o: without it the far shoulder was laid from the near edge line's place — 340 m off)
+      b.quadN([x, HY, z0], [xe, HY, z0], [xe, HY - 0.1, z1], [x, HY - 0.1, z1], [0, 1, 0], KIND.ROCK);
+      b.place((x + xe) / 2, HY + 0.008, R.z + s * 4.1);
+      b.box(xe - x, 0.012, 0.12, KIND.BONE); // edge line
+    }
+  }
+  for (let x = Math.ceil(x0 / 9) * 9; x < x1; x += 9) {
+    b.place(x + 1.5, HY + 0.008, R.z);
+    b.box(3, 0.012, 0.13, KIND.BONE); // centre dashes
+  }
+  for (const s of [-1, 1]) {
+    const zr = R.z + s * 5.7;
+    for (let x = Math.ceil(x0 / 4) * 4; x < x1; x += 4) {
+      if (s < 0 && Math.abs(x - Y.x) < 9) continue; // (the gap where the road from the cut comes in)
+      b.place(x, HY - 0.25, zr);
+      b.box(0.09, 1.0, 0.12, T, { bottom: true });
+      b.place(x + 2, HY + 0.6, zr + s * 0.05);
+      b.box(4.02, 0.3, 0.05, T);
+    }
+  }
+  for (let x = lampFirst(); x < FAR.x1; x += R.lampEvery) {
+    if (x < x0 || x >= x1) continue;
+    const zp = R.z - 7.2;
+    b.place(x, HY - 0.4, zp);
+    b.cylinder(6, 0.12, 0.08, 9.2, T, { capTop: true });
+    b.identity();
+    b.limb([x, HY + 8.6, zp], [x, HY + 9.05, zp + 2.0], 0.05, 0.045, T, 4);
+    b.limb([x, HY + 9.05, zp + 2.0], [x, HY + 8.95, zp + 4.6], 0.045, 0.04, T, 4);
+    b.place(x, HY + 8.88, zp + 4.6);
+    b.box(0.28, 0.12, 0.6, GK.DARK);
+    b.place(x, HY + 8.81, zp + 4.6);
+    b.box(0.2, 0.02, 0.46, GK.BULB);
+    if (x > R.x0 - 70 && x < R.x1 + 170) lamps.push({ x, y: HY + 8.7, z: zp + 4.6 });
+  }
+}
+
+// a pine far off in the haze: a trunk and two cones (only its outline matters from there)
+function distantPine(b, x, y, z, s, r) {
+  b.place(x, y - 0.3, z, 0, r.float(0, 6.283), 0, s * 1.15);
+  b.cylinder(4, 0.25, 0.12, 4.6, KIND.BARK, { capTop: false });
+  b.cone(5, 2.1, 3.4, KIND.LEAF, { y0: 2.2 });
+  b.cone(5, 1.45, 2.8, KIND.LEAF, { y0: 4.1 });
+}
+
+// one cell of the far land (FAR.cell square). Next to the finer ground (the forest's, the strip's 2.5 m cells)
+// that ground's in-between vertex goes into this cell's edge as well, so the seam has no crack to show the sky
+function farCell(b, gh, covered, x, z, C) {
+  const h = C / 2;
+  const P = (px, pz) => [px, gh(px, pz), pz];
+  const w = covered(x - h, z + h), s = covered(x + h, z - h), e = covered(x + C + h, z + h), n = covered(x + h, z + C + h);
+  if (!(w || s || e || n)) {
+    const p00 = P(x, z), p10 = P(x + C, z), p01 = P(x, z + C), p11 = P(x + C, z + C);
+    b.tri(p00, p01, p11, KIND.GROUND, 4);
+    b.tri(p00, p11, p10, KIND.GROUND, 1);
+    return;
+  }
+  const ring = [P(x, z)];
+  if (w) ring.push(P(x, z + h));
+  ring.push(P(x, z + C));
+  if (n) ring.push(P(x + h, z + C));
+  ring.push(P(x + C, z + C));
+  if (e) ring.push(P(x + C, z + h));
+  ring.push(P(x + C, z));
+  if (s) ring.push(P(x + h, z));
+  const c = P(x + h, z + h);
+  for (let i = 0; i < ring.length; i++) b.tri(c, ring[i], ring[(i + 1) % ring.length], KIND.GROUND, 5);
+}
+
 // returns { meshes, lamps: [{x, y, z}] (the sodium heads, for their glow) }
 export function buildOutside(world, material) {
   const R = CFG.ROAD, H = CFG.WORLD_HALF, cell = CFG.TERRAIN_CELL;
@@ -444,46 +529,7 @@ export function buildOutside(world, material) {
         b.tri(p00, p11, p10, KIND.GROUND, 1);
       }
     }
-    // the highway: two lanes of asphalt, gravel shoulders, lines, guard rails, lamps on arms
-    for (let x = cx; x < x1 - 0.01; x += 4) {
-      const xe = Math.min(x1, x + 4);
-      b.identity();
-      b.quadN([x, HY, R.z - 4.5], [xe, HY, R.z - 4.5], [xe, HY, R.z + 4.5], [x, HY, R.z + 4.5], [0, 1, 0], GK.CONCRETE);
-      for (const s of [-1, 1]) {
-        const z0 = R.z + s * 4.5, z1 = R.z + s * 6.4;
-        b.quadN([x, HY, z0], [xe, HY, z0], [xe, HY - 0.1, z1], [x, HY - 0.1, z1], [0, 1, 0], KIND.ROCK);
-        b.place((x + xe) / 2, HY + 0.008, R.z + s * 4.1);
-        b.box(xe - x, 0.012, 0.12, KIND.BONE); // edge line
-      }
-    }
-    for (let x = Math.ceil(cx / 9) * 9; x < x1; x += 9) {
-      b.place(x + 1.5, HY + 0.008, R.z);
-      b.box(3, 0.012, 0.13, KIND.BONE); // centre dashes
-    }
-    for (const s of [-1, 1]) {
-      const zr = R.z + s * 5.7;
-      for (let x = Math.ceil(cx / 4) * 4; x < x1; x += 4) {
-        if (s < 0 && Math.abs(x - Y.x) < 9) continue; // (the gap where the road from the cut comes in)
-        b.place(x, HY - 0.25, zr);
-        b.box(0.09, 1.0, 0.12, T, { bottom: true });
-        b.place(x + 2, HY + 0.6, zr + s * 0.05);
-        b.box(4.02, 0.3, 0.05, T);
-      }
-    }
-    for (let x = lampFirst(); x < R.x1; x += R.lampEvery) {
-      if (x < cx || x >= x1) continue;
-      const zp = R.z - 7.2;
-      b.place(x, HY - 0.4, zp);
-      b.cylinder(6, 0.12, 0.08, 9.2, T, { capTop: true });
-      b.identity();
-      b.limb([x, HY + 8.6, zp], [x, HY + 9.05, zp + 2.0], 0.05, 0.045, T, 4);
-      b.limb([x, HY + 9.05, zp + 2.0], [x, HY + 8.95, zp + 4.6], 0.045, 0.04, T, 4);
-      b.place(x, HY + 8.88, zp + 4.6);
-      b.box(0.28, 0.12, 0.6, GK.DARK);
-      b.place(x, HY + 8.81, zp + 4.6);
-      b.box(0.2, 0.02, 0.46, GK.BULB);
-      lamps.push({ x, y: HY + 8.7, z: zp + 4.6 });
-    }
+    highway(b, cx, x1, HY, lamps);
     // the gravel road down from the cut (the part past the edge)
     for (let i = 0; i < road.length - 1; i++) {
       const [ax, az] = road[i], [bx, bz] = road[i + 1];
@@ -529,6 +575,43 @@ export function buildOutside(world, material) {
     mesh.matrixAutoUpdate = false;
     mesh.updateMatrix();
     meshes.push(mesh);
+  }
+  // (3.1o) ...and on past all that, into the haze: the coarser land, the highway running on both ways, the pines
+  // as thick as the strip's along the road and thinning out away from it. Big chunks: few draws.
+  {
+    const covered = (x, z) => (x >= -H && x < H && z < H) || (x >= X0 && x < X1 && z >= Z0 && z < Z1);
+    const gh = (x, z) => groundAt(world, x, z);
+    const C = FAR.cell, rf = new RNG(5151);
+    for (let cx = FAR.x0; cx < FAR.x1; cx += 160) {
+      for (let cz = FAR.z0; cz < FAR.z1; cz += 140) {
+        const xe = Math.min(FAR.x1, cx + 160), ze = Math.min(FAR.z1, cz + 140);
+        const b = new MeshBuilder(30000);
+        b.identity();
+        for (let z = cz; z < ze - 0.01; z += C) {
+          for (let x = cx; x < xe - 0.01; x += C) {
+            if (!covered(x + C / 2, z + C / 2)) farCell(b, gh, covered, x, z, C);
+          }
+        }
+        if (R.z > cz && R.z < ze) {
+          if (cx < X0) highway(b, cx, Math.min(xe, X0), HY, lamps);
+          if (xe > X1) highway(b, Math.max(cx, X1), xe, HY, lamps);
+        }
+        const n = Math.round((xe - cx) * (ze - cz) * 0.006);
+        for (let i = 0; i < n; i++) {
+          const x = cx + rf.float(0, xe - cx), z = cz + rf.float(0, ze - cz);
+          const d = Math.abs(z - R.z);
+          if (covered(x, z) || d < 11) continue;
+          const near = d < 120;
+          if (!rf.chance((z < R.z ? 0.75 : 0.45) * (near ? 1 : 0.3))) continue;
+          (near ? farPine : distantPine)(b, x, gh(x, z), z, rf.float(0.85, 1.3), rf);
+        }
+        if (!b.count) continue;
+        const mesh = new THREE.Mesh(b.toGeometry(), material);
+        mesh.matrixAutoUpdate = false;
+        mesh.updateMatrix();
+        meshes.push(mesh);
+      }
+    }
   }
   // ...and the part of the cut's road inside the forest's edge (from the back gate to the edge)
   {

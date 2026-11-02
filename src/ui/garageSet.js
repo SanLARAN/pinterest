@@ -491,94 +491,151 @@ export const CARP = {
   horn: [-0.42, 1.24, 0.42],
 };
 
+// a flat convex polygon (x, y points, either winding) thickened between z0 and z1: a closed slab with every face
+// facing out. (3.1o) The old body was thin boards set edge to edge, with gaps between them — and the world's
+// material culls back faces, so every gap and every board seen from behind was a hole you looked through.
+function slab(b, pts, z0, z1, kind) {
+  b.identity();
+  const n = pts.length;
+  let cx = 0, cy = 0;
+  for (const [x, y] of pts) { cx += x / n; cy += y / n; }
+  for (const [z, nz] of [[z0, -1], [z1, 1]]) {
+    for (let i = 1; i < n - 1; i++) {
+      const hide = (i > 1 ? 1 : 0) | (i < n - 2 ? 4 : 0); // the fan's inner diagonals stay unlined
+      b.triN([pts[0][0], pts[0][1], z], [pts[i][0], pts[i][1], z], [pts[i + 1][0], pts[i + 1][1], z], [0, 0, nz], kind, hide);
+    }
+  }
+  for (let i = 0; i < n; i++) {
+    const [ax, ay] = pts[i], [bx, by] = pts[(i + 1) % n];
+    let nx = by - ay, ny = ax - bx; // across the edge, then turned away from the middle
+    if (nx * ((ax + bx) / 2 - cx) + ny * ((ay + by) / 2 - cy) < 0) { nx = -nx; ny = -ny; }
+    b.quadN([ax, ay, z0], [bx, by, z0], [bx, by, z1], [ax, ay, z1], [nx, ny, 0], kind);
+  }
+}
+
+// a number plate: white, a dark rim, the characters as dark blocks (у469хв 73). face: +1 looks along +x, −1 along −x
+function plate(b, x, y, z, face) {
+  const f = face, w = 0.52, h = 0.11;
+  boxAt(b, x, y, z, 0.006, h, w, KIND.BONE);
+  for (const dy of [-1, 1]) boxAt(b, x + f * 0.003, y + dy * (h / 2 - 0.006), z, 0.004, 0.008, w, GK.DARK);
+  for (const dz of [-1, 1]) boxAt(b, x + f * 0.003, y, z + dz * (w / 2 - 0.006), 0.004, h, 0.008, GK.DARK);
+  boxAt(b, x + f * 0.003, y, z - f * (w / 2 - 0.13), 0.004, h, 0.008, GK.DARK); // the region's own box
+  const glyphs = [-0.17, -0.11, -0.06, -0.01, 0.05, 0.1];
+  glyphs.forEach((g, i) => boxAt(b, x + f * 0.003, y - (i === 0 || i > 3 ? 0.008 : 0), z - f * (g - 0.07), 0.004, i === 0 || i > 3 ? 0.04 : 0.058, 0.036, GK.DARK));
+  for (const g of [0.19, 0.225]) boxAt(b, x + f * 0.003, y + 0.012, z - f * g, 0.004, 0.036, 0.026, GK.DARK);
+}
+
 // opts.forest: the one in the forestry yard — no spare wheel or can on its tail, and no hood (its hood is
 // its own mesh, propped open over an engine bay with things missing: see game/uaz.js)
+//
+// (3.1o) Rebuilt after the reference the owner sent (a УАЗ-469, its roof off): every panel a closed slab, the
+// arches cut as flat-topped trapezoids, the hood raised between two flat-topped wings, the grille panel with
+// its round lamps, amber indicators, the emblem and the slots, both bumpers with plates, wipers, mirrors on
+// arms, the four doors' seams, hinges and handles, the spare on the tailgate, lamps on the tail's corners.
+// The doors' window frames come off with the roof (they do on the real car); the canvas is rolled up behind
+// the back seat. The frame, the axles on their springs and the wheel wells underneath, so a low camera finds
+// a car and not a hollow box.
 export function buildCarBody(opts = {}) {
   const forest = !!opts.forest;
-  const b = new MeshBuilder(8192);
-  const P = opts.paint ?? GK.CARPAINT, D = GK.DARK, CV = opts.canvas ?? GK.CANVAS;
-  const W = 0.89;
-  // chassis rails and the sump, seen under the body
-  boxAt(b, 0, 0.5, 0.42, 3.8, 0.12, 0.08, D);
-  boxAt(b, 0, 0.5, -0.42, 3.8, 0.12, 0.08, D);
-  boxAt(b, -1.19, 0.4, 0, 0.14, 0.14, 1.36, D);
-  boxAt(b, 1.19, 0.4, 0, 0.14, 0.14, 1.36, D);
-  boxAt(b, 0.2, 0.42, 0, 1.2, 0.1, 0.12, D);
-  // the tub: floor, sides with the rear arches, the tail
-  boxAt(b, -0.2, 0.55, 0, 1.0, 0.04, 1.74, D); // the footwell
-  boxAt(b, 1.0, 0.66, 0, 2.0, 0.04, 1.74, D);
+  const b = new MeshBuilder(12288);
+  const P = opts.paint ?? GK.CARPAINT, D = GK.DARK, CV = opts.canvas ?? GK.CANVAS, CH = GK.CHROME;
+  const W = 0.89, T = 0.045; // half the body's width, the panels' thickness
+  const SILL = 0.6, BELT = 1.27, SHELF = 0.99; // the body's lower edge, the top of the sides, the wings' flat tops
+  const side = (s) => (s > 0 ? [W - T, W] : [-W, -W + T]);
+
+  // ---- underneath: the frame, the axles on their springs, the transfer box, the exhaust ----
   for (const s of [-1, 1]) {
-    const z = s * (W - 0.02);
-    boxAt(b, 0.0, 0.94, z, 1.4, 0.64, 0.04, P);
-    boxAt(b, 1.19, 1.1, z, 0.94, 0.32, 0.04, P);
-    boxAt(b, 1.83, 0.94, z, 0.34, 0.64, 0.04, P);
-    // arch lips (the УАЗ's arches are flat-topped trapezoids)
-    boxAt(b, 1.19, 0.95, z + s * 0.015, 0.7, 0.04, 0.05, P);
-    boxAt(b, 0.78, 0.8, z + s * 0.015, 0.04, 0.32, 0.05, P, 0, 0, -0.35);
-    boxAt(b, 1.6, 0.8, z + s * 0.015, 0.04, 0.32, 0.05, P, 0, 0, 0.35);
-    // the top rail of the side, door seams, a handle, a step
-    boxAt(b, 0.65, 1.27, z, 2.72, 0.05, 0.08, P);
-    boxAt(b, -0.66, 0.95, z + s * 0.022, 0.012, 0.62, 0.01, D);
-    boxAt(b, 0.34, 0.95, z + s * 0.022, 0.012, 0.62, 0.01, D);
-    boxAt(b, 0.66, 0.95, z + s * 0.022, 0.012, 0.62, 0.01, D);
-    boxAt(b, 0.18, 1.12, z + s * 0.03, 0.12, 0.025, 0.025, GK.CHROME);
-    boxAt(b, 0.5, 1.12, z + s * 0.03, 0.1, 0.025, 0.025, GK.CHROME);
-    boxAt(b, -0.1, 0.6, z + s * 0.05, 0.5, 0.03, 0.12, D);
+    boxAt(b, 0, 0.5, s * 0.42, 3.9, 0.12, 0.08, D);
+    for (const x of [-CARP.wheelX, CARP.wheelX]) boxAt(b, x, 0.44, s * 0.42, 1.1, 0.05, 0.07, D); // leaf springs
   }
-  boxAt(b, 2.0, 0.94, 0, 0.04, 0.64, 1.78, P);
-  boxAt(b, 2.0, 1.27, 0, 0.08, 0.05, 1.8, P);
-  for (const [x, y, z] of CARP.tail) boxAt(b, x - 0.01, y, z, 0.03, 0.09, 0.12, GK.TAILLAMP);
-  boxAt(b, 2.08, 0.52, 0, 0.1, 0.12, 1.76, D); // rear bumper
-  // the spare wheel on the tail, a jerry can beside it (the forest's car: an empty bracket, an empty strap)
-  if (!forest) {
-    b.place(2.18, 0.98, 0.3, 0, 0, PI / 2);
-    tyre(b, 0.36, 0.22, GK.RUBBER, 12, true);
-    b.place(2.18, 0.98, 0.3, 0, 0, PI / 2);
-    b.cylinder(10, 0.2, 0.2, 0.18, P, { y0: -0.09 });
-    boxAt(b, 2.14, 0.98, -0.5, 0.14, 0.44, 0.3, P);
-    boxAt(b, 2.14, 1.22, -0.44, 0.06, 0.05, 0.1, P);
-  } else {
-    b.place(2.1, 0.98, 0.3, 0, 0, PI / 2);
-    b.cylinder(6, 0.04, 0.04, 0.16, GK.RUST, { y0: -0.02 }); // the stud the spare hung on
-    boxAt(b, 2.09, 0.98, -0.5, 0.03, 0.03, 0.34, GK.RUST);
+  for (const x of [-CARP.wheelX, CARP.wheelX]) {
+    b.place(x, CARP.wheelR, 0, PI / 2, 0, 0);
+    b.cylinder(6, 0.05, 0.05, 1.42, D, { y0: -0.71, capBottom: true }); // the axle
+    boxAt(b, x, CARP.wheelR, -0.1, 0.24, 0.24, 0.26, D); // its differential
   }
-  // exhaust pipe under the tail, right side
+  boxAt(b, -0.1, 0.45, 0.05, 0.42, 0.16, 0.3, D);
+  b.place(0.6, 0.42, 0, 0, 0, PI / 2);
+  b.cylinder(5, 0.035, 0.035, 1.5, D, { y0: -0.75 }); // the prop shaft
   b.place(1.55, 0.43, CARP.exhaust[2], 0, 0, PI / 2);
   b.cylinder(6, 0.03, 0.03, 1.1, D, { y0: -0.55 });
 
-  // the front: flat hood, fenders like shelves, a slotted grille panel, round lamps
-  if (!forest) boxAt(b, -1.35, 1.06, 0, 1.28, 0.06, 1.32, P, 0, 0, 0.025);
-  boxAt(b, -1.35, 0.83, 0.64, 1.26, 0.42, 0.03, P);
-  boxAt(b, -1.35, 0.83, -0.64, 1.26, 0.42, 0.03, P);
+  // ---- the tub: floor, firewall, tailgate, two sides with the rear arches cut out of them ----
+  boxAt(b, 0.64, 0.62, 0, 2.78, 0.08, 1.74, D);
+  boxAt(b, -0.72, 0.86, 0, 0.06, 0.52, 1.74, D);
+  boxAt(b, 1.995, (SILL + BELT) / 2, 0, 0.05, BELT - SILL, 2 * W, P);
+  const AR = [[0.66, SILL], [0.9, 0.97], [1.48, 0.97], [1.72, SILL]]; // the rear arch
   for (const s of [-1, 1]) {
-    const zc = s * 0.765;
-    boxAt(b, -1.36, 0.99, zc, 1.3, 0.035, 0.27, P);
-    boxAt(b, -1.85, 0.8, s * (W - 0.015), 0.28, 0.4, 0.03, P);
-    boxAt(b, -0.76, 0.8, s * (W - 0.015), 0.12, 0.4, 0.03, P);
-    boxAt(b, -1.31, 0.94, s * (W - 0.015), 0.8, 0.09, 0.03, P);
-    boxAt(b, -1.31, 0.88, s * (W + 0.0), 0.86, 0.035, 0.05, P);
-    boxAt(b, -1.98, 0.8, zc, 0.03, 0.4, 0.26, P);
+    const [z0, z1] = side(s);
+    slab(b, [[-0.74, SILL], AR[0], AR[1], [AR[1][0], BELT], [-0.74, BELT]], z0, z1, P);
+    slab(b, [AR[1], AR[2], [AR[2][0], BELT], [AR[1][0], BELT]], z0, z1, P);
+    slab(b, [AR[2], AR[3], [2.02, SILL], [2.02, BELT], [AR[2][0], BELT]], z0, z1, P);
+    // the wheel well behind the arch: a roof, an inner wall, two ends (through the arch you see the well)
+    boxAt(b, 1.19, 0.96, s * 0.73, 1.08, 0.05, 0.3, D);
+    boxAt(b, 1.19, 0.78, s * 0.595, 1.06, 0.36, 0.03, D);
+    for (const x of [0.675, 1.705]) boxAt(b, x, 0.78, s * 0.72, 0.03, 0.36, 0.26, D);
+    // the rounded top edge of the side, running on over the tail's corner
+    boxAt(b, 0.64, BELT + 0.015, s * (W - 0.03), 2.8, 0.04, 0.075, P);
+    // the doors: seams (two at the pillar between them), hinges at the front edges, handles at the back
+    for (const [x, y0] of [[-0.7, SILL], [0.26, SILL], [0.3, SILL], [0.88, 0.97]]) {
+      boxAt(b, x, (y0 + BELT) / 2, s * (W + 0.002), 0.012, BELT - y0, 0.006, D);
+    }
+    boxAt(b, -0.21, SILL + 0.012, s * (W + 0.002), 0.95, 0.012, 0.006, D);
+    boxAt(b, 0.57, SILL + 0.012, s * (W + 0.002), 0.18, 0.012, 0.006, D);
+    for (const x of [-0.665, 0.335]) for (const y of [0.8, 1.15]) boxAt(b, x, y, s * (W + 0.01), 0.05, 0.07, 0.025, D);
+    for (const x of [0.13, 0.74]) {
+      boxAt(b, x, 1.13, s * (W + 0.016), 0.11, 0.022, 0.022, CH);
+      boxAt(b, x - 0.045, 1.13, s * (W + 0.008), 0.02, 0.02, 0.02, CH);
+    }
+    // the fuel filler, low by the back arch
+    b.place(0.58, 0.72, s * (W + 0.004), PI / 2, 0, 0);
+    b.cylinder(8, 0.05, 0.05, 0.02, D, { y0: -0.01, capBottom: true });
   }
-  boxAt(b, -1.995, 0.83, 0, 0.03, 0.44, 1.02, P);
-  for (let i = 0; i < 7; i++) boxAt(b, -2.01, 0.85, -0.3 + i * 0.1, 0.012, 0.3, 0.045, D);
+
+  // ---- the front: two wings with flat tops, the hood raised between them, the grille panel ----
+  const AF = [[-1.72, SILL], [-1.47, 0.97], [-0.91, 0.97], [-0.76, SILL]]; // the front arch
+  const top = SHELF + 0.02;
+  for (const s of [-1, 1]) {
+    const [z0, z1] = side(s);
+    slab(b, [[-2.0, 0.66], [AF[0][0], 0.66], AF[1], [AF[1][0], top], [-2.0, top]], z0, z1, P);
+    slab(b, [AF[1], AF[2], [AF[2][0], top], [AF[1][0], top]], z0, z1, P);
+    slab(b, [AF[2], AF[3], [-0.74, SILL], [-0.74, top], [AF[2][0], top]], z0, z1, P);
+    boxAt(b, -1.37, SHELF, s * 0.745, 1.26, 0.04, 0.29, P); // the wing's flat top
+    boxAt(b, -1.37, 0.82, s * 0.59, 1.26, 0.42, 0.03, P); // its inner wall, inboard of the wheel (the bay's side)
+    boxAt(b, -1.985, 0.84, s * 0.74, 0.03, 0.36, 0.3, P); // ...and its front
+    // the hood's side catches
+    for (const x of [-1.75, -1.05]) boxAt(b, x, SHELF + 0.035, s * 0.655, 0.05, 0.05, 0.02, D);
+  }
+  if (!forest) {
+    boxAt(b, -1.36, 1.06, 0, 1.28, 0.06, 1.32, P, 0, 0, 0.025); // the hood (the forest's is its own mesh)
+    boxAt(b, -1.36, 0.565, 0, 1.22, 0.03, 1.2, D); // the bay's pan (from below: no hollow)
+  }
+  boxAt(b, -0.76, 1.07, 0, 0.2, 0.08, 2 * W, P); // the scuttle under the windscreen, side to side
+  boxAt(b, -2.0, 0.82, 0, 0.04, 0.44, 1.32, P); // the grille panel
+  boxAt(b, -2.025, 0.84, 0, 0.012, 0.2, 0.72, D); // the grille's opening...
+  for (let i = 0; i < 4; i++) boxAt(b, -2.035, 0.765 + i * 0.05, 0, 0.012, 0.018, 0.72, P); // ...its bars
+  for (const z of [-0.3, -0.1, 0.1, 0.3]) boxAt(b, -2.026, 0.665, z, 0.012, 0.035, 0.14, D); // the slots under it
+  boxAt(b, -2.026, 0.975, 0, 0.012, 0.022, 0.2, CH); // the emblem: a bar...
+  b.place(-2.027, 0.975, 0, 0, 0, PI / 2);
+  b.cylinder(8, 0.035, 0.035, 0.012, CH, { y0: -0.006 }); // ...and the ring on it
   for (const [x, y, z] of CARP.head) {
-    b.place(x + 0.04, y, z, 0, 0, PI / 2);
-    b.cylinder(10, 0.105, 0.105, 0.06, GK.CHROME, { y0: -0.03, capTop: false });
-    b.place(x + 0.012, y, z, 0, 0, PI / 2);
-    b.cylinder(10, 0.088, 0.088, 0.012, GK.HEADLAMP, { y0: -0.006 });
-    boxAt(b, x + 0.02, 0.68, z * 1.12, 0.03, 0.05, 0.08, GK.YELLOW);
+    b.place(x - 0.01, y, z, 0, 0, PI / 2);
+    b.cylinder(10, 0.11, 0.11, 0.08, CH, { y0: -0.04, capTop: false, capBottom: true }); // the lamp's bucket
+    b.place(x - 0.035, y, z, 0, 0, PI / 2);
+    b.cylinder(10, 0.092, 0.092, 0.012, GK.HEADLAMP, { y0: -0.006 });
+    boxAt(b, -2.035, 0.69, z, 0.03, 0.06, 0.1, GK.YELLOW); // the indicator under it
   }
-  boxAt(b, -2.08, 0.56, 0, 0.12, 0.13, 1.82, D); // front bumper
-  for (const s of [-1, 1]) boxAt(b, -2.16, 0.56, s * 0.42, 0.06, 0.06, 0.05, GK.RUST);
-  // windshield frame (raked), wipers, mirrors
+  boxAt(b, -2.14, 0.565, 0, 0.12, 0.13, 1.84, D); // the front bumper
+  for (const s of [-1, 1]) boxAt(b, -2.22, 0.565, s * 0.5, 0.06, 0.05, 0.06, GK.RUST); // tow hooks
+  plate(b, -2.203, 0.565, 0, -1);
+  // the windscreen's frame (raked), wipers parked at its foot, mirrors on arms
   const wf = (y) => -0.72 + (y - 1.1) * 0.17;
   for (const s of [-1, 1]) {
     b.place(-0.72, 1.1, s * 0.85, 0, 0, -0.17);
     b.box(0.05, 0.64, 0.05, P, { bottom: true });
     b.place(wf(1.4), 1.42, s * 0.97, 0, 0, 0);
-    b.box(0.02, 0.02, 0.14, D);
-    b.place(wf(1.4) + 0.02, 1.47, s * 1.04, 0, s * 0.2, 0);
-    b.box(0.03, 0.12, 0.1, GK.CHROME);
+    b.box(0.02, 0.02, 0.16, D);
+    b.place(wf(1.4) + 0.02, 1.47, s * 1.05, 0, s * 0.2, 0);
+    b.box(0.03, 0.12, 0.1, CH);
   }
   b.place(wf(1.12), 1.12, 0, 0, 0, -0.17);
   b.box(0.05, 0.05, 1.72, P);
@@ -588,36 +645,49 @@ export function buildCarBody(opts = {}) {
     b.place(wf(1.16) - 0.02, 1.16, z, 0.4, 0, -0.17);
     b.box(0.012, 0.012, 0.36, D);
   }
-  // the hoop of the folded top, and the canvas rolled up behind the rear seat
-  for (const x of [0.42, 1.62]) {
-    for (const s of [-1, 1]) boxAt(b, x, 1.56, s * 0.86, 0.04, 0.6, 0.04, D);
-    boxAt(b, x, 1.86, 0, 0.04, 0.04, 1.76, D);
+
+  // ---- the tail: lamps on its corners, the bumper, the plate, the spare and the can (the forest's: bare) ----
+  for (const [x, y, z] of CARP.tail) {
+    boxAt(b, x, y + 0.02, z, 0.03, 0.1, 0.1, GK.TAILLAMP);
+    boxAt(b, x, y - 0.08, z, 0.03, 0.07, 0.1, GK.YELLOW);
   }
-  b.place(1.92, 1.38, 0, PI / 2, 0, 0);
-  b.cylinder(8, 0.11, 0.11, 1.66, CV, { y0: -0.83, capBottom: true });
-  for (const z of [-0.5, 0.5]) {
-    b.place(1.92, 1.38, z, PI / 2, 0, 0);
-    b.cylinder(8, 0.118, 0.118, 0.04, GK.DARK, { y0: -0.02, capTop: false });
+  boxAt(b, 2.11, 0.54, 0, 0.1, 0.12, 1.8, D);
+  boxAt(b, 2.025, 1.12, -0.2, 0.025, 0.025, 0.12, CH); // the tailgate's handle
+  plate(b, 2.023, 0.7, -0.45, 1);
+  if (!forest) {
+    b.place(2.18, 0.98, 0.3, 0, 0, PI / 2);
+    tyre(b, 0.36, 0.22, GK.RUBBER, 12, true);
+    b.place(2.18, 0.98, 0.3, 0, 0, PI / 2);
+    b.cylinder(10, 0.22, 0.22, 0.18, P, { y0: -0.09 });
+    boxAt(b, 2.14, 0.98, -0.5, 0.14, 0.44, 0.3, P);
+    boxAt(b, 2.14, 1.22, -0.44, 0.06, 0.05, 0.1, P);
+  } else {
+    b.place(2.1, 0.98, 0.3, 0, 0, PI / 2);
+    b.cylinder(6, 0.04, 0.04, 0.16, GK.RUST, { y0: -0.02 }); // the stud the spare hung on
+    boxAt(b, 2.09, 0.98, -0.5, 0.03, 0.03, 0.34, GK.RUST);
+  }
+  // the roof, off: the canvas rolled up on the back deck
+  b.place(1.86, 1.36, 0, PI / 2, 0, 0);
+  b.cylinder(8, 0.11, 0.11, 1.6, CV, { y0: -0.8, capBottom: true });
+  for (const z of [-0.48, 0.48]) {
+    b.place(1.86, 1.36, z, PI / 2, 0, 0);
+    b.cylinder(8, 0.118, 0.118, 0.04, D, { y0: -0.02, capTop: false });
   }
 
-  // inside: dashboard + gauges, the column and the wheel, seats, the gear stick, cargo
+  // ---- inside: dashboard + gauges, the column, seats, the gear stick, cargo ----
   boxAt(b, -0.68, 1.1, 0, 0.16, 0.2, 1.7, D);
   boxAt(b, -0.6, 1.2, 0, 0.12, 0.03, 1.66, D);
   for (const dz of [-0.07, 0.07]) {
     b.place(CARP.dash[0] + 0.07, CARP.dash[1] - 0.04, CARP.dash[2] + dz, 0, 0, PI / 2 - 0.3);
     b.cylinder(8, 0.042, 0.042, 0.01, GK.DASH, { y0: -0.005 });
   }
-  boxAt(b, -0.6, 1.1, -0.42, 0.02, 0.1, 0.3, GK.DARK); // glovebox lid
-  const [wx, wy, wz] = CARP.wheelC;
-  b.place(-0.58, 1.06, wz, 0, 0, -(PI / 2 - 0.45));
-  b.box(0.035, 0.22, 0.035, D, { bottom: true });
-  void wx; void wy; // (the wheel itself is buildSteering: it turns)
-  // a rear-view mirror under the top of the windshield
+  boxAt(b, -0.6, 1.1, -0.42, 0.02, 0.1, 0.3, D); // glovebox lid
+  b.place(-0.58, 1.06, CARP.wheelC[2], 0, 0, -(PI / 2 - 0.45));
+  b.box(0.035, 0.22, 0.035, D, { bottom: true }); // the column (the wheel itself is buildSteering: it turns)
   b.place(-0.63, 1.66, 0.0, 0, 0.12, 0);
-  b.box(0.03, 0.06, 0.2, D);
+  b.box(0.03, 0.06, 0.2, D); // the rear-view mirror under the top of the windscreen
   b.place(-0.625, 1.69, 0.0, 0, 0, 0);
   b.box(0.012, 0.05, 0.012, D, { bottom: true });
-  // seats
   for (const s of [1, -1]) {
     const z = s * 0.42;
     boxAt(b, 0.12, 0.84, z, 0.46, 0.12, 0.46, GK.SEAT);
@@ -633,8 +703,7 @@ export function buildCarBody(opts = {}) {
   b.place(-0.12, 1.05, 0.02, 0, 0, 0);
   b.octa(0.03, 0.03, D);
   boxAt(b, -0.22, 0.72, 0.02, 0.18, 0.06, 0.16, D);
-  // cargo in the back: a crate, a sack, a shovel
-  boxAt(b, 1.75, 0.86, 0.48, 0.36, 0.36, 0.42, KIND.WOOD, 0.1);
+  boxAt(b, 1.75, 0.86, 0.48, 0.36, 0.36, 0.42, KIND.WOOD, 0.1); // a crate, a sack, a shovel
   b.place(1.72, 0.7, -0.4, 0, 0.5, 0.25);
   b.taper(0.42, 0.3, 0.3, 0.24, 0.42, CV);
   b.place(1.2, 1.0, -0.78, 0.1, 0, 1.25);
@@ -671,7 +740,7 @@ export function buildCarWheels(opts = {}, only = -1) {
     b.place(cx, cy, cz, PI / 2, 0, 0);
     tyre(b, r, w, GK.RUBBER, 12, true);
     b.place(cx, cy, cz + sz * w * 0.38, PI / 2, 0, 0);
-    b.cylinder(10, r * 0.55, r * 0.55, 0.03, P, { y0: -0.015, capBottom: true });
+    b.cylinder(10, r * 0.62, r * 0.62, 0.03, P, { y0: -0.015, capBottom: true }); // (3.1o: the tyre's hole is a 12-gon of 0.58 r; this 10-gon's flats sit at 0.59 r. At 0.55 r a ring of daylight showed round the rim)
     b.place(cx, cy, cz + sz * w * 0.45, PI / 2, 0, 0);
     b.cylinder(6, 0.07, 0.07, 0.03, GK.CHROME, { y0: -0.015 });
     // A wheel has to look like a wheel that turns: four spokes and a valve stem on its face.

@@ -47,7 +47,7 @@ function wheelPart(b) {
   tyre(b, r, w, GK.RUBBER, 12, true);
   for (const s of [-1, 1]) {
     b.place(0, s * w * 0.36, 0, s < 0 ? PI : 0, 0, 0);
-    b.cylinder(10, r * 0.55, r * 0.55, 0.02, GK.CARPAINT, { y0: -0.01, capBottom: true });
+    b.cylinder(10, r * 0.62, r * 0.62, 0.02, GK.CARPAINT, { y0: -0.01, capBottom: true }); // (3.1o: its flats at 0.59 r close the tyre's 0.58 r hole)
     b.place(0, s * w * 0.42, 0, s < 0 ? PI : 0, 0, 0);
     b.cylinder(6, 0.07, 0.06, 0.03, GK.CHROME, { y0: 0 });
   }

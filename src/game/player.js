@@ -37,6 +37,7 @@ export class Player {
     this.stepAcc = 0;
     this.bobPhase = 0;
     this.bobY = 0;
+    this.bobAmp = 0;
     this.crouching = false;
     this.sprinting = false;
     this.bumpCD = 0;
@@ -181,8 +182,15 @@ export class Player {
     } else {
       this.stepAcc = Math.min(this.stepAcc, stepLen * 0.6);
     }
-    const bobAmp = heavy ? clamp(this.speed / carryV, 0, 1) * 0.06 : clamp(this.speed / P.sprint, 0, 1) * (this.sprinting ? 0.075 : 0.045);
-    this.bobY = -Math.abs(Math.sin(this.bobPhase)) * bobAmp;
+    // (3.1o) the head dips into each footfall and rises between them — a smooth cos², not |sin|: the old curve
+    // reversed the camera's vertical speed in one frame, four times a second, and in any light you could see
+    // the world jolt on every step (on a bike there's no bob, so a bike rode smooth). The depth eases too,
+    // so starting a sprint doesn't drop the view a few centimetres at once.
+    const ampTo = heavy ? clamp(this.speed / carryV, 0, 1) * 0.06 : clamp(this.speed / P.sprint, 0, 1) * (this.sprinting ? 0.075 : 0.045);
+    this.bobAmp = damp(this.bobAmp || 0, ampTo, 8, dt);
+    const bobAmp = this.bobAmp;
+    const c = Math.cos(this.bobPhase);
+    this.bobY = -c * c * bobAmp;
     this.roll = damp(this.roll, Math.sin(this.bobPhase) * bobAmp * 0.35 - input.move.x * 0.012, 10, dt);
     return ev;
   }

@@ -7,6 +7,19 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v:'3.1o',date:'2026-11-02',
+    ru:{title:'Ровный шаг, дорога без края, новый УАЗ',items:[
+      'Ходьба больше не дёргается. Голова качалась на шагах так, что в каждом шаге камера разворачивалась вниз-вверх за один кадр, четыре раза в секунду. В темноте этого не видно, а на полигоне, утром и у ламп весь мир вздрагивал на каждом шаге. Теперь голова плавно проседает в шаг и поднимается, а переход на бег углубляет качку постепенно. У мотоцикла качки нет, поэтому на нём всё и было ровно.',
+      'В фильме по дороге в лесхоз шоссе за машиной больше не обрывается: земля, холмы, сосны, фонари и отбойники уходят в дымку на сотни метров в обе стороны. Попутные машины тоже выезжают из дымки, а не из пустоты. Северная обочина шоссе вернулась на место: её строило в 340 метрах от дороги.',
+      'УАЗ собран заново по референсу УАЗ-469, без крыши. Цельный кузов без щелей, трапециевидные арки с колёсными нишами, плоские крылья и поднятый капот, решётка с эмблемой, круглые фары с поворотниками, номера спереди и сзади. У четырёх дверей швы, петли и ручки, зеркала на кронштейнах, запаска на задней двери, тент свёрнут за задним сиденьем. Снизу рама, мосты на рессорах и кардан. Вокруг ступицы колеса больше не просвечивает кольцо.',
+    ]},
+    en:{title:'A steady step, a road with no end, a new UAZ',items:[
+      'Walking no longer jerks. The head bob turned the camera from down to up inside one frame at every step, four times a second. In the dark you never saw it; on the training ground, in the morning and by the lamps the whole world jolted on every step. Now the head eases down into each step and back up, and breaking into a run deepens the bob gradually. A bike has no bob, which is why riding was always smooth.',
+      'In the film on the way to the forestry the highway no longer ends behind the car: the land, the hills, the pines, the lamps and the rails run on into the haze for hundreds of metres both ways. Passing cars come out of the haze too, not out of nothing. The highway\'s north shoulder is back where it belongs: it was being laid 340 metres away from the road.',
+      'The UAZ is rebuilt after a UAZ-469 reference, with its roof off. One closed body with no gaps, flat-topped arches with wheel wells, flat wings with the hood raised between them, the grille with its emblem, round lamps with indicators, plates front and back. Four doors with seams, hinges and handles, mirrors on arms, the spare on the tailgate, the canvas rolled up behind the back seat. Underneath: the frame, the axles on their springs, the prop shaft. No more ring of daylight round the wheel hubs.',
+    ]},
+  },
+  {
     v:'3.1n',date:'2026-11-02',
     ru:{title:'Дорога в лесхоз',items:[
       'Смена в лесу начинается в дороге. УАЗ едет по шоссе на закате, пассажир ловит радио: сначала треск, потом песня CUPSIZE «вайфуу», как из старого автомобильного динамика.',

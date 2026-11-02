@@ -18,7 +18,7 @@ import { RNG, clamp, lerp, smoothstep, damp } from '../core/rng.js';
 import { shared, shadowLights, createWorldMaterial } from '../render/sonar.js';
 import { LANDMARKS, CAP } from '../world/world.js';
 import { Collision } from '../world/collision.js';
-import { GATE, BACK, buildGateLeaf, buildBackLeaf, exitPath, groundAt, roadHeight, lampFirst, inYard } from '../world/yard.js';
+import { GATE, BACK, buildGateLeaf, buildBackLeaf, exitPath, groundAt, roadHeight, lampFirst, inYard, FAR } from '../world/yard.js';
 import { PARTS, SLOTS, SEATS, WHEELS, MISSING, HOOD_HINGE, HOOD_OPEN, buildForestCar, buildPart, geometryOf } from './uaz.js';
 import { CARP } from '../ui/garageSet.js';
 
@@ -197,7 +197,7 @@ export class Escape {
     this.skyGlow.material.opacity = 0.07;
     game.scene.add(this.skyGlow);
     shared.uRoad.value.set(lampFirst(), CFG.ROAD.lampEvery, CFG.ROAD.z - 2.6, this.roadY + 8.7);
-    shared.uRoadK.value.set(1.5, lampFirst(), CFG.ROAD.x1);
+    shared.uRoadK.value.set(1.5, lampFirst(), FAR.x1); // (3.1o: the highway runs on into the haze)
     // ---- the four parts ----
     this.parts = PARTS.map((def, i) => {
       const geo = geometryOf(buildPart(def.key).toArrays());
@@ -1615,7 +1615,8 @@ export class Escape {
       this.trafficT = 14 + Math.random() * 30;
       const dir = Math.random() < 0.5 ? 1 : -1;
       const R = CFG.ROAD;
-      const c = { dir, x: dir > 0 ? R.x0 + 2 : R.x1 - 2, z: R.z + (dir > 0 ? 1.9 : -1.9), v: 19 + Math.random() * 8, passed: false };
+      // (3.1o) out of the haze, not out of thin air where the road used to end
+      const c = { dir, x: dir > 0 ? R.x0 - 120 : R.x1 + 120, z: R.z + (dir > 0 ? 1.9 : -1.9), v: 19 + Math.random() * 8, passed: false };
       const geo = (this._trafficGeo ||= (() => {
         const b = new MeshBuilder(256);
         b.place(0, 0.62, 0);
@@ -1654,7 +1655,7 @@ export class Escape {
         c.passed = true;
         g.audio.carPass(c.x, y + 0.6, c.z, c.dir, c.v);
       }
-      if (c.x < CFG.ROAD.x0 - 5 || c.x > CFG.ROAD.x1 + 5) {
+      if (c.x < CFG.ROAD.x0 - 125 || c.x > CFG.ROAD.x1 + 125) {
         this._dropCar(c);
         this.traffic.splice(i, 1);
       }
