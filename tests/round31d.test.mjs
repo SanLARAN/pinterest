@@ -241,7 +241,8 @@ test('the shell: a frameless launcher with its own bridge, the game in its own w
   assert.match(main, /frame: false/);
   assert.match(main, /win\.loadURL\(`\$\{SCHEME\}:\/\/app\/launcher\.html`\)/);
   assert.match(main, /const fromLauncher = \(e\) => !!launcherWin && e\.sender === launcherWin\.webContents;/, 'only the launcher may press its buttons');
-  assert.match(main, /\['autoplay', 'fullscreen'\]\.includes\(key\) \|\| typeof value !== 'boolean'/);
+  assert.match(main, /const PREF_KEYS = \['autoplay', 'fullscreen', 'returnToLauncher'\];/); // (3.1k: a third setting)
+  assert.match(main, /!PREF_KEYS\.includes\(key\) \|\| typeof value !== 'boolean'/);
   assert.match(main, /spawn\(file, \['\/S', '--updated', \.\.\.\(restart \? \['--force-run'\] : \[\]\)\]/, 'the NSIS installer, silently, in place');
   assert.match(main, /app\.on\('before-quit'/);
   assert.match(main, /if \(updater\) gameCopy = updater\.current\(\);/, 'the game window opens on the newest copy');
@@ -253,7 +254,7 @@ test('the shell: a frameless launcher with its own bridge, the game in its own w
   const builder = src('electron-builder.yml');
   for (const f of readdirSync(new URL('../electron', import.meta.url)).filter((n) => n.endsWith('.cjs'))) assert.ok(builder.includes(`electron/${f}`), `${f} is packed`);
   assert.match(builder, /- target: nsis/);
-  assert.match(builder, /oneClick: true\n {2}perMachine: false/);
+  assert.match(builder, /oneClick: false\n {2}perMachine: false/); // (3.1k: a wizard with a folder choice, per-user by default)
   assert.match(builder, /artifactName: HUSH-Setup-\$\{version\}\.\$\{ext\}/);
 });
 

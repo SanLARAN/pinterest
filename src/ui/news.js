@@ -7,6 +7,23 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v:'3.1k',date:'2026-11-02',
+    ru:{title:'Установщик и лаунчер',items:[
+      'Установщик для Windows стал мастером на русском или английском. Можно выбрать, для кого ставить игру (только для себя — без прав администратора, или для всех) и в какую папку, и нужен ли ярлык на рабочем столе. В конце — «Запустить ТИШЕ».',
+      'Обновления ставятся туда же, куда ты установил игру. Ярлык, который ты удалил с рабочего стола, обновление не вернёт.',
+      'В лаунчере две вкладки: «Что нового» и «Настройки». Пока качается обновление, кнопка «Играть» заполняется и показывает проценты. Под ней видно, когда игра последний раз проверяла обновления, и можно проверить ещё раз.',
+      'В настройках: сразу запускать игру, игра на весь экран, возвращаться ли в лаунчер после игры, язык. Там же видны папка игры и папка сохранений, есть кнопки «Проверить файлы игры» (скачать игру заново, если что-то сломалось) и «Удалить игру».',
+      'При удалении игра спросит, удалять ли сохранения и настройки. Если ответить «Нет», после новой установки всё будет на месте.',
+    ]},
+    en:{title:'Installer and launcher',items:[
+      'The Windows installer is now a wizard, in Russian or English. You choose who the game is for (just you, with no admin rights, or everyone), which folder it goes to, and whether you want a desktop shortcut. At the end: Start HUSH.',
+      'Updates install into the folder you picked. A desktop shortcut you deleted stays deleted after an update.',
+      'The launcher has two tabs: What\'s new and Settings. While an update downloads, the Play button fills up and shows the percentage. Under it you can see when the game last checked for updates, and check again.',
+      'Settings: start the game right away, full screen, whether to come back to the launcher after playing, and the language. They also show the game folder and the saves folder, with Check game files (download the game again if something broke) and Uninstall.',
+      'Uninstalling asks whether to remove your saves and settings too. Answer No and everything is still there after you install again.',
+    ]},
+  },
+  {
     v:'3.1j',date:'2026-11-02',
     ru:{title:'Главное меню и магазин',items:[
       'Главное меню стало одним списком: «Одному» первым и крупнее всех, под ним «С друзьями», ниже «Полигон», «Гардероб» и «Магазин». Строка, на которой ты стоишь, отмечена красной чертой.',

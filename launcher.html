@@ -12,11 +12,12 @@
     <header class="ln-bar">
       <span class="ln-brand">ТИШЕ / HUSH</span>
       <span class="ln-win">
-        <button type="button" data-win="min" class="ln-wbtn"><span aria-hidden="true">—</span></button>
-        <button type="button" data-win="close" class="ln-wbtn ln-close"><span aria-hidden="true">×</span></button>
+        <button type="button" data-win="min" class="ln-wbtn"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6.5h8" /></svg></button>
+        <button type="button" data-win="close" class="ln-wbtn ln-close"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 2.5l7 7M9.5 2.5l-7 7" /></svg></button>
       </span>
     </header>
     <main class="ln-main">
+      <!-- (3.1k) the left half is one job: get into the game. Everything else lives in the tabs on the right. -->
       <section class="ln-left">
         <h1 class="ln-title">ТИШЕ</h1>
         <p class="ln-tag" data-t="lnTag"></p>
@@ -24,33 +25,100 @@
           <p data-t="lnBrowser"></p>
           <a href="./" data-t="lnBrowserLink"></a>
         </div>
-        <button type="button" id="lnPlay" class="ln-play"></button>
-        <button type="button" id="lnPlayNow" class="ln-link" hidden data-t="lnPlayNow"></button>
-        <div class="ln-status" role="status" aria-live="polite">
-          <p id="lnLine"></p>
-          <div class="ln-bar-track" hidden><i id="lnFill"></i></div>
-          <button type="button" id="lnRetry" class="ln-link" hidden data-t="lnRetry"></button>
+        <div class="ln-go">
+          <button type="button" id="lnPlay" class="ln-play"><span class="ln-play-fill" aria-hidden="true"></span><span class="ln-play-text" id="lnPlayText"></span></button>
+          <div class="ln-status" role="status" aria-live="polite">
+            <i class="ln-dot" aria-hidden="true"></i>
+            <p id="lnLine"></p>
+          </div>
+          <div class="ln-status-acts">
+            <button type="button" id="lnRetry" class="ln-link" hidden data-t="lnRetry"></button>
+            <button type="button" id="lnCheck" class="ln-link" hidden data-t="lnCheck"></button>
+            <button type="button" id="lnPlayNow" class="ln-link" hidden data-t="lnPlayNow"></button>
+          </div>
         </div>
         <div class="ln-shell" hidden>
           <p id="lnShellLine"></p>
-          <button type="button" id="lnShellApply" class="ln-btn" hidden data-t="lnShellApply"></button>
+          <button type="button" id="lnShellApply" class="ln-btn amber" hidden data-t="lnShellApply"></button>
         </div>
-        <div class="ln-prefs">
-          <label><input type="checkbox" id="lnAuto" /> <span data-t="lnAuto"></span></label>
-          <label><input type="checkbox" id="lnFull" /> <span data-t="lnFull"></span></label>
-        </div>
-        <nav class="ln-links">
-          <button type="button" class="ln-link" data-open="folder" data-t="lnFolder"></button>
-          <button type="button" class="ln-link" data-open="site" data-t="lnSite"></button>
-          <button type="button" class="ln-link" data-open="issues" data-t="lnBug"></button>
-        </nav>
         <p class="ln-ver" id="lnVer"></p>
       </section>
-      <aside class="ln-news">
-        <h2 data-t="lnNews"></h2>
-        <div id="lnNewsList"></div>
+
+      <aside class="ln-side">
+        <nav class="ln-tabs" role="tablist">
+          <button type="button" role="tab" id="lnTabNews" aria-controls="lnPaneNews" aria-selected="true" data-t="lnTabNews"></button>
+          <button type="button" role="tab" id="lnTabSettings" aria-controls="lnPaneSettings" aria-selected="false" tabindex="-1" data-t="lnTabSettings"></button>
+        </nav>
+
+        <section class="ln-pane" id="lnPaneNews" role="tabpanel" aria-labelledby="lnTabNews">
+          <div id="lnNewsList"></div>
+        </section>
+
+        <section class="ln-pane ln-settings" id="lnPaneSettings" role="tabpanel" aria-labelledby="lnTabSettings" hidden>
+          <h2 data-t="lnSecLaunch"></h2>
+          <label class="ln-switch">
+            <input type="checkbox" role="switch" id="lnAuto" />
+            <span class="ln-sw" aria-hidden="true"></span>
+            <span class="ln-sw-text"><b data-t="lnAuto"></b><small data-t="lnAutoHint"></small></span>
+          </label>
+          <label class="ln-switch">
+            <input type="checkbox" role="switch" id="lnFull" />
+            <span class="ln-sw" aria-hidden="true"></span>
+            <span class="ln-sw-text"><b data-t="lnFull"></b><small data-t="lnFullHint"></small></span>
+          </label>
+          <label class="ln-switch" data-needs="info">
+            <input type="checkbox" role="switch" id="lnBack" />
+            <span class="ln-sw" aria-hidden="true"></span>
+            <span class="ln-sw-text"><b data-t="lnBack"></b><small data-t="lnBackHint"></small></span>
+          </label>
+
+          <h2 data-t="lnSecLang"></h2>
+          <div class="ln-seg" role="radiogroup" aria-labelledby="lnLangLabel">
+            <span id="lnLangLabel" hidden data-t="lnSecLang"></span>
+            <button type="button" role="radio" data-lang="ru">Русский</button>
+            <button type="button" role="radio" data-lang="en">English</button>
+          </div>
+
+          <h2 data-t="lnSecFiles"></h2>
+          <div class="ln-path" data-needs="info">
+            <span data-t="lnInstallDir"></span>
+            <code id="lnInstallDir"></code>
+            <button type="button" class="ln-link" data-open="install" data-t="lnOpen"></button>
+          </div>
+          <div class="ln-path">
+            <span data-t="lnDataDir"></span>
+            <code id="lnDataDir" data-needs="info"></code>
+            <button type="button" class="ln-link" data-open="folder" data-t="lnOpen"></button>
+          </div>
+          <div class="ln-acts" data-needs="info">
+            <button type="button" id="lnRepair" class="ln-btn" data-t="lnRepair"></button>
+            <button type="button" id="lnUninstall" class="ln-btn danger" hidden data-t="lnUninstall"></button>
+          </div>
+          <p class="ln-note" id="lnFilesNote" role="status" aria-live="polite"></p>
+          <p class="ln-note" id="lnOldShell" hidden data-t="lnOldShell"></p>
+
+          <h2 data-t="lnSecAbout"></h2>
+          <p class="ln-about" id="lnAbout"></p>
+          <nav class="ln-links">
+            <button type="button" class="ln-link" data-open="site" data-t="lnSite"></button>
+            <button type="button" class="ln-link" data-open="issues" data-t="lnBug"></button>
+            <button type="button" class="ln-link" data-open="privacy" data-needs="info" data-t="lnPrivacy"></button>
+          </nav>
+        </section>
       </aside>
     </main>
+
+    <!-- the one question the launcher asks: before it hands over to the uninstaller -->
+    <div class="ln-dialog" id="lnConfirm" hidden>
+      <div class="ln-dialog-card" role="alertdialog" aria-modal="true" aria-labelledby="lnConfirmTitle" aria-describedby="lnConfirmText">
+        <h2 id="lnConfirmTitle" data-t="lnUninstallTitle"></h2>
+        <p id="lnConfirmText" data-t="lnUninstallAsk"></p>
+        <div class="ln-dialog-acts">
+          <button type="button" class="ln-btn" id="lnConfirmNo" data-t="lnCancel"></button>
+          <button type="button" class="ln-btn danger" id="lnConfirmYes" data-t="lnUninstallYes"></button>
+        </div>
+      </div>
+    </div>
     <script type="module" src="/src/launcher/launcher.js"></script>
   </body>
 </html>

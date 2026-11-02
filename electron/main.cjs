@@ -122,10 +122,12 @@ function createGameWindow() {
 }
 
 // ---------------------------------------------------------------- the launcher (3.1d)
-// The first window: ИГРАТЬ, the update line, what's new. It hides while the game window is open and comes back
-// when it closes; closing the launcher quits. Its two settings live in <userData>/launcher.json.
+// The first window: ИГРАТЬ, the update line, what's new, settings. It hides while the game window is open and comes
+// back when it closes (unless the player turned that off: then closing the game quits); closing the launcher quits.
+// Its settings live in <userData>/launcher.json.
 const PREFS_FILE = () => path.join(app.getPath('userData'), 'launcher.json');
-let prefs = { autoplay: false, fullscreen: false };
+const PREF_KEYS = ['autoplay', 'fullscreen', 'returnToLauncher'];
+let prefs = { autoplay: false, fullscreen: false, returnToLauncher: true };
 function loadPrefs() {
   try { prefs = { ...prefs, ...JSON.parse(fs.readFileSync(PREFS_FILE(), 'utf8')) }; } catch { /* first run */ }
 }
@@ -138,6 +140,22 @@ function shellMode() {
   if (!app.isPackaged) return 'dev';
   if (process.env.PORTABLE_EXECUTABLE_FILE) return 'portable';
   return 'nsis';
+}
+
+// (3.1k) where this copy lives, for the launcher's settings: the folder the player chose in the installer (or the
+// portable .exe's own folder), the saves, and the uninstaller electron-builder left beside the .exe
+function installInfo() {
+  const mode = shellMode();
+  const exe = mode === 'portable' ? process.env.PORTABLE_EXECUTABLE_FILE : process.execPath;
+  const installDir = mode === 'dev' ? ROOT : path.dirname(exe);
+  let uninstaller = null;
+  if (mode === 'nsis') {
+    try {
+      const name = fs.readdirSync(installDir).find((n) => /^Uninstall .+\.exe$/i.test(n));
+      if (name) uninstaller = path.join(installDir, name);
+    } catch { /* a folder we cannot list: no uninstall button */ }
+  }
+  return { mode, installDir, exe, dataDir: app.getPath('userData'), shell: app.getVersion(), electron: process.versions.electron, uninstaller };
 }
 
 let updater = null;
@@ -201,7 +219,7 @@ function openGame() {
   gameWin.on('closed', () => {
     gameWin = null;
     if (quitting) return;
-    if (launcherWin) { launcherWin.show(); launcherWin.focus(); updater?.check(); }
+    if (launcherWin && prefs.returnToLauncher !== false) { launcherWin.show(); launcherWin.focus(); updater?.check(); }
     else app.quit();
   });
   launcherWin?.hide();
@@ -262,18 +280,48 @@ function wireLauncherIpc() {
   ipcMain.handle('hush:ln:shell', (e) => (fromLauncher(e) ? applyShell(true) : false));
   ipcMain.handle('hush:ln:prefs', (e) => (fromLauncher(e) ? { ...prefs } : null));
   ipcMain.handle('hush:ln:pref', (e, key, value) => {
-    if (!fromLauncher(e) || !['autoplay', 'fullscreen'].includes(key) || typeof value !== 'boolean') return false;
+    if (!fromLauncher(e) || !PREF_KEYS.includes(key) || typeof value !== 'boolean') return false;
     prefs[key] = value;
     savePrefs();
     return true;
   });
   ipcMain.handle('hush:ln:open', (e, what) => {
     if (!fromLauncher(e)) return false;
-    if (what === 'folder') shell.openPath(app.getPath('userData'));
+    const info = installInfo();
+    if (what === 'folder' || what === 'data') shell.openPath(info.dataDir);
+    else if (what === 'install') { if (info.mode === 'portable') shell.showItemInFolder(info.exe); else shell.openPath(info.installDir); }
     else if (what === 'site') shell.openExternal(SITE);
+    else if (what === 'privacy') shell.openExternal(`${SITE}privacy.html`);
     else if (what === 'issues') shell.openExternal(ISSUES);
     else if (what === 'releases') shell.openExternal(PAGE);
     else return false;
+    return true;
+  });
+  // (3.1k) the settings tab: the folders, and the two things it can do with them
+  ipcMain.handle('hush:ln:info', (e) => {
+    if (!fromLauncher(e)) return null;
+    const { mode, installDir, dataDir, shell: ver, electron, uninstaller } = installInfo();
+    return { mode, installDir, dataDir, shell: ver, electron, canUninstall: !!uninstaller };
+  });
+  ipcMain.handle('hush:ln:repair', async (e) => {
+    if (!fromLauncher(e)) return null;
+    if (gameWin) return { error: 'playing' };
+    return updater.repair();
+  });
+  // hand over to electron-builder's uninstaller (it asks for itself, and about the saves): the launcher steps out
+  // of its way, and a shell update downloaded in the background is not installed on the way out
+  ipcMain.handle('hush:ln:uninstall', (e) => {
+    if (!fromLauncher(e) || gameWin) return false;
+    const { uninstaller } = installInfo();
+    if (!uninstaller) return false;
+    try {
+      spawn(uninstaller, [], { detached: true, stdio: 'ignore' }).unref();
+    } catch {
+      return false;
+    }
+    shellApplied = true;
+    quitting = true;
+    setTimeout(() => app.quit(), 200);
     return true;
   });
   ipcMain.handle('hush:ln:win', (e, action) => {

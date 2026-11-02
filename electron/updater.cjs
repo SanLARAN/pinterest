@@ -33,6 +33,7 @@ class Updater {
       latest: null,
       latestGame: '',
       progress: 0,
+      size: 0, // (3.1k) bytes of the game being downloaded, for «42 % of 7 MB»
       error: '',
       shell: { phase: 'none', progress: 0, size: 0, version: null, kind: null, error: '' }, // none | downloading | ready | error
       checkedAt: 0,
@@ -83,8 +84,19 @@ class Updater {
     return this.fetchGame(m);
   }
 
+  // (3.1k) «проверить файлы игры»: forget every downloaded copy and fetch the newest one again. The bundled copy
+  // inside the install stays, so the game still starts if the network is down. Not while a game window is open
+  // (main.cjs refuses it then): that window reads from the current copy.
+  async repair() {
+    if (this.busy) await this.busy.catch(() => {});
+    fs.rmSync(content.root(this.userData), { recursive: true, force: true });
+    const cur = this.current();
+    this.set({ game: cur.version, source: cur.source, progress: 0, error: '' });
+    return this.check();
+  }
+
   async fetchGame(m) {
-    this.set({ phase: 'downloading', progress: 0 });
+    this.set({ phase: 'downloading', progress: 0, size: m.pak.size });
     const dest = path.join(content.root(this.userData), 'downloads', m.pak.name);
     try {
       const r = await this.net.download(m.pak.url, dest, {

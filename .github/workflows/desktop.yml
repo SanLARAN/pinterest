@@ -119,8 +119,9 @@ jobs:
           make_latest: true
           name: ТИШЕ / HUSH ${{ github.ref_name }}
           body: |
-            **Установка:** скачай `HUSH-Setup-….exe` и запусти — без прав администратора, ярлыки на рабочем столе
-            и в «Пуске». Откроется лаунчер: ИГРАТЬ, что нового, обновления.
+            **Установка:** скачай `HUSH-Setup-….exe` и запусти. Мастер спросит, для кого ставить игру и в какую
+            папку, нужен ли ярлык на рабочем столе; «только для меня» не требует прав администратора. Откроется
+            лаунчер: ИГРАТЬ, что нового, настройки.
 
             **Обновляется сама.** Лаунчер при каждом запуске (и раз в три часа) смотрит сюда. Новая игра — это файл
             `hush-game-….pak` на несколько мегабайт: он скачивается и проверяется сам, переустанавливать ничего не
@@ -128,7 +129,8 @@ jobs:
 
             Без установки: `HUSH-…-win-x64.exe` — портативная сборка, тоже с лаунчером и обновлениями.
 
-            **Install:** download `HUSH-Setup-….exe` and run it — no admin rights, desktop and Start menu shortcuts.
+            **Install:** download `HUSH-Setup-….exe` and run it — the wizard asks who it is for, which folder, and
+            whether you want a desktop shortcut; «only me» needs no admin rights.
             The launcher keeps the game current on its own. No install: `HUSH-…-win-x64.exe` (portable).
 
             Windows может показать «Система Windows защитила ваш компьютер»: сборка не подписана сертификатом —

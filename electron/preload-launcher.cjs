@@ -1,6 +1,7 @@
 // 3.1d: the launcher window's bridge (launcher.html / src/launcher/launcher.js), and nothing else.
-// Sandboxed, isolated, no Node: it can ask for the update state, press ИГРАТЬ, change its two settings, open
-// three known places, and move its own window. main.cjs answers only when the call comes from the launcher.
+// Sandboxed, isolated, no Node: it can ask for the update state, press ИГРАТЬ, change its settings, open a few
+// known places, and move its own window; (3.1k) see where the game is installed, fetch the game again, and start
+// the uninstaller. main.cjs answers only when the call comes from the launcher.
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('hushLauncher', {
@@ -17,4 +18,8 @@ contextBridge.exposeInMainWorld('hushLauncher', {
   setPref: (key, value) => ipcRenderer.invoke('hush:ln:pref', key, value),
   open: (what) => ipcRenderer.invoke('hush:ln:open', what),
   win: (action) => ipcRenderer.invoke('hush:ln:win', action),
+  // (3.1k) where it is installed and what it can do there; fetch the game again; hand over to the uninstaller
+  info: () => ipcRenderer.invoke('hush:ln:info'),
+  repair: () => ipcRenderer.invoke('hush:ln:repair'),
+  uninstall: () => ipcRenderer.invoke('hush:ln:uninstall'),
 });

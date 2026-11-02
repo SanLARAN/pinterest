@@ -32,6 +32,9 @@ files:
   - electron/pak.cjs
   - electron/net.cjs
   - electron/assets/**
+  # (3.1k) the installer's own art and script sit beside the icon, but the app does not need them
+  - '!electron/assets/*.bmp'
+  - '!electron/assets/*.nsh'
   - dist/**
   - package.json
 
@@ -47,13 +50,21 @@ win:
       arch: [x64]
   artifactName: HUSH-${version}-win-${arch}.${ext}
 
-# (3.1d) the installer: one click, into the user's own profile (no UAC prompt), shortcuts, and the game starts at
-# the end. The launcher runs a newer one of these with `/S --updated` to update the shell in place.
+# (3.1k) the installer is a wizard now: Welcome → only me / everyone → the folder → Shortcuts → Finish, in Russian or
+# English after the Windows language, with the game's own art. Its pages, words and the uninstaller's question about
+# the saves are in electron/assets/installer.nsh; the art (installerSidebar.bmp, uninstallerSidebar.bmp,
+# installerHeader.bmp) is found there by name. «Only me» stays the default: no UAC prompt, and silent updates.
+# The launcher runs a newer installer with `/S --updated` to update the shell in place — into the folder the player
+# picked (the installer reads it back from the registry).
 nsis:
-  oneClick: true
+  oneClick: false
   perMachine: false
-  allowElevation: false
-  createDesktopShortcut: always
+  allowElevation: true
+  allowToChangeInstallationDirectory: true
+  multiLanguageInstaller: true
+  installerLanguages: [ru_RU, en_US]
+  displayLanguageSelector: false
+  createDesktopShortcut: true
   createStartMenuShortcut: true
   shortcutName: ТИШЕ HUSH
   runAfterFinish: true

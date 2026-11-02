@@ -4,7 +4,7 @@
 > Он написан для человека и для агента: любой новый чат начинается с чтения `AGENTS.md`, а тот отправляет
 > сюда. Если код и этот файл расходятся — прав код, а файл надо поправить в том же коммите.
 >
-> Последнее обновление: раунд **3.1j** (главное меню списком, магазин).
+> Последнее обновление: раунд **3.1k** (установщик-мастер, лаунчер с настройками).
 
 ---
 
@@ -636,6 +636,27 @@
   `.news-tab` получил `aria-label` (на телефоне видна только версия).
 - **Тесты:** `tests/round31j.test.mjs` (4).
 
+### 3.1k — установщик-мастер и лаунчер с настройками
+
+- `electron-builder.yml` → `nsis`: `oneClick: false`, `perMachine: false` (страница «для кого», по умолчанию «только
+  для меня»), `allowElevation: true`, `allowToChangeInstallationDirectory: true`, `multiLanguageInstaller` +
+  `installerLanguages: [ru_RU, en_US]` без выбора языка, `createDesktopShortcut: true` (не always).
+- `electron/assets/installer.nsh` (подхватывается по имени): `customWelcomePage`, `customPageAfterChangeDir` (nsDialogs,
+  галочка рабочего стола), `customInstall` (снятая галочка → удалить `$newDesktopLink`, не при `--updated`),
+  `customUnInstall` (MessageBox про `%APPDATA%\HUSH`, только не silent и не updated; контекст оболочки — current,
+  потом обратно, если установка all). Включается в заголовок до MUI2: слова — LangString по числовым id, MUI —
+  внутри макросов, половины разделены `BUILD_UNINSTALLER` (сборка с `-WX`). Картинки BMP 24 бит.
+- Папка сохраняется при тихих обновлениях: `multiUser.nsh` читает `InstallLocation` из реестра.
+- Оболочка: `installInfo()` (папка установки, exe, userData, деинсталлятор `Uninstall *.exe` рядом с exe),
+  IPC `hush:ln:info`, `hush:ln:repair` (не при открытой игре), `hush:ln:uninstall` (spawn деинсталлятора,
+  `shellApplied = true`, выход), `open('install'|'privacy')`; `PREF_KEYS` + `returnToLauncher` (закрытие игры →
+  лаунчер или выход). `Updater.repair()`, `state.size`. Меняет `shellId` → у всех установок новая оболочка.
+- Лаунчер (`launcher.html`, `src/launcher/`): прогресс внутри «Играть» (`--p`), точка состояния, «проверено в …»,
+  вкладки (tablist, ←/→), переключатели `role=switch`, язык через `settings.lang` + `saveSettings`, диалог удаления
+  (`alertdialog`, Esc, фокус внутри). `[data-needs="info"]` прячется без `api.info` (старая оболочка).
+- Локальная сборка в песочнице: выход в короткую папку (`%TEMP%\hb`), иначе 7za/makensis не стартуют (путь > 260).
+- **Тесты:** `tests/round31k.test.mjs` (6); `round31d` — `PREF_KEYS` и `oneClick: false` (поведение по замыслу).
+
 ## 2. Петля игры (и это надо понимать буквально)
 
 ```
@@ -885,7 +906,7 @@ src/
   ui/              hud.js, menus.js, graphics.js (расширенная графика), garage*.js (3D-гараж), lobby.js, wardrobe.js, mannequin.js, atlas*.js,
                    bag3d.js, touchButtons.js, radar.js, news.js, miccal.js, socialDock/Toasts/Words, account.js,
                    beyond.js, voicemix.js, sfxtest.js, reel.js (2.1u: plays the shift's highlights, writes .webm)
-tests/             node:test, 63 файла / 515 тестов (на 3.1j)
+tests/             node:test, 64 файла / 521 тест (на 3.1k)
 play/              собранная игра для GitHub Pages (артефакт сборки, коммитится)
 ```
 
@@ -899,7 +920,7 @@ play/              собранная игра для GitHub Pages (артефа
 
 ## 6. Проверка: как убедиться, что не сломал
 
-1. `npm test` — 515 тестов (3.1j), все должны проходить (правка теста допустима только если изменилось **поведение по
+1. `npm test` — 521 тест (3.1k), все должны проходить (правка теста допустима только если изменилось **поведение по
    замыслу**, и тогда в коммит-сообщении надо сказать, какое).
 2. `npm run build:pages` — сборка в `play/`; без неё деплой покажет старую версию.
 3. Живой прогон в браузере (headless-харнесс, рецепт ниже) на **конкретной сцене**, а не «в целом работает».
