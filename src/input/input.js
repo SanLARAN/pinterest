@@ -1,6 +1,9 @@
-// Unified input: keyboard (layout-independent codes), mouse (pointer lock w/ drag fallback), touch.
+// Unified input: keyboard (layout-independent codes), mouse (pointer lock; drag only without the API), touch.
 import { settings } from '../core/storage.js';
 import { cleanKeys, actionMap } from '../core/keybinds.js';
+
+// (3.1i) refusals in a row before the hint stops saying just «click»: two can be ordinary (Esc, the cooldown)
+export const LOCK_STUCK = 3;
 
 // (3.0y) the keyboard is read as actions (core/keybinds.js): the player can rebind them in the settings.
 // The шкафандр's beat follows the movement keys, whatever they are (and the arrows).
@@ -22,8 +25,9 @@ export class Input {
     this.peekTouchUntil = 0;
     this.events = [];
     this.locked = false;
-    this.lockFailed = false; // (3.0v) only where the lock can never be had: no API, or a frame that keeps refusing it
-    // (3.0v) a page inside someone else's frame may be refused the lock for good; a page of its own never is
+    this.lockFailed = false; // (3.1i) only a browser with no pointer-lock API at all drags to look
+    this.lockFails = 0; // refusals in a row: after a few, the hint says why (an old .exe shell, a foreign frame)
+    // a page inside someone else's frame may be refused the lock for good; a page of its own never is
     this.inFrame = (() => { try { return typeof window !== 'undefined' && window.self !== window.top; } catch { return true; } })();
     // (3.0v) raw, unaccelerated mouse movement is opt-in (?rawmouse): on Windows Chrome it arrives in uneven
     // bursts and the camera stepped — worst when the frame rate dips, which is to say under the lamps
@@ -242,12 +246,17 @@ export class Input {
   // (3.0v) a refused lock. The browser refuses for ordinary reasons — no click behind the request, Esc (which is
   // never a gesture: closing the backpack with it used to count), or the second after you left the lock — and
   // none of those may turn the mouse into drag-to-look for the rest of the session: the next click asks again.
-  // Only a page in someone else's frame, refused twice, falls back to dragging — and (3.1f) the desktop build:
-  // a shell from before 3.1f refuses the lock outright (its permission list had no 'pointerLock'), and there the
-  // camera must still turn while the new shell is on its way.
+  // (3.1i) Not in a frame and not in the .exe either: «зажми ЛКМ и тяни» is gone. Where the lock keeps being
+  // refused — a shell from before 3.1f, a frame that forbids it — lockHint() says what to do instead.
   _lockRefused() {
-    this.lockFails = (this.lockFails || 0) + 1;
-    if ((this.inFrame || !!globalThis.hushDesktop) && this.lockFails >= 2) this.lockFailed = true;
+    this.lockFails++;
+  }
+
+  // the line under «кликни, чтобы управлять взглядом» once the lock has been refused LOCK_STUCK times in a row
+  lockHint() {
+    if (this.lockFails < LOCK_STUCK) return '';
+    if (globalThis.hushDesktop) return 'lockRestart';
+    return this.inFrame ? 'lockOwnTab' : '';
   }
 
   exitLock() {

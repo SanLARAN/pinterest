@@ -7,6 +7,19 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v:'3.1i',date:'2026-11-02',
+    ru:{title:'Мышь без «зажми и тяни»',items:[
+      'Режим «зажми ЛКМ и тяни, чтобы смотреть» убран. Камера всегда управляется как обычно: кликнул, и мышь вертит взгляд без зажатой кнопки.',
+      'Если после выхода в меню первый клик не захватил мышь, следующий захватит. Раньше два таких клика подряд переключали управление на перетаскивание до конца игры.',
+      'Если в приложении для Windows мышь так и не захватывается, значит, стоит старая версия программы. Подсказка попросит закрыть игру и открыть снова: при выходе поставится новая версия, и мышь заработает.',
+    ]},
+    en:{title:'The mouse without «hold and drag»',items:[
+      'The «hold LMB and drag to look around» mode is gone. The camera always works the usual way: click once, and the mouse turns your view without holding a button.',
+      'If the first click after the menu does not take the mouse, the next one does. Before, two such clicks in a row switched you to dragging for the rest of the game.',
+      'If the Windows app still cannot take the mouse, it is an old version of the program. The hint asks you to close the game and open it again: the new version installs on exit, and the mouse works.',
+    ]},
+  },
+  {
     v:'3.1h',date:'2026-11-01',
     ru:{title:'Новая заставка в лесу',items:[
       'Фильм перед сменой в лесу снят заново. Камера опускается на лагерь в последний светлый вечер, и у каждого игрока своё дело: один проверяет фонарь и светит в лес, другой закрывает палатку, третий доливает бензин в генератор, четвёртый заливает костёр водой из ведра.',

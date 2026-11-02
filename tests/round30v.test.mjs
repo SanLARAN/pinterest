@@ -55,15 +55,13 @@ test('refused locks never turn the mouse into drag-to-look on a page of its own 
   assert.equal(input.locked, true, 'and the sixth click gets it: the ordinary mouse look');
 });
 
-test('only a page inside someone else\'s frame, refused twice, falls back to dragging', async () => {
+test('(3.1i) a page inside someone else\'s frame no longer falls back to dragging either', async () => {
   const b = browser({ framed: true });
   const { Input } = await import('../src/input/input.js?framed');
   const input = new Input(b.canvas);
   input.gameActive = true;
-  b.fire('canvas:mousedown'); await tick();
-  assert.equal(input.lockFailed, false);
-  b.fire('canvas:mousedown'); await tick();
-  assert.equal(input.lockFailed, true);
+  for (let i = 0; i < 4; i++) { b.fire('canvas:mousedown'); await tick(); }
+  assert.equal(input.lockFailed, false, 'the hint asks for a tab of its own instead (round31i)');
 });
 
 test('raw, unaccelerated mouse movement is opt-in (?rawmouse)', async () => {

@@ -369,7 +369,7 @@ const menus = new Menus({
       account.render();social.update();syncIdentityFields();
       updateMicUI();
       lobby.render();
-      $('lockHint').textContent = input.lockFailed ? t('dragToLook') : t('clickToLook');
+      $('lockHint').textContent = input.lockFailed ? t('dragToLook') : t(input.lockHint() || 'clickToLook');
     }
   },
   uiSound: (k) => {
@@ -1175,7 +1175,7 @@ function step(now, render) {
       // pointer-lock hint (or drag-to-look hint when the browser/iframe refuses pointer lock)
       let lockMsg = '';
       if (!input.touch && (game.state === 'play' || game.state === 'morning' || game.state === 'training') && !input.locked) {
-        if (!input.lockFailed) lockMsg = t('clickToLook');
+        if (!input.lockFailed) lockMsg = t(input.lockHint() || 'clickToLook'); // (3.1i) never «drag»: say why it won't lock
         else {
           if (!perf.dragHintAt) perf.dragHintAt = now;
           if (now - perf.dragHintAt < 7000) lockMsg = t('dragToLook');

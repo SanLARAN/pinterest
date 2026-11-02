@@ -871,6 +871,8 @@ const STR = {
     touchFlare: 'РАКЕТА',
     clickToLook: 'кликни, чтобы управлять взглядом',
     dragToLook: 'зажми ЛКМ и тяни, чтобы смотреть',
+    lockRestart: 'мышь не захватывается — закрой игру и открой снова: поставится новая версия программы',
+    lockOwnTab: 'в этом окне мышь не захватывается — открой игру в отдельной вкладке',
     touchCrouch: 'ТИХО',
     deathBy: {
       listener: 'Слушатель',
@@ -1857,6 +1859,8 @@ const STR = {
     touchFlare: 'FLARE',
     clickToLook: 'click to control the camera',
     dragToLook: 'hold LMB and drag to look around',
+    lockRestart: 'the mouse will not lock: close the game and open it again to install the new app version',
+    lockOwnTab: 'this window cannot take the mouse: open the game in a tab of its own',
     touchCrouch: 'SNEAK',
     deathBy: {
       listener: 'Listener',

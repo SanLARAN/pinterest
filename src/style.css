@@ -435,7 +435,9 @@ body.morning #crosshair .dot { background: rgba(40, 30, 22, 0.5); }
 
 #lockHint {
   position: absolute; left: 50%; top: calc(50% + 48px); transform: translateX(-50%); font-size: 11px; letter-spacing: 0.2em;
-  color: var(--ash); opacity: 0; transition: opacity 0.3s; white-space: nowrap; text-transform: uppercase;
+  color: var(--ash); opacity: 0; transition: opacity 0.3s; text-transform: uppercase;
+  /* (3.1i) one line for «click», two for the longer «why it won't lock» */
+  width: max-content; max-width: min(92vw, 560px); text-align: center; line-height: 1.6;
 }
 body.needlock #lockHint { opacity: 0.8; animation: introBreath 1.8s ease-in-out infinite; }
 

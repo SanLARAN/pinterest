@@ -31,17 +31,16 @@ function browser() {
 }
 const tick = () => new Promise((r) => setTimeout(r, 0));
 
-test('an old desktop shell that refuses the lock: after two clicks the mouse drags the view instead of nothing', async () => {
+test('an old desktop shell that refuses the lock: (3.1i) no drag-to-look, the hint says to restart onto the new shell', async () => {
   const b = browser();
   globalThis.hushDesktop = { desktop: true };
   try {
     const { Input } = await import('../src/input/input.js?desk');
     const input = new Input(b.canvas);
     input.gameActive = true;
-    b.fire('canvas:mousedown'); await tick();
-    assert.equal(input.lockFailed, false, 'one refusal can be an ordinary one');
-    b.fire('canvas:mousedown'); await tick();
-    assert.equal(input.lockFailed, true, 'two in the desktop shell: drag to look');
+    for (let i = 0; i < 4; i++) { b.fire('canvas:mousedown'); await tick(); }
+    assert.equal(input.lockFailed, false, 'the 3.1f drag fallback was removed at the player\'s request');
+    assert.equal(input.lockHint(), 'lockRestart');
   } finally { delete globalThis.hushDesktop; }
 });
 
