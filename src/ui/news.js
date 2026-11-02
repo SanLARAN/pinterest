@@ -7,6 +7,19 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v:'3.1l',date:'2026-11-02',
+    ru:{title:'Часы на руке',items:[
+      'Часы на TAB теперь похожи на часы. Время показано крупными сегментными цифрами, как на настоящем электронном циферблате, и сквозь них слабо видны незажжённые «восьмёрки». Над цифрами написано, до чего идёт отсчёт: «до рассвета» ночью, «до темноты» утром.',
+      'Ночью экран подсвечен сине-зелёным, как подсветка у часов в темноте; днём он обычный, серо-зелёный.',
+      'Под временем две короткие строки: генераторы с делениями, детали УАЗа, кто жив, очки. Задача идёт бегущей строкой, а не обрывается на полуслове. Внизу — координаты и то, что важно сейчас: тишина, заряд фонаря или рюкзак.',
+    ]},
+    en:{title:'The watch on your wrist',items:[
+      'The TAB watch now looks like a watch. The time is in big seven-segment digits, like a real digital face, with the unlit eights faintly showing through. Above the digits it says what it counts to: to dawn at night, to dark in the morning.',
+      'At night the face glows blue-green like a watch backlight in the dark; by day it is a plain grey-green LCD.',
+      'Under the time there are two short lines: generators with their bars, UAZ parts, who is alive, the score. The task scrolls by as a ticker instead of being cut off mid-word. At the bottom: your coordinates and whatever matters right now (the quiet, your flashlight charge or your backpack).',
+    ]},
+  },
+  {
     v:'3.1k',date:'2026-11-02',
     ru:{title:'Установщик и лаунчер',items:[
       'Установщик для Windows стал мастером на русском или английском. Можно выбрать, для кого ставить игру (только для себя — без прав администратора, или для всех) и в какую папку, и нужен ли ярлык на рабочем столе. В конце — «Запустить ТИШЕ».',

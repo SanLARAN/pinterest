@@ -302,6 +302,8 @@ const STR = {
     watchInfo: "Информация на наручных часах",
     watchFind: "Проверь генератор у костра",
     watchTime: "ВРЕМЯ",
+    watchToDawn: "ДО РАССВЕТА", // (3.1l) what the big digits count down to
+    watchToDusk: "ДО ТЕМНОТЫ",
     watchDay: "ДЕНЬ",
     watchNight: "НОЧЬ",
     watchDayN: "ДЕНЬ {n}/{d}",
@@ -1331,6 +1333,8 @@ const STR = {
     watchInfo: "Wristwatch information",
     watchFind: "Check the generator by the fire",
     watchTime: "TIME",
+    watchToDawn: "TO DAWN",
+    watchToDusk: "TO DARK",
     watchDay: "DAY",
     watchNight: "NIGHT",
     watchDayN: "DAY {n}/{d}",
