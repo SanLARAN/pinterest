@@ -325,11 +325,14 @@ export class Menus {
     $('overKicker').textContent = won
       ? `${isEsc ? B('escKicker') : t('winKicker')} · ${fmtTime(stats.time)}`
       : `${t('survived')} ${fmtTime(stats.time)} · ${t(bog ? 'pumps' : 'generators')} ${stats.gens | 0}/5`;
-    const titles = { scream: 'deadScream', crawler: 'deadCrawler', watcher: 'deadWatcher', howler: 'deadHowler', shkaf: 'deadShkaf', angler: 'deadAngler', razlom: 'deadRazlom' };
+    const titles = { scream: 'deadScream', crawler: 'deadCrawler', watcher: 'deadWatcher', howler: 'deadHowler', shkaf: 'deadShkaf', angler: 'deadAngler', razlom: 'deadRazlom', shiftEnd: 'deadShiftEnd' };
     let title = won ? (isEsc ? B('escTitle') : t('winTitle')) : t(titles[res.cause] || 'deadTitle');
     const who = !won && res.cause !== 'scream' ? (t('deathBy')[res.cause] || '') : '';
     let sub = won ? (isEsc ? (res.alive === false ? t('escSubHurt') : B('escSub')) : t('winSub')) : who ? `— ${who}` : '';
-    if (res.left) {
+    if (res.cause === 'shiftEnd' && !won) {
+      // (3.1m) the forest's last morning ran out with the УАЗ in the yard: nobody died, nobody got out
+      sub = t('shiftEndSub');
+    } else if (res.left) {
       // the УАЗ went without you
       title = t('leftTitle');
       sub = t('leftSub');

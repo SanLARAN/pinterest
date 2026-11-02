@@ -133,17 +133,18 @@ export class FieldView {
     const task=g.objectives.taskText()||t(bog?'watchFindBog':'watchFind');
     const calm=Math.ceil(g.calmLeft?.()||0),state=g.state,S=CFG.SHIFT;
     // the shift has four days: the big number counts DOWN — to dusk in the morning, to dawn at night
-    const rem=state==='play'?Math.max(0,S.NIGHT-(g.time||0)):state==='morning'?Math.max(0,S.MORNING-(g.morningT||0)):(g.time||0);
+    const fin=!!g.finale; // (3.1m) the last morning counts down to the end of the shift
+    const rem=fin?Math.max(0,S.FINALE-(g.time||0)):state==='play'?Math.max(0,S.NIGHT-(g.time||0)):state==='morning'?Math.max(0,S.MORNING-(g.morningT||0)):(g.time||0);
     const info={time:fmtTime(rem),day:`${g.day||1}/${g.daysTotal||S.DAYS}`,gens:g.objectives.count||0,parts:g.escape.count||0,winch:bog?Math.round((g.winch?.p||0)*100):0,score:Math.floor(g.score||0),mult:(g.mult||1).toFixed(1),team:g.online?`${g.livePlayers().length}/${g.remotes.size+1}`:'1/1',pos:fmtPos(p.x,p.z),calm,task,torch:g.torch.has?Math.ceil(g.torch.charge*100):null};
     // (3.1l) the task walks through its one line a character every 0.2 s (the LCD's own refresh)
     const step=Math.floor(performance.now()/200);
     const line=marquee(task.toUpperCase(),30,step);
-    const key=JSON.stringify(info)+t('watchTime')+state+line;if(key===this.lcdKey) return;this.lcdKey=key;this.data=info;
+    const key=JSON.stringify(info)+t('watchTime')+state+fin+line;if(key===this.lcdKey) return;this.lcdKey=key;this.data=info;
     // (3.1l) a digital watch, not a little screen: the bezel prints, one LCD window with the time in seven big
     // segments (the unlit ones faintly there), a few short readouts in the watch's own caps, the task walking
     // through one line. At night the window glows the blue-green of an electroluminescent backlight; by day it
     // is a plain grey-green LCD.
-    const c=this.lcd,night=state!=='morning';
+    const c=this.lcd,night=state!=='morning'&&!fin;
     const ink=night?'#082320':'#1b2a22',ghost=night?'rgba(8,35,32,.1)':'rgba(27,42,34,.08)';
     c.fillStyle='#121718';c.fillRect(0,0,512,536);
     const rim=c.createLinearGradient(0,0,0,536);rim.addColorStop(0,'#1d2425');rim.addColorStop(1,'#0c1011');c.fillStyle=rim;c.fillRect(8,8,496,520);
@@ -160,9 +161,9 @@ export class FieldView {
     c.fillStyle='rgba(0,0,0,.14)';c.fillRect(30,92,452,5);c.fillRect(30,92,5,358); // the glass sits in the frame
     // top line: which part of the shift, and what the big number counts to
     c.fillStyle=ink;c.font='bold 23px monospace';c.textAlign='left';
-    c.fillText(`${t(state==='morning'?'watchDay':'watchNight')} ${info.day}`,46,126);
+    c.fillText(`${t(state==='morning'||fin?'watchDay':'watchNight')} ${info.day}`,46,126);
     c.textAlign='right';c.font='bold 18px monospace';
-    c.fillText(t(state==='play'?'watchToDawn':state==='morning'?'watchToDusk':'watchTime'),468,124);
+    c.fillText(t(fin?'watchToEnd':state==='play'?'watchToDawn':state==='morning'?'watchToDusk':'watchTime'),468,124);
     // the time: MM:SS in seven segments, slanted the way watch digits are
     const [mm,ss]=info.time.split(':').map((p)=>p.slice(-2)); // (a training stopwatch past 99 minutes keeps two digits)
     c.setTransform(1,0,-.09,1,18,0); // (setTransform, not transform: the same call every canvas has)

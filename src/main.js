@@ -1018,7 +1018,7 @@ function onEnd(res) {
   game.flares.clear(); // (a burning flare would hiss on behind the end screen)
   // the reel's last shot: how the night ended is a moment too
   const hlEnd = res.escaped ? (res.won ? 'escape' : 'left') : (res.won ? 'win' : 'death');
-  highlights.note(hlEnd, { cause: res.cause });
+  if (res.cause !== 'shiftEnd') highlights.note(hlEnd, { cause: res.cause }); // (3.1m: the last morning running out killed nobody)
   highlights.stop();
   menus.showOver(res, stats, rank, list, team); // (3.0r: res.map — the end screen speaks the ground's words)
   paintReelButton();

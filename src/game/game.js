@@ -275,6 +275,7 @@ export class Game {
     this.mult = 1;
     this.stats = { shards: 0, close: 0, escapes: 0, loudest: 0, hunts: 0, gens: 0, bodies: 0, thrown: 0, flares: 0, glows: 0, revives: 0, syringes: 0, parts: 0, seen: {} }; // seen: creatures that showed themselves (the atlas); syringes: friends raised with the needle
     this.state = this.training ? 'training' : 'morning'; // the schoolyard has no dusk to wait out
+    this.finale = false; // (3.1m) the forest's last morning
     this.grace = true;
     this.fx = this._fxDefaults();
     if (this.audio) this.audio.psychosis(0); // never carry the last death's ringing into a new shift
@@ -609,6 +610,7 @@ export class Game {
     const fromFilm = (this.opening && this.opening.state === 'run') || this.fadeIn > 0;
     if (fromFilm) this.opening.cancel();
     this.state = 'play';
+    this.finale = false;
     this.time = 0;
     shared.uDawn.value = 0;
     shared.uMorning.value = 0;
@@ -663,6 +665,7 @@ export class Game {
     const S = CFG.SHIFT;
     const dayLen = S.NIGHT + S.MORNING + CFG.DUSK_SECONDS;
     const left = (this.daysTotal - this.day) * dayLen;
+    if (this.finale) return Math.max(0, S.FINALE - this.time); // (3.1m) the last morning: what is left of it
     if (this.state === 'play') return Math.max(0, left + Math.max(0, S.NIGHT - this.time));
     if (this.state === 'morning') return Math.max(0, left + Math.max(0, S.NIGHT + S.MORNING - this.morningT));
     if (this.state === 'dusk') return Math.max(0, left + S.NIGHT);
@@ -1838,7 +1841,9 @@ export class Game {
     const last = this.day >= this.daysTotal;
     // (3.0f) on the bog the last dawn is not the win: the car is still in the water, and the winch pays for it
     const bogFinal = last && this.map === 'bog' && !!this.winch && !this.winch.driven;
-    if (last && !bogFinal) {
+    // (3.1m) ...and in the forest it is not the win either: the УАЗ is. Outlasting the shift buys one more morning
+    const forestFinal = last && this.map !== 'bog';
+    if (last && !bogFinal && !forestFinal) {
       this.winBonus = CFG.SCORE.win;
       if (!this.player.alive) this.winBonus = Math.round(this.winBonus * 0.3); // your team made it; you didn't
       this.score += this.winBonus;
@@ -1851,8 +1856,46 @@ export class Game {
     this.audio.setAmbience(0.25, 0);
     this.hud.setHint(null);
     for (const m of this.monsters) m.setState('flee');
-    const line = bogFinal ? t('winchFinale') : t(last ? 'winTitle' : 'dawnSurvived');
-    this.hud.flashAlert(line.replace('{n}', this.day).replace('{d}', this.daysTotal), 'dawn', bogFinal ? 4 : 3);
+    const line = bogFinal ? t('winchFinale') : forestFinal ? t('finaleDawn') : t(last ? 'winTitle' : 'dawnSurvived');
+    this.hud.flashAlert(line.replace('{n}', this.day).replace('{d}', this.daysTotal), 'dawn', bogFinal || forestFinal ? 4 : 3);
+  }
+
+  // (3.1m) the forest's last morning. The shift is won by driving out, not by outlasting it: daylight, nothing
+  // hunting, the engines, the parts and the yard as the nights left them — and CFG.SHIFT.FINALE seconds to finish
+  // the УАЗ and go. It runs as a 'play' state, because the whole way out (engines, the shelter's breaker, the
+  // seats, the drive) belongs to the night; the hunters, the errands, the scares and the last night's wake are
+  // what `finale` switches off. Every machine starts it on its own from the same dawn.
+  startFinale() {
+    this.state = 'play';
+    this.finale = true;
+    this.time = 0;
+    this.cause = 'shiftEnd';
+    this.awake = false; // the Angler and the girl wait for a forest that is awake: this one never wakes
+    this.endgame = false;
+    this.timeline = [];
+    for (const m of this.monsters) m.dispose();
+    this.monsters = [];
+    shared.uDawn.value = MORNING_LIGHT;
+    shared.uMorning.value = 1;
+    shared.uSun.value.set(0.42, 0.62, -0.66).normalize();
+    this.audio.setMorning(true);
+    this.audio.setAmbience(0.25, 0);
+    this.objectives.setMorning(true);
+    this.hud.setHint(null);
+    this.hud.setSkip(false);
+    this.hud.setIntro(t('finaleBig'), t('finaleSmall').replace('{m}', Math.round(CFG.SHIFT.FINALE / 60)));
+    this.timeline.push({ at: 7, fn: () => this.hud.setIntro(null) });
+  }
+
+  // (3.1m) the last morning ran out and the УАЗ is still in the yard: the shift is over, and it was not a win
+  failShift() {
+    if (this.state !== 'play') return;
+    this.cause = 'shiftEnd';
+    if (this.online) return this.endOnline(false, { cause: 'shiftEnd' });
+    this.state = 'over';
+    this.fx.fade = 0;
+    this.audio.setAmbience(0, 0);
+    if (this.onEnd) this.onEnd({ won: false, cause: 'shiftEnd' });
   }
 
   updateDawn(dt) {
@@ -1874,6 +1917,7 @@ export class Game {
         // (3.0f) the bog's last dawn is not the end of the shift: the car is. Light, no monsters, and one
         // machine still in the water — everything the level was about, in one last thing to do by hand
         if (this.map === 'bog' && this.winch && !this.winch.driven) { this.winch.finale(); return; }
+        if (this.map !== 'bog') { this.startFinale(); return; } // (3.1m) the forest: drive out, or the shift is lost
         this.state = 'won';
         if (this.onEnd) this.onEnd({ won: true, coop: this.online, alive: this.player.alive });
       } else this.startMorning(this.day + 1);
@@ -2108,7 +2152,9 @@ export class Game {
     if (this.state !== 'play') return; // the host ended the night
     if (this.teamOverAt && this.time >= this.teamOverAt) return this.endOnline(false);
     // eight minutes and the sky pales: the host's dawn covers the whole room
-    if (this.auth && this.time >= CFG.SHIFT.NIGHT) return this.startDawn();
+    // (3.1m: the last morning ends the shift instead — a guest gives the host's word six seconds to arrive)
+    if (this.finale) { if (this.time >= CFG.SHIFT.FINALE + (this.auth ? 0 : 6)) return this.failShift(); }
+    else if (this.auth && this.time >= CFG.SHIFT.NIGHT) return this.startDawn();
 
     // timeline events
     for (let i = this.timeline.length - 1; i >= 0; i--) {
@@ -2255,15 +2301,15 @@ export class Game {
     this.bunker.update(dt);
     if (this.state !== 'play') return;
     es.beacons(dt);
-    if (this.auth) this.updateArrivals();
+    if (this.auth && !this.finale) this.updateArrivals();
     this.updateFronts();
-    this.updateDirector(dt);
-    if (this.time > this.nextScare) {
+    if (!this.finale) this.updateDirector(dt); // (3.1m: the last morning sends nobody)
+    if (!this.finale && this.time > this.nextScare) {
       this.nextScare = this.time + this.rng.float(55, 115);
       if (!this.monsters.some((m) => m.state === 'hunt')) this.scare();
     }
     this.updateIntro(dt);
-    this.dread.update(dt);
+    if (!this.finale) this.dread.update(dt);
 
     // ---- scoring ----
     this.score += dt * CFG.SCORE.perSecond * this.mult;
@@ -2272,10 +2318,10 @@ export class Game {
     const dread = this.firstPingT < 0 ? 0.16 : 0; // a slow heartbeat in the dark before your first sound
     fx.danger = damp(fx.danger, Math.max(nearest, dread), 3, dt);
     this.audio.update(fx.danger, Math.min(1, this.time / CFG.SHIFT.NIGHT));
-    this.audio.setAmbience(0.9, fx.danger);
+    this.audio.setAmbience(this.finale ? 0.25 : 0.9, fx.danger);
 
     // four minutes into the last night the forest stops pretending: everything comes looking, for good
-    if (this.day >= this.daysTotal && this.time >= CFG.SHIFT.LAST_WAKE && this.auth) {
+    if (!this.finale && this.day >= this.daysTotal && this.time >= CFG.SHIFT.LAST_WAKE && this.auth) {
       if (!this.endgame) {
         this.endgame = true;
         this.wakeT = 5;
@@ -2325,13 +2371,13 @@ export class Game {
     const nearest = this.updateMonsters(dt);
     if (this.state !== 'play') return;
     this.objectives.update(dt, true);
-    if (this.auth) this.updateArrivals();
+    if (this.auth && !this.finale) this.updateArrivals();
     this.updateFronts();
-    this.updateDirector(dt);
+    if (!this.finale) this.updateDirector(dt);
     this.fx.danger = damp(this.fx.danger, nearest * 0.8, 3, dt);
     this.audio.update(this.fx.danger, Math.min(1, this.time / CFG.SHIFT.NIGHT));
-    this.audio.setAmbience(0.9, this.fx.danger);
-    if (this.day >= this.daysTotal && this.time >= CFG.SHIFT.LAST_WAKE && this.auth && !this.endgame) {
+    this.audio.setAmbience(this.finale ? 0.25 : 0.9, this.fx.danger);
+    if (!this.finale && this.day >= this.daysTotal && this.time >= CFG.SHIFT.LAST_WAKE && this.auth && !this.endgame) {
       this.endgame = true;
       if (this.role === 'host') this.sync.ev('wk');
       this.fxWake();

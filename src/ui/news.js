@@ -7,6 +7,19 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v:'3.1m',date:'2026-11-02',
+    ru:{title:'Лес: победа — уехать',items:[
+      'В лесу побеждают только отъездом на УАЗе. Пережить смену — ещё не победа: рассвет последней ночи открывает «последнее утро». Это пять минут при свете, без монстров, чтобы доделать УАЗ и уехать. Не успел — смена кончилась, и это поражение.',
+      'Новое приходит по одному. Первая ночь обучающая, ползуна в ней нет. Во второй появляется один ползун, на четвёртой минуте. Удильщик — с третьей ночи, порча генераторов — с четвёртой.',
+      'От ползуна можно убежать. В погоне он чуть медленнее твоего бега и делает рывок только в последних трёх метрах. Оторвись и затихни — он потеряет тебя через несколько секунд.',
+    ]},
+    en:{title:'Forest: the win is driving out',items:[
+      'In the forest the only win is driving out in the UAZ. Surviving the shift is not a win yet: the last night\'s dawn opens the last morning. That is five minutes of daylight with no monsters to finish the UAZ and go. Run out of time and the shift is over, and it counts as a loss.',
+      'New threats arrive one at a time. The first night is a tutorial with no crawler. The second brings one crawler, four minutes in. The Angler arrives from the third night, generator sabotage from the fourth.',
+      'You can outrun a crawler. In a chase it is a little slower than your sprint and only lunges in the last three metres. Get ahead, go quiet, and it loses you within seconds.',
+    ]},
+  },
+  {
     v:'3.1l',date:'2026-11-02',
     ru:{title:'Часы на руке',items:[
       'Часы на TAB теперь похожи на часы. Время показано крупными сегментными цифрами, как на настоящем электронном циферблате, и сквозь них слабо видны незажжённые «восьмёрки». Над цифрами написано, до чего идёт отсчёт: «до рассвета» ночью, «до темноты» утром.',

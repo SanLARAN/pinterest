@@ -1013,7 +1013,7 @@ export class Monster {
         tx = this.huntTarget ? this.huntTarget.x : p.x;
         tz = this.huntTarget ? this.huntTarget.z : p.z;
         if (pd < 4) this.lock = Math.max(this.lock, 1.2);
-        speed = cfg.hunt * (pd < 7 ? 1.18 : 1);
+        speed = cfg.hunt * (pd < (cfg.lunge || 7) ? 1.18 : 1); // (3.1m: the crawler lunges only at the very end)
         if (this.stateT < 0.7) speed *= 0.25; // the windup screech
         if (this.stateT > 0.35) {
           // whoever it reaches: the one it chases first, else whoever is nearest in its way

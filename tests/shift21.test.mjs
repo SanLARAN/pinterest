@@ -82,14 +82,15 @@ test('danger steps every four minutes of a night and again with each dawn surviv
 
 test('the forest sends more of them each night of the shift, listeners still capped at three', () => {
   assert.deepEqual(monsterTargets(0, 1), { listeners: 2, crawlers: 0 });
-  assert.deepEqual(monsterTargets(240, 1), { listeners: 3, crawlers: 1 });
+  assert.deepEqual(monsterTargets(240, 1), { listeners: 3, crawlers: 0 }); // (3.1m: the first night teaches — no crawler)
+  assert.deepEqual(monsterTargets(240, 2), { listeners: 3, crawlers: 1 }); // (the second brings one)
   assert.deepEqual(monsterTargets(0, 2), { listeners: 3, crawlers: 0 });
   assert.deepEqual(monsterTargets(300, 3), { listeners: 3, crawlers: 2 });
   assert.deepEqual(monsterTargets(180, 4), { listeners: 3, crawlers: 3 });
   for (let t = 0; t <= S.NIGHT; t += 60) for (let d = 1; d <= 4; d++) assert.ok(monsterTargets(t, d).listeners <= CFG.MAX_LISTENERS);
 });
 
-test('a night ends in a dawn; dawns one to three roll into the next morning, the fourth wins', () => {
+test('a night ends in a dawn; dawns one to three roll into the next morning, the fourth opens the last morning', () => {
   const g = bare();
   g.time = S.NIGHT - 0.01;
   // the host's own dawn, exactly at the bell
@@ -111,7 +112,7 @@ test('a night ends in a dawn; dawns one to three roll into the next morning, the
   g.morningT = 104.99;
   Game.prototype.updateMorning.call(g, 0.2, { events: [] });
   assert.equal(g.state, 'dusk', '1:45 and the light starts dying');
-  // the last dawn is the shift's win
+  // (3.1m) the last dawn is not the win in the forest: the УАЗ is. It opens one more morning to drive out in
   g.day = 4;
   g.state = 'play';
   g.startDawn();
@@ -119,11 +120,19 @@ test('a night ends in a dawn; dawns one to three roll into the next morning, the
   g.onEnd = (r) => (ended = r);
   g.dawnT = 11.01;
   Game.prototype.updateDawn.call(g, 0.02);
-  assert.equal(g.state, 'won');
-  assert.deepEqual(ended, { won: true, coop: false, alive: true });
+  assert.equal(g.state, 'play', 'the last morning runs as play: the whole way out belongs to it');
+  assert.equal(g.finale, true);
+  assert.equal(g.monsters.length, 0, 'and nothing is out there');
+  assert.equal(ended, null, 'outlasting the shift is not a win');
+  assert.equal(g.shiftLeft(), S.FINALE);
+  // the morning runs out with the car still in the yard: the shift is lost
+  g.time = S.FINALE;
+  g.failShift();
+  assert.equal(g.state, 'over');
+  assert.deepEqual(ended, { won: false, cause: 'shiftEnd' });
 });
 
-test('each survived dawn pays the night bonus; only the last one pays the win', () => {
+test('each survived dawn pays the night bonus — the last one too: in the forest only the УАЗ pays the win', () => {
   const g = bare();
   g.score = 1000;
   g.startDawn();
@@ -131,14 +140,8 @@ test('each survived dawn pays the night bonus; only the last one pays the win', 
   g.state = 'play';
   g.day = 4;
   g.startDawn();
-  assert.equal(g.score, 1000 + CFG.SCORE.night + CFG.SCORE.win);
-  // downed at the final dawn, you take the reduced share
-  g.state = 'play';
-  g.day = 4;
-  g.player.alive = false;
-  g.score = 0;
-  g.startDawn();
-  assert.equal(g.score, Math.round(CFG.SCORE.win * 0.3));
+  assert.equal(g.score, 1000 + 2 * CFG.SCORE.night, '(3.1m) no win bonus for waiting it out');
+  assert.equal(g.winBonus | 0, 0);
 });
 
 test('shiftLeft pays out the seconds the team did not need, by the day', () => {

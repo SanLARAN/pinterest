@@ -34,7 +34,7 @@
 
 ```bash
 npm install
-npm test            # node:test, 65 файлов, 524 теста (3.1l) — все должны быть зелёными
+npm test            # node:test, 66 файлов, 528 тестов (3.1m) — все должны быть зелёными
 npm run dev         # http://localhost:5173
 npm run build:pages # сборка в play/ — без неё деплой покажет старую версию
 ```

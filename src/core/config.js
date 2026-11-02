@@ -14,6 +14,9 @@ export const CFG = {
     NIGHT: 8 * 60, // one night
     MORNING: 105, // 1:45 of daylight between the nights
     LAST_WAKE: 240, // on the last night: the minute the forest stops pretending
+    // (3.1m) the forest's shift is won by driving out, not by waiting it through: the last dawn opens one more
+    // morning — daylight, nothing hunting — and this long to finish the УАЗ and go. Then the shift is over.
+    FINALE: 300,
   },
   GRACE_SECONDS: 12, // at the start of the night monsters can't hunt you
   SPAWN_DELAY: 45, // ...and for the first 45 s the forest sleeps: no monsters at all, look around in peace
@@ -79,7 +82,9 @@ export const CFG = {
 
   MONSTER: {
     listener: { wander: 1.05, investigate: 2.1, hunt: 4.7, hearing: 1.0, lock: 6.0, radius: 0.45 },
-    crawler: { wander: 1.6, investigate: 3.2, hunt: 6.1, hearing: 0.62, stepHearing: 2.2, lock: 3.2, radius: 0.45 },
+    // (3.1m) a chase you can live through: a hair slower than your sprint (5.7), and its last-moment lunge only
+    // in the final three metres — a head start and then going quiet (it loses you in `lock` s) gets you away
+    crawler: { wander: 1.6, investigate: 3.2, hunt: 5.4, lunge: 3, hearing: 0.62, stepHearing: 2.2, lock: 3.2, radius: 0.45 },
     // the Watcher: deaf, faceless, moves only while nothing lights it
     watcher: { stalk: 3.5, hearing: 0, lock: 0, radius: 0.4, litThreshold: 0.13, arrive: 240, arriveGens: 2, seize: 1.6 }, // seize: seconds it holds your gaze before the kill — light still saves you (2.1s)
     // the Howler: half-deaf brute that "sees" with its howl — anything moving when it howls gets charged
@@ -172,7 +177,7 @@ export const CFG = {
   // mean. Up to twice a night one of them is sent to beat a running generator until it stops; the
   // part stays in it, but it wants cranking again (work → cord/spin, as the first time, faster hands).
   GEN_BREAK: {
-    fromDay: 3, // nights one and two they still ignore the machines
+    fromDay: 4, // (3.1m) one new thing a night: the Angler on the third, the beaten engines on the fourth
     maxPerNight: 2,
     firstAfter: 170, // s into the night before the first errand
     gap: [100, 170], // s between errands
@@ -270,8 +275,8 @@ export function monsterTargets(t, day = 1) {
   let listeners = 2, crawlers = 0;
   if (m >= 2) listeners = 3;
   if (day >= 2) listeners = 3;
-  if (m >= 4) crawlers = 1;
-  if (day >= 2 && m >= 4) crawlers = 2;
+  // (3.1m) the first night teaches: no crawler at all. The second brings one, at four minutes; the third, two
+  if (day >= 2 && m >= 4) crawlers = 1;
   if (day >= 3) crawlers = 2;
   if (day >= 4 && m >= 2) crawlers = 3;
   return { listeners: Math.min(listeners, CFG.MAX_LISTENERS), crawlers };

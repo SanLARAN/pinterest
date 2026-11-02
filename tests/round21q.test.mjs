@@ -150,7 +150,7 @@ test('a beaten generator stops, wants cranking again, and the break rides the me
   assert.equal(host.count, 2);
 });
 
-test('the director sends a thing to a far, long-running generator — from night 3, at most twice a night, never the Watcher', () => {
+test('the director sends a thing to a far, long-running generator — from night 4 (3.1m), at most twice a night, never the Watcher', () => {
   const mk = (day, px, pz, done = 0) => {
     const g = Object.create(Game.prototype);
     g.day = day; g.time = 200; g.role = 'host'; g.rng = new RNG(3);
@@ -170,7 +170,10 @@ test('the director sends a thing to a far, long-running generator — from night
     if (done) g.sab = { day, done, next: 0 };
     return g;
   };
-  const g = mk(3, 120, 120);
+  const third = mk(3, 120, 120);
+  third._sabotageTick();
+  assert.equal(third.monsters[0].sab, null, '(3.1m) the third night is the Angler’s: the engines are left alone');
+  const g = mk(4, 120, 120);
   g._sabotageTick();
   assert.equal(g.monsters[0].sab.k, 0, 'the old, far engine gets the errand');
   assert.deepEqual(g.monsters[0].inv, [0, 0]);
@@ -178,7 +181,7 @@ test('the director sends a thing to a far, long-running generator — from night
   // one errand at a time, and the night’s budget is two
   g._sabotageTick();
   assert.equal(g.sab.done, 0, 'nothing double-sent');
-  const spent = mk(3, 120, 120, 2);
+  const spent = mk(4, 120, 120, 2);
   spent._sabotageTick();
   assert.equal(spent.monsters[0].sab, null, 'two a night is the lot');
   // night two: they still ignore the machines
@@ -186,7 +189,7 @@ test('the director sends a thing to a far, long-running generator — from night
   early._sabotageTick();
   assert.equal(early.monsters[0].sab, null);
   // a player standing at the engine: not under their nose
-  const guarded = mk(3, 4, 0);
+  const guarded = mk(4, 4, 0);
   guarded._sabotageTick();
   assert.equal(guarded.monsters[0].sab, null, 'someone is right there: no errand');
 });
