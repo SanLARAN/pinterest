@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#000000" />
+    <meta name="color-scheme" content="dark" />
+    <title>ТИШЕ / HUSH — эхолокационный хоррор в браузере</title>
+    <meta name="description" content="Ночной лес, ты слеп, твой голос — сонар. Бесплатный кооперативный хоррор до четырёх игроков: запусти пять генераторов и не кричи." />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="ТИШЕ / HUSH" />
+    <meta property="og:url" content="https://sanlaran.github.io/pinterest/site/" />
+    <meta property="og:title" content="ТИШЕ / HUSH — эхолокационный хоррор в браузере" />
+    <meta property="og:description" content="Ночной лес, ты слеп, твой голос — сонар. Бесплатный кооперативный хоррор до четырёх игроков: запусти пять генераторов и не кричи." />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="ТИШЕ / HUSH — эхолокационный хоррор в браузере" />
+    <meta name="twitter:description" content="Ночной лес, ты слеп, твой голос — сонар. Бесплатный кооперативный хоррор до четырёх игроков: запусти пять генераторов и не кричи." />
+    <link rel="icon" href="../favicon.svg" type="image/svg+xml" />
+    <script type="module" src="./main.js"></script>
+  </head>
+  <body data-sec="top">
+    <a class="skip" href="#echo" data-i18n="nav.skip">К содержанию</a>
+    <canvas id="stage" aria-hidden="true"></canvas>
+    <div class="veil" aria-hidden="true"></div>
+    <div class="grain" aria-hidden="true"></div>
+
+    <header class="nav" id="nav">
+      <a class="nav-logo" href="#top" data-i18n-attr="aria-label: nav.home"><b>ТИШЕ</b><small>HUSH</small></a>
+      <nav class="nav-links" id="navLinks">
+        <a href="#echo" data-nav="echo" data-i18n="nav.echo">Эхо</a>
+        <a href="#shift" data-nav="shift" data-i18n="nav.shift">Смена</a>
+        <a href="#coop" data-nav="coop" data-i18n="nav.coop">Вместе</a>
+        <a href="#atlas" data-nav="atlas" data-i18n="nav.atlas">Атлас</a>
+        <a href="#vote" data-nav="vote" data-i18n="nav.vote">Голосование</a>
+        <a href="#patches" data-nav="patches" data-i18n="nav.patches">Патчи</a>
+        <a class="nav-menu-play btn primary" href="../" data-i18n="nav.play">Играть</a>
+      </nav>
+      <div class="nav-tools">
+        <button class="nav-ico" id="soundBtn" type="button" aria-pressed="false">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path class="spk" d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5z"/><path class="w1" d="M15.5 9a4 4 0 0 1 0 6"/><path class="w2" d="M18 6.5a7.5 7.5 0 0 1 0 11"/><path class="x" d="M16 9.5l5 5M21 9.5l-5 5"/></svg>
+        </button>
+        <button class="nav-lang" id="langBtn" type="button" data-i18n="nav.lang" data-i18n-attr="aria-label: nav.langLabel, title: nav.langLabel">EN</button>
+        <a class="btn nav-play" href="../" data-i18n="nav.play">Играть</a>
+        <button class="nav-burger" id="burger" type="button" aria-expanded="false" aria-controls="navLinks" data-i18n-attr="aria-label: nav.menu"><i></i><i></i></button>
+      </div>
+    </header>
+
+    <nav class="rail" id="rail" aria-hidden="true">
+      <span class="rail-line"><i></i></span>
+      <a href="#top" data-rail="top" tabindex="-1"><i></i><span data-i18n="rail.top">Лес</span></a>
+      <a href="#echo" data-rail="echo" tabindex="-1"><i></i><span data-i18n="rail.echo">Эхо</span></a>
+      <a href="#shift" data-rail="shift" tabindex="-1"><i></i><span data-i18n="rail.shift">Смена</span></a>
+      <a href="#coop" data-rail="coop" tabindex="-1"><i></i><span data-i18n="rail.coop">Вместе</span></a>
+      <a href="#atlas" data-rail="atlas" tabindex="-1"><i></i><span data-i18n="rail.atlas">Атлас</span></a>
+      <a href="#vote" data-rail="vote" tabindex="-1"><i></i><span data-i18n="rail.vote">Голос</span></a>
+      <a href="#patches" data-rail="patches" tabindex="-1"><i></i><span data-i18n="rail.patches">Патчи</span></a>
+      <b class="rail-clock" id="railClock"></b>
+    </nav>
+
+    <main>
+      <!-- I. the far end of the old footpath -->
+      <section id="top" class="sec hero" data-sonar>
+        <div class="wrap hero-in">
+          <p class="kicker" data-i18n="hero.kicker">эхолокационный хоррор · кооператив до 4</p>
+          <h1 class="hero-title" data-i18n="hero.title">ТИШЕ</h1>
+          <p class="hero-sub" data-nosonar><span data-i18n="hero.sub">Ночной лес. Ты слеп. Твой голос — сонар.</span> <span class="red" data-i18n="hero.sub2">Запусти пять генераторов. Не кричи.</span></p>
+          <div class="hero-cta" data-nosonar>
+            <a class="btn primary hero-play" href="../">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"/></svg>
+              <span data-i18n="hero.play">Играть в браузере</span>
+            </a>
+            <a class="btn hero-dl" href="https://github.com/SanLARAN/pinterest/releases/latest" data-dl rel="noopener">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5.6l7.4-1v7H3zM11.4 4.4L21 3v8.6h-9.6zM3 12.4h7.4v7l-7.4-1zM11.4 12.4H21V21l-9.6-1.4z"/></svg>
+              <span class="dl-l"><b data-i18n="hero.download">Скачать для Windows</b><small id="dlMeta">все сборки на GitHub</small></span>
+            </a>
+          </div>
+          <p class="hero-free" data-i18n="hero.free">бесплатно · без регистрации · RU / EN</p>
+          <p class="hero-ver" id="heroVer"></p>
+          <p class="nogl-note" id="noGl" hidden data-i18n="noGl">WebGL недоступен — лес не нарисовать, но читать можно.</p>
+        </div>
+        <div class="hero-hint" aria-hidden="true"><i class="hint-ring"></i><span data-i18n="hero.hint">клик — камень · зажми — голос</span></div>
+        <a class="hero-scroll" href="#echo" data-nosonar><span data-i18n="hero.scroll">листай — и слушай</span><i></i></a>
+      </section>
+
+      <!-- II. sound is your sight -->
+      <section id="echo" class="sec echo" data-sonar>
+        <div class="wrap echo-grid">
+          <div class="echo-text" data-nosonar>
+            <p class="kicker" data-i18n="echo.kicker">I · эхо</p>
+            <h2 data-echo data-i18n="echo.title">Звук — твои глаза</h2>
+            <p class="lead" data-reveal data-i18n="echo.lead"></p>
+            <p class="lead dim" data-reveal style="--i:1" data-i18n="echo.lead2"></p>
+            <div class="facts">
+              <div class="fact" data-reveal style="--i:0"><b id="fSpeed">30</b><span data-i18n="echo.factSpeed"></span></div>
+              <div class="fact" data-reveal style="--i:1"><b id="fScream">78%</b><span data-i18n="echo.factScream"></span></div>
+              <div class="fact" data-reveal style="--i:2"><b id="fDrop">6</b><span data-i18n="echo.factDrop"></span></div>
+            </div>
+          </div>
+          <aside class="try panel ticks" data-nosonar data-reveal style="--i:1">
+            <h3 data-i18n="echo.tryTitle">Попробуй прямо здесь</h3>
+            <p data-i18n="echo.try"></p>
+            <div class="meter" id="meter">
+              <div class="meter-bar"><i class="fill" id="meterFill"></i><i class="mk" style="--at:0.3"></i><i class="mk sc" style="--at:0.78"></i></div>
+              <div class="meter-marks"><span data-i18n="echo.whisper">шёпот</span><span class="mt" data-i18n="echo.talk">разговор</span><span class="ms" data-i18n="echo.scream">крик</span></div>
+              <dl class="meter-read">
+                <div><dt data-i18n="echo.loud">громкость</dt><dd id="mLoud">—</dd></div>
+                <div><dt data-i18n="echo.seen">видно</dt><dd id="mSeen">—</dd></div>
+                <div><dt data-i18n="echo.heard">слышно</dt><dd id="mHeard">—</dd></div>
+              </dl>
+            </div>
+            <button class="btn mic" id="micBtn" type="button" aria-pressed="false">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3.5" width="6" height="11" rx="3"/><path d="M6 11.5a6 6 0 0 0 12 0M12 17.5v3"/></svg>
+              <span data-i18n="echo.mic">Включить микрофон</span>
+            </button>
+            <p class="note"><b id="micState"></b> <span data-i18n="echo.micNote"></span></p>
+          </aside>
+        </div>
+      </section>
+
+      <!-- III. four nights, scrolled -->
+      <section id="shift" class="sec shift is-night" data-sonar>
+        <div class="pin">
+          <div class="wrap shift-grid">
+            <div class="shift-text" data-nosonar>
+              <p class="kicker" data-i18n="shift.kicker">II · смена</p>
+              <h2 data-echo data-i18n="shift.title">Четыре ночи</h2>
+              <p class="lead" data-i18n="shift.lead"></p>
+              <p class="wake" data-i18n="shift.wake"></p>
+            </div>
+            <div class="shift-panel panel ticks" data-nosonar>
+              <div class="clock">
+                <span class="clock-seg" id="clkSeg">НОЧЬ 1</span>
+                <span class="clock-woke" id="clkWoke" hidden data-i18n="shift.woke">лес проснулся</span>
+              </div>
+              <div class="clock-row"><span class="clock-t" id="clkT">0:00</span><span class="clock-of" id="clkOf">/ 8:00</span></div>
+              <div class="segbar" id="segbar"></div>
+              <div class="gens-head">
+                <h3 data-i18n="shift.gensTitle">Пять генераторов</h3>
+                <p data-i18n="shift.gensLead"></p>
+              </div>
+              <ol class="gens" id="gens"></ol>
+              <div class="escape">
+                <h3 data-i18n="shift.escapeTitle">Или уехать</h3>
+                <p data-i18n="shift.escape"></p>
+              </div>
+              <p class="scrub" data-i18n="shift.scrub">листай — время идёт</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- IV. by the fire -->
+      <section id="coop" class="sec coop" data-sonar>
+        <div class="wrap">
+          <div class="coop-head" data-nosonar>
+            <p class="kicker" data-i18n="coop.kicker">III · вместе</p>
+            <h2 data-echo data-i18n="coop.title">До четырёх</h2>
+            <p class="lead" data-reveal data-i18n="coop.lead"></p>
+            <div class="room" data-reveal style="--i:1"><span data-i18n="coop.room">комната</span><b id="roomCode">-----</b><i class="room-dots"><i></i><i></i><i></i><i></i></i></div>
+          </div>
+          <div class="feats" data-nosonar>
+            <article class="feat panel ticks" data-reveal style="--i:0"><span class="feat-n">01</span><h3 data-i18n="coop.f1t"></h3><p data-i18n="coop.f1"></p></article>
+            <article class="feat panel ticks" data-reveal style="--i:1"><span class="feat-n">02</span><h3 data-i18n="coop.f2t"></h3><p data-i18n="coop.f2"></p></article>
+            <article class="feat panel ticks" data-reveal style="--i:2"><span class="feat-n">03</span><h3 data-i18n="coop.f3t"></h3><p data-i18n="coop.f3"></p></article>
+            <article class="feat panel ticks" data-reveal style="--i:3"><span class="feat-n">04</span><h3 data-i18n="coop.f4t"></h3><p data-i18n="coop.f4"></p></article>
+          </div>
+          <div class="coop-cta" data-nosonar data-reveal><a class="btn primary" href="../" data-i18n="coop.cta">Собрать отряд</a></div>
+        </div>
+      </section>
+
+      <!-- V. the field journal -->
+      <section id="atlas" class="sec book atlas">
+        <div class="wrap">
+          <header class="sec-head">
+            <p class="kicker" data-i18n="atlas.kicker">IV · атлас</p>
+            <h2 data-echo data-i18n="atlas.title">Атлас</h2>
+            <p class="lead" data-reveal data-i18n="atlas.lead"></p>
+          </header>
+          <div class="mount atl" data-mount="atlas"><p class="mount-wait" data-i18n="atlas.loading">проявляется…</p></div>
+        </div>
+      </section>
+
+      <!-- VI. who comes next -->
+      <section id="vote" class="sec book vote">
+        <div class="wrap">
+          <header class="sec-head">
+            <p class="kicker" data-i18n="vote.kicker">V · голосование</p>
+            <h2 data-echo data-i18n="vote.title">Кто придёт следующим</h2>
+            <p class="lead" data-reveal data-i18n="vote.lead"></p>
+          </header>
+          <div class="mount ballot" data-mount="vote"><p class="mount-wait" data-i18n="atlas.loading">проявляется…</p></div>
+        </div>
+      </section>
+
+      <!-- VII. what's new -->
+      <section id="patches" class="sec book patches">
+        <div class="wrap">
+          <header class="sec-head">
+            <p class="kicker" data-i18n="patches.kicker">VI · патчи</p>
+            <h2 data-echo data-i18n="patches.title">Что нового</h2>
+            <p class="lead" data-reveal id="patchesLead"></p>
+          </header>
+          <div class="mount pt" data-mount="patches"><p class="mount-wait" data-i18n="atlas.loading">проявляется…</p></div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="foot">
+      <div class="wrap foot-in">
+        <div class="foot-brand"><b>ТИШЕ</b><span data-i18n="footer.line">ТИШЕ / HUSH — бесплатная игра. Код открыт.</span></div>
+        <nav class="foot-links">
+          <a href="../" data-i18n="footer.play">Играть</a>
+          <a href="https://github.com/SanLARAN/pinterest/releases/latest" data-dl rel="noopener" data-i18n="footer.download">Скачать</a>
+          <a href="https://github.com/SanLARAN/pinterest" rel="noopener" data-i18n="footer.github">GitHub</a>
+          <a href="../about.html" data-i18n="footer.about">Об игре</a>
+          <a href="../privacy.html" data-i18n="footer.privacy">Конфиденциальность</a>
+          <a href="#top" data-i18n="footer.top">Наверх</a>
+        </nav>
+        <p class="foot-ver" id="footVer"></p>
+      </div>
+    </footer>
+
+    <noscript>
+      <div class="noscript">
+        <h1>ТИШЕ / HUSH</h1>
+        <p>Бесплатный браузерный кооперативный хоррор: ночью в лесу ты слеп, а мир проявляется только эхом твоего голоса. · A free co-op horror in your browser: blind in a night forest, you see only by the echo of your voice.</p>
+        <p><a href="../">Играть · Play</a> · <a href="https://github.com/SanLARAN/pinterest/releases/latest">Windows</a> · <a href="../about.html">Об игре · About</a></p>
+      </div>
+    </noscript>
+  </body>
+</html>
