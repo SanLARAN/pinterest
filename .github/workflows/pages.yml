@@ -1,4 +1,5 @@
 # GitHub Pages for the game: https://sanlaran.github.io/pinterest/
+# and its landing page one level down: https://sanlaran.github.io/pinterest/site/ (site/, `npm run build:site`)
 #
 # Two ways Pages can be set up (Settings → Pages → Build and deployment → Source):
 #  • "GitHub Actions" (current): this workflow builds dist/ and deploys it itself — the game is at the
@@ -41,6 +42,9 @@ jobs:
       - run: npm test
       - name: Build
         run: npm run build
+      # the landing page goes into dist/site after the game (the game's build empties dist/)
+      - name: Build the landing page
+        run: npm run build:site
       - name: Prebuilt ./play/ is up to date
         run: |
           npm run build:pages

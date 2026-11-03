@@ -9,6 +9,7 @@
     "build": "vite build",
     "test": "node --test tests/*.test.mjs",
     "build:pages": "vite build --outDir play --emptyOutDir",
+    "build:site": "vite build --config vite.site.config.js",
     "preview": "vite preview --host 0.0.0.0",
     "desktop": "npm run build && npx --yes electron@45.0.0 .",
     "desktop:dev": "npx --yes electron@45.0.0 .",
