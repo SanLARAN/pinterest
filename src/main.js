@@ -25,7 +25,7 @@ import { Post } from './render/post.js';
 import { qualityPlan } from './render/quality.js';
 import { effectiveGraphics } from './render/graphicsSettings.js';
 import './graphics.css';
-import { OmniShadows } from './render/shadows.js';
+import { OmniShadows, SunShadow } from './render/shadows.js';
 import { cleanMap, runUrl, needsReload } from './core/maps.js'; // 3.0g: the two участка and how the menu switches
 import { mapOpen } from './core/mapUnlock.js'; // 3.0s: the bog is earned on the forestry
 import { Ghosts } from './render/ghosts.js';
@@ -44,6 +44,9 @@ import { buildListener } from './game/monsters.js';
 import { PLAYER_COLORS } from './game/remote.js';
 import { EARN, wallet, onWallet, pendingRewards } from './game/wallet.js';
 import { Highlights, HL_CAPTURE } from './game/highlights.js';
+import { PHOTO } from './game/photo.js'; // 4.0: the camera's frames
+import { dateStamp } from './core/photoStore.js';
+import { FilmStrip } from './ui/film.js';
 import { Reel } from './ui/reel.js';
 import {myFit} from './game/outfit.js';
 import {beginRewards,endRewards} from './cloud/rewards.js';
@@ -91,6 +94,7 @@ const DEBUG = {
   days: +params.get('days') || 0, // ?days=2|4|6: the shift length a pick in the menu asked for
   shelter: params.has('shelter'), // (3.0q) start on the peat works' camp with the cap unlocked: the shelter, without five pumps
   unlock: params.has('unlock') || params.has('shelter'), // (3.0s) the bog without a forest win: for the harness and for testing a build
+  tentacles: params.has('tentacles'), // (4.0) the arms on the horizon come up 4 s into every night
 };
 
 const $ = (id) => document.getElementById(id);
@@ -112,6 +116,7 @@ const camera = new THREE.PerspectiveCamera(CFG.FOV, innerWidth / innerHeight, 0.
 camera.rotation.order = 'YXZ';
 const post = new Post(renderer);
 const shadows = new OmniShadows(renderer); // walls stop light (filled with the forest once it's generated)
+const sunShadow = new SunShadow(renderer, shadows); // (4.0) ...and in the morning the trees stop the sun
 
 // ---------------- systems ----------------
 const worldMat = createWorldMaterial();
@@ -221,6 +226,9 @@ function applyGraphics() {
   const g = effectiveGraphics(settings.graphics);
   post.setGraphics(settings.graphics);
   shadows.enabled = g.shadows;
+  sunShadow.enabled = g.shadows;
+  sunShadow.setSize(settings.quality === 'high' ? 2048 : 1024);
+  post.setRays(g.shadows && settings.quality !== 'low'); // (4.0) the morning's light shafts need the sun's shadows
   if ((g.showFPS || DEBUG.fps) && !perf.fpsEl) {
     perf.fpsEl = document.createElement('div');
     perf.fpsEl.className = 'graphics-fps';
@@ -1038,6 +1046,7 @@ function onEnd(res) {
   if (res.cause !== 'shiftEnd') highlights.note(hlEnd, { cause: res.cause }); // (3.1m: the last morning running out killed nobody)
   highlights.stop();
   menus.showOver(res, stats, rank, list, team); // (3.0r: res.map — the end screen speaks the ground's words)
+  filmStrip.show(game.camItem?.film); // (4.0) the camera's frames: to the album, or to disk
   paintReelButton();
   // the night's own trailer: solo, a few moments to speak of, and you have not touched the results yet
   overTouched = false;
@@ -1239,13 +1248,61 @@ function step(now, render) {
   post.u.uTime.value = now / 1000;
   renderer.info.reset();
   shadows.update(camera);
+  sunShadow.update(state === 'playing' || state === 'paused' || state === 'over' ? camera.position : null);
+  // (4.0) the camera's frame is what the lens saw — not your own hands holding it up
+  const photoHide = !!game?.camItem?.wantShot && game.fieldView.root.visible;
+  if (photoHide) game.fieldView.root.visible = false;
   post.render(scene, camera);
+  if (photoHide) game.fieldView.root.visible = true;
   // 2.1u: the highlight director's eye — only while the night is actually running
   const grabsBefore = hlGrabs;
   if (state === 'playing' && game && game.state !== 'idle') highlights.update(game.time, highlightFrame);
+  if (game?.camItem?.wantShot) takePhoto(); // (4.0) the flash's own frame, the moment it was drawn
   if (DEBUG.perfGraph) perfGraph(now, { faces: shadows.faces || 0, grab: hlGrabs !== grabsBefore, resized: perf.resizedAt === perf.frameNo, calls: renderer.info.render.calls });
   perf.frameNo = (perf.frameNo || 0) + 1;
   if (state === 'menu' && !MENU_COVERS.some((id) => menus.isOpen(id))) wardrobe.menuFrame(rawDt);
+}
+
+// ---------------- (4.0) the camera's frame ----------------
+// The flash, the moment it was drawn: the finished picture once more into a target of its own (post.capture, the
+// screen's shape at PHOTO.h lines), read back through a fence like the reel's (nothing in the frame waits for the
+// GPU), flipped, the date burnt into the corner the way those cameras printed it, and a JPEG on the film.
+const filmStrip = new FilmStrip($('overFilm'));
+let photoBusy = 0;
+function takePhoto() {
+  const cam = game.camItem, meta = cam.wantShot;
+  cam.wantShot = null;
+  if (photoBusy > 2) return;
+  const src = renderer.domElement, sw = src.width || 1, sh = src.height || 1;
+  const gh = Math.max(1, Math.min(PHOTO.h, sh)), gw = Math.max(1, Math.min(2048, Math.round((gh * sw) / sh)));
+  const rt = post.capture(gw, gh, 'rtPhoto');
+  const buf = new Uint8Array(gw * gh * 4);
+  photoBusy++;
+  const read = typeof renderer.readRenderTargetPixelsAsync === 'function'
+    ? renderer.readRenderTargetPixelsAsync(rt, 0, 0, gw, gh, buf)
+    : Promise.resolve().then(() => { renderer.readRenderTargetPixels(rt, 0, 0, gw, gh, buf); return buf; });
+  read.then((px) => {
+    const tmp = document.createElement('canvas');
+    tmp.width = gw; tmp.height = gh;
+    tmp.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(px.buffer, px.byteOffset, gw * gh * 4), gw, gh), 0, 0);
+    const cv = document.createElement('canvas');
+    cv.width = gw; cv.height = gh;
+    const ctx = cv.getContext('2d', { alpha: false });
+    ctx.setTransform(1, 0, 0, -1, 0, gh); // (GL's rows run bottom-up)
+    ctx.drawImage(tmp, 0, 0);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    const fs = Math.round(gh * 0.045);
+    ctx.font = `700 ${fs}px "JetBrains Mono", ui-monospace, monospace`;
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'alphabetic';
+    ctx.shadowColor = 'rgba(255, 120, 30, 0.75)';
+    ctx.shadowBlur = fs * 0.35;
+    ctx.fillStyle = 'rgba(255, 150, 60, 0.92)';
+    ctx.fillText(dateStamp(meta.at), gw - fs * 1.2, gh - fs * 1.1);
+    return new Promise((res) => cv.toBlob(res, 'image/jpeg', PHOTO.q));
+  }).then((blob) => {
+    if (blob && game?.camItem === cam) cam.addPhoto(blob, Object.assign(meta, { w: gw, h: gh })); // (meta itself: see PhotoCamera.scared)
+  }).catch((e) => console.warn('[camera] the frame was lost', e)).finally(() => { photoBusy--; });
 }
 
 // ---------------- the highlight reel's eye (2.1u) ----------------
@@ -1399,6 +1456,7 @@ function boot() {
     try {
       world.generate();
       for (const g of world.occluders) shadows.addStatic(g);
+      for (const l of world.decay?.layers || []) shadows.addDynamic(l.mesh); // (4.0: the snags cast too, once they stand)
       game = new Game({ scene, camera, world, pulses, ghosts, eyes, particles, audio, mic, input, hud, radar, post, shadows, drawPortrait: (fit, canvas, view) => {
         if (!wardrobe.mq) return false;
         wardrobe.mq.still(fit, 'body', canvas, view);
@@ -1409,6 +1467,7 @@ function boot() {
       return;
     }
     game.onEnd = onEnd;
+    game.debugTentacles = DEBUG.tentacles;
     try {
       setupAttract();
       wardrobe.init(); // the live survivor now belongs to the shared garage scene
@@ -1418,7 +1477,7 @@ function boot() {
     }
     // warm up shaders so the first ping doesn't hitch
     renderer.compile(scene, camera);
-    window.__hush = { world, game, shared, pulses, ghosts, eyes, renderer, perf, mic, audio, music: menuMusic, input, hud, post, shadows, coop, lobby, atlas, wardrobe, micCal, news, home, debug: DEBUG, profile, startRun, pause, resume, toMenu, highlights, reel, get opening() { return game && game.opening; }, ensureGarage, cloud, account, social, notifications, get garage() { return garage; }, get state() { return state; }, get splash() { return splash; } };
+    window.__hush = { world, game, shared, pulses, ghosts, eyes, renderer, perf, mic, audio, music: menuMusic, input, hud, post, shadows, sunShadow, coop, lobby, atlas, wardrobe, micCal, news, home, debug: DEBUG, profile, startRun, pause, resume, toMenu, highlights, reel, get opening() { return game && game.opening; }, ensureGarage, cloud, account, social, notifications, get garage() { return garage; }, get state() { return state; }, get splash() { return splash; } };
     const enterMenu = () => {
       state = 'menu';
       menuTime = 0;

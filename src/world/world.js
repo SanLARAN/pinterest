@@ -8,6 +8,8 @@ import { Terrain } from './terrain.js';
 import { Collision } from './collision.js';
 import { ForestTrails } from './trails.js';
 import { Meadow } from './meadow.js';
+import { Undergrowth } from './undergrowth.js';
+import { ForestDecay } from './decay.js';
 import { ForestNavigation } from './navigation.js';
 import { buildYard, buildOutside, inYard } from './yard.js';
 import { FIRETOWER, ZARYA, buildFiretower, buildZarya, buildWaymarks } from './expedition.js';
@@ -156,6 +158,8 @@ export class World {
     this.occluders = [];
     this.outside = null;
     this.grass = null;
+    this.undergrowth = null; // (4.0) bushes, ferns, young firs and brushwood: world/undergrowth.js
+    this.decay = null; // (4.0) what each night leaves standing: world/decay.js
     this.trails = null;
     this.navigation = null;
     return this;
@@ -181,6 +185,10 @@ export class World {
       m.geometry?.dispose();
     }
     this.grass = null;
+    this.undergrowth?.dispose(this.scene);
+    this.undergrowth = null;
+    this.decay?.dispose(this.scene);
+    this.decay = null;
     this.occluders = [];
   }
 
@@ -215,6 +223,8 @@ export class World {
     this.navigation=new ForestNavigation(this);
     this.buildChunks();
     this.grass=new Meadow(this).generate();
+    this.undergrowth = new Undergrowth(this).generate(); // (4.0: after the grass — it borrows the grass's material)
+    this.decay = new ForestDecay(this).generate(); // (4.0: the layers each night adds — all hidden on day one)
     // past the edge: the cut through the hills, the lowland, the highway (meshes of their own)
     this.outside = buildOutside(this, this.material);
     for (const m of this.outside.meshes) this.scene.add(m);

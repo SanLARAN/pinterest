@@ -96,6 +96,10 @@ export class Input {
           this.crouch = !this.crouch;
           this.emit('crouch');
           break;
+        case 'jump':
+          this.jumpAt = performance.now(); // (4.0: the player reads this — a press just before landing still counts)
+          this.emit('jump');
+          break;
         case 'mic':
           this.emit('mic');
           break;
@@ -364,6 +368,7 @@ export class Input {
         this.emit('pingUp');
       }
     });
+    btn('#tJump', () => { this.jumpAt = performance.now(); this.emit('jump'); }); // (4.0)
     btn('#tBag', () => { this.bagTouch = true; this.emit('bag'); }, () => { this.bagTouch = false; }); // (3.1c) a long press opens the quick wheel
     btn('#tItem', () => this.emit('primary'));
     btn('#tAlt', () => this.emit('secondary'));

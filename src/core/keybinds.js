@@ -5,9 +5,10 @@
 // The arrows (move / turn), Escape (pause) and Enter (confirm) stay where they are whatever is rebound: they are
 // the way back if a binding goes wrong.
 
-export const ACTIONS = ['forward', 'back', 'left', 'right', 'sprint', 'crouch', 'ping', 'use', 'bag', 'watch', 'carry', 'mic', 'pause'];
+// (4.0) jump: V, as in the survival games that keep SPACE for something else (here: the echolocator)
+export const ACTIONS = ['forward', 'back', 'left', 'right', 'sprint', 'crouch', 'jump', 'ping', 'use', 'bag', 'watch', 'carry', 'mic', 'pause'];
 export const DEFAULT_KEYS = {
-  forward: 'KeyW', back: 'KeyS', left: 'KeyA', right: 'KeyD', sprint: 'ShiftLeft', crouch: 'KeyC',
+  forward: 'KeyW', back: 'KeyS', left: 'KeyA', right: 'KeyD', sprint: 'ShiftLeft', crouch: 'KeyC', jump: 'KeyV',
   ping: 'Space', use: 'KeyE', bag: 'KeyI', watch: 'Tab', carry: 'KeyR', mic: 'KeyM', pause: 'KeyP',
 };
 // fixed keys that always work alongside the bindings (and cannot be taken by one)
@@ -20,9 +21,12 @@ export const bindable = (code) => typeof code === 'string' && CODE.test(code) &&
 export function cleanKeys(raw) {
   const out = { ...DEFAULT_KEYS };
   const src = raw && typeof raw === 'object' ? raw : {};
-  for (const a of ACTIONS) if (bindable(src[a])) out[a] = src[a];
+  const mine = ACTIONS.filter((a) => bindable(src[a]));
+  for (const a of mine) out[a] = src[a];
+  // (4.0) a player's own choices first, then the defaults: a key that joins the defaults later (V for the jump)
+  // never takes one somebody had already chosen for something else — the newcomer is left unbound instead
   const seen = new Map();
-  for (const a of ACTIONS) {
+  for (const a of [...mine, ...ACTIONS.filter((x) => !mine.includes(x))]) {
     const c = out[a];
     if (seen.has(c)) out[a] = DEFAULT_KEYS[a] !== c && ![...seen.keys()].includes(DEFAULT_KEYS[a]) ? DEFAULT_KEYS[a] : null;
     if (out[a]) seen.set(out[a], a);

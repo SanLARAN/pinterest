@@ -44,8 +44,21 @@ export const CFG = {
     walk: 3.1,
     sprint: 5.7,
     crouch: 1.45,
-    accel: 16,
-    decel: 20,
+    // (4.0) a body with weight: it takes a moment to get going and a moment to stop (the old 16 / 20 were a
+    // camera on rails), and once your feet leave the ground you are going where you were going
+    accel: 10.5,
+    decel: 12.5,
+    airAccel: 2.2,
+    airDrag: 0.35, // (keys let go in the air: what the air takes off your speed — next to nothing)
+    // the jump (V): 0.75 m at the top, a fall heavier than the rise, a little grace off an edge (coyote) and a
+    // press just before landing that still counts (buffer). It costs breath, and the landing is heard
+    jumpV: 4.9,
+    gravity: 16,
+    gravityFall: 21,
+    coyote: 0.12,
+    jumpBuffer: 0.15,
+    jumpCost: 9,
+    stepDown: 0.35, // a drop deeper than this under your feet is a fall, not a slope
     stamina: 100,
     sprintDrain: 21,
     staminaRegen: 16,
@@ -56,6 +69,10 @@ export const CFG = {
     maxStones: 3,
     stoneRegen: 55,
   },
+
+  // (4.0) the undergrowth (world/undergrowth.js): in the thick of a bush you walk at (1 - slow) and every step
+  // through it rustles — that much louder to whatever listens (crouched: only a whisper of it); dry brushwood cracks
+  UNDERGROWTH: { slow: 0.24, loud: 0.07, crouchLoud: 0.025, dry: 0.12 },
 
   PULSE: {
     slots: 16, // total uniform slots (main + footsteps)
@@ -74,11 +91,14 @@ export const CFG = {
   voiceRevealRadius: (loud) => 14 + 54 * Math.pow(Math.max(loud, 0), 0.8),
   SCREAM: 0.78, // loudness at/above which it's a scream (instant hunt)
   TALK: 0.3, // loudness of ordinary talking into the microphone (its upper end)
-  // SPACE (the ECHO button): after each echo a short wait while it comes back — longer after a loud one.
-  // Let go during the wait and, if the wait is nearly over, it goes the moment it can
-  PING_CD: 0.85,
-  PING_CD_LOUD: 0.55,
-  PING_QUEUE: 0.35,
+  // (4.0) SPACE (the ECHO button) is an echolocator now, not a voice: one press, one long clean wave that maps the
+  // forest for 64 m around you and holds the picture for ~20 s — and it is no louder than a click of the tongue
+  // (a monster has to be within ~7 m to hear it). Then the device is empty for half a minute (the gnats' blindness
+  // makes it refill at half speed). No holding, no clap, no scream: the scream is the microphone's alone.
+  ECHO: { cd: 30, radius: 64, strength: 1.5, decay: 0.3, noise: 0.12 },
+  // (4.0) the arms on the horizon (render/tentacles.js): the chance a night has them, growing with the shift
+  // (night 1: 30%, night 6: 75%), and when in the night they come up (s after nightfall)
+  TENTACLES: { chance: 0.3, perDay: 0.09, maxChance: 0.75, minT: 45, maxT: 320 },
 
   MONSTER: {
     listener: { wander: 1.05, investigate: 2.1, hunt: 4.7, hearing: 1.0, lock: 6.0, radius: 0.45 },

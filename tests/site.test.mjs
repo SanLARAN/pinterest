@@ -46,7 +46,7 @@ test('site strings: the page and the modules only ask for keys that exist', () =
   const html = src('site/index.html');
   const keys = new Set([...html.matchAll(/data-i18n="([\w.]+)"/g)].map((m) => m[1]));
   for (const m of html.matchAll(/data-i18n-attr="([^"]+)"/g)) for (const pair of m[1].split(',')) keys.add(pair.split(':')[1].trim());
-  for (const f of ['main.js', 'atlas.js', 'votes.js', 'patches.js']) for (const m of src('site/' + f).matchAll(/\bt\('([\w.]+)'/g)) keys.add(m[1]);
+  for (const f of ['main.js', 'atlas.js', 'votes.js', 'album.js', 'patches.js']) for (const m of src('site/' + f).matchAll(/\bt\('([\w.]+)'/g)) keys.add(m[1]);
   assert.ok(keys.size > 120, `${keys.size} keys asked for`);
   for (const k of keys) {
     assert.notEqual(get(STR.ru, k), undefined, `ru: ${k}`);

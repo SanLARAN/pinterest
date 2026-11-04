@@ -13,6 +13,7 @@ import { MAX_PLAYERS, makeCode } from '../src/net/net.js';
 import { detectLang, setLang, getLang, saveLang, readSite, saveSite, t, plural } from './i18n.js';
 import { trackU, pinProgress, shiftAt, gensLitAt, SHIFT_SEGMENTS, clockText, clamp01 } from './timeline.js';
 import { esc, echoText, reveals, toast, SonarCursor } from './fx.js';
+import { CAMERA_SHOTS } from '../src/game/backpackData.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -22,7 +23,7 @@ const S = CFG.SHIFT;
 const REPO = 'SanLARAN/pinterest';
 const RELEASES = `https://github.com/${REPO}/releases/latest`;
 const FOREST = ['top', 'echo', 'shift', 'coop'];
-const ORDER = ['top', 'echo', 'shift', 'coop', 'atlas', 'vote', 'patches'];
+const ORDER = ['top', 'echo', 'shift', 'coop', 'atlas', 'vote', 'album', 'patches'];
 
 document.documentElement.classList.add('js');
 if (reduced) document.documentElement.classList.add('reduced');
@@ -45,6 +46,7 @@ function vars() {
     wake: Math.round(S.LAST_WAKE / 60),
     finale: plural(Math.round(S.FINALE / 60), t('shift.min')),
     code: ROOM.length,
+    shots: CAMERA_SHOTS,
     options: `${o.slice(0, -1).join(', ')} ${t('shift.or')} ${o[o.length - 1]}`,
   };
 }
@@ -89,6 +91,7 @@ function applyLang() {
   shiftUI(shiftP);
   atlas?.refreshLang();
   ballot?.refreshLang();
+  album?.refreshLang();
   patches?.refreshLang();
 }
 
@@ -497,7 +500,7 @@ function scrolled() {
 }
 
 // ---------------- the sections that wake up later ----------------
-let atlas = null, ballot = null, patches = null;
+let atlas = null, ballot = null, album = null, patches = null;
 const lazy = {
   atlas: async (el) => {
     const { AtlasTheatre } = await import('./atlas.js');
@@ -508,6 +511,11 @@ const lazy = {
     const { Ballot } = await import('./votes.js');
     ballot = new Ballot(el, { audio: audioFor.explicit, reduced, onToast: toast });
     return ballot;
+  },
+  album: async (el) => {
+    const { Album } = await import('./album.js');
+    album = new Album(el, { reduced, onToast: toast });
+    return album;
   },
   patches: async (el) => {
     const m = patchesMod || (patchesMod = await import('./patches.js'));
@@ -540,7 +548,7 @@ function watchSections() {
       const id = e.target.dataset.mount;
       if (e.isIntersecting) seen.add(id);
       else seen.delete(id);
-      ({ atlas, vote: ballot, patches })[id]?.setVisible(e.isIntersecting);
+      ({ atlas, vote: ballot, album, patches })[id]?.setVisible(e.isIntersecting);
     }
   }, { rootMargin: '10% 0px 10% 0px' });
   for (const el of $$('[data-mount]')) {
@@ -557,6 +565,9 @@ async function deepLink() {
     requestAnimationFrame(() => $('#atlas').scrollIntoView({ block: 'start' }));
   } else if (/^#v\d/.test(h)) {
     await wakeSection('patches');
+  } else if (h === '#album') { // (4.0: the game's results screen links here once a film is saved)
+    await wakeSection('album');
+    requestAnimationFrame(() => $('#album').scrollIntoView({ block: 'start' }));
   }
 }
 
@@ -673,6 +684,7 @@ window.__hushSite = {
   get stage() { return stage; },
   get atlas() { return atlas; },
   get ballot() { return ballot; },
+  get album() { return album; },
   get patches() { return patches; },
   get engine() { return engine; },
 };

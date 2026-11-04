@@ -32,6 +32,7 @@
         <a href="#coop" data-nav="coop" data-i18n="nav.coop">Вместе</a>
         <a href="#atlas" data-nav="atlas" data-i18n="nav.atlas">Атлас</a>
         <a href="#vote" data-nav="vote" data-i18n="nav.vote">Голосование</a>
+        <a href="#album" data-nav="album" data-i18n="nav.album">Альбом</a>
         <a href="#patches" data-nav="patches" data-i18n="nav.patches">Патчи</a>
         <a class="nav-menu-play btn primary" href="../" data-i18n="nav.play">Играть</a>
       </nav>
@@ -53,6 +54,7 @@
       <a href="#coop" data-rail="coop" tabindex="-1"><i></i><span data-i18n="rail.coop">Вместе</span></a>
       <a href="#atlas" data-rail="atlas" tabindex="-1"><i></i><span data-i18n="rail.atlas">Атлас</span></a>
       <a href="#vote" data-rail="vote" tabindex="-1"><i></i><span data-i18n="rail.vote">Голос</span></a>
+      <a href="#album" data-rail="album" tabindex="-1"><i></i><span data-i18n="rail.album">Альбом</span></a>
       <a href="#patches" data-rail="patches" tabindex="-1"><i></i><span data-i18n="rail.patches">Патчи</span></a>
       <b class="rail-clock" id="railClock"></b>
     </nav>
@@ -192,11 +194,23 @@
         </div>
       </section>
 
-      <!-- VII. what's new -->
+      <!-- VII. the shift's film (4.0: the camera's frames, kept in this browser) -->
+      <section id="album" class="sec book album">
+        <div class="wrap">
+          <header class="sec-head">
+            <p class="kicker" data-i18n="album.kicker">VI · альбом</p>
+            <h2 data-echo data-i18n="album.title">Альбом</h2>
+            <p class="lead" data-reveal data-i18n="album.lead"></p>
+          </header>
+          <div class="mount alb-mount" data-mount="album"><p class="mount-wait" data-i18n="atlas.loading">проявляется…</p></div>
+        </div>
+      </section>
+
+      <!-- VIII. what's new -->
       <section id="patches" class="sec book patches">
         <div class="wrap">
           <header class="sec-head">
-            <p class="kicker" data-i18n="patches.kicker">VI · патчи</p>
+            <p class="kicker" data-i18n="patches.kicker">VII · патчи</p>
             <h2 data-echo data-i18n="patches.title">Что нового</h2>
             <p class="lead" data-reveal id="patchesLead"></p>
           </header>

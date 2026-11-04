@@ -424,6 +424,62 @@ export class AudioEngine {
     this._noiseBurst(t, { f: 1800, q: 0.8, a: 0.02, d: 0.25, hold: dur - 0.15, gain: 0.08 * loud, dest: out });
   }
 
+  // (4.0) the echolocator: the press of a small button and one clean, quiet ping — a device, not a voice. The
+  // returns are the echo ticks (see tick), scheduled as the wave reaches things
+  echoPing(dest = null, gain = 1) {
+    if (!this.ready) return;
+    const t = this.now;
+    const o = dest || this.sfx;
+    this._noiseBurst(t, { f: 4200, q: 3, a: 0.0006, d: 0.012, gain: 0.22 * gain, dest: o });
+    this._tone(t + 0.012, { f: 2350, fEnd: 2240, a: 0.003, d: 0.2, gain: 0.15 * gain, rev: 0.55, dest: o });
+    this._tone(t + 0.012, { f: 4700, fEnd: 4480, a: 0.002, d: 0.08, gain: 0.035 * gain, dest: o });
+    this._tone(t + 0.02, { type: 'triangle', f: 1175, fEnd: 1120, a: 0.004, d: 0.38, gain: 0.045 * gain, rev: 0.7, dest: o });
+  }
+
+  // the device is full again: two soft ticks, for you alone
+  echoReady() {
+    if (!this.ready) return;
+    const t = this.now;
+    this._tone(t, { f: 1800, a: 0.002, d: 0.05, gain: 0.045 });
+    this._tone(t + 0.09, { f: 2400, a: 0.002, d: 0.06, gain: 0.04 });
+  }
+
+  // SPACE while it is still empty: the button clicks dully and nothing goes out
+  echoDeny() {
+    if (!this.ready) return;
+    const t = this.now;
+    this._noiseBurst(t, { f: 900, q: 1.2, a: 0.001, d: 0.03, gain: 0.16 });
+    this._tone(t, { f: 220, fEnd: 170, a: 0.002, d: 0.06, gain: 0.05 });
+  }
+
+  // (4.0) the camera: the mirror's slap and the shutter, the flash going off (a hard white pop), and the capacitor
+  // charging again behind it — the thin rising whine of every flash camera there was. A friend's comes from where
+  // they are; an empty one only clicks.
+  cameraShot(x, y, z, own = true, empty = false) {
+    if (!this.ready) return;
+    const t = this.now;
+    let o = this.sfx;
+    if (!own) {
+      o = this._panner(x, y, z, 4, 1.05);
+      o.connect(this.sfx);
+    }
+    this._noiseBurst(t, { f: 3100, q: 2.4, a: 0.0005, d: 0.014, gain: 0.26, dest: o }); // the shutter
+    this._noiseBurst(t + 0.018, { type: 'lowpass', f: 900, q: 0.9, a: 0.001, d: 0.03, gain: 0.14, dest: o });
+    if (empty) return;
+    this._noiseBurst(t + 0.006, { f: 6500, q: 0.7, a: 0.0004, d: 0.05, gain: 0.2, rev: 0.25, dest: o }); // the flash
+    this._noiseBurst(t + 0.034, { f: 2600, q: 2, a: 0.0005, d: 0.012, gain: 0.18, dest: o }); // the second curtain
+    this._tone(t + 0.12, { f: 1900, fEnd: 7600, a: 0.08, d: 1.4, gain: own ? 0.018 : 0.03, dest: o }); // the whine
+    this._tone(t + 0.12, { f: 3800, fEnd: 15000, a: 0.08, d: 1.3, gain: own ? 0.006 : 0.01, dest: o });
+  }
+
+  // a friend's echolocator, from where they stand
+  mateEcho(x, y, z) {
+    if (!this.ready) return;
+    const pn = this._panner(x, y, z, 3, 1.2);
+    pn.connect(this.sfx);
+    this.echoPing(pn, 0.9);
+  }
+
   sonarSweep(loud, big = false) {
     if (!this.ready) return;
     const t = this.now;
@@ -534,6 +590,105 @@ export class AudioEngine {
     if (intensity > 0.6) this._tone(t, { f: 95, fEnd: 55, a: 0.002, d: 0.08, gain: 0.25 * intensity, dest: o });
   }
 
+  // (4.0) the undergrowth around your legs: leaves dragging over cloth (a soft band of noise that swells and dies
+  // with the stride) and, in dry brushwood, a stick snapping under the boot — k: how thick, 0..1
+  rustle(k = 0.5, intensity = 0.5, dry = false, dest = null) {
+    if (!this.ready) return;
+    const t = this.now;
+    const o = dest || this.sfx;
+    const g = 0.03 + 0.09 * k * (0.5 + intensity);
+    this._noiseBurst(t, { f: 2600 + Math.random() * 900, q: 0.6, a: 0.05, d: 0.22 + 0.1 * k, gain: g, dest: o });
+    this._noiseBurst(t + 0.06 + Math.random() * 0.05, { buf: this.pink, f: 1500 + Math.random() * 500, q: 0.9, a: 0.04, d: 0.18, gain: g * 0.7, dest: o });
+    if (Math.random() < 0.35 * k) this._noiseBurst(t + 0.12, { f: 5200, q: 2.2, a: 0.01, d: 0.07, gain: g * 0.45, dest: o }); // a needle twig flicks back
+    if (dry) {
+      // the snap: a sharp click and a woody knock under it, sometimes a second, smaller one
+      const at = t + 0.015 + Math.random() * 0.03;
+      this._noiseBurst(at, { f: 3400 + Math.random() * 1200, q: 3.5, a: 0.001, d: 0.025, gain: 0.12 + 0.12 * intensity, dest: o });
+      this._tone(at, { type: 'triangle', f: 480 + Math.random() * 160, fEnd: 260, a: 0.001, d: 0.04, gain: 0.05 + 0.05 * intensity, dest: o });
+      if (Math.random() < 0.5) this._noiseBurst(at + 0.05 + Math.random() * 0.04, { f: 2800, q: 3, a: 0.001, d: 0.02, gain: 0.06, dest: o });
+    }
+  }
+
+  // (4.0) the push off a jump: cloth, kit shifting on the back, a short breath through the nose
+  jumpPush(wet = false, dest = null) {
+    if (!this.ready) return;
+    const t = this.now;
+    const o = dest || this.sfx;
+    this._noiseBurst(t, { f: 1400, q: 0.7, a: 0.01, d: 0.09, gain: 0.07, dest: o });
+    this._noiseBurst(t + 0.03, { buf: this.pink, f: 900, q: 1.1, a: 0.02, d: 0.16, gain: 0.05, dest: o });
+    if (wet) this.wade(0.6, 0.35, o);
+  }
+
+  // (4.0) a landing: both boots at once and the body's weight behind them — a low thud under the step, a rattle of
+  // kit; k: 0 a hop .. 1 a hard fall
+  land(k = 0.5, wet = false, dest = null) {
+    if (!this.ready) return;
+    const t = this.now;
+    const o = dest || this.sfx;
+    if (wet) this.wade(0.7 + k * 0.3, 0.4, o);
+    else {
+      this.footstep(0.55 + k * 0.4, o);
+      this._noiseBurst(t + 0.012, { f: 520 + Math.random() * 200, q: 0.8, a: 0.002, d: 0.09 + k * 0.05, gain: 0.14 + k * 0.2, dest: o });
+    }
+    this._tone(t, { f: 78, fEnd: 42, a: 0.002, d: 0.12 + k * 0.1, gain: 0.22 + k * 0.3, dest: o });
+    this._noiseBurst(t + 0.05, { f: 3100, q: 3, a: 0.003, d: 0.05, gain: 0.025 + k * 0.03, dest: o });
+  }
+
+  // (4.0) the arms on the horizon (render/tentacles.js). Where it is: a bearing in the world, heard from far off —
+  // a panner a long way out in that direction, barely attenuated, so it is "over there" and not "in your ear"
+  _farAt(az, eye) {
+    const e = eye || { x: 0, y: 0, z: 0 };
+    const pn = this._panner(e.x + Math.sin(az) * 90, (e.y || 0) + 6, e.z + Math.cos(az) * 90, 80, 0.25);
+    pn.connect(this.sfx);
+    return pn;
+  }
+
+  // ...one coming up out of the ground: the earth tearing a long way off, then a groan too low to have a throat.
+  // delay: how long the sound takes to get here (it is a long way)
+  tentacleRise(az, eye, delay = 1.8) {
+    if (!this.ready) return;
+    const t = this.now + delay, o = this._farAt(az, eye);
+    const n = this._noise(this.brown);
+    const lp = this._filter('lowpass', 90, 0.9);
+    lp.frequency.setValueAtTime(70, t);
+    lp.frequency.linearRampToValueAtTime(260, t + 1.4);
+    lp.frequency.exponentialRampToValueAtTime(80, t + 5.5);
+    const g = this._gain(0);
+    n.connect(lp).connect(g).connect(o);
+    this._env(g, t, 1.1, 0.42, 4.2, 0.6);
+    n.start(t, Math.random() * 2);
+    n.stop(t + 6.6);
+    this._tone(t + 0.6, { type: 'sawtooth', f: 41, fEnd: 29, a: 1.4, hold: 1.2, d: 3.2, gain: 0.07, dest: o, rev: 0.7, detune: -12 });
+    this._tone(t + 0.9, { type: 'triangle', f: 63, fEnd: 47, a: 1.2, hold: 0.8, d: 2.6, gain: 0.05, dest: o, rev: 0.8, detune: 9 });
+    for (let i = 0; i < 4; i++) this._noiseBurst(t + 0.2 + Math.random() * 2.5, { buf: this.brown, type: 'lowpass', f: 380, a: 0.02, d: 0.5, gain: 0.12, dest: o });
+  }
+
+  // ...and one coming down: a blow you feel more than hear, and the rumble rolling on after it
+  tentacleCrash(az, eye, delay = 1.8, k = 1) {
+    if (!this.ready) return;
+    const t = this.now + delay, o = this._farAt(az, eye);
+    this._tone(t, { f: 46, fEnd: 22, a: 0.01, d: 1.6, gain: 0.5 * k, dest: o, rev: 0.4 });
+    this._noiseBurst(t, { buf: this.brown, type: 'lowpass', f: 520, fEnd: 90, a: 0.008, d: 1.1, gain: 0.5 * k, dest: o, rev: 0.6 });
+    const n = this._noise(this.brown);
+    const lp = this._filter('lowpass', 140, 0.7);
+    lp.frequency.setValueAtTime(240, t + 0.2);
+    lp.frequency.exponentialRampToValueAtTime(60, t + 6.5);
+    const g = this._gain(0);
+    n.connect(lp).connect(g).connect(o);
+    this._env(g, t + 0.15, 0.4, 0.34 * k, 5.5, 0.5);
+    n.start(t, Math.random() * 2);
+    n.stop(t + 7.2);
+    for (let i = 0; i < 5; i++) this._noiseBurst(t + 0.3 + i * 0.5 + Math.random() * 0.4, { buf: this.brown, type: 'lowpass', f: 300, a: 0.03, d: 0.6, gain: 0.1 * k, dest: o }); // debris
+  }
+
+  // a friend's landing, from where they came down
+  mateLand(x, y, z, k = 0.5) {
+    if (!this.ready) return;
+    const pn = this._panner(x, y, z, 2.5, 1.3);
+    pn.connect(this.sfx);
+    this.land(k * 0.85, false, pn);
+  }
+
   // the midges (3.0e): a thin, high cloud of noise, right up against your ears
   gnatSwarm() {
     if (!this.ready) return;
@@ -624,13 +779,14 @@ export class AudioEngine {
 
   // ---------- co-op: your friends in the forest ----------
   // a teammate's footstep, from where they walk
-  mateStep(x, y, z, intensity = 0.4, waterDepth = 0) {
+  mateStep(x, y, z, intensity = 0.4, waterDepth = 0, brush = 0, dry = false) {
     if (!this.ready) return;
     const pn = this._panner(x, y, z, 2.5, 1.3);
     pn.connect(this.sfx);
     // (3.0k) a friend wading sounds like a friend wading, not like a friend on peat
     if (waterDepth > 0) this.wade(intensity * 0.9, waterDepth, pn);
     else this.footstep(intensity * 0.8, pn);
+    if (brush > 0.08) this.rustle(brush, intensity, dry, pn); // (4.0) ...and one in a bush, like one in a bush
   }
 
   // a teammate's click / clap / shout (their mic voice comes through the voice chat instead)

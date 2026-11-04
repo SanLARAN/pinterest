@@ -168,7 +168,7 @@ test('the lobby: a ready button for guests, badges in the list, START held with 
   assert.match(lobby, /coopWaitReady/);
   assert.match(src('net/coop.js'), /'rd'/);
   const { PROTOCOL } = await import('../src/net/net.js');
-  assert.equal(PROTOCOL, 20);
+  assert.equal(PROTOCOL >= 20, true); // (4.0 moved it to 21: the camera, the arms)
 });
 
 // ---------------------------------------------------------------- readable panels

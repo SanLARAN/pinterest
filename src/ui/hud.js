@@ -346,6 +346,14 @@ export class HUD {
     this.cross.classList.add('deny');
   }
 
+  // (4.0) the echolocator is full again: the dot answers with one soft ring
+  pingReady() {
+    this.cross.classList.remove('ready');
+    void this.cross.offsetWidth;
+    this.cross.classList.add('ready');
+    if (this.tPing) { this.tPing.classList.remove('ready'); void this.tPing.offsetWidth; this.tPing.classList.add('ready'); }
+  }
+
   pulseCross() {
     this.ripple.classList.remove('go');
     void this.ripple.offsetWidth;

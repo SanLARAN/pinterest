@@ -1157,6 +1157,104 @@ export function poseSurvivor(rig, phase, speed, crouch, dead) {
   n.elR.rotation.set(-0.25 - amp * 0.2, 0, 0);
 }
 
+// (4.0) a friend's body as top games move one: a real gait instead of a pendulum, blended from smoothed
+// parameters, so nothing in it can snap. Each leg runs its own stride (ψ: heel strike at 0, toe-off at π, the knee
+// folding mid-swing); the pelvis rises over the standing leg, sways onto it and twists with the stride while the
+// chest twists back; arms counter-swing, elbows bend and pump in a run with the chest leaning into it; the lower
+// body turns toward a sidestep while the chest keeps facing where they look; the head follows their real pitch;
+// they lean into a turn; they tuck in the air and fold on a landing; they breathe and shift their weight standing.
+// st: { phase, speed, fwd, side, crouch, sprint, air, vy, land, pitch, turn }  (land: an impulse, 0..1, once)
+const _damp = (a, b, k, dt) => a + (b - a) * (1 - Math.exp(-k * dt));
+export function animateSurvivor(rig, st, dt) {
+  const n = rig.nodes;
+  const A = rig.anim || (rig.anim = { c: st.crouch ? 1 : 0, sp: st.speed || 0, sprint: 0, air: 0, land: { x: 0, v: 0 }, lean: 0, hipYaw: 0, look: st.pitch || 0, t: Math.random() * 10 });
+  dt = Math.min(Math.max(dt, 0), 0.1);
+  A.t += dt;
+  A.c = _damp(A.c, st.crouch ? 1 : 0, 9, dt);
+  A.sp = _damp(A.sp, st.air ? A.sp : st.speed || 0, 8, dt);
+  A.sprint = _damp(A.sprint, st.sprint && (st.speed || 0) > 3.4 ? 1 : 0, 6, dt);
+  A.air = _damp(A.air, st.air ? 1 : 0, st.air ? 14 : 20, dt);
+  if (st.land > 0) A.land.v += st.land * 7;
+  { const L = A.land; for (let i = 0, m = Math.ceil(dt / 0.008), h = dt / Math.max(1, m); i < m; i++) { L.v += (-150 * L.x - 15 * L.v) * h; L.x += L.v * h; } }
+  const land = clamp(A.land.x, 0, 1.2);
+  A.look = _damp(A.look, st.pitch || 0, 10, dt);
+  A.lean = _damp(A.lean, clamp(-(st.turn || 0) * Math.min(A.sp, 6) * 0.04, -0.22, 0.22), 6, dt);
+  // a sidestep turns the legs (and a step back turns them the other way round, walked backwards)
+  const fwd = st.fwd || 0, side = st.side || 0, moving = Math.hypot(fwd, side) > 0.35;
+  let ang = moving ? Math.atan2(side, fwd) : 0;
+  if (Math.abs(ang) > 1.95) ang = ang > 0 ? ang - PI : ang + PI;
+  A.hipYaw = _damp(A.hipYaw, moving ? -clamp(ang, -0.85, 0.85) : 0, 7, dt);
+
+  const c = A.c, sprint = A.sprint, air = A.air;
+  const amp = clamp(A.sp / 3.2, 0, 1.4) * (1 - air) * (1 - 0.35 * c);
+  const amp1 = Math.min(amp, 1);
+  const psi = st.phase || 0, sp = Math.sin(psi), cp = Math.cos(psi);
+  const idle = 1 - amp1;
+  const rising = (st.vy || 0) > 0 ? 1 : 0.6;
+  // pelvis
+  const bob = amp * (-0.022 * Math.cos(2 * psi) * (1 - sprint) + 0.03 * Math.cos(2 * psi) * sprint);
+  n.hips.position.set(
+    -0.02 * amp1 * sp * (1 - 0.6 * sprint) + 0.012 * Math.sin(A.t * 0.6) * idle,
+    lerp(0.94, 0.62, c) + bob - 0.04 * sprint - 0.14 * land + 0.03 * air,
+    0,
+  );
+  n.hips.rotation.set(0, 0.1 * amp * cp + A.hipYaw, -0.04 * amp1 * sp + A.lean);
+  // chest: lean into speed, the crouch, a run; counter-twist; breathing; the spine takes a quarter of the look
+  const leanX = 0.05 * amp + 0.22 * sprint;
+  n.chest.rotation.set(leanX + 0.55 * c + 0.08 * air + 0.25 * land - A.look * 0.25 + 0.012 * Math.sin(A.t * 1.7) * idle, -0.16 * amp * cp - A.hipYaw, -A.lean * 0.3);
+  n.head.rotation.set(-leanX * 0.7 - 0.35 * c - A.look * 0.6 - 0.15 * land, 0.08 * amp * cp + A.hipYaw * 0.15, -A.lean * 0.4);
+  // legs: L strides at ψ, R half a cycle later
+  const At = 0.5 * amp * (1 - 0.45 * c);
+  for (const [th, kn, ps, tuck, kt] of [[n.thL, n.knL, psi, 0.6, 1.05], [n.thR, n.knR, psi + PI, 0.3, 0.7]]) {
+    const s1 = Math.sin(ps), c1 = Math.cos(ps);
+    const swingK = 0.55 * amp + 0.45 * sprint * (1 - air);
+    th.rotation.set(-c1 * At - 1.1 * c - tuck * air * rising - 0.5 * land, 0, 0);
+    kn.rotation.set((s1 > 0 ? 0.12 * amp * s1 : -swingK * s1) + 1.6 * c + kt * air * rising + 0.95 * land, 0, 0);
+  }
+  // arms: counter-swing, a run's pump, out a little in the air
+  const Aa = 0.42 * amp * (1 - 0.3 * c) + 0.25 * sprint * (1 - air);
+  n.shL.rotation.set(Aa * cp - 0.15 * sprint - 0.35 * air - 0.2 * land, 0, -0.06 - 0.05 * sprint - 0.25 * air);
+  n.shR.rotation.set(-Aa * cp - 0.15 * sprint - 0.35 * air - 0.2 * land, 0, 0.06 + 0.05 * sprint + 0.25 * air);
+  const el = -0.22 - 0.18 * amp - 1.0 * sprint - 0.3 * c - 0.35 * air;
+  n.elL.rotation.set(el - 0.3 * sprint * Math.max(0, -cp), 0, 0);
+  n.elR.rotation.set(el - 0.3 * sprint * Math.max(0, cp), 0, 0);
+  rig.root.rotation.x = 0;
+}
+
+// (4.0) inertialization: whatever pose was written this frame — the gait, a torch raised, a crouch, a carry, a
+// seat, getting up off the cot — the body never jumps to it. A jump in any joint bigger than a frame of honest
+// motion leaves an offset that dies away in ~0.25 s, so poses flow into each other (the technique top games use
+// to blend animations without a blend tree). Call once a frame, after everything that poses the rig.
+const SETTLE = ['hips', 'chest', 'head', 'shL', 'shR', 'elL', 'elR', 'thL', 'thR', 'knL', 'knR'];
+export function settleRig(rig, dt) {
+  const n = rig.nodes;
+  const N = SETTLE.length * 3 + 2;
+  const S = rig.settle || (rig.settle = { raw: new Float32Array(N), off: new Float32Array(N), on: false });
+  dt = Math.min(Math.max(dt, 0), 0.1);
+  const rotThr = 0.25 + 12 * dt, posThr = 0.06 + 2 * dt, fade = Math.exp(-dt / 0.085);
+  let i = 0;
+  const ch = (v, set, thr = rotThr) => {
+    if (S.on && Math.abs(v - S.raw[i]) > thr) S.off[i] = S.raw[i] + S.off[i] - v; // a snap: carry on from where we were
+    else S.off[i] *= fade;
+    if (Math.abs(S.off[i]) < 1e-4) S.off[i] = 0;
+    S.raw[i] = v;
+    if (S.off[i]) set(v + S.off[i]);
+    i++;
+  };
+  for (const k of SETTLE) {
+    const r = n[k]?.rotation;
+    if (!r) { i += 3; continue; }
+    ch(r.x, (v) => (r.x = v));
+    ch(r.y, (v) => (r.y = v));
+    ch(r.z, (v) => (r.z = v));
+  }
+  const hp = n.hips.position;
+  ch(hp.y, (v) => (hp.y = v), posThr);
+  const rr = rig.root.rotation;
+  ch(rr.x, (v) => (rr.x = v));
+  S.on = true;
+}
+
 // slung over a friend's shoulder (a fireman's carry): folded at the waist on their shoulder — legs hanging
 // down in front of them, the body and arms hanging down their back. The caller puts the root (the hips) on
 // the shoulder, rotation (0, carrier's yaw, 0): the body faces the carrier.

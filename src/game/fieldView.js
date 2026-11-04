@@ -53,7 +53,8 @@ export class FieldView {
     this.wrench=this.buildWrench();this.right.add(this.wrench);this.wrench.visible=false;
     this.prop=new THREE.Group();this.root.add(this.prop);
     this.props={};
-    for(const kind of ['stones','battery','flare','flareAmmo']) {
+    for(const kind of ['stones','battery','flare','flareAmmo','camera']) {
+      if(!game.inventory.geo[kind]) continue; // (4.0: the camera is the forest's)
       const m=new THREE.Mesh(game.inventory.geo[kind],game.tools.viewMat);m.visible=false;m.frustumCulled=false;m.renderOrder=8;
       this.prop.add(m);this.props[kind]=m;
     }
@@ -229,6 +230,10 @@ export class FieldView {
       m.visible=!bag.active && (kind==='flareAmmo' ? bag.equipped==='flare'&&!g.player.hasFlare : bag.equipped===kind && (kind!=='flare'||g.player.hasFlare));
       m.rotation.set(kind==='flare'?0:-.35,kind==='flare'?-Math.PI/2:0,kind==='battery'?-.25:0);
       m.scale.setScalar(kind==='stones'?.7:1);
+      if(kind==='camera') { // (4.0) held up, lens forward; the shot jerks it in your hand
+        const kick=g.camItem?.kick||0;
+        m.position.set(-.035,.04+kick*.012,-.02+kick*.03);m.rotation.set(-.08+kick*.22,.12,-.04);
+      }
     }
     if(g.partMap?.amount>.01){const d=g.partMap.distance(camera),k=g.partMap.amount;this.left.visible=this.right.visible=true;this.watchCase.visible=false;this.bag.visible=this.prop.visible=false;this.left.position.set(-.25,-.42-(1-k)*.3,-d+.025);this.right.position.set(.25,-.42-(1-k)*.3,-d+.025);this.left.rotation.set(.1,0,.08);this.right.rotation.set(.1,0,-.08);}
     const dyes=g.selfBody.rig?.dyes;

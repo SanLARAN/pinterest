@@ -225,3 +225,106 @@ export class OmniShadows {
     U.set(L.x, L.y, L.z, L.R);
   }
 }
+
+// (4.0) The sun's shadows. One orthographic depth picture of everything that casts (the same scene the lights'
+// shadows draw: every chunk's props, the doors, the gate, the УАЗ), seen from the sun, a square around you.
+// The world and the people read it in daylight (sonar.js: sunShadow) — a low morning sun lays the pines' shadows
+// out long across the meadow — and the fog between them lights up into shafts (post.js: the rays pass).
+// Redrawn only when you've walked a few metres from where it was drawn, the sun moved, or something that casts
+// moved near you; at night it is off and costs nothing.
+const SUN_FRAG = /* glsl */ `
+varying vec3 vW;
+varying float vK;
+void main() {
+  if (abs(vK - 50.0) < 0.5) discard; // chain-link: the sun goes through it
+  float v = clamp(gl_FragCoord.z, 0.0, 0.99999);
+  float hi = floor(v * 255.0) / 255.0;
+  gl_FragColor = vec4(hi, fract(v * 255.0), 0.0, 1.0);
+}`;
+const _sv = new THREE.Vector3(), _sc = new THREE.Vector3(), _bias = new THREE.Matrix4().set(
+  0.5, 0, 0, 0.5,
+  0, 0.5, 0, 0.5,
+  0, 0, 0.5, 0.5,
+  0, 0, 0, 1,
+);
+
+export class SunShadow {
+  constructor(renderer, omni, size = 1024, half = 64) {
+    this.r = renderer;
+    this.omni = omni; // (its scene of casters, and its list of things that move)
+    this.size = size;
+    this.half = half;
+    this.rt = new THREE.WebGLRenderTarget(size, size, {
+      type: THREE.UnsignedByteType, format: THREE.RGBAFormat,
+      minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter,
+      generateMipmaps: false, depthBuffer: true, stencilBuffer: false,
+    });
+    this.rt.texture.colorSpace = THREE.NoColorSpace;
+    this.mat = new THREE.ShaderMaterial({ vertexShader: VERT, fragmentShader: SUN_FRAG, side: THREE.DoubleSide });
+    this.cam = new THREE.OrthographicCamera(-half, half, half, -half, 1, 320);
+    this.at = new THREE.Vector3(1e9, 0, 0); // where it was last drawn around
+    this.sun = new THREE.Vector3();
+    this.frame = -1;
+    this.draws = 0; // (for tests / the perf strip)
+    this.enabled = true;
+    shared.uSunMap.value = this.rt.texture;
+    shared.uSunK.value.set(0, (2 * half) / size, 1 / size, 0.0003);
+  }
+
+  // the high preset draws it at twice the detail (a pine's trunk is a line, not a smudge)
+  setSize(size) {
+    if (size === this.size) return;
+    this.size = size;
+    this.rt.setSize(size, size);
+    this.at.set(1e9, 0, 0);
+  }
+
+  // f: where the eyes are (the box is kept centred on them)
+  update(f) {
+    const K = shared.uSunK.value;
+    const on = this.enabled && shared.uDawn.value > 0.001 && !!f;
+    K.x = on ? 1 : 0;
+    if (!on) return false;
+    const sun = shared.uSun.value;
+    let dyn = false;
+    for (const d of this.omni.dyn) if (d.changed > this.frame && d.vis && Math.hypot(d.c.x - f.x, d.c.z - f.z) < this.half + d.r) { dyn = true; break; }
+    const moved = Math.hypot(f.x - this.at.x, f.z - this.at.z);
+    if (moved < this.half * 0.12 && sun.distanceTo(this.sun) < 0.002 && !dyn) return false;
+    this.frame = this.omni.frame;
+    this.sun.copy(sun);
+    // centre the box on you, snapped to whole texels of the sun's view (the shadows don't crawl as you walk)
+    const cam = this.cam, texel = (2 * this.half) / this.size;
+    cam.position.copy(_sc.set(0, 0, 0)).addScaledVector(sun, 160);
+    cam.up.set(0, 1, 0);
+    if (Math.abs(sun.y) > 0.98) cam.up.set(0, 0, 1);
+    cam.lookAt(0, 0, 0);
+    cam.updateMatrixWorld();
+    _sv.set(f.x, f.y, f.z).applyMatrix4(cam.matrixWorldInverse);
+    _sv.x = Math.round(_sv.x / texel) * texel;
+    _sv.y = Math.round(_sv.y / texel) * texel;
+    _sv.z = 0;
+    _sv.applyMatrix4(cam.matrixWorld); // the snapped centre, back in the world
+    cam.position.copy(_sv).addScaledVector(sun, 160);
+    cam.lookAt(_sv);
+    cam.updateMatrixWorld();
+    cam.updateProjectionMatrix();
+    this.at.set(f.x, f.y, f.z);
+    const r = this.r, scene = this.omni.scene, prevTarget = r.getRenderTarget();
+    r.getClearColor(_keep);
+    const keepA = r.getClearAlpha();
+    r.setClearColor(_white, 1);
+    const keepOv = scene.overrideMaterial;
+    scene.overrideMaterial = this.mat;
+    r.setRenderTarget(this.rt);
+    r.clear(true, true, false);
+    r.render(scene, cam);
+    scene.overrideMaterial = keepOv;
+    r.setRenderTarget(prevTarget);
+    r.setClearColor(_keep, keepA);
+    shared.uSunMat.value.multiplyMatrices(_bias, cam.projectionMatrix).multiply(cam.matrixWorldInverse);
+    K.y = texel;
+    K.z = 1 / this.size;
+    this.draws++;
+    return true;
+  }
+}

@@ -4,7 +4,8 @@
 > Он написан для человека и для агента: любой новый чат начинается с чтения `AGENTS.md`, а тот отправляет
 > сюда. Если код и этот файл расходятся — прав код, а файл надо поправить в том же коммите.
 >
-> Последнее обновление: раунд **3.1r** (Kugoo Wish 01 на полигоне и эндуро-физика).
+> Последнее обновление: раунд **4.0 ULTRA** (подлесок, утро с тенями и лучами, упадок леса, щупальца, фотоаппарат и альбом,
+> прыжок и вес, анимация друзей, эхолокатор, трава).
 
 ---
 
@@ -810,6 +811,45 @@
   поворот и лоусайд, гироскопы, посадка носом, пробой без батута и камень без разгона, 4 мин по лесу, глаза райдера);
   `moto-training` — ожидания под новую физику (разгон 14 с, гребни после разгона, подъём 28% с места).
 
+### 4.0 ULTRA — подлесок, утро, упадок, щупальца, фотоаппарат, прыжок, эхолокатор
+
+- **Подлесок** (`world/undergrowth.js`, `Undergrowth`): кусты, папоротник, ёлочки, валежник из своего RNG
+  (`seed ^ 0x75677277`) после деревьев — лес не сдвигается. `allowed()` — не лагерь, не тропы, не стволы, не постройки,
+  не двор. Плитки 40 м (`MeshBuilder`, материал травы: `blade`/`bladeHeight`), видимость 100 м. **Не коллайдер**:
+  `probe(x, z)` → `{ k, dry }` читают `Player.update` (скорость × (1 − 0,24 k), громкость шага) и `RemotePlayer` (шорох).
+- **Утро**: `SunShadow` (`render/shadows.js`) — ортокарта 128 м вокруг глаз, снап к текселю, лениво перерисовывается;
+  `sunShadow()` в `sonar.js` и `people.js`, `shared.uSunK.x` = есть ли карта. `Game._morningSun(k)`: 10° → 23°, азимут
+  прежний. Лучи — проход `rays` в `post.js` (полразмера, марш по глубине сквозь туман, HG-рассеяние), `post.setRays`
+  только при тенях и не на low. Не трогать `uSunK` вне `SunShadow` — по нему шейдеры решают, читать ли карту.
+- **Упадок** (`world/decay.js`, `ForestDecay`): `DECAY_LAYERS` 5 (дни 2–6) × `DECAY` {26 сухостоин, 7 пугал/человечков,
+  48 меток}. Всё генерится сразу; `setDay(n)` включает меши и «распарковывает» коллайдеры (`_park`: r/h = −1, оригинал
+  в `_r/_h`). Вызывается: новая смена (1), `startMorning(day)`, debug-переход в ночь. Красный — `XPAL` 47/37.
+- **Щупальца** (`render/tentacles.js`): событие — сид; `tentaclePlan` детерминирован, `armPhase` — фазы, `Tentacles`
+  рисует за всем (как небо) и отдаёт `take()` события `rise`/`impact` → `Audio.tentacleRise/Crash` с задержкой
+  `TENT.far / 343` и тряской. Хост: `Game` бросает шанс от `baseSeed ^ day`, шлёт `tn`; гость только показывает.
+- **Фотоаппарат** (`game/photo.js`): `PhotoCamera` — `reset(rng, online)` (места из `SPOTS`, лампочка-спрайт),
+  `take` → `inventory.claim('camera', i)` (источник `camera` в claim/grant), `shoot()` (5 вспышек, перезарядка, шум,
+  `wantShot` → `main.js takePhoto()` после `post.render` со скрытым `fieldView.root`), `hostFlash` (только хост:
+  `inFlash` + `losBlocked`, `endSeize` сразу, `vanish` через `vanishQ` двумя тиками позже, `cw`), `netFlash` (чужая
+  вспышка: спрайт-вспышка + свет `lightSources`), `scared` (метит `lastMeta.watcher` — тот же объект, что на плёнке).
+  Кинд рюкзака `camera` — **последний** в `BAG_KINDS` (индекс идёт по сети в `ps`), `cleanParcel` проверяет `shots`.
+- **Плёнка и альбом**: `ui/film.js` (`FilmStrip` на экране итогов; «в альбом» скрыто в `.exe`/file://: `albumHere`),
+  `core/photoStore.js` (IndexedDB `hush-photos`/`photos`, `ALBUM_MAX` 400, `cleanMeta` на каждом чтении, `zipStore` —
+  свой stored-zip с crc32), `site/album.js` (раздел `#album`, `window.__hushSite.album`). Сайт и игра — один origin.
+- **Тело**: `CFG.PLAYER` jump*/gravity*/coyote/jumpBuffer/airAccel/airDrag/stepDown; `Player._vertical` (буфер нажатия по
+  `input.jumpAt`, койот, падение с края), `_eyes` (пружины `spring`). `PF.air` = 256 в состоянии игрока. Клавиша
+  `jump` (V) — `cleanKeys` сначала раскладывает **свои** привязки игрока, потом умолчания (новая клавиша по умолчанию
+  не отбирает занятую игроком — остаётся без привязки).
+- **Друзья**: `RemotePlayer` — Эрмит по буферу пакетов, `vx/vz/vy/turn`, приземление (`mateLand`);
+  `animateSurvivor(rig, st, dt)` вместо `poseSurvivor` для живых на ногах; `settleRig(rig, dt)` — **последним** после
+  всех поз (инерциализация). `uNear` (people.js) ставит `Game` по расстоянию до камеры (3 → 9 м), днём 0.
+- **Эхолокатор**: `CFG.ECHO`; `pingPress` (отказ — `hud.cooldownDeny` + `audio.echoDeny`), `_ping`, `_echoClock`
+  (`echoMul` мошкары). Голос — только микрофон. `pu` с последним полем 2 = чужой эхолокатор.
+- **Трава**: `meadow.js` — `uTime` объявлялся дважды (шейдер не компилировался → поле голое); `sonar.js` sunN/sunS —
+  дневной свет травы и просвечивание.
+- `PROTOCOL` = 21. Тесты: `round40a` (10), `round40b` (10), `round40c` (12); браузерные проверки — скриншоты утра,
+  ночи 4, вспышки с Наблюдателем в кадре, альбома 1280/390.
+
 ## 2. Петля игры (и это надо понимать буквально)
 
 ```
@@ -1041,30 +1081,35 @@ src/
   main.js          вход: рендерер, камера, post, меню, состояния приложения ('menu'|'playing'|'paused'|'over'),
                    DEBUG-параметры URL, __hush для отладки, retina/качество/сглаживание
   core/            config.js (баланс), rng.js, i18n.js, storage.js (настройки/результаты), persistence.js,
-                   identity.js (ник/анонимность)
+                   identity.js (ник/анонимность), photoStore.js (4.0: IndexedDB альбома + zip)
   world/           world.js (лес, локации), terrain.js, builder.js (MeshBuilder+KIND), collision.js, trails.js,
-                   meadow.js, navigation.js, yard.js (лесхоз/просека/шоссе), expedition.js (вышка/Зорька)
+                   meadow.js, navigation.js, yard.js (лесхоз/просека/шоссе), expedition.js (вышка/Зорька),
+                   undergrowth.js (4.0: подлесок), decay.js (4.0: упадок леса по дням)
   render/          sonar.js (материал мира + shared-юниформы), pulses.js, ghosts.js, eyes.js, particles.js,
-                   people.js (материал людей), shadows.js, post.js
+                   people.js (материал людей), shadows.js (+ SunShadow, 4.0), post.js (+ лучи, 4.0),
+                   tentacles.js (4.0: щупальца за картой)
   game/            game.js (машина состояний, правила, директор, скримеры, applyView)
                    objectives / escape / uaz / cabinets / doors / flares / glowsticks / torch / tools /
                    tapeCodec / toolModels / medhut / rescue / inventory / backpackData / partMap / shards /
                    stones / monsters / dread / mimics / player / remote / survivor / outfit / selfbody /
                    fieldView / moto / training / expedition / campPower / campfire / intro / netsync / wallet /
-                   highlights (2.1u: the highlight director; frames are opaque tokens, so it is testable)
+                   highlights (2.1u: the highlight director; frames are opaque tokens, so it is testable) /
+                   photo (4.0: фотоаппарат, вспышка, Наблюдатель)
   audio/           audio.js (весь синтез), mic.js, music.js, phrases.js
   net/             net.js (Trystero), coop.js (комната/рассадка/старт), netsync.js (протокол), ice.js, lobbyRules.js
   cloud/           client.js (Supabase), controller.js (снимки/ревизии), rewards.js, snapshot.js, words.js
   input/           input.js (клавиатура по e.code, мышь+pointer lock, тач-кнопки)
   ui/              hud.js, menus.js, graphics.js (расширенная графика), garage*.js (3D-гараж), lobby.js, wardrobe.js, mannequin.js, atlas*.js,
                    bag3d.js, touchButtons.js, radar.js, news.js, miccal.js, socialDock/Toasts/Words, account.js,
-                   beyond.js, voicemix.js, sfxtest.js, reel.js (2.1u: plays the shift's highlights, writes .webm)
-tests/             node:test, 72 файла / 580 тестов (на 3.1s)
+                   beyond.js, voicemix.js, sfxtest.js, reel.js (2.1u: plays the shift's highlights, writes .webm),
+                   film.js (4.0: плёнка смены на экране итогов)
+tests/             node:test, 75 файлов / 612 тестов (на 4.0)
 play/              собранная игра для GitHub Pages (артефакт сборки, коммитится)
 site/              сайт игры (3.1s) → /pinterest/site/: index.html, main.js (прокрутка, звук, микрофон, ленивые
                    секции), stage.js + forest.js (фоновый лес из World.prototype.*, sonar-материал, импульсы),
                    timeline.js (трек камеры, смена на прокрутке), atlas.js + plate.js (пластины atlas3d.js),
-                   votes.js + voteClient.js + mobs.js + mobVoices.js (голосование), patches.js (news.js),
+                   votes.js + voteClient.js + mobs.js + mobVoices.js (голосование), album.js (4.0: снимки
+                   фотоаппарата из IndexedDB), patches.js (news.js),
                    fx.js, i18n.js (свои строки ru/en), site.css. Сборка: vite.site.config.js → dist/site/
 supabase/          миграции; 20261103180000_hush_mob_votes.sql — урна голосования сайта (hush_mob_tally/vote)
 ```
@@ -1073,7 +1118,7 @@ supabase/          миграции; 20261103180000_hush_mob_votes.sql — ур�
 не расходится с игрой. Правила: в `play/` он не попадает (менять его можно без пересборки `play/`); строки — только
 в `site/i18n.js`, ru **и** en; ссылки в игру относительные (`../`). Dev: `npm run dev` → `/site/`; `?q=0.25` —
 фиксированный масштаб рендера (SwiftShader: ~1–2 с на кадр). `window.__hushSite` — `stage`, `atlas`, `ballot`,
-`patches`, `engine`; в харнессе после `scrollTo` ставить `stage.uSmooth = stage.u`, чтобы камера не догоняла.
+`patches`, `album`, `engine`; в харнессе после `scrollTo` ставить `stage.uSmooth = stage.u`, чтобы камера не догоняла.
 **Голоса в тестах не отправлять никогда**: в харнессе — `page.route(/supabase\.co/)` с поддельным ответом.
 
 **Потоки данных, которые важно не ломать**
@@ -1086,7 +1131,7 @@ supabase/          миграции; 20261103180000_hush_mob_votes.sql — ур�
 
 ## 6. Проверка: как убедиться, что не сломал
 
-1. `npm test` — 580 тестов (3.1s), все должны проходить (правка теста допустима только если изменилось **поведение по
+1. `npm test` — 612 тестов (4.0), все должны проходить (правка теста допустима только если изменилось **поведение по
    замыслу**, и тогда в коммит-сообщении надо сказать, какое).
 2. `npm run build:pages` — сборка в `play/`; без неё деплой покажет старую версию.
 3. Живой прогон в браузере (headless-харнесс, рецепт ниже) на **конкретной сцене**, а не «в целом работает».
@@ -1112,7 +1157,8 @@ await page.evaluate(() => window.__hush.startRun());
   `startRun`, `opening`, `state`, `debug`.
 
 **URL-параметры**: `?night` (сразу ночь), `?nointro` (без фильма), `?t=500` (ночь с 8:20), `?nomic` (без микрофона),
-`?speed=2`, `?fps`, `?sfx` (панель звука), `?autostart`, `?seats=1..4` (превью четырёх прощаний у костра),
+`?speed=2`, `?fps`, `?sfx` (панель звука), `?autostart`, `?seats=1..4` (превью четырёх прощаний у костра), `?tentacles`
+(щупальца на 4-й секунде каждой ночи, 4.0),
 `?room=КОД`, `?net=nostr|torrent`, `?relays=ws://…`.
 
 **Грабли, на которые уже наступали** — не повторять:

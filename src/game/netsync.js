@@ -75,7 +75,7 @@ export class NetSync {
       if (p.crouching) f |= PF.crouch;
       if (p.sprinting) f |= PF.sprint;
       if (p.alive) f |= PF.alive;
-      if (g.charge && g.charge.active && g.charge.t > 0.3) f |= PF.charging;
+      if (p.grounded === false) f |= PF.air; // (4.0) a jump, a fall off a deck
       if (g.input.useHeld) f |= PF.use;
       if (g.torch && g.torch.on) f |= PF.torch;
       if (g.torch && g.torch.on && g.torch.dip) f |= PF.dip;
@@ -252,7 +252,10 @@ export class NetSync {
       case 'ibg': if (isHostMsg) g.inventory.applyClaim(a); break;
       case 'gd': if (r && typeof a === 'string') { const s = g.glows.find(a); if (s?.owner === pid && s.state === 'held') g.glows.dropFor(pid, +b, +c); } break;
       case 'pu':
-        if (r) g.remotePulse(r, +a, +b, +c, +e, !!f);
+        if (r) g.remotePulse(r, +a, +b, +c, +e, f === 2 ? 2 : f ? 1 : 0); // (4.0: 2 = their echolocator)
+        break;
+      case 'cf': // (4.0) a friend's camera flash: the burst, its light, the click — and on the host, the Watcher
+        if (r) g.camItem.netFlash(r, +a, +b, +c, +e, +f);
         break;
       case 'mb': // a friend got on/off their bike at the training ground
         if (Number.isInteger(a) && g.motos) g.motos.netMount(pid, a, !!b);
@@ -345,6 +348,11 @@ export class NetSync {
           case 'iu': g.cabinets.netUnlock(a); break;
           case 'spe': g.expedition.netMerge(a); break;
           case 'du': if (g.state === 'morning') g.startDusk(); break;
+          case 'tn': if (Number.isFinite(+a)) g.startTentacles(+a >>> 0); break; // (4.0) the arms on the horizon
+          case 'cw': // (4.0) a flash drove a Watcher off: where it stood (and if it was your flash, you hear it)
+            if ([b, c, e].every((v) => Number.isFinite(+v))) g.camItem.driven(+b, +c, +e);
+            if (a === g.player.id) g.camItem.scared(1);
+            break;
           case 'dn': if (g.state === 'play') { if (Number.isInteger(a)) g.day = Math.max(1, a); g.startDawn(); } break;
           case 'hu': if (m) g.fxHunt(m, b); break;
           case 'in': if (m) g.fxInvestigate(m, +c || 0, b); break;

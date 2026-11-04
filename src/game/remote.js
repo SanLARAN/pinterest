@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import { CFG } from '../core/config.js';
 import { BAG_KINDS } from './backpackData.js';
 import { clamp, lerp, angleDiff } from '../core/rng.js';
-import { buildSurvivor, poseSurvivor, poseCarrier, poseGlowHand, poseTorchHand, poseFur, poseRider } from './survivor.js';
+import { buildSurvivor, poseSurvivor, poseCarrier, poseGlowHand, poseTorchHand, poseFur, poseRider, animateSurvivor, settleRig } from './survivor.js';
 import { cleanFit } from './outfit.js';
 import { createPersonMaterial, dressPerson, undressPerson } from '../render/people.js';
 
@@ -17,7 +17,7 @@ export const PLAYER_HEX = [0x8ef0ff, 0xa6ff9e, 0xd2a8ff, 0xffe08a];
 const DELAY = 110; // ms
 
 // flags in the player-state message
-export const PF = { crouch: 1, sprint: 2, alive: 4, charging: 8, use: 16, morning: 32, torch: 64, dip: 128 };
+export const PF = { crouch: 1, sprint: 2, alive: 4, charging: 8, use: 16, morning: 32, torch: 64, dip: 128, air: 256 }; // (4.0: air — their feet are off the ground)
 
 // slot → spawn offset around the camp (right, back) in metres
 export const SLOT_OFFSET = [[0, 0], [1.5, 0.55], [-1.5, 0.55], [0, 1.6]];
@@ -69,6 +69,15 @@ export class RemotePlayer {
     this.stepAcc = 0;
     this.lastStep = 0;
     this.revealT = -9; // last time a wave found them (name label)
+    // (4.0) what the animator reads: their real velocity along and across their body, how fast they turn, the air
+    this.air = false;
+    this.airT = 0;
+    this.vx = 0;
+    this.vz = 0;
+    this.vy = 0;
+    this.turn = 0;
+    this.landImp = 0;
+    this.near = 0;
     this.lastHeard = performance.now();
   }
 
@@ -119,13 +128,37 @@ export class RemotePlayer {
         k = 1;
       }
       const k1 = Math.min(1, k);
-      const ox = this.x, oz = this.z;
+      const ox = this.x, oz = this.z, oy = this.y, oyaw = this.yaw;
       if (this.alive) {
-        this.x = lerp(a.x, b.x, k);
-        this.z = lerp(a.z, b.z, k);
-        this.y = lerp(a.y, b.y, k1);
+        // (4.0) a curve through the reports, not a polyline: Hermite with tangents from the neighbours (in their
+        // real timing), so a turn, a jump's arc or a stop has no corners at 15 reports a second. Past the last
+        // report it only runs on in a straight line (never a cubic's overshoot)
+        const ia = B.indexOf(a), a0 = B[Math.max(0, ia - 1)], b1 = B[Math.min(B.length - 1, ia + 2)];
+        if (k <= 1 && b !== a) {
+          const span = b.t - a.t;
+          const ta = span / Math.max(1, b.t - a0.t), tb = span / Math.max(1, b1.t - a.t);
+          const k2 = k * k, k3 = k2 * k;
+          const h00 = 2 * k3 - 3 * k2 + 1, h10 = k3 - 2 * k2 + k, h01 = -2 * k3 + 3 * k2, h11 = k3 - k2;
+          const H = (pa0, pa, pb, pb1) => h00 * pa + h10 * (pb - pa0) * ta + h01 * pb + h11 * (pb1 - pa) * tb;
+          this.x = H(a0.x, a.x, b.x, b1.x);
+          this.z = H(a0.z, a.z, b.z, b1.z);
+          this.y = H(a0.y, a.y, b.y, b1.y);
+        } else {
+          this.x = lerp(a.x, b.x, k);
+          this.z = lerp(a.z, b.z, k);
+          this.y = lerp(a.y, b.y, k1);
+        }
         this.yaw = a.yaw + angleDiff(a.yaw, b.yaw) * k1;
         this.pitch = lerp(a.pitch, b.pitch, k1);
+      }
+      if (dt > 1e-4 && this.alive) {
+        const ivx = (this.x - ox) / dt, ivz = (this.z - oz) / dt;
+        if (Math.hypot(ivx, ivz) < 15) {
+          this.vx = lerp(this.vx, ivx, 1 - Math.exp(-12 * dt));
+          this.vz = lerp(this.vz, ivz, 1 - Math.exp(-12 * dt));
+          this.vy = lerp(this.vy, (this.y - oy) / dt, 1 - Math.exp(-12 * dt));
+        }
+        this.turn = lerp(this.turn, angleDiff(oyaw, this.yaw) / dt, 1 - Math.exp(-8 * dt));
       }
       this.speed = lerp(a.speed, b.speed, k1);
       const f = (k1 > 0.5 ? b : a).f;
@@ -133,32 +166,57 @@ export class RemotePlayer {
       this.sprinting = !!(f & PF.sprint);
       this.charging = !!(f & PF.charging);
       this.useHeld = !!(f & PF.use);
+      const air = !!(f & PF.air) && this.alive;
+      if (air) this.airT += dt;
+      else if (this.air) {
+        // they came down: a squat, and a thud you hear from where they are
+        this.landImp = clamp(0.35 + this.airT * 0.9, 0.35, 1);
+        const d = this.game.distToEars(this.x, this.z);
+        if (d < 30) this.game.audio.mateLand?.(this.x, this.y + 0.1, this.z, this.landImp);
+        this.airT = 0;
+      }
+      this.air = air;
       this.eyeCur = lerp(this.eyeCur, this.crouching ? CFG.PLAYER.crouchEye : CFG.PLAYER.eye, 1 - Math.exp(-10 * dt));
       // footsteps you can hear (not on the network: derived from how they move)
       const moved = Math.hypot(this.x - ox, this.z - oz);
-      if (this.alive && moved < 3 && this.speed > 0.3) {
+      if (this.alive && moved < 3 && this.speed > 0.3 && !this.air) {
         const stepLen = this.carrying ? CFG.PLAYER.stepWalk * 0.82 : this.crouching ? CFG.PLAYER.stepCrouch : this.sprinting ? CFG.PLAYER.stepSprint : CFG.PLAYER.stepWalk;
         this.stepAcc += moved;
-        this.phase += (moved / stepLen) * Math.PI;
+        // (4.0) a step back is the stride played backwards (it used to moonwalk forwards)
+        const back = -this.vx * Math.sin(this.yaw) - this.vz * Math.cos(this.yaw) < -0.4 * Math.abs(this.vx * Math.cos(this.yaw) - this.vz * Math.sin(this.yaw)) - 0.2;
+        this.phase += (back ? -1 : 1) * (moved / stepLen) * Math.PI;
         if (this.stepAcc >= stepLen) {
           this.stepAcc -= stepLen;
           const d = this.game.distToEars(this.x, this.z);
           if (d < 26 && (!this.crouching || this.carrying)) {
             const w = this.game.world;
             const depth = w.water && !w.onWalk(this.x, this.z, 0) ? w.water.depth(this.x, this.z) : 0; // 3.0k
-            this.game.audio.mateStep(this.x, this.y + 0.1, this.z, this.carrying ? 0.62 : this.sprinting ? 0.85 : 0.4, depth);
+            const ug = w.undergrowth?.probe(this.x, this.z); // (4.0) through a bush: you hear it rustle
+            this.game.audio.mateStep(this.x, this.y + 0.1, this.z, this.carrying ? 0.62 : this.sprinting ? 0.85 : 0.4, depth, ug ? ug.k : 0, !!ug?.dry);
             // (3.0n) a friend in the water pushes it too, in the same field your own boot writes to
             if (this.game.waves) waterKick(this.game.waves, w, this.x, this.z, this.game.time || 0, this.sprinting ? 'run' : this.crouching ? 'tap' : 'step', 0.7 + 0.5 * Math.min(1, depth / 0.7));
           }
         }
       }
     }
+    this._pose(dt);
+    settleRig(this.rig, dt); // (4.0) whatever posed them this frame, they flow into it
+  }
+
+  _pose(dt) {
     if (this.riding >= 0 && this.alive) {
       // a rider: knees bent, chest over the bars, leaning with the machine they are on
       const bike = this.game.motos?.bikes?.[this.riding];
       poseRider(this.rig, bike?.roll || 0, bike?.steer || 0, this.game.time || 0);
+    } else if (!this.alive) {
+      poseSurvivor(this.rig, this.phase, 0, false, true);
     } else {
-      poseSurvivor(this.rig, this.phase, this.alive ? this.speed : 0, this.crouching, !this.alive);
+      const sy = Math.sin(this.yaw), cy = Math.cos(this.yaw);
+      animateSurvivor(this.rig, {
+        phase: this.phase, speed: this.speed, fwd: -this.vx * sy - this.vz * cy, side: this.vx * cy - this.vz * sy,
+        crouch: this.crouching, sprint: this.sprinting, air: this.air, vy: this.vy, land: this.landImp, pitch: this.pitch, turn: this.turn,
+      }, dt);
+      this.landImp = 0;
     }
     if (this.alive) poseFur(this.rig, dt, this.speed);
     const r = this.rig.root;
@@ -196,7 +254,7 @@ export class RemotePlayer {
     const geo=g.inventory.geo[kind] || g.tools.geo[kind];
     if(!geo) return;
     if(!m) { m=new THREE.Mesh(geo,g.world.material);this.rig.nodes.elR.add(m);this.kitMeshes.set(kind,m); }
-    m.position.set(0,-.3,.09);m.rotation.set(kind==='crowbar'?-.5:Math.PI/2,kind==='flare'?-Math.PI/2:0,.1);
+    m.position.set(0,-.3,.09);if(kind==='camera') m.rotation.set(Math.PI/2,Math.PI,0); else m.rotation.set(kind==='crowbar'?-.5:Math.PI/2,kind==='flare'?-Math.PI/2:0,.1); // (4.0: the camera's lens is its −z; held out in front, lens forward, top up)
     m.scale.setScalar(kind==='tape'?.65:kind==='stones'?.7:1);m.visible=true;
   }
 

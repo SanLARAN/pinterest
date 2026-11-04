@@ -1,7 +1,7 @@
 // One run of the game: rules, scoring, director, scares, juice.
 import * as THREE from 'three';
 import { CFG, dangerMultiplier, monsterTargets, diffDay, fovFor } from '../core/config.js';
-import { RNG, Simplex2, clamp, lerp, smoothstep, damp } from '../core/rng.js';
+import { RNG, Simplex2, clamp, lerp, smoothstep, damp, angleDiff } from '../core/rng.js';
 import { t } from '../core/i18n.js';
 import { settings, saveSettings } from '../core/storage.js';
 import { createMonster, ShadeRig, buildRig } from './monsters.js';
@@ -12,7 +12,7 @@ import { Beyond } from '../ui/beyond.js';
 import { earn, EARN } from './wallet.js';
 import { NetSync } from './netsync.js';
 import { Objectives } from './objectives.js';
-import { Player } from './player.js';
+import { Player, spring } from './player.js';
 import { Shards } from './shards.js';
 import { Stones } from './stones.js';
 import { Doors } from './doors.js';
@@ -24,6 +24,7 @@ import { Escape } from './escape.js';
 import { Bunker } from './bunker.js'; // 3.0q: the shelter under the peat works' camp, and what is in it
 import { Cabinets } from './cabinets.js';
 import { Torches } from './torch.js';
+import { PhotoCamera } from './photo.js'; // 4.0: the camera and its flash
 import { ForestTools } from './tools.js';
 import { Expedition } from './expedition.js';
 import { Backpack } from './inventory.js';
@@ -43,7 +44,7 @@ import {PartMap} from './partMap.js';
 import { Angler } from './angler.js'; // 2.1o: the man with the lantern (see CFG.ANGLER)
 import { Stray } from './stray.js'; // 2.1v: the girl who takes the voice (see CFG.STRAY)
 import { buildStrayBody, poseStrayLunge } from './strayBody.js'; // 3.0t: her muzzle, for the death close-up
-import { echoOf, mistScale } from './water.js'; // 3.0b: what water does to a sound
+import { echoOf, mistScale, speedScale } from './water.js'; // 3.0b: what water does to a sound
 import { inert } from '../core/inert.js'; // 3.0: a system the current map does not have
 import { syncPumps } from '../world/bog.js'; // 3.0c: a running pump drains its sector
 import { Drowned } from './drowned.js'; // 3.0d: the one in the water
@@ -51,6 +52,7 @@ import { Gnats } from './gnat.js'; // 3.0e: the swarm that eats your echo
 import { Magpies } from './magpies.js'; // 3.1c: the birds that tell
 import { Winch } from './winch.js'; // 3.0f: the way out of the bog
 import { Rain } from '../render/rain.js'; // 3.0i: the bog's own weather — a fine drizzle, nothing more
+import { Tentacles, TENT } from '../render/tentacles.js'; // 4.0: the arms on the horizon
 
 const RED = [1.0, 0.13, 0.08];
 const CUT_FADE = 13.9; // s into the fly-by when the screen starts going dark
@@ -62,7 +64,7 @@ const MORNING_LIGHT = 0.95;
 const FADE_IN = 1.4; // s: up out of the film's black into the first night
 const DAWN_SECONDS = 11; // the last night lets go of the sky slowly
 const NO_LOOK = { dx: 0, dy: 0 };
-const SRC_SELF = new Set(['voice', 'ping', 'step', 'bump', 'breath', 'repair', 'door', 'flare', 'glow', 'part', 'engine', 'torch', 'crowbar', 'ladder']);
+const SRC_SELF = new Set(['voice', 'ping', 'step', 'bump', 'breath', 'repair', 'door', 'flare', 'glow', 'part', 'engine', 'torch', 'crowbar', 'ladder', 'camera']);
 const _v = new THREE.Vector3();
 const escHtml = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -79,6 +81,9 @@ export class Game {
     this.objectives = new Objectives(this);
     this.doors = new Doors(this);
     this.flares = new Flares(this);
+    this.tentacles = new Tentacles(this.scene); // (4.0) far out past the edge, some nights
+    this.tentAt = -1;
+    this.tentShake = [];
     this.glows = new GlowSticks(this);
     this.medhut = new MedHut(this); // (after the glow sticks: its lantern is one of their small lights)
     this.rescue = new Rescue(this);
@@ -102,6 +107,8 @@ export class Game {
     this.cabinets = new Cabinets(this); // cupboards in the buildings (and the шкафандр)
     this.torch = this.map === 'forest' ? new Torches(this) : inert(Torches, this, { hasLight: false, has: false, on: false, charge: 0, items: [], spare: 0 }); // flashlights (3.0r: `items`/`spare` too — a guest's torch claim used to throw on the host)
     this.tools = new ForestTools(this);
+    // (4.0) the camera: one lies out in the forest (the bog has none — its spots are the forest's landmarks)
+    this.camItem = this.map === 'forest' ? new PhotoCamera(this) : inert(PhotoCamera, this, { has: false, shots: 0, items: [], film: [], bursts: [], label: '' });
     this.expedition = this.map === 'forest' ? new Expedition(this) : inert(Expedition, this);
     this.selfBody = new SelfBody(this); // yours, when you look down
     this.beyond = new Beyond(document.getElementById('beyond')); // co-op: the dead talk among themselves
@@ -269,6 +276,9 @@ export class Game {
     this.baseSeed = opts.seed != null ? opts.seed >>> 0 : 0; // the flare gun's nightly body is chosen from it, alike on every machine
     this.time = 0;
     this.day = 1; // every dawn but the last one is just a breather
+    this.world.decay?.setDay(1); // (4.0) a new shift finds the forest as it was
+    this.tentacles?.stop();
+    this.tentAt = -1;
     this.daysTotal = CFG.SHIFT.OPTIONS.includes(opts.days) ? opts.days : CFG.SHIFT.DAYS; // (2.1s: the host picks 2, 4 or 6 nights)
     this.seizedByWatcher = false;
     this.score = 0;
@@ -320,7 +330,9 @@ export class Game {
     this.escape.reset(new RNG((this.rng.next() * 4294967296) >>> 0)); // (its own stream: the same on every machine)
     this.bunker.reset(); // (3.0q) the shelter: the cap locked, the lamps burning, nothing out of the crack
     this.cabinets.reset(new RNG((this.rng.next() * 4294967296) >>> 0));
-    this.torch.reset(new RNG((this.rng.next() * 4294967296) >>> 0), opts.online || this.online);
+    const torchSeed = (this.rng.next() * 4294967296) >>> 0;
+    this.torch.reset(new RNG(torchSeed), opts.online || this.online);
+    this.camItem.reset(new RNG((torchSeed ^ 0x63616d72) >>> 0), opts.online || this.online); // (4.0: from the torch's seed — the night's own draws stay as they were)
     this.tools.reset();
     this.expedition.reset();
     this.setFlares(0, false);
@@ -332,8 +344,8 @@ export class Game {
     this.objectives.setMorning(true);
     this.charge = { active: false, t: 0 };
     this.pingCD = 0;
-    this.pingCDMax = 1;
-    this.pingQueue = null;
+    this.pingCDMax = CFG.ECHO.cd;
+    this.echoReadyCued = true;
     this.stepNoise = 0;
     this.killer = null;
     this.deathT = 0;
@@ -347,7 +359,7 @@ export class Game {
     if (this.map === 'bog') syncPumps(this.world, this.objectives.gens); // no pump runs yet: the water is where it was
     shared.uDawn.value = MORNING_LIGHT;
     shared.uMorning.value = 1;
-    shared.uSun.value.set(0.42, 0.62, -0.66).normalize(); // a high, friendly sun
+    this._morningSun(0); // (4.0: the first morning's sun comes up low too — updateMorning lifts it)
     shared.uFear.value = 0;
     this.dread.reset();
     this.hud.setIntro(null);
@@ -408,6 +420,7 @@ export class Game {
     const p = this.player;
     this.morningT += dt;
     this.time += dt;
+    this._morningSun(this.morningT / CFG.SHIFT.MORNING);
     if (!this.morningAudio && this.audio.ready && this.audio.ambOn) {
       this.morningAudio = true;
       this.audio.setMorning(true);
@@ -451,6 +464,7 @@ export class Game {
       this.audio.bump();
       this.addTrauma(0.12);
     }
+    this._jumpEvents(pev, false);
     // (2.1k: there used to be a 26 m leash round the camp here — an invisible wall that pushed you back
     // with a hint. The morning is short and the forest is the point: walk out if you want to.)
     const hud = this.hud;
@@ -470,6 +484,7 @@ export class Game {
     this.cabinets.update(dt);
     this.medhut.update(dt);
     this.torch.update(dt);
+    this.camItem?.update(dt);
     this.glows.update(dt);
     this.pulses.update(this.time);
     this._waterFrame();
@@ -501,21 +516,11 @@ export class Game {
       this.updateRemotes(dt);
     }
     for (const e of this.inputMuted ? [] : raw.events) {
-      if (e === 'pingDown') { this.charge.active = true; this.charge.t = 0; }
-      else if (e === 'pingUp') this.pingRelease();
+      if (e === 'pingDown') this.pingPress();
       else if (e === 'primary') this.inventory.primary();
       else if (e === 'secondary') this.inventory.secondary();
     }
-    if (this.charge.active) {
-      this.charge.t += dt;
-      if (this.charge.t > 2.4) this.pingRelease();
-    }
-    this.pingCD -= dt;
-    if (this.pingQueue != null && this.pingCD <= 0) {
-      const h = this.pingQueue;
-      this.pingQueue = null;
-      this._ping(h);
-    }
+    this._echoClock(dt);
 
     // on foot: the usual walker. In the saddle the bike is the body (MotoPark.update writes it back).
     const riding = this.motos.rider >= 0;
@@ -523,6 +528,7 @@ export class Game {
       const pev = p.update(dt, input, this.inputMuted || this.inventory.active ? NO_LOOK : raw.look, this.inputMuted || this.inventory.active);
       if (pev.step) this.audio.footstep(pev.step.intensity * 0.8);
       if (pev.bump) { this.audio.bump(); this.addTrauma(0.14); }
+      this._jumpEvents(pev, false);
     }
     this.motos.update(dt, input);
     if (this.motos.rider >= 0) {
@@ -545,6 +551,7 @@ export class Game {
     this.cabinets.update(dt);
     this.medhut.update(dt);
     this.torch.update(dt);
+    this.camItem?.update(dt);
     this.glows.update(dt);
     this.stones.update(dt, this);
     this.flares.update(dt);
@@ -564,6 +571,9 @@ export class Game {
     if (day <= this.day && this.state !== 'dawn') return;
     this.day = day;
     this.state = 'morning';
+    this.world.decay?.setDay(day); // (4.0) the forest the night left: more dead trees, stick men, red paint
+    this.tentacles?.stop();
+    this.tentAt = -1;
     this.time = 0; // the night's clocks start clean (the fallen stay down — their own clock runs on: see Rescue.bleedLeft)
     this.morningT = 0;
     this.duskT = 0;
@@ -578,8 +588,64 @@ export class Game {
     this.audio.setAmbience(0.25, 0);
     shared.uDawn.value = MORNING_LIGHT;
     shared.uMorning.value = 1;
-    shared.uSun.value.set(0.42, 0.62, -0.66).normalize();
+    this._morningSun(0);
     this.objectives.setMorning(true);
+  }
+
+  // (4.0) the arms on the horizon (render/tentacles.js). At nightfall the host (or a solo game) decides whether
+  // tonight something far off comes up, and when — likelier as the shift goes on; the room gets the seed at that
+  // moment ('tn') and everyone sees the same arms rise and fall. Nothing in the forest is touched: it is too far
+  _scheduleTentacles() {
+    this.tentacles?.stop();
+    this.tentAt = -1;
+    this.tentShake = [];
+    if (!this.auth) return;
+    const T = CFG.TENTACLES;
+    const base = this.online ? this.baseSeed : (Math.random() * 4294967295) >>> 0;
+    const r = new RNG((base ^ Math.imul(this.day | 0, 0x9e3779b1) ^ 0x74656e74) >>> 0);
+    const p = Math.min(T.maxChance, T.chance + T.perDay * (this.day - 1));
+    const go = r.chance(p);
+    const at = r.float(T.minT, T.maxT);
+    this.tentSeed = ((r.next() * 4294967295) >>> 0) || 1;
+    if (this.debugTentacles) this.tentAt = 4;
+    else if (go) this.tentAt = at;
+  }
+
+  startTentacles(seed) {
+    if (this.tentacles.active || !(this.state === 'play' || this.state === 'dying')) return false;
+    this.tentacles.start(seed >>> 0);
+    return true;
+  }
+
+  _tentFrame(dt) {
+    if (this.auth && this.state === 'play' && this.tentAt > 0 && this.time >= this.tentAt) {
+      this.tentAt = -1;
+      if (this.startTentacles(this.tentSeed) && this.role === 'host') this.sync.ev('tn', this.tentSeed);
+    }
+    if (!this.tentacles.active) return;
+    if (!(this.state === 'play' || this.state === 'dying' || this.state === 'escape')) { this.tentacles.stop(); return; }
+    this.tentacles.update(dt, this.camera.position, this.time);
+    const delay = TENT.far / 343; // (it is a long way off: you see it, then you hear it)
+    for (const e of this.tentacles.take()) {
+      if (e.type === 'rise') this.audio.tentacleRise(e.az, this.camera.position, delay);
+      else {
+        this.audio.tentacleCrash(e.az, this.camera.position, delay, 1);
+        this.tentShake.push(this.time + delay);
+      }
+    }
+    for (let i = this.tentShake.length - 1; i >= 0; i--) {
+      if (this.time < this.tentShake[i]) continue;
+      this.addTrauma(0.12); // the ground carries it
+      this.tentShake.splice(i, 1);
+    }
+  }
+
+  // (4.0) the morning sun climbs: it comes up low over the trees (long shadows, the fog lit from the side, shafts
+  // between the trunks) and by the dusk it stands a little higher — on the same bearing as it always has
+  _morningSun(k) {
+    const el = 0.17 + 0.23 * smoothstep(0, 1, Math.min(1, Math.max(0, k))); // ~10° → ~23°
+    const az = Math.atan2(0.42, -0.66);
+    shared.uSun.value.set(Math.cos(el) * Math.sin(az), Math.sin(el), Math.cos(el) * Math.cos(az));
   }
 
   startDusk() {
@@ -631,9 +697,14 @@ export class Game {
     // (finish() marks itself 'done' before calling this, so the film's own hand-over is fadeIn > 0)
     const fromFilm = (this.opening && this.opening.state === 'run') || this.fadeIn > 0;
     if (fromFilm) this.opening.cancel();
+    // (4.0) a film put away before its first frame (a debug jump, a host who starts the night at once) left the
+    // picture in the black the film opens from: nothing restored it. Come up out of it the way the film's own end does
+    if (fromFilm && this.fadeIn <= 0 && this.fx.fade < 1) this.fadeIn = FADE_IN;
     this.state = 'play';
     this.finale = false;
     this.time = 0;
+    this.world.decay?.setDay(this.day); // (4.0: a debug jump into a later night has its forest too)
+    this._scheduleTentacles();
     shared.uDawn.value = 0;
     shared.uMorning.value = 0;
     shared.uSun.value.set(0.5, 0.35, -0.8).normalize(); // if you ever see the sky again, it'll be a sunrise
@@ -765,8 +836,8 @@ export class Game {
 
   // what the Howler's wave counts as "moving" (anyone: you, or a teammate by their last report)
   movingForHowler(pl = this.player) {
-    if (pl === this.player) return pl.speed > 0.7 || (this.charge.active && this.charge.t > 0.3);
-    return pl.speed > 0.7 || !!pl.charging;
+    if (pl === this.player) return pl.speed > 0.7 || !pl.grounded; // (4.0: a jump is movement too)
+    return pl.speed > 0.7 || !!pl.charging || !!pl.air;
   }
 
   // ---------------- helpers ----------------
@@ -854,10 +925,12 @@ export class Game {
   }
 
   // ---------------- player sound ----------------
-  emitPlayerPulse(loud, fromMic) {
+  // device (4.0): the echolocator's wave — its own radius, strength and slow fade, whatever its (small) loudness
+  emitPlayerPulse(loud, fromMic, device = false) {
     const p = this.player;
     const e = this.eyePos();
-    let R = fromMic ? CFG.voiceRevealRadius(loud) : CFG.revealRadius(loud);
+    const E = CFG.ECHO;
+    let R = device ? E.radius : fromMic ? CFG.voiceRevealRadius(loud) : CFG.revealRadius(loud);
     // the участок (3.0b): knee-deep water shortens and slows the wave, vapour swallows its return
     const echo = echoOf(this.world, e.x, e.z);
     R *= echo.scale * mistScale(this.world, e.x, e.z);
@@ -867,22 +940,25 @@ export class Game {
       this.firstPingT = this.time;
       this.onFirstPing(this.player);
     }
-    const strength = 0.8 + loud * 0.7;
+    const strength = device ? E.strength : 0.8 + loud * 0.7;
     this.lastPulseT = this.time;
-    if (this.sync) this.sync.ev('pu', +e.x.toFixed(2), +(e.y - 0.25).toFixed(2), +e.z.toFixed(2), +loud.toFixed(3), fromMic ? 1 : 0);
-    const s = this.pulses.emit(e.x, e.y - 0.25, e.z, this.time, { radius: R, strength, speed: echo.speed, decay: 0.38 + (1 - loud) * 0.22, color: SONAR, kind: 'player' });
+    if (this.sync) this.sync.ev('pu', +e.x.toFixed(2), +(e.y - 0.25).toFixed(2), +e.z.toFixed(2), +loud.toFixed(3), device ? 2 : fromMic ? 1 : 0);
+    const s = this.pulses.emit(e.x, e.y - 0.25, e.z, this.time, { radius: R, strength, speed: echo.speed, decay: device ? E.decay : 0.38 + (1 - loud) * 0.22, color: SONAR, kind: 'player' });
     if (echo.scale < 1 || echo.speed !== CFG.PULSE.speed) {
       // a wave that dies in the water: the sound tells you before the picture does
       this.audio.sonarSweep(loud * 0.6, false);
     }
-    this.echoTicks(s, loud);
+    // (4.0) the device's wave is clean and wide, but it is a device: no shout in the screen, a soft ring in the ears,
+    // and every return ticks clearly (those clicks are for you alone — they are what "pings well" means)
+    const vis = device ? 0.45 : loud;
+    this.echoTicks(s, device ? 0.75 : loud);
     this.fx.shockT = 0;
-    this.fx.shockAmp = 0.35 + loud * 0.75;
-    this.addTrauma(0.06 + loud * 0.22);
-    this.fx.fovKick = Math.max(this.fx.fovKick, 1.5 + loud * 5);
+    this.fx.shockAmp = 0.35 + vis * 0.75;
+    this.addTrauma(device ? 0.03 : 0.06 + loud * 0.22);
+    this.fx.fovKick = Math.max(this.fx.fovKick, device ? 1.2 : 1.5 + loud * 5);
     this.hud.pulseCross();
-    this.audio.sonarSweep(loud, loud > 0.45);
-    this.particles.burst(e.x, e.y - 0.4, e.z, 10 + Math.round(loud * 26), { color: [0.5, 0.6, 0.66], speed: 6 + loud * 12, life: 0.55, size: 0.06, gravity: 0, drag: 2.2, dir: { x: 0, y: 0, z: 0 }, cone: 1, spread: 0.5 });
+    this.audio.sonarSweep(device ? 0.4 : loud, !device && loud > 0.45);
+    this.particles.burst(e.x, e.y - 0.4, e.z, 10 + Math.round(vis * 26), { color: [0.5, 0.6, 0.66], speed: 6 + vis * 12, life: 0.55, size: 0.06, gravity: 0, drag: 2.2, dir: { x: 0, y: 0, z: 0 }, cone: 1, spread: 0.5 });
     return s;
   }
 
@@ -911,32 +987,60 @@ export class Game {
     }
   }
 
-  pingRelease() {
-    const c = this.charge;
-    if (!c.active) return;
-    c.active = false;
-    const held = c.t;
+  // (4.0) SPACE: the echolocator. One press, one wave — or, while it is still empty, a flinch of the arc and a dull
+  // click of the button (nothing to hear for anyone else)
+  pingPress() {
     if (this.pingCD > 0) {
-      // the last echo isn't back yet: this one goes the moment it is (if that's soon), or not at all
-      if (this.pingCD <= CFG.PING_QUEUE) this.pingQueue = held;
-      else this.hud.cooldownDeny();
+      this.hud.cooldownDeny();
+      this.audio.echoDeny?.();
       return;
     }
-    this._ping(held);
+    this._ping();
   }
 
-  _ping(held) {
-    const loud = held < 0.18 ? 0.24 : lerp(0.32, 1.0, clamp((held - 0.18) / 0.95, 0, 1));
-    this.pingCD = this.pingCDMax = (CFG.PING_CD + CFG.PING_CD_LOUD * loud) * (this.echoMul || 1);
-    if (loud < 0.36) this.audio.click(loud);
-    else if (loud < CFG.SCREAM) this.audio.clap(loud);
-    else this.audio.shout(loud);
-    const scream = loud >= CFG.SCREAM;
-    this.stats.loudest = Math.max(this.stats.loudest, loud);
-    this.emitPlayerPulse(loud, false);
-    this.playerNoise(this.player.x, this.player.z, loud, 'ping', scream);
-    if (scream) this.onScream();
-    this.radar.noiseR = Math.max(this.radar.noiseR, CFG.hearRadius(loud));
+  // (4.0) a jump: the push off is a breath and a rustle; the landing is a thud the ground passes on — the harder
+  // you came down, the further (a sprint step's worth for an ordinary jump). night: monsters may hear it
+  _jumpEvents(pev, night) {
+    const p = this.player;
+    if (pev.jump) {
+      this.audio.jumpPush?.(!!pev.jump.wet);
+      if (night) this.playerNoise(p.x, p.z, 0.06, 'step');
+      this.stats.jumps = (this.stats.jumps || 0) + 1;
+    }
+    const L = pev.land;
+    if (!L) return;
+    const wet = speedScale(this.world, p.x, p.z) < 0.999;
+    this.audio.land?.(L.k, wet);
+    this.addTrauma(0.04 + L.k * 0.16);
+    if (!night) return;
+    const loud = Math.min(0.32, 0.1 + 0.032 * L.impact) * (p.crouching ? 0.5 : 1);
+    this.pulses.emitStep(p.x, p.y + 0.2, p.z, this.time, { radius: 6 + L.k * 5, strength: 0.55 + L.k * 0.3, speed: 16, decay: 1.8, kind: 'step' });
+    this.playerNoise(p.x, p.z, loud, 'step');
+    this.stepNoise = Math.max(this.stepNoise, loud);
+    if (wet) waterKick(this.waves, this.world, p.x, p.z, this.time, 'run', 1.1);
+  }
+
+  _ping() {
+    const E = CFG.ECHO, p = this.player;
+    this.pingCD = this.pingCDMax = E.cd;
+    this.echoReadyCued = false;
+    this.audio.echoPing?.();
+    this.stats.echoes = (this.stats.echoes || 0) + 1;
+    this.emitPlayerPulse(E.noise, false, true);
+    this.playerNoise(p.x, p.z, E.noise, 'ping', false);
+    this.radar.noiseR = Math.max(this.radar.noiseR, CFG.hearRadius(E.noise));
+  }
+
+  // the device refills (at half speed while the gnats are in your eyes — see game/gnat.js); a soft double tick
+  // when it is ready again
+  _echoClock(dt) {
+    if (this.pingCD <= 0) return;
+    this.pingCD = Math.max(0, this.pingCD - dt / (this.echoMul || 1));
+    if (this.pingCD === 0 && !this.echoReadyCued) {
+      this.echoReadyCued = true;
+      this.hud.pingReady?.();
+      if (this.player.alive) this.audio.echoReady?.();
+    }
   }
 
   onScream() {
@@ -1135,9 +1239,11 @@ export class Game {
   }
 
   // a teammate made a sound: you see their wave (tinted with their colour) and hear their click / clap / shout
+  // fromMic: 0 a click from an old build, 1 their voice, 2 (4.0) their echolocator
   remotePulse(r, x, y, z, loud, fromMic) {
     loud = Math.max(0, Math.min(1, loud));
-    let R = fromMic ? CFG.voiceRevealRadius(loud) : CFG.revealRadius(loud);
+    const device = fromMic === 2, E = CFG.ECHO;
+    let R = device ? E.radius : fromMic ? CFG.voiceRevealRadius(loud) : CFG.revealRadius(loud);
     const echo = echoOf(this.world, x, z);
     R *= echo.scale * mistScale(this.world, x, z);
     const first = this.firstPingT < 0;
@@ -1145,11 +1251,13 @@ export class Game {
     const c = r.hex;
     const k = 0.32;
     const color = [SONAR[0] * (1 - k) + (((c >> 16) & 255) / 255) * k, SONAR[1] * (1 - k) + (((c >> 8) & 255) / 255) * k, SONAR[2] * (1 - k) + ((c & 255) / 255) * k];
-    this.pulses.emit(x, y, z, this.time, { radius: R, strength: 0.8 + loud * 0.7, speed: echo.speed, decay: 0.38 + (1 - loud) * 0.22, color, kind: 'player' });
-    if (!fromMic) this.audio.matePing(x, y + 0.25, z, loud, CFG.SCREAM);
+    this.pulses.emit(x, y, z, this.time, { radius: R, strength: device ? E.strength : 0.8 + loud * 0.7, speed: echo.speed, decay: device ? E.decay : 0.38 + (1 - loud) * 0.22, color, kind: 'player' });
+    if (device) this.audio.mateEcho?.(x, y + 0.25, z);
+    else if (!fromMic) this.audio.matePing(x, y + 0.25, z, loud, CFG.SCREAM);
     // whoever made the sound flashes up at the heart of their own wave
     if (!(this.spectate && this.spectate.target === r) && this.distToEars(r.x, r.z) > 1.2) {
-      this.ghosts.spawn(r.rig, this.time, { strength: 0.55 + loud * 0.6, color: r.hex, life: 1.6 + loud, decay: 1.1, jitter: 0.4 });
+      const vis = device ? 0.5 : loud;
+      this.ghosts.spawn(r.rig, this.time, { strength: 0.55 + vis * 0.6, color: r.hex, life: 1.6 + vis, decay: 1.1, jitter: 0.4 });
       r.revealT = this.time;
     }
     this.lastPulseT = this.time;
@@ -1850,6 +1958,8 @@ export class Game {
   // the fourth is the end of the shift and the win. The host's word starts it for everyone.
   startDawn() {
     this.bunker?.evacuate?.(); // (3.0q) the shelter does not keep anyone past the night
+    this.tentacles?.stop(); // (4.0: whatever was out there goes back down with the light)
+    this.tentAt = -1;
     this.state = 'dawn';
     this.dawnT = 0;
     shared.uDawn.value = 0;
@@ -2075,8 +2185,13 @@ export class Game {
       // On the range there is nothing to hide behind: a friend is drawn there whatever the hour, the
       // lamp or the cupboard thinks. (They used to blink out when a state packet landed mid-teardown.)
       const range = this.state === 'training';
+      // (4.0) and close by you just see them: fully at three metres, fading out by nine (people.js uNear)
+      const cp = this.camera.position;
+      const nd = Math.hypot(r.x - cp.x, r.y + (r.alive ? 1 : 0.3) - cp.y, r.z - cp.z);
+      r.near = day ? 0 : 1 - smoothstep(3, 9, nd);
+      r.mat.uniforms.uNear.value = r.near;
       r.rig.root.visible = watched !== r && !this.onShoulder(r)
-        && (range ? r.alive : lit > 0.03 && this.state !== 'idle' && !this.cabinets.hides(r));
+        && (range ? r.alive : (lit > 0.03 || r.near > 0.01) && this.state !== 'idle' && !this.cabinets.hides(r));
       if (lit > 0.06 && !day) r.revealT = this.time;
     }
   }
@@ -2109,6 +2224,7 @@ export class Game {
       this.cabinets.update(dt);
       this.flares.update(dt);
       this.torch.update(dt);
+      this.camItem.update(dt);
       this.glows.update(dt);
       this.time += dt;
       this._commonFx(dt);
@@ -2121,6 +2237,7 @@ export class Game {
       this.doors.update(dt);
       this.flares.update(dt);
       this.torch.update(dt);
+      this.camItem.update(dt);
       this.glows.update(dt);
       this.escape.update(dt);
       for (const m of this.monsters) m.update(dt, this.time);
@@ -2142,6 +2259,7 @@ export class Game {
       this.flares.update(dt);
       this.medhut.update(dt);
       this.torch.update(dt);
+      this.camItem.update(dt);
       this.glows.update(dt);
       this.rescue.update(dt);
       for (const e of this.inputMuted ? [] : raw.events) {
@@ -2190,11 +2308,8 @@ export class Game {
     const heldByWater = this.drowned.captiveLocal(); // 3.0d: a hand round your ankle, and the water is patient
     for (const e of raw.events) {
       if (heldByHim || heldByHer) continue;
-      if (caught && e !== 'pingDown' && e !== 'pingUp') continue;
-      if (e === 'pingDown') {
-        this.charge.active = true;
-        this.charge.t = 0;
-      } else if (e === 'pingUp') this.pingRelease();
+      if (caught && e !== 'pingDown') continue;
+      if (e === 'pingDown') this.pingPress();
       else if (e === 'primary') this.inventory.primary();
       else if (e === 'secondary') this.inventory.secondary();
       else if (e === 'carry') this.carryKey();
@@ -2204,19 +2319,10 @@ export class Game {
       this.objectives.closeNote();
       this.events = raw.events.filter((e) => e !== 'useDown');
     }
-    if (this.charge.active) {
-      this.charge.t += dt; // the loudness ring around the dot shows how loud this will be
-      if (this.charge.t > 2.4) this.pingRelease(); // don't hold forever
-    }
-    this.pingCD -= dt;
+    this._echoClock(dt);
     if (this.echoMulT > 0) {
       this.echoMulT = Math.max(0, this.echoMulT - dt);
       if (this.echoMulT === 0) this.echoMul = 1; // the echo comes back on time again
-    }
-    if (this.pingQueue != null && this.pingCD <= 0) {
-      const h = this.pingQueue;
-      this.pingQueue = null;
-      this._ping(h);
     }
 
     // ---- player ----
@@ -2240,10 +2346,11 @@ export class Game {
       } else {
         this.audio.footstep(s.intensity);
       }
+      if (s.brush) this.audio.rustle(s.brush, s.intensity, s.dry); // (4.0) the undergrowth around your legs
       if (s.mode === 'crouch') {
         this.pulses.emitStep(p.x, p.y + 0.15, p.z, this.time, { radius: 2.6, strength: 0.3, speed: 10, decay: 2.4, kind: 'step' });
-        // ...unless it is a crouched step in the water: that still splashes, quietly
-        if (s.water) this.playerNoise(p.x, p.z, s.loud, 'step');
+        // ...unless it is a crouched step in the water: that still splashes, quietly (or one through a bush: it rustles)
+        if (s.water || s.brush) this.playerNoise(p.x, p.z, s.loud, 'step');
       } else {
         const sprint = s.mode === 'sprint';
         this.pulses.emitStep(p.x, p.y + 0.2, p.z, this.time, { radius: sprint ? 9 : 5.5, strength: sprint ? 0.6 : 0.42, speed: 16, decay: sprint ? 1.9 : 2.3, kind: 'step' });
@@ -2260,6 +2367,7 @@ export class Game {
       this.stepNoise = Math.max(this.stepNoise, 0.26);
       this.particles.burst(b.x, p.y + 1.3, b.z, 12, { color: [0.55, 0.8, 0.9], speed: 2.5, life: 0.7, size: 0.05, gravity: -5, drag: 2, dir: { x: b.nx, y: 0.3, z: b.nz }, cone: 0.8 });
     }
+    this._jumpEvents(pev, true);
     if (pev.breath) {
       this.audio.breathHeavy();
       this.playerNoise(p.x, p.z, 0.14, 'breath');
@@ -2295,6 +2403,7 @@ export class Game {
     this.flares.update(dt);
     this.medhut.update(dt);
     this.torch.update(dt);
+    this.camItem.update(dt);
     this.glows.update(dt);
     this.rescue.update(dt);
     es.update(dt);
@@ -2377,6 +2486,7 @@ export class Game {
     this.flares.update(dt);
     this.medhut.update(dt);
     this.torch.update(dt);
+    this.camItem.update(dt);
     this.glows.update(dt);
     this.rescue.update(dt);
     this.angler.update(dt); // a dead host still keeps his rope and his clock
@@ -2657,6 +2767,7 @@ export class Game {
 
   _commonFx(dt) {
     const fx = this.fx;
+    this._tentFrame(dt);
     fx.trauma = Math.max(0, fx.trauma - dt * 1.05);
     fx.glitch = Math.max(0, fx.glitch - dt * 1.8);
     // the Watcher's grip (2.1s): while it holds you the psychosis climbs to the ceiling; let go and it leaks away
@@ -2713,11 +2824,13 @@ export class Game {
       // a held breath: the view is never perfectly still, and shakes more when it's close
       const br = 0.0035 + fx.danger * 0.0045 + (p.exhausted ? 0.006 : 0);
       const yaw = p.yaw + sh * 0.07 * nx + Math.sin(realT * 0.43) * br * 0.5;
-      const pitch = p.pitch + sh * 0.06 * ny + Math.sin(realT * 1.05) * br;
+      // (4.0) + the body's weight in the eyes: the landing's nod, a lean back into a push and forward into a stop
+      const pitch = p.pitch + (p.viewPitch || 0) + sh * 0.06 * ny + Math.sin(realT * 1.05) * br;
       const roll = (p.roll || 0) + sh * 0.09 * nr + Math.sin(realT * 0.61 + 1.3) * br * 0.7;
       camera.rotation.set(pitch, yaw, roll, 'YXZ');
       const cy = Math.cos(p.yaw), sy = Math.sin(p.yaw);
-      camera.position.set(p.x + cy * sh * 0.08 * px, p.y + p.eyeCur + (p.bobY || 0) + sh * 0.06 * py, p.z - sy * sh * 0.08 * px);
+      const lf = p.swayF || 0, lr = p.swayR || 0; // (the head a hair behind the push, along and across the body)
+      camera.position.set(p.x + cy * sh * 0.08 * px - sy * lf + cy * lr, p.y + p.eyeCur + (p.bobY || 0) + (p.viewY || 0) + sh * 0.06 * py, p.z - sy * sh * 0.08 * px - cy * lf - sy * lr);
       const base = fovFor(camera.aspect);
       const fov = this.expedition.viewing ? 22 : base + fx.fovKick + (p.sprinting ? 5 : 0);
       if (Math.abs(camera.fov - fov) > 0.01) {
@@ -2730,18 +2843,20 @@ export class Game {
     this.audio.setListener(camera.position.x, camera.position.y, camera.position.z, _v.x, _v.y, _v.z);
     this.expedition.applyView(camera);
     this.world.grass?.update(camera);
+    this.world.undergrowth?.update(camera);
     // on a bike your hands are on the bars: the first-person arms would be drawn across the cockpit
     const riding = this.motos?.rider >= 0;
     const hands = !cutCam && !sp && !riding && !this.expedition.onTower && this.player.alive && (this.state === 'play' || this.state === 'dawn' || this.state === 'training');
     const gear = hands && !this.partMap.active && !this.cabinets.busy && !this.inventory.active && this.inventory.equipT <= 0 && this.fieldView.watch < 0.1 && !this.escape.held && !this.player.carrying;
     const active = this.inventory.equipped;
-    this.glows.placeView(camera, gear && active === 'glow');
-    this.escape.placeView(camera, hands);
+    const hc = cutCam || sp ? camera : this._handCam(camera, realT); // (4.0) the hands on arms, not on the lens
+    this.glows.placeView(hc, gear && active === 'glow');
+    this.escape.placeView(hc, hands);
     this.cabinets.placeView(camera, hands);
-    this.torch.placeView(camera, gear && active === 'torch');
-    this.tools.placeView(camera, gear && (active === 'tape' || active === 'crowbar'));
+    this.torch.placeView(hc, gear && active === 'torch');
+    this.tools.placeView(hc, gear && (active === 'tape' || active === 'crowbar'));
     this.partMap.place(camera,hands&&!this.cabinets.busy&&!this.inventory.active);
-    this.fieldView.place(camera, !cutCam && !sp && this.player.alive && !riding && !this.cabinets.busy && !this.expedition.onTower && ['play','morning','dawn','training'].includes(this.state));
+    this.fieldView.place(hc, !cutCam && !sp && this.player.alive && !riding && !this.cabinets.busy && !this.expedition.onTower && ['play','morning','dawn','training'].includes(this.state));
     this.bag3d.place(camera);
     this.fire.placeCamera(camera);
     this.motos.placeCockpit(camera, riding); // the rider's own bars (the arms above are off while riding)
@@ -2767,6 +2882,35 @@ export class Game {
     const live = this.state === 'play' || this.state === 'dying';
     u.uFlicker.value = this.state === 'play' ? this.dread.flicker : 0;
     shared.uFear.value = live ? smoothstep(0.5, 1.0, fx.danger) : 0;
+  }
+
+  // (4.0) where the hands are drawn from: the camera, plus a little of the arms' own life — they trail a quick turn
+  // and swing back, sink a touch deeper than the eyes on a landing, lift as you rise, and drop and tilt in a run
+  _handCam(camera, realT) {
+    const hc = this._hcam || (this._hcam = new THREE.Object3D());
+    const H = this._hs || (this._hs = { t: realT, yaw: camera.rotation.y, pitch: camera.rotation.x, ly: { x: 0, v: 0 }, lp: { x: 0, v: 0 }, run: 0, air: 0 });
+    const dt = clamp(realT - H.t, 0, 0.1);
+    H.t = realT;
+    const p = this.player;
+    if (dt > 0) {
+      const wy = angleDiff(H.yaw, camera.rotation.y) / dt, wp = (camera.rotation.x - H.pitch) / dt;
+      spring(H.ly, clamp(-wy * 0.011, -0.07, 0.07), 140, 17, dt);
+      spring(H.lp, clamp(-wp * 0.009, -0.05, 0.05), 140, 17, dt);
+      H.run = damp(H.run, p.sprinting && p.speed > 2 ? 1 : 0, 6, dt);
+      H.air = damp(H.air, p.grounded === false ? clamp((p.vy || 0) * 0.25, -1, 1) : 0, 10, dt);
+    }
+    H.yaw = camera.rotation.y;
+    H.pitch = camera.rotation.x;
+    hc.position.copy(camera.position);
+    hc.quaternion.copy(camera.quaternion);
+    hc.rotateY(H.ly.x);
+    hc.rotateX(H.lp.x - H.run * 0.07);
+    const ph = p.bobPhase || 0, amp = p.bobAmp || 0;
+    hc.translateX(Math.sin(ph) * amp * 0.18);
+    hc.translateY(-H.run * 0.022 + (p.viewY || 0) * 0.6 - H.air * 0.012 - Math.abs(Math.sin(ph)) * amp * 0.08);
+    hc.aspect = camera.aspect;
+    hc.updateMatrixWorld(true);
+    return hc;
   }
 
   hudUpdate(dt) {
@@ -2798,12 +2942,12 @@ export class Game {
     document.body.classList.toggle('holding', playing && !!es.held);
     document.body.classList.toggle('has-glow', playing && (this.glows.count > 0 || !!this.glows.held));
     document.body.classList.toggle('has-torch', playing && this.torch.has);
-    const chargeLvl = this.charge.active ? (this.charge.t < 0.18 ? 0.24 : lerp(0.32, 1, clamp((this.charge.t - 0.18) / 0.95, 0, 1))) : 0;
-    this.hud.ring(dt, this.mic, this.state === 'play' ? chargeLvl : 0, this.mic.state === 'on');
-    this.hud.cooldown(this.state === 'play' && p.alive && this.pingCD > 0 ? this.pingCD / this.pingCDMax : 0);
+    // (4.0) no more charging: the ring is the microphone's alone, and the arc round the dot is the device refilling
+    this.hud.ring(dt, this.mic, 0, this.mic.state === 'on');
+    this.hud.cooldown((this.state === 'play' || this.state === 'training') && p.alive && this.pingCD > 0 ? this.pingCD / this.pingCDMax : 0);
     if (settings.radar) {
-      const R = p.alive ? Math.max(this.mic.loud > 0 ? CFG.voiceHearRadius(this.mic.loud) : 0, this.stepNoise > 0 ? CFG.hearRadius(this.stepNoise) : 0, chargeLvl > 0 ? CFG.hearRadius(chargeLvl) : 0) : 0;
-      const scream = p.alive && (this.mic.screamHeld > 0.1 || chargeLvl >= CFG.SCREAM);
+      const R = p.alive ? Math.max(this.mic.loud > 0 ? CFG.voiceHearRadius(this.mic.loud) : 0, this.stepNoise > 0 ? CFG.hearRadius(this.stepNoise) : 0) : 0;
+      const scream = p.alive && this.mic.screamHeld > 0.1;
       const c = (sp && sp.target) || p;
       this.radar.draw(dt, c.x, c.z, c.yaw, this.pulses.slots, R, scream);
     }

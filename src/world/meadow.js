@@ -36,11 +36,12 @@ export class Meadow {
       this.tufts++;if(this.samples.length<256)this.samples.push({x,z,y,h});
     }
     // Same fragment shader/uniforms as the forest: no emissive grass or bright navigation stripe.
-    const vertexShader=w.material.vertexShader?.replace('varying vec3 vWorld;',`attribute float blade;
+    // (3.1s) the forest's own vertex shader declares uTime since 3.0n (the water's swell): declared twice, the
+    // grass never compiled and the field stood bare. Add only what the base shader does not already have.
+    const base=w.material.vertexShader,has=(n)=>new RegExp(`uniform\\s+\\w+\\s+${n}\\b`).test(base||'');
+    const vertexShader=base?.replace('varying vec3 vWorld;',`attribute float blade;
 attribute float bladeHeight;
-uniform float uTime;
-uniform vec3 uCam;
-varying vec3 vWorld;`).replace('vWorld = wp.xyz;',`float fade=1.-smoothstep(58.,83.,distance(wp.xz,uCam.xz));
+${has('uTime')?'':'uniform float uTime;\n'}${has('uCam')?'':'uniform vec3 uCam;\n'}varying vec3 vWorld;`).replace('vWorld = wp.xyz;',`float fade=1.-smoothstep(58.,83.,distance(wp.xz,uCam.xz));
   wp.y-=blade*bladeHeight*(1.-fade);
   wp.x+=blade*fade*.055*sin(uTime*1.7+wp.x*.72+wp.z*.43);
   wp.z+=blade*fade*.025*cos(uTime*1.3+wp.x*.51+wp.z*.37);

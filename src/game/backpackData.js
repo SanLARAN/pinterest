@@ -3,8 +3,10 @@
 // The adrenaline syringe: a downed friend on their feet in a jab (a dose at Zarya, one locked away,
 // and since 2.1q they also turn up in ordinary cupboards).
 export const BAG_SIZE = 4;
-export const BAG_KINDS = ['stones', 'glow', 'torch', 'flare', 'battery', 'tape', 'crowbar', 'map', 'syringe'];
-export const BAG_LIMIT = { stones: 3, glow: 3, torch: 1, flare: 6, battery: 3, tape: 1, crowbar: 1, map: 1, syringe: 2 };
+// (4.0) the camera goes LAST: a pocket's kind travels as its index here ('ps'), and the old ones keep theirs
+export const BAG_KINDS = ['stones', 'glow', 'torch', 'flare', 'battery', 'tape', 'crowbar', 'map', 'syringe', 'camera'];
+export const BAG_LIMIT = { stones: 3, glow: 3, torch: 1, flare: 6, battery: 3, tape: 1, crowbar: 1, map: 1, syringe: 2, camera: 1 };
+export const CAMERA_SHOTS = 5; // (game/photo.js PHOTO.shots: here too, so a parcel is checked without the renderer)
 export const LOOT_KIND = { nuts: 'stones', glow: 'glow', battery: 'battery', flare: 'flare', syringe: 'syringe' };
 export const kindIndex = (kind) => BAG_KINDS.indexOf(kind);
 
@@ -12,7 +14,7 @@ export const kindIndex = (kind) => BAG_KINDS.indexOf(kind);
 export const BAG_TABS = [
   { id: 'all', kinds: BAG_KINDS },
   { id: 'light', kinds: ['glow', 'torch', 'flare', 'battery'] },
-  { id: 'tools', kinds: ['stones', 'tape', 'crowbar', 'map'] },
+  { id: 'tools', kinds: ['stones', 'tape', 'crowbar', 'map', 'camera'] },
   { id: 'aid', kinds: ['syringe'] },
 ];
 export function fitsPocket(slots, kind) {
@@ -32,7 +34,8 @@ export function cleanParcel(d) {
   if (!Number.isInteger(d.n) || d.n < 0 || d.n > BAG_LIMIT[d.kind]) return null;
   if (!d.n && d.kind !== 'flare') return null;
   if (d.kind === 'torch' && (d.n !== 1 || !Number.isFinite(d.charge) || d.charge < 0 || d.charge > 1)) return null;
-  return { kind: d.kind, n: d.n, ...(d.kind === 'torch' ? { charge: d.charge } : {}), ...(d.kind === 'flare' ? { gun: !!d.gun } : {}) };
+  if (d.kind === 'camera' && (d.n !== 1 || !Number.isInteger(d.shots) || d.shots < 0 || d.shots > CAMERA_SHOTS)) return null;
+  return { kind: d.kind, n: d.n, ...(d.kind === 'torch' ? { charge: d.charge } : {}), ...(d.kind === 'flare' ? { gun: !!d.gun } : {}), ...(d.kind === 'camera' ? { shots: d.shots } : {}) };
 }
 export const BAG_ICON = {
   map:'<path d="m6 14 17-5 18 6 17-6v42l-17 5-18-6-17 5Z"/><path d="M23 9v41M41 15v41M13 26l7 7M20 26l-7 7M31 37l5 5M36 37l-5 5"/>',
@@ -44,5 +47,6 @@ export const BAG_ICON = {
   tape: '<rect x="7" y="17" width="50" height="35" rx="4"/><path d="M10 12h25l7 5M14 23h36v16H14ZM20 44h24l4 8H16Z"/><circle cx="22" cy="31" r="5"/><circle cx="42" cy="31" r="5"/><path d="M27 31h10"/>',
   crowbar: '<path d="m27 57-6-2 17-36-2-8-5-1-6 5-5-2 6-9 13 1 7 12-19 40Z"/><path d="m22 50 6 3M24 55l1-4"/>',
   syringe: '<path d="M26 8h12v30l-3 3H29l-3-3ZM29 4h6v4h-6ZM22 38h20v6H22Z"/><path d="M32 44v14M26 58h12"/><path d="M32 14v20M26 18h12"/>',
+  camera: '<path d="M8 22h12l4-6h16l4 6h12v28H8Z"/><circle cx="32" cy="35" r="10"/><circle cx="32" cy="35" r="4"/><path d="M12 27h7M46 27h6"/>',
 };
 export const iconSvg = (kind) => `<svg viewBox="0 0 64 64" aria-hidden="true">${BAG_ICON[kind] || ''}</svg>`;

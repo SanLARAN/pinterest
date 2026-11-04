@@ -97,9 +97,10 @@ test('three seconds inside the cloud, and the echo takes twice as long for twent
   // ...and it wears off by itself
   g.echoMulT = 0.5;
   g.gnats.update(0); // (the game ticks this, not the swarm — checked below)
+  // (4.0) the echolocator's 30 s refill is what slows: at half speed while blinded (it used to be the cooldown that doubled)
   assert.match(readFileSync(new URL('../src/game/game.js', import.meta.url), 'utf8'),
-    /this\.pingCD = this\.pingCDMax = \(CFG\.PING_CD \+ CFG\.PING_CD_LOUD \* loud\) \* \(this\.echoMul \|\| 1\)/,
-    'the cooldown itself is what doubles');
+    /this\.pingCD = Math\.max\(0, this\.pingCD - dt \/ \(this\.echoMul \|\| 1\)\)/,
+    'the refill is what slows down');
 });
 
 test('walking out of the cloud does not blind you, and the clock drains', () => {

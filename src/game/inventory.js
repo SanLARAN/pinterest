@@ -11,7 +11,7 @@ import { myFit } from './outfit.js';
 
 const round = (v) => Math.round(v * 100) / 100;
 const esc = (v) => String(v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const KEYS = { stones: 'bagStones', glow: 'bagGlow', torch: 'torchItem', flare: 'flareGun', battery: 'bagBattery', tape: 'tapeItem', crowbar: 'crowbarName', map: 'partMapName', syringe: 'bagSyringe' };
+const KEYS = { stones: 'bagStones', glow: 'bagGlow', torch: 'torchItem', flare: 'flareGun', battery: 'bagBattery', tape: 'tapeItem', crowbar: 'crowbarName', map: 'partMapName', syringe: 'bagSyringe', camera: 'cameraItem' };
 export const bagName = (kind) => t(KEYS[kind] || 'bagEmpty');
 
 function parcelGeometry(kind) {
@@ -37,6 +37,7 @@ export class Backpack {
     this.g = game;
     this.geo = Object.fromEntries(['stones','glow','flare','flareAmmo','battery','map','syringe'].map(k => [k, parcelGeometry(k)]));
     this.geo.torch = game.torch.geo;
+    this.geo.camera = game.camItem.geo; // (4.0)
     this.heldViews = {};
     this.el = document.createElement('section');
     this.el.id = 'backpack'; this.el.hidden = true;
@@ -215,7 +216,7 @@ export class Backpack {
   get blocked() { return this.active || this.pending.size > 0; }
   owns(k) {
     const g=this.g;
-    return k==='stones' ? g.player.stones>0 : k==='glow' ? g.glows.count>0 || !!g.glows.held : k==='torch' ? g.torch.has : k==='flare' ? !!g.player.hasFlare || g.player.flares>0 : k==='battery' ? this.cells>0 : k==='tape' ? !!g.tools.tapeHeld : k==='crowbar' ? g.tools.hasCrowbar : k==='map'?!!g.partMap?.has:k==='syringe'?this.syringes>0:false;
+    return k==='stones' ? g.player.stones>0 : k==='glow' ? g.glows.count>0 || !!g.glows.held : k==='torch' ? g.torch.has : k==='flare' ? !!g.player.hasFlare || g.player.flares>0 : k==='battery' ? this.cells>0 : k==='tape' ? !!g.tools.tapeHeld : k==='crowbar' ? g.tools.hasCrowbar : k==='map'?!!g.partMap?.has:k==='syringe'?this.syringes>0:k==='camera'?!!g.camItem?.has:false;
   }
   // How many you have. (2.1k: everything that was not a stack fell through to `1` here — so the pack
   // showed a recorder, a crowbar, a map and a syringe you had never picked up. Non-stackables are 1 only
@@ -232,6 +233,7 @@ export class Backpack {
       case 'tape': return g.tools.tapeHeld ? 1 : 0;
       case 'crowbar': return g.tools.hasCrowbar ? 1 : 0;
       case 'map': return g.partMap?.has ? 1 : 0;
+      case 'camera': return g.camItem?.has ? 1 : 0;
       default: return 0;
     }
   }
@@ -346,6 +348,7 @@ export class Backpack {
     else if(k==='flare') g.fireFlare();
     else if(k==='tape') g.tools.play();
     else if(k==='map')g.partMap.toggle();
+    else if(k==='camera') g.camItem.shoot(); // (4.0) the flash
     else if(k==='battery') {
       if(!g.torch.has) { g.hud.popup(t('bagBatteryNoTorch'),'dim'); return; }
       if(g.torch.charge>=.99) { g.hud.popup(t('bagBatteryFull'),'dim'); return; }
@@ -361,6 +364,7 @@ export class Backpack {
     const d={kind,n:this.count(kind)};
     if(kind==='torch') d.charge=this.g.torch.charge;
     if(kind==='flare') d.gun=!!this.g.player.hasFlare;
+    if(kind==='camera') d.shots=this.g.camItem.shots|0;
     return cleanParcel(d);
   }
   clear(kind) {
@@ -372,6 +376,7 @@ export class Backpack {
     if(kind==='battery') this.cells=0;
     if(kind==='syringe') this.syringes=0;
     if(kind==='map'&&g.partMap){g.partMap.has=false;g.partMap.fold(true);}
+    if(kind==='camera'&&g.camItem){g.camItem.has=false;g.camItem.shots=0;}
     if(this.equipped===kind) this.equipped=null;
   }
   gain(d) {
@@ -383,6 +388,7 @@ export class Backpack {
     if(k==='syringe') this.syringes=Math.min(BAG_LIMIT.syringe,this.syringes+d.n);
     if(k==='torch') { g.torch.has=true; g.torch.charge=Math.min(1,g.torch.charge+d.charge); g.stats.torch=1; }
     if(k==='flare') g.setFlares(Math.min(BAG_LIMIT.flare,(g.player.flares|0)+d.n),!!g.player.hasFlare||d.gun);
+    if(k==='camera') { g.camItem.has=true; g.camItem.shots=d.shots|0; }
     this.reconcile();
   }
   drop(i,death=false) {
@@ -466,7 +472,7 @@ export class Backpack {
   claim(source,a,b=0) {
     if(this.claimPending) return false;
     const g=this.g;
-    let kind=source==='torch'?'torch':source==='gun'?'flare':source==='map'?'map':LOOT_KIND[g.cabinets.list[a]?.items[b]?.kind];
+    let kind=source==='torch'?'torch':source==='camera'?'camera':source==='gun'?'flare':source==='map'?'map':LOOT_KIND[g.cabinets.list[a]?.items[b]?.kind];
     if(kind && !this.canReceive(kind,true,source==='gun')) return false;
     this.claimPending={source,a,b,left:2};
     if(g.auth) return this.hostClaim(g.player.id,source,a,b);
@@ -477,6 +483,7 @@ export class Backpack {
     const fail=()=>{ if(pid===g.player.id) this.claimPending=null; return false; };
     if(!g.auth || !p?.alive || !Number.isInteger(a) || !Number.isInteger(b) || p.carrying || g.escape.load(pid) || g.cabinets.locked(pid) || g.escape.seatOf(pid)>=0) return fail();
     if(source==='torch') { obj=g.torch.items[a]; if(!obj || obj.taken) return fail(); kind='torch'; spot=obj; }
+    else if(source==='camera') { obj=g.camItem.items?.[a]; if(!obj || obj.taken || b!==0) return fail(); kind='camera'; spot=obj; }
     else if(source==='cabinet') { const c=g.cabinets.list[a]; obj=c?.items[b]; if(!c || !obj || obj.taken || !c.opened || c.locked) return fail(); kind=LOOT_KIND[obj.kind]; loot=obj.kind; spot={x:c.front.x,y:c.spec.y,z:c.front.z}; }
     else if(source==='map'){obj=g.partMap?.source;if(!obj||obj.taken||a!==0||b!==0)return fail();kind='map';spot=obj;}
     else if(source==='gun') { obj=g.objectives.bodies[a]; if(!obj?.gun?.visible) return fail(); kind='flare'; spot=obj; }
@@ -487,9 +494,10 @@ export class Backpack {
     this.applyClaim(claim); if(g.sync) g.sync.ev('ibg',claim); return true;
   }
   applyClaim(d) {
-    if(!d || typeof d.pid!=='string' || !['torch','cabinet','gun','map'].includes(d.source) || !Number.isInteger(d.a) || !Number.isInteger(d.b) || d.id!==`${d.source}:${d.a}:${d.b}`) return;
+    if(!d || typeof d.pid!=='string' || !['torch','cabinet','gun','map','camera'].includes(d.source) || !Number.isInteger(d.a) || !Number.isInteger(d.b) || d.id!==`${d.source}:${d.a}:${d.b}`) return;
     if(this.claims.has(d.id) && this.applied.has(d.id)) return;
     if(d.source==='torch') { const it=this.g.torch.items[d.a]; if(!it) return; this.g.torch._taken(it); }
+    if(d.source==='camera') { const it=this.g.camItem.items?.[d.a]; if(!it) return; this.g.camItem._taken(it); }
     if(d.source==='cabinet') { const c=this.g.cabinets.list[d.a]; if(!c?.items[d.b]) return; this.g.cabinets._taken(c,d.b); }
     if(d.source==='map'){if(!this.g.partMap)return;this.g.partMap.claimed(d.pid);}
     if(d.source==='gun') { const b=this.g.objectives.bodies[d.a]; if(!b?.gun) return; b.gun.visible=false; }
@@ -502,6 +510,7 @@ export class Backpack {
       }
       if(d.source==='cabinet') this.g.cabinets._give(this.g.cabinets.list[d.a].items[d.b].kind);
       if(d.source==='gun') this.g.onFlareFound(true);
+      if(d.source==='camera') this.g.camItem.got();
       if(d.source==='map'){this.g.partMap.has=true;this.g.hud.popup(t('partMapTaken'),'amber');}
       this.reconcile();
     } else this.applied.add(d.id);
@@ -563,7 +572,7 @@ export class Backpack {
     this.portrait(); // independent of the item-count cache (also retries a renderer not ready at open)
     const g=this.g;
     const lang=getLang();
-    const key=[t('bagTitle'),lang,this.tab,this.sel,this.equipped,this.slots.join(','),...BAG_KINDS.map(k=>this.count(k)),(g.torch.charge || 0).toFixed(2),g.tools.tapeHeld?.charges,this.pending.size,!!g.glows.held,!!g.player.hasFlare].join('|');
+    const key=[t('bagTitle'),lang,this.tab,this.sel,this.equipped,this.slots.join(','),...BAG_KINDS.map(k=>this.count(k)),(g.torch.charge || 0).toFixed(2),g.camItem?.shots,g.tools.tapeHeld?.charges,this.pending.size,!!g.glows.held,!!g.player.hasFlare].join('|');
     if(key===this.renderKey) return; this.renderKey=key;
     const touch=g.input.touch;
     const tab=BAG_TABS.find(x=>x.id===this.tab)||BAG_TABS[0];
@@ -620,6 +629,7 @@ export class Backpack {
         chips.push([t('bagTorchAfter'), pv ? (pv.full ? t('bagTorchFullShort') : `${pv.from}% → ${pv.to}%`) : t('bagNoTorchShort')]);
       }
       if(k==='tape') chips.push([t('bagCharge'), `${g.tools.tapeHeld?.charges||0} / 2`]);
+      if(k==='camera') chips.push([t('bagShots'), g.camItem.label]);
       if(k==='glow'&&g.glows.held) chips.push([t('bagState'), t('bagLit')]);
       if(this.equipped===k) chips.push([t('bagState'), t('bagInHands')]);
       if(this.pending.size) chips.push([t('bagState'), t('bagPending')]);

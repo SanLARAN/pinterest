@@ -4,6 +4,7 @@ import { effectiveGraphics } from './graphicsSettings.js';
 // fear flicker and tape-roll interference.
 import * as THREE from 'three';
 import { FXAAShader } from 'three/addons/shaders/FXAAShader.js';
+import { shared } from './sonar.js';
 
 // Reuse Three's tested edge search inside the existing composite, before grain and scanlines.
 // No extra full-size framebuffer, and no multisampled half-float resolve.
@@ -50,6 +51,60 @@ void main() {
 }
 `;
 
+// (4.0) light through the morning fog. For every pixel (at half size) the view ray is walked out through the
+// fog to whatever the pixel shows, asking the sun's shadow map at each step "is the sun here?" — the lit steps
+// scatter light toward you (more when you look toward the sun: Henyey–Greenstein), the shadowed ones take
+// the sun's share out of the fog the world shader already put there. Out come the shafts between the trunks
+// and the dark wedges of their shadows hanging in the milk. r: the light, g: the shade.
+const RAYS_FRAG = /* glsl */ `
+uniform sampler2D tDepth;
+uniform sampler2D uSunMap;
+uniform mat4 uSunMat;
+uniform vec4 uSunK;
+uniform mat4 uInvProj;
+uniform mat4 uCamWorld;
+uniform vec3 uCamPos;
+uniform vec3 uSunDir;
+uniform float uDensity;
+uniform float uMaxD;
+uniform float uTime;
+varying vec2 vUv;
+float hashR(vec2 p) {
+  vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+  p3 += dot(p3, p3.yzx + 33.33);
+  return fract((p3.x + p3.y) * p3.z);
+}
+float sunAt(vec3 p) {
+  vec3 q = (uSunMat * vec4(p, 1.0)).xyz;
+  if (q.x <= 0.0 || q.y <= 0.0 || q.x >= 1.0 || q.y >= 1.0 || q.z >= 1.0) return 1.0;
+  vec4 t = texture2D(uSunMap, q.xy);
+  return step(q.z - uSunK.w * 2.0, t.r + t.g / 255.0);
+}
+void main() {
+  float z = texture2D(tDepth, vUv).r;
+  vec4 vp = uInvProj * vec4(vUv * 2.0 - 1.0, z * 2.0 - 1.0, 1.0);
+  vp.xyz /= vp.w;
+  float dist = z >= 0.99999 ? 1e4 : length(vp.xyz);
+  vec3 dir = normalize((uCamWorld * vec4(vp.xyz, 0.0)).xyz);
+  float far = min(dist, uMaxD);
+  const int N = 22;
+  float dt = far / float(N);
+  float jit = hashR(gl_FragCoord.xy + fract(uTime * 7.31) * 113.0);
+  float lit = 0.0, shade = 0.0;
+  for (int i = 0; i < N; i++) {
+    float t = (float(i) + jit) * dt;
+    float w = exp(-uDensity * t);
+    float s = sunAt(uCamPos + dir * t);
+    lit += s * w;
+    shade += (1.0 - s) * w;
+  }
+  float k = uDensity * dt;
+  float mu = dot(dir, uSunDir), g = 0.5;
+  float hg = (1.0 - g * g) / pow(1.0 + g * g - 2.0 * g * mu, 1.5);
+  gl_FragColor = vec4(lit * k * hg, shade * k, 0.0, 1.0);
+}
+`;
+
 const COMPOSITE_FRAG = /* glsl */ `
 uniform sampler2D tScene;
 uniform sampler2D tBloom;
@@ -77,6 +132,10 @@ uniform float uUserAberr;
 uniform float uUserVignette;
 uniform float uUserScanlines;
 uniform float uUserFlicker;
+uniform sampler2D tRays;
+uniform float uRays;
+uniform vec3 uRayC;
+uniform vec3 uRayFog;
 varying vec2 vUv;
 ${FXAA}
 vec4 sceneSample(vec2 uv) {
@@ -135,6 +194,13 @@ void main() {
   float ashK = clamp(s0.a, 0.0, 1.0); // the scene marks what a lamp lights in its own colours (alpha → 0)
   vec3 bl = texture2D(tBloom, uv).rgb;
   col += bl * uBloom * uUserBloom;
+  if (uRays > 0.001) {
+    // (4.0) the shafts (half size, so four taps smooth the march's dither away)
+    vec2 tx = 1.0 / uRes;
+    vec2 rr = (texture2D(tRays, uv + tx * vec2(-1.2, -0.6)).rg + texture2D(tRays, uv + tx * vec2(1.2, 0.6)).rg
+      + texture2D(tRays, uv + tx * vec2(-0.6, 1.2)).rg + texture2D(tRays, uv + tx * vec2(0.6, -1.2)).rg) * 0.25;
+    col = max(col + (uRayC * rr.r - uRayFog * rr.g) * uRays, 0.0);
+  }
 
   // tone: filmic shoulder, crushed toe — shadows fall into true black
   // (in daylight the toe and the tunnel let go: the world is open)
@@ -226,9 +292,26 @@ export class Post {
         uAA: { value: true },
         uUserExposure: { value: 1 }, uUserBloom: { value: 1 }, uUserGrain: { value: 1 },
         uUserAberr: { value: 1 }, uUserVignette: { value: 1 }, uUserScanlines: { value: 1 }, uUserFlicker: { value: 1 },
+        tRays: { value: null }, uRays: { value: 0 },
+        uRayC: { value: new THREE.Color(1.0, 0.86, 0.66) }, uRayFog: { value: new THREE.Color(0.3, 0.31, 0.33) },
       },
       vertexShader: FS_VERT, fragmentShader: COMPOSITE_FRAG, depthTest: false, depthWrite: false,
     });
+    // (4.0) the morning's light shafts: the scene's depth (to know how far each ray goes) and a half-size target
+    this.rtScene.depthTexture = new THREE.DepthTexture(4, 4);
+    this.rtRays = new THREE.WebGLRenderTarget(4, 4, { type: THREE.HalfFloatType, depthBuffer: false, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter });
+    this.rays = new THREE.ShaderMaterial({
+      uniforms: {
+        tDepth: { value: this.rtScene.depthTexture },
+        uSunMap: shared.uSunMap, uSunMat: shared.uSunMat, uSunK: shared.uSunK,
+        uInvProj: { value: new THREE.Matrix4() }, uCamWorld: { value: new THREE.Matrix4() },
+        uCamPos: { value: new THREE.Vector3() }, uSunDir: shared.uSun,
+        uDensity: { value: 0.04 }, uMaxD: { value: 70 }, uTime: { value: 0 },
+      },
+      vertexShader: FS_VERT, fragmentShader: RAYS_FRAG, depthTest: false, depthWrite: false,
+    });
+    this.raysOn = true;
+    this.comp.uniforms.tRays.value = this.rtRays.texture;
     this.u = this.comp.uniforms;
     this.w = 1;
     this.h = 1;
@@ -258,9 +341,20 @@ export class Post {
     const bw = Math.max(2, w >> 2), bh = Math.max(2, h >> 2);
     this.rtA.setSize(bw, bh);
     this.rtB.setSize(bw, bh);
+    this.rtRays.setSize(Math.max(2, w >> 1), Math.max(2, h >> 1));
     this.u.uRes.value.set(w, h);
     this.bloomW = bw;
     this.bloomH = bh;
+  }
+
+  setRays(on) { this.raysOn = !!on; }
+
+  // (4.0) how strong the shafts are this frame: the morning's milk (uFog · uMorning) is where they live; the clear
+  // victory dawn has a faint haze of them; at night there's no sun and no pass at all
+  _raysStrength() {
+    if (!this.raysOn || shared.uSunK.value.x <= 0) return 0;
+    const dawn = shared.uDawn.value, milk = shared.uFog.value * shared.uMorning.value;
+    return dawn * (0.35 + 0.65 * milk);
   }
 
   _pass(mat, target) {
@@ -274,6 +368,19 @@ export class Post {
     r.setRenderTarget(this.rtScene);
     r.clear();
     r.render(scene, camera);
+
+    const rays = this._raysStrength();
+    this.u.uRays.value = rays;
+    if (rays > 0.001) {
+      const R = this.rays.uniforms, milk = shared.uFog.value * shared.uMorning.value;
+      R.uInvProj.value.copy(camera.projectionMatrixInverse);
+      R.uCamWorld.value.copy(camera.matrixWorld);
+      R.uCamPos.value.setFromMatrixPosition(camera.matrixWorld);
+      // (the same fog the world shader draws: sonar.js — milk 0.05 a metre, the clear dawn 0.016)
+      R.uDensity.value = 0.016 + (0.05 - 0.016) * milk;
+      R.uTime.value = this.u.uTime.value;
+      this._pass(this.rays, this.rtRays);
+    }
 
     if (this.u.uBloom.value * this.u.uUserBloom.value > 0) {
       this.bright.uniforms.tSrc.value = this.rtScene.texture;
@@ -294,11 +401,12 @@ export class Post {
 
   // (3.0z) the reel's eye: the finished picture drawn once more, small, into a target of its own (8-bit RGBA) that
   // main.js reads back with a fence instead of copying the full-size canvas. One fullscreen pass at ~640×360.
-  capture(w, h) {
-    if (!this.rtGrab) this.rtGrab = new THREE.WebGLRenderTarget(w, h, { depthBuffer: false });
-    else if (this.rtGrab.width !== w || this.rtGrab.height !== h) this.rtGrab.setSize(w, h);
-    this._pass(this.comp, this.rtGrab);
+  // (4.0: `slot` — the camera's frame has a target of its own, so a reel grab still being read is never resized)
+  capture(w, h, slot = 'rtGrab') {
+    if (!this[slot]) this[slot] = new THREE.WebGLRenderTarget(w, h, { depthBuffer: false });
+    else if (this[slot].width !== w || this[slot].height !== h) this[slot].setSize(w, h);
+    this._pass(this.comp, this[slot]);
     this.renderer.setRenderTarget(null);
-    return this.rtGrab;
+    return this[slot];
   }
 }

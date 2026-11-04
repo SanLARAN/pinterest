@@ -186,12 +186,12 @@ test('(b) a foot in water has its own sound, and the depth reaches it', () => {
   const audio = readFileSync(new URL('../src/audio/audio.js', import.meta.url), 'utf8');
   assert.match(audio, /wade\(intensity = 0\.5, depth = 0\.3, dest = null\)/);
   assert.match(audio, /const d = Math\.max\(0, Math\.min\(1\.2, depth\)\)/, 'the depth is read, not ignored');
-  assert.match(audio, /mateStep\(x, y, z, intensity = 0\.4, waterDepth = 0\)/);
+  assert.match(audio, /mateStep\(x, y, z, intensity = 0\.4, waterDepth = 0(, [^)]*)?\)/); // (4.0: + the undergrowth it rustles through)
   assert.match(audio, /if \(waterDepth > 0\) this\.wade\(/, 'a friend wading sounds like a friend wading');
   const game = readFileSync(new URL('../src/game/game.js', import.meta.url), 'utf8');
   assert.match(game, /this\.audio\.wade\(s\.intensity, s\.depth \|\| 0\.3\)/);
   const remote = readFileSync(new URL('../src/game/remote.js', import.meta.url), 'utf8');
-  assert.match(remote, /mateStep\([^)]*depth\)/, 'the network step carries the water it is standing in');
+  assert.match(remote, /mateStep\([^)]*depth(, [^)]*)?\)/, 'the network step carries the water it is standing in');
 });
 
 test('(c) TAB lifts the wristwatch on the bog — the stand-ins answer with data, not undefined', () => {

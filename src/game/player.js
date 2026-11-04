@@ -1,8 +1,19 @@
-// First-person controller: snappy acceleration, stamina, footsteps, bumps into trees.
+// First-person controller: a body with weight (4.0) — momentum, a jump with a heavy fall, a landing the knees
+// and the eyes feel — stamina, footsteps, bumps into trees.
 import { CFG } from '../core/config.js';
 import { speedScale, stepOf } from './water.js';
 import { clamp, damp } from '../core/rng.js';
 import { SLOT_OFFSET } from './remote.js';
+
+// a damped spring (x'' = -k(x - to) - c x'), sub-stepped so a slow frame can't blow it up
+export function spring(s, to, k, c, dt) {
+  const n = Math.min(8, Math.ceil(dt / 0.008)), h = dt / n;
+  for (let i = 0; i < n; i++) {
+    s.v += (-k * (s.x - to) - c * s.v) * h;
+    s.x += s.v * h;
+  }
+  return s.x;
+}
 
 export class Player {
   constructor(world) {
@@ -51,6 +62,29 @@ export class Player {
     this.floorY = null; // (2.1s: the lookout's deck — while set, you stand on it, not on the terrain)
     this.col = null; // (3.0q: under the camp, the shelter's own walls — see game/bunker.js)
     this.underground = false; // (3.0q: five metres of clay between you and everything out there)
+    this._initBody();
+  }
+
+  // (4.0) the vertical: feet on the ground, or a body in the air
+  _initBody() {
+    this.vy = 0;
+    this.grounded = true;
+    this.airT = 0;
+    this.coyote = 0;
+    this.jumpBuf = 0;
+    this._jumpSeen = performance.now();
+    this.landK = 0; // how hard the last landing was (0..1), fading — the remote and self bodies squat with it
+    // ...and what the eyes feel of it: the landing's dip, the nod, the head lagging behind a push (see applyView)
+    this.dip = { x: 0, v: 0 };
+    this.nod = { x: 0, v: 0 };
+    this.lagF = { x: 0, v: 0 };
+    this.lagR = { x: 0, v: 0 };
+    this.viewY = 0;
+    this.viewPitch = 0;
+    this.swayF = 0;
+    this.swayR = 0;
+    this._vx0 = 0;
+    this._vz0 = 0;
   }
 
   forward() {
@@ -61,6 +95,7 @@ export class Player {
   // load: a part of the УАЗ in your arms ({ walk, step }: see game/uaz.js) — slow, no running
   update(dt, input, look, frozen = false, load = null) {
     const P = CFG.PLAYER;
+    if (!this.dip) this._initBody();
     const ev = { step: null, bump: null, breath: false };
     this.yaw -= look.dx;
     this.pitch = clamp(this.pitch - look.dy, -1.35, 1.35);
@@ -84,12 +119,20 @@ export class Player {
     // the bog (3.0b): knee-deep water is just over half speed — and it stacks with everything else
     const wetScale = speedScale(this.world, this.x, this.z);
     if (wetScale !== 1) target *= wetScale;
+    // (4.0) the undergrowth holds your legs back: the thicker it is around you, the slower (world/undergrowth.js)
+    const ug = this.world.undergrowth?.probe(this.x, this.z);
+    this.brush = ug ? ug.k : 0;
+    this.brushDry = !!ug?.dry;
+    if (this.brush > 0) target *= 1 - CFG.UNDERGROWTH.slow * this.brush;
 
     const sy = Math.sin(this.yaw), cy = Math.cos(this.yaw);
     // forward = (-sin, -cos), right = (cos, -sin)
     const wx = (-sy * my + cy * mx) * target;
     const wz = (-cy * my - sy * mx) * target;
-    const accel = mag > 0.01 ? P.accel : P.decel;
+    // (4.0) weight: getting going takes a moment, turning round is braking first, and in the air you only steer —
+    // let go of the keys up there and you carry on where you were going (only the air slows you, a little)
+    const against = this.vx * wx + this.vz * wz < 0;
+    const accel = !this.grounded ? (mag > 0.01 ? P.airAccel : P.airDrag) : mag > 0.01 && !against ? P.accel : P.decel;
     this.vx = damp(this.vx, wx, accel, dt);
     this.vz = damp(this.vz, wz, accel, dt);
 
@@ -124,10 +167,10 @@ export class Player {
     const gy = this.floorY != null ? this.floorY
       : deckY != null ? Math.max(deckY, this.world.terrain.height(this.x, this.z))
       : this.world.terrain.height(this.x, this.z);
-    this.y = damp(this.y, gy, 18, dt);
+    this._vertical(dt, gy, input, frozen, heavy, wetScale, ev);
 
     // stamina
-    if (this.sprinting && this.speed > 1) {
+    if (this.sprinting && this.speed > 1 && this.grounded) {
       this.stamina -= P.sprintDrain * (this.adrenaline > 0 ? CFG.SYRINGE.drain : 1) * dt;
       this.staminaDelay = 0.8;
       if (this.stamina <= 0) {
@@ -152,7 +195,7 @@ export class Player {
     const eyeTarget = this.crouching ? P.crouchEye : P.eye;
     this.eyeCur = damp(this.eyeCur, eyeTarget, 10, dt);
     const stepLen = heavy ? P.stepWalk * 0.82 : this.crouching ? P.stepCrouch : this.sprinting ? P.stepSprint : P.stepWalk;
-    if (this.speed > 0.25) {
+    if (this.speed > 0.25 && this.grounded) {
       this.stepAcc += moved;
       this.bobPhase += (moved / stepLen) * Math.PI;
       if (this.stepAcc >= stepLen) {
@@ -167,6 +210,13 @@ export class Player {
           intensity = this.crouching ? 0.35 : 0.62;
           ev.step = { loud, mode: 'walk', intensity, heavy: true };
         } else ev.step = { loud, mode, intensity };
+        // (4.0) through a bush: a rustle on top of the step (and dry brushwood cracks) — even crouched, a little
+        if (this.brush > 0.08) {
+          const U = CFG.UNDERGROWTH;
+          ev.step.brush = this.brush;
+          ev.step.dry = this.brushDry;
+          ev.step.loud += this.brush * (this.crouching ? U.crouchLoud : U.loud) + (this.brushDry && !this.crouching ? U.dry * this.brush : 0);
+        }
         // (3.0b) the ground decides what a step is worth: a splash carries further, a board creaks
         const g = stepOf(this.world, this.x, this.z, ev.step.loud);
         if (g.water || g.plank) {
@@ -186,12 +236,87 @@ export class Player {
     // reversed the camera's vertical speed in one frame, four times a second, and in any light you could see
     // the world jolt on every step (on a bike there's no bob, so a bike rode smooth). The depth eases too,
     // so starting a sprint doesn't drop the view a few centimetres at once.
-    const ampTo = heavy ? clamp(this.speed / carryV, 0, 1) * 0.06 : clamp(this.speed / P.sprint, 0, 1) * (this.sprinting ? 0.075 : 0.045);
+    const ampTo = !this.grounded ? 0 : heavy ? clamp(this.speed / carryV, 0, 1) * 0.06 : clamp(this.speed / P.sprint, 0, 1) * (this.sprinting ? 0.075 : 0.045);
     this.bobAmp = damp(this.bobAmp || 0, ampTo, 8, dt);
     const bobAmp = this.bobAmp;
     const c = Math.cos(this.bobPhase);
     this.bobY = -c * c * bobAmp;
-    this.roll = damp(this.roll, Math.sin(this.bobPhase) * bobAmp * 0.35 - input.move.x * 0.012, 10, dt);
+    // (4.0) lean into a sidestep with the body's real sideways speed, not the key: it eases in and out with it
+    const vR = this.vx * cy - this.vz * sy;
+    this.roll = damp(this.roll, Math.sin(this.bobPhase) * bobAmp * 0.35 - vR * 0.0042, 10, dt);
+    this._eyes(dt, sy, cy);
     return ev;
+  }
+
+  // (4.0) the vertical: a jump (V, buffered, with a little grace off an edge), a fall when the ground drops away
+  // under you, and the landing — how hard depends on how fast you came down
+  _vertical(dt, gy, input, frozen, heavy, wetScale, ev) {
+    const P = CFG.PLAYER;
+    const jt = input.jumpAt || 0;
+    if (jt > this._jumpSeen) {
+      this._jumpSeen = jt;
+      this.jumpBuf = P.jumpBuffer;
+    }
+    this.jumpBuf = Math.max(0, this.jumpBuf - dt);
+    this.coyote = this.grounded ? P.coyote : Math.max(0, this.coyote - dt);
+    this.landK = Math.max(0, this.landK - dt * 2.2);
+    const can = !frozen && !heavy && !this.crouching && !this.exhausted && !this.col && this.stamina >= P.jumpCost && this.floorY == null;
+    if (this.jumpBuf > 0 && this.coyote > 0 && can && this.vy <= 0.01) {
+      const wet = wetScale < 0.999;
+      this.vy = P.jumpV * (wet ? 0.72 : 1);
+      this.grounded = false;
+      this.coyote = 0;
+      this.jumpBuf = 0;
+      this.airT = 0;
+      this.stamina -= P.jumpCost;
+      this.staminaDelay = Math.max(this.staminaDelay, 0.6);
+      this.dip.v -= 0.25; // the knees give a little as you push off
+      ev.jump = { wet };
+    }
+    if (this.grounded) {
+      if (this.y - gy > P.stepDown) {
+        // the ground fell away (a deck's edge, a bank): you are falling now
+        this.grounded = false;
+        this.vy = Math.min(this.vy, 0);
+        this.airT = 0;
+      } else {
+        this.y = damp(this.y, gy, 18, dt);
+        this.vy = 0;
+      }
+    }
+    if (!this.grounded) {
+      this.airT += dt;
+      this.vy -= (this.vy > 0 ? P.gravity : P.gravityFall) * dt;
+      this.y += this.vy * dt;
+      if (this.y <= gy) {
+        const impact = Math.max(0, -this.vy);
+        this.y = gy;
+        this.vy = 0;
+        this.grounded = true;
+        this.stepAcc = 0;
+        const k = clamp((impact - 1.2) / 5.5, 0, 1);
+        this.landK = Math.max(this.landK, k);
+        this.dip.v -= impact * 0.16;
+        this.nod.v -= impact * 0.055;
+        if (impact > 1.2) ev.land = { impact, k, air: this.airT };
+        this.airT = 0;
+      }
+    }
+  }
+
+  // (4.0) what the eyes feel of the body: the landing's dip and nod, and the head lagging a hair behind every push
+  // and every stop (springs: they overshoot a little and settle, the way a neck does)
+  _eyes(dt, sy, cy) {
+    const idt = 1 / Math.max(dt, 1e-3);
+    let ax = (this.vx - this._vx0) * idt, az = (this.vz - this._vz0) * idt;
+    this._vx0 = this.vx;
+    this._vz0 = this.vz;
+    const al = Math.hypot(ax, az);
+    if (al > 25) { ax *= 25 / al; az *= 25 / al; } // a tree stops you dead: that is the bump's business
+    const aF = -ax * sy - az * cy, aR = ax * cy - az * sy;
+    this.viewY = spring(this.dip, 0, 120, 15, dt);
+    this.viewPitch = spring(this.nod, clamp(aF * 0.0018, -0.03, 0.03), 90, 13, dt);
+    this.swayF = spring(this.lagF, clamp(-aF * 0.0016, -0.03, 0.03), 60, 11, dt);
+    this.swayR = spring(this.lagR, clamp(-aR * 0.0016, -0.03, 0.03), 60, 11, dt);
   }
 }

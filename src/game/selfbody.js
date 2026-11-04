@@ -107,7 +107,10 @@ export class SelfBody {
     const P = CFG.PLAYER;
     const k = clamp((P.eye - p.eyeCur) / (P.eye - P.crouchEye), 0, 1); // standing 0 → squatting 1
     const amp = clamp(p.speed / 3.2, 0, 1.4) * (1 - 0.5 * k);
-    poseSelf(rig, p.bobPhase || 0, amp, k);
+    // (4.0) in the air the knees come up; a landing folds them for a moment
+    const air = p.grounded === false ? clamp(0.35 + (p.airT || 0) * 2.5, 0, 1) : 0;
+    this._air = lerp(this._air || 0, air, 0.25);
+    poseSelf(rig, p.bobPhase || 0, amp * (1 - this._air), k, this._air, p.landK || 0);
     const now = performance.now();
     poseFur(rig, Math.min(0.1, (now - (this._t || now)) / 1000), p.speed); // (a tail behind you, as it should be)
     this._t = now;
@@ -117,7 +120,7 @@ export class SelfBody {
     const wk = clamp(g.workK || 0, 0, 1) * (carrying || part ? 0 : 1);
     if (wk > 0.001) poseWork(rig, wk, (g.time || 0) + (p.bobPhase || 0) * 0.1);
     if (carrying) poseCarrier(rig);
-    root.position.set(p.x, p.y + (p.bobY || 0), p.z);
+    root.position.set(p.x, p.y + (p.bobY || 0) + (p.viewY || 0), p.z);
     root.rotation.set(0, p.yaw + PI, 0); // (the rig faces +z; you look down -z)
     root.translateZ(-this._clear(n.chest.rotation.x));
     // hands busy with something drawn up close: those arms step aside
@@ -137,18 +140,19 @@ export class SelfBody {
 
 // standing → walking → a deep squat. k: how far down the crouch is (follows your eye height). The hips don't
 // bob here: your eyes bob with the whole body (the root), so the body under them holds still as you walk
-function poseSelf(rig, phase, amp, k) {
+function poseSelf(rig, phase, amp, k, air = 0, land = 0) {
   const n = rig.nodes;
   const s = Math.sin(phase);
   rig.root.rotation.x = 0;
-  n.hips.position.set(0, lerp(0.94, 0.42, k), 0);
+  const sq = land * 0.6; // (4.0) a landing's squat
+  n.hips.position.set(0, lerp(0.94, 0.42, k) - sq * 0.1 + air * 0.04, 0);
   n.hips.rotation.set(0, 0, 0);
-  n.chest.rotation.set(lerp(0.05 * amp, 0.4, k), 0, 0);
+  n.chest.rotation.set(lerp(0.05 * amp, 0.4, k) + sq * 0.12, 0, 0);
   n.head.rotation.set(0, 0, 0);
-  n.thL.rotation.set(s * 0.55 * amp - 1.45 * k, 0, -0.07 * k);
-  n.thR.rotation.set(-s * 0.55 * amp - 1.45 * k, 0, 0.07 * k);
-  n.knL.rotation.x = Math.max(0, -s) * 0.7 * amp + 2.25 * k;
-  n.knR.rotation.x = Math.max(0, s) * 0.7 * amp + 2.25 * k;
+  n.thL.rotation.set(s * 0.55 * amp - 1.45 * k - air * 0.75 - sq * 0.45, 0, -0.07 * k);
+  n.thR.rotation.set(-s * 0.55 * amp - 1.45 * k - air * 0.45 - sq * 0.45, 0, 0.07 * k);
+  n.knL.rotation.x = Math.max(0, -s) * 0.7 * amp + 2.25 * k + air * 1.15 + sq * 0.8;
+  n.knR.rotation.x = Math.max(0, s) * 0.7 * amp + 2.25 * k + air * 0.8 + sq * 0.8;
   n.shL.rotation.set(-s * 0.45 * amp - 0.5 * k, 0, -0.07 - 0.12 * k);
   n.shR.rotation.set(s * 0.45 * amp - 0.5 * k, 0, 0.07 + 0.12 * k);
   n.elL.rotation.x = -0.25 - amp * 0.2 - 0.55 * k;

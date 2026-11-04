@@ -629,6 +629,7 @@ export class Objectives {
       if (game.rescue) game.rescue.consider(consider);
       if (game.glows) game.glows.consider(consider);
       if (game.torch) game.torch.consider(consider);
+      if (game.camItem) game.camItem.consider(consider); // (4.0)
       if (game.tools) game.tools.consider(consider);
       game.inventory?.consider(consider);
       game.partMap?.consider(consider);
@@ -732,6 +733,13 @@ export class Objectives {
       this.searchT = 0;
       hud.setUse(T('useTorch'), 0, true);
       if (pressed) game.torch.take(o);
+      return;
+    }
+    if (best.kind === 'camera') {
+      this.searchT = 0;
+      const ok = game.inventory.canReceive('camera');
+      hud.setUse(ok ? T('useCamera') : t('bagFull'), 0, ok);
+      if (pressed && ok) game.camItem.take(o);
       return;
     }
     if (best.kind === 'body') {

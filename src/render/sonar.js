@@ -54,6 +54,11 @@ export const shared = {
   uDisc: { value: Array.from({ length: DISC_SLOTS }, () => new THREE.Vector4(0, 0, 1, 0)) },
   uDiscR: { value: Array.from({ length: DISC_SLOTS }, () => new THREE.Vector4(1, 1, 0, 0)) },
   uHeadD: { value: new THREE.Vector3(0, 0, 1) },
+  // (4.0) the sun's shadow map (render/shadows.js SunShadow): world → [0,1] map coordinates + depth along the
+  // sun, and x = on (daylight only), y = how deep a texel is (m), z = 1 / map size, w = depth bias
+  uSunMap: { value: null },
+  uSunMat: { value: new THREE.Matrix4() },
+  uSunK: { value: new THREE.Vector4(0, 1, 1 / 1024, 0.0015) },
 };
 
 // who casts which shadow this frame (filled by whoever owns the light; read by render/shadows.js):
@@ -95,6 +100,26 @@ uniform vec4 uRoad;
 uniform vec3 uRoadK;
 uniform vec4 uHead;
 uniform vec3 uHeadD;
+uniform sampler2D uSunMap;
+uniform mat4 uSunMat;
+uniform vec4 uSunK;
+
+// (4.0) is P in the sun? 1 = yes. Four taps of the sun's depth picture (the casters seen from the sun), a little
+// off the surface so it doesn't shadow itself; outside the picture (or at night) everything is in the sun
+float sunShadow(vec3 P, vec3 Nrm) {
+  if (uSunK.x <= 0.0) return 1.0;
+  vec3 q = (uSunMat * vec4(P + Nrm * (0.04 + 0.6 * uSunK.y), 1.0)).xyz;
+  vec2 e2 = min(q.xy, 1.0 - q.xy);
+  float edge = min(e2.x, e2.y);
+  if (edge <= 0.0 || q.z >= 1.0) return 1.0;
+  float d = q.z - uSunK.w;
+  float o = uSunK.z * 0.75, s = 0.0;
+  vec4 t = texture2D(uSunMap, q.xy + vec2(-o, -o)); s += step(d, t.r + t.g / 255.0);
+  t = texture2D(uSunMap, q.xy + vec2(o, -o)); s += step(d, t.r + t.g / 255.0);
+  t = texture2D(uSunMap, q.xy + vec2(-o, o)); s += step(d, t.r + t.g / 255.0);
+  t = texture2D(uSunMap, q.xy + vec2(o, o)); s += step(d, t.r + t.g / 255.0);
+  return mix(1.0, s * 0.25, smoothstep(0.0, 0.05, edge));
+}
 
 // ---- shadows: walls stop light. Each light has a row of six cube faces in the atlas; a texel holds how
 // far from the light the nearest thing is in that direction (16 bits over the light's reach)
@@ -507,15 +532,23 @@ void main() {
   // daylight (the morning, or the dawn you earned): the forest becomes visible
   if (uDawn > 0.0) {
     vec3 dbase = dayC;
-    float sunL = max(dot(Nrm, uSun), 0.0);
-    float sky = 0.5 + 0.5 * Nrm.y;
+    // (4.0) the trees' long morning shadows. The shading itself takes the sun a little higher than it is: a sun ten
+    // degrees up would leave the ground nearly unlit, and the long shadows on it with nothing to show against
+    // A grass blade is lit like the turf it grows from (its own normal lies flat, and every low sun turned half
+    // the field into black spikes), and a sun low behind it shines through the blade.
+    vec3 sunN = k == 55 ? normalize(Nrm * 0.3 + vec3(0.0, 1.0, 0.0)) : Nrm;
+    float sunS = sunShadow(vWorld, sunN);
+    float sunL = max(dot(sunN, normalize(uSun + vec3(0.0, 0.3, 0.0))), 0.0) * sunS;
+    if (k == 55) sunL += 0.45 * sunS * pow(max(dot(-toCam / max(camD, 1e-3), normalize(uSun)), 0.0), 4.0);
+    float sky = 0.5 + 0.5 * sunN.y;
     float milk = uFog * uMorning; // (2.1s: white mornings — the victory dawn stays clear and golden)
-    vec3 warm = mix(vec3(1.0, 0.8, 0.62), vec3(1.0, 0.93, 0.82), uMorning);
-    vec3 day = dbase * (mix(0.36, 0.5, uMorning) * sky + 1.05 * sunL * warm * (1.0 - milk * 0.62)) * (0.8 + 0.3 * st);
+    // (4.0) a low sun is a golden one; the milk takes less of it, so the trees' shadows read through the fog
+    vec3 warm = mix(vec3(1.0, 0.8, 0.62), vec3(1.0, 0.93, 0.82), uMorning * smoothstep(0.12, 0.5, uSun.y));
+    vec3 day = dbase * (mix(0.36, 0.5, uMorning) * sky + 1.05 * sunL * warm * (1.0 - milk * 0.45)) * (0.8 + 0.3 * st);
     day = mix(day, vec3(dot(day, vec3(0.333))), milk * 0.42); // what colour the day had, drowns
     day += edge * dbase * 0.1;
     vec3 fogC = mix(mix(vec3(0.62, 0.52, 0.5), vec3(0.72, 0.76, 0.78), uMorning), vec3(0.74, 0.76, 0.78), milk);
-    float fog = 1.0 - exp(-camD * mix(mix(0.016, 0.011, uMorning), 0.058, milk));
+    float fog = 1.0 - exp(-camD * mix(mix(0.016, 0.011, uMorning), 0.05, milk)); // (4.0: 0.058 → 0.05, see post.js rays)
     day = mix(day, fogC, fog);
     col = mix(col, day + col * 0.3, uDawn);
   }
@@ -716,7 +749,7 @@ export function createSky() {
         vec3 c = mix(hor, top, smoothstep(-0.05, 0.55, h));
         float sun = pow(max(dot(vDir, uSun), 0.0), 64.0) * 2.5 + pow(max(dot(vDir, uSun), 0.0), 6.0) * 0.4;
         float milk = uFog * uMorning;
-        c += vec3(1.0, 0.75, 0.5) * sun * (1.0 - milk * 0.92); // the fog eats the sun first
+        c += vec3(1.0, 0.75, 0.5) * sun * (1.0 - milk * 0.8); // the fog eats the sun first (4.0: less — a low sun burns through)
         c = mix(c, vec3(0.74, 0.76, 0.78), milk * (1.0 - 0.4 * smoothstep(0.0, 0.6, h)));
         // no stars any more (the author asked, 2.1o): once the day is gone the sky is simply black —
         // the only light up there is the one you make yourself

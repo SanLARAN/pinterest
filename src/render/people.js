@@ -1,6 +1,7 @@
 // Teammates as your eyes see them: a solid body in their own clothes, lit only by real light — the
-// morning sun, a work lamp, a flare, a glow stick, the hut's lantern. In the dark there is nothing to
-// see (the echo still finds them: that's the afterimage in ghosts.js).
+// morning sun, a work lamp, a flare, a glow stick, the hut's lantern. Further off in the dark there is nothing
+// to see (the echo still finds them: that's the afterimage in ghosts.js) — but (4.0) within a few steps your
+// eyes have them anyway: uNear.
 //
 // Alpha out is "how much of this is lit": the post pass leaves lit colours alone instead of turning them
 // to ash (see the world shader in sonar.js), so a friend standing under a lamp is simply a friend.
@@ -34,6 +35,7 @@ uniform vec3 uRim;     // their colour in the team
 uniform float uShow;   // fades them in and out
 uniform float uSelfLit;
 uniform float uEcho;   // 1 = your own body: found by the echo like the trees are
+uniform float uNear;   // (4.0) how close they stand to you: 1 within a few steps, 0 from ~9 m
 varying vec3 vWorld;
 varying vec3 vLocal;
 varying vec3 vBary;
@@ -62,9 +64,9 @@ void main() {
   vec3 lamp = lampLight(vWorld, N) * vec3(1.0, 1.2, 1.55);
   vec3 glow = glowLight(vWorld, N);
   vec3 flare = flareLight(vWorld, N);
-  float sunL = max(dot(N, uSun), 0.0);
+  float sunL = uDawn > 0.0 ? max(dot(N, normalize(uSun + vec3(0.0, 0.3, 0.0))), 0.0) * sunShadow(vWorld, N) : 0.0; // (4.0: under a tree, out of the sun)
   float sky = 0.5 + 0.5 * N.y;
-  vec3 warm = mix(vec3(1.0, 0.8, 0.62), vec3(1.0, 0.93, 0.82), uMorning);
+  vec3 warm = mix(vec3(1.0, 0.8, 0.62), vec3(1.0, 0.93, 0.82), uMorning * smoothstep(0.12, 0.5, uSun.y));
   vec3 day = (mix(0.36, 0.5, uMorning) * sky + 1.05 * sunL * warm) * uDawn;
   vec3 light = day + (lamp + glow) * 1.3 + flare * 0.75;
   float lum = max(light.r, max(light.g, light.b));
@@ -95,6 +97,13 @@ void main() {
   }
 
   if(uSelfLit>0.){col+=base*uSelfLit*(.6+.4*abs(dot(N,V)));nat=max(nat,.65);}
+  // (4.0) up close the eyes adapt: a friend a few steps away is a dim but readable figure in their own clothes,
+  // with their team colour along the edges — never a hole in the dark you only find with a wave
+  if (uNear > 0.001) {
+    col += base * uNear * (0.26 + 0.18 * facing) * (0.84 + 0.22 * st) + base * edge * 0.07 * uNear;
+    col += uRim * rim * 0.34 * uNear;
+    nat = max(nat, uNear * 0.85);
+  }
   // the dark eats distance; daylight has its haze
   col *= mix(exp(-camD * 0.015), 1.0, uDawn);
   vec3 fogC = mix(vec3(0.62, 0.52, 0.5), vec3(0.72, 0.76, 0.78), uMorning);
@@ -116,6 +125,7 @@ export function createPersonMaterial(dyes, rimHex) {
       uShow: { value: 1 },
       uEcho: { value: 0 },
       uSelfLit:{value:0},
+      uNear: { value: 0 },
     },
     vertexShader: VERT,
     fragmentShader: FRAG,
