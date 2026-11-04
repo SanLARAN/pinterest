@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import { CFG } from '../core/config.js';
 import { BAG_KINDS } from './backpackData.js';
 import { clamp, lerp, angleDiff } from '../core/rng.js';
-import { buildSurvivor, poseSurvivor, poseCarrier, poseGlowHand, poseTorchHand, poseFur, poseRider, animateSurvivor, settleRig } from './survivor.js';
+import { buildSurvivor, poseSurvivor, poseCarrier, poseGlowHand, poseTorchHand, poseFur, poseRider, animateSurvivor, settleRig, poseSwimming } from './survivor.js';
 import { cleanFit } from './outfit.js';
 import { createPersonMaterial, dressPerson, undressPerson } from '../render/people.js';
 
@@ -17,7 +17,7 @@ export const PLAYER_HEX = [0x8ef0ff, 0xa6ff9e, 0xd2a8ff, 0xffe08a];
 const DELAY = 110; // ms
 
 // flags in the player-state message
-export const PF = { crouch: 1, sprint: 2, alive: 4, charging: 8, use: 16, morning: 32, torch: 64, dip: 128, air: 256 }; // (4.0: air — their feet are off the ground)
+export const PF = { crouch: 1, sprint: 2, alive: 4, charging: 8, use: 16, morning: 32, torch: 64, dip: 128, air: 256, swim: 512 }; // (4.0: air — their feet are off the ground)
 
 // slot → spawn offset around the camp (right, back) in metres
 export const SLOT_OFFSET = [[0, 0], [1.5, 0.55], [-1.5, 0.55], [0, 1.6]];
@@ -162,6 +162,7 @@ export class RemotePlayer {
       }
       this.speed = lerp(a.speed, b.speed, k1);
       const f = (k1 > 0.5 ? b : a).f;
+      this.swimming = !!(f & PF.swim) && this.alive;
       this.crouching = !!(f & PF.crouch);
       this.sprinting = !!(f & PF.sprint);
       this.charging = !!(f & PF.charging);
@@ -208,6 +209,8 @@ export class RemotePlayer {
       // a rider: knees bent, chest over the bars, leaning with the machine they are on
       const bike = this.game.motos?.bikes?.[this.riding];
       poseRider(this.rig, bike?.roll || 0, bike?.steer || 0, this.game.time || 0);
+    } else if (this.swimming && this.alive) {
+      poseSwimming(this.rig, (this.game.time || 0) * 3);
     } else if (!this.alive) {
       poseSurvivor(this.rig, this.phase, 0, false, true);
     } else {

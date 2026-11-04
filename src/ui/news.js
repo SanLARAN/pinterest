@@ -7,6 +7,21 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v:'4.1',date:'2026-11-04',
+    ru:{title:'Обгон на заднем и то, что под водой',items:[
+      'На дороге в лесхоз вас обгоняет Kugoo: байкер поднимает переднее колесо прямо рядом с УАЗом, а следом пролетает полиция с мигалками и позиционной сиреной. Пассажиры оборачиваются на обгон и погоню.',
+      'УАЗ больше не едет под землёй на подъезде к лесхозу: высота следует настоящей дороге, поворот обходит столб, а сам столб отодвинут с проезда. В гараже убраны хромированные спицы, которые мерцали белыми осколками поверх дисков.',
+      'Озеро доходит до настоящего берега без дыр по краям. На мелководье идёшь медленнее, в глубине плывёшь, а не бегаешь по дну. Задержишься там, где глубже двух метров, — снизу выйдет акула. В коопе друзья видят прыжок, укус и исчезновение тела под водой; стоящие рядом вздрагивают. Из её пасти на койку уже не попадёшь.',
+      'Защита звука: направление слуха всегда конечное и ненулевое, даже при резком развороте; прерванный браузером аудиоконтекст возобновляется. Если в выходном тракте появляются некорректные отсчёты, фильтр и лимитер пересобираются, не обрывая голоса и источники. Обычная тишина восстановление не запускает.',
+    ]},
+    en:{title:'A wheelie on the highway and something below the lake',items:[
+      'A Kugoo overtakes you on the way to the forestry yard: the rider lifts the front wheel right beside the UAZ, then a police car tears past with flashing lights and a positional siren. The passengers turn to watch the overtake and the pursuit.',
+      'The UAZ no longer drives underground on the approach to the yard: its height follows the actual road, its turn clears the lamp post, and the post itself stands off the track. Chrome spokes that shimmered as white shards over the garage wheel discs are gone.',
+      'The lake reaches its actual bank without open seams. Shallows slow you down; in deep water you swim instead of running along the bottom. Stay where it is more than two metres deep and a shark comes up from below. In co-op your friends see the breach, bite and body disappearing underwater; nearby witnesses recoil. There is no cot rescue from its jaws.',
+      'Audio safeguards: the listening direction stays finite and non-zero, even during a sudden turn, and a browser-interrupted audio context resumes. Invalid output samples rebuild the filter and limiter without cutting off voices or sound sources. Ordinary silence does not trigger a repair.',
+    ]},
+  },
+  {
     v:'4.0a',date:'2026-11-04',
     ru:{title:'Ворота лесхоза снова открываются сами',items:[
       'Ворота лесхоза снова едут сами, как и написано на табличке у них: запустил все пять генераторов — двор под током, воет сирена, ворота откатываются. Рубильника в лесу нет и не нужно: задание больше не отправляет в убежище, которого на этом участке нет, и ночь в лесу снова проходится до машины.',

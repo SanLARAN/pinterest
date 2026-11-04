@@ -10,7 +10,7 @@
 // Nothing here goes over the network: your friends see your remote body, as always.
 import { CFG } from '../core/config.js';
 import { clamp, lerp } from '../core/rng.js';
-import { buildSurvivor, poseCarrier, poseFur } from './survivor.js';
+import { buildSurvivor, poseCarrier, poseFur, poseSwimming } from './survivor.js';
 import { fitKey } from './outfit.js';
 import { createPersonMaterial, dressPerson, undressPerson } from '../render/people.js';
 
@@ -120,9 +120,12 @@ export class SelfBody {
     const wk = clamp(g.workK || 0, 0, 1) * (carrying || part ? 0 : 1);
     if (wk > 0.001) poseWork(rig, wk, (g.time || 0) + (p.bobPhase || 0) * 0.1);
     if (carrying) poseCarrier(rig);
+    if (p.swimming) poseSwimming(rig, p.swimPhase || 0);
     root.position.set(p.x, p.y + (p.bobY || 0) + (p.viewY || 0), p.z);
     root.rotation.set(0, p.yaw + PI, 0); // (the rig faces +z; you look down -z)
     root.translateZ(-this._clear(n.chest.rotation.x));
+    // The swimmer's hips are pitched too: keep that forward-folded torso behind the eyes.
+    if (p.swimming) root.translateZ(-0.48);
     // hands busy with something drawn up close: those arms step aside
     this._arms(!(carrying || part || g.fieldView.left.visible && g.fieldView.root.visible), !(carrying || part || g.fieldView.right.visible && g.fieldView.root.visible));
   }

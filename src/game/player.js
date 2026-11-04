@@ -1,7 +1,7 @@
 // First-person controller: a body with weight (4.0) — momentum, a jump with a heavy fall, a landing the knees
 // and the eyes feel — stamina, footsteps, bumps into trees.
 import { CFG } from '../core/config.js';
-import { speedScale, stepOf } from './water.js';
+import { speedScale, stepOf, swimming, waterOf } from './water.js';
 import { clamp, damp } from '../core/rng.js';
 import { SLOT_OFFSET } from './remote.js';
 
@@ -51,6 +51,8 @@ export class Player {
     this.bobAmp = 0;
     this.crouching = false;
     this.sprinting = false;
+    this.swimming = false;
+    this.swimPhase = 0;
     this.bumpCD = 0;
     this.stones = CFG.PLAYER.maxStones;
     this.stoneTimer = 0;
@@ -103,9 +105,10 @@ export class Player {
 
     let mx = frozen ? 0 : input.move.x, my = frozen ? 0 : input.move.y;
     const mag = Math.min(1, Math.hypot(mx, my));
-    this.crouching = input.crouch && !frozen;
+    this.swimming = this.floorY == null && !this.col && swimming(this.world, this.x, this.z) && this.y < waterOf(this.world).level - 0.45;
+    this.crouching = input.crouch && !frozen && !this.swimming;
     const heavy = !!this.carrying || !!load; // someone on your shoulder (or an engine part in your arms): no running
-    const wantSprint = input.sprint && !heavy && !this.crouching && mag > 0.3 && !this.exhausted && this.stamina > 2;
+    const wantSprint = input.sprint && !this.swimming && !heavy && !this.crouching && mag > 0.3 && !this.exhausted && this.stamina > 2;
     this.sprinting = wantSprint;
     const R = CFG.REVIVE;
     const carryV = load && !this.carrying ? load.walk : R.carry;
@@ -132,7 +135,7 @@ export class Player {
     // (4.0) weight: getting going takes a moment, turning round is braking first, and in the air you only steer —
     // let go of the keys up there and you carry on where you were going (only the air slows you, a little)
     const against = this.vx * wx + this.vz * wz < 0;
-    const accel = !this.grounded ? (mag > 0.01 ? P.airAccel : P.airDrag) : mag > 0.01 && !against ? P.accel : P.decel;
+    const accel = this.swimming ? 3.6 : !this.grounded ? (mag > 0.01 ? P.airAccel : P.airDrag) : mag > 0.01 && !against ? P.accel : P.decel;
     this.vx = damp(this.vx, wx, accel, dt);
     this.vz = damp(this.vz, wz, accel, dt);
 
@@ -167,7 +170,17 @@ export class Player {
     const gy = this.floorY != null ? this.floorY
       : deckY != null ? Math.max(deckY, this.world.terrain.height(this.x, this.z))
       : this.world.terrain.height(this.x, this.z);
-    this._vertical(dt, gy, input, frozen, heavy, wetScale, ev);
+    const canFloat = this.floorY == null && !this.col && swimming(this.world, this.x, this.z);
+    this.swimming = canFloat && this.y < waterOf(this.world).level - 0.45;
+    if (this.swimming) {
+      const surface = waterOf(this.world).level;
+      this.swimPhase += dt * (this.speed > 0.2 ? 3 : 1.5);
+      const floatY = surface - P.eye + 0.3 + Math.sin(this.swimPhase) * 0.025;
+      this.y = Math.max(surface - P.eye + 0.14, damp(this.y, floatY, 5, dt));
+      this.vy = 0; this.grounded = false; this.airT = 0;
+      this.coyote = 0; this.jumpBuf = 0;
+      this.sprinting = false; this.crouching = false;
+    } else this._vertical(dt, gy, input, frozen, heavy, wetScale, ev);
 
     // stamina
     if (this.sprinting && this.speed > 1 && this.grounded) {
@@ -195,7 +208,7 @@ export class Player {
     const eyeTarget = this.crouching ? P.crouchEye : P.eye;
     this.eyeCur = damp(this.eyeCur, eyeTarget, 10, dt);
     const stepLen = heavy ? P.stepWalk * 0.82 : this.crouching ? P.stepCrouch : this.sprinting ? P.stepSprint : P.stepWalk;
-    if (this.speed > 0.25 && this.grounded) {
+    if (this.speed > 0.25 && (this.grounded || this.swimming)) {
       this.stepAcc += moved;
       this.bobPhase += (moved / stepLen) * Math.PI;
       if (this.stepAcc >= stepLen) {
@@ -240,7 +253,7 @@ export class Player {
     this.bobAmp = damp(this.bobAmp || 0, ampTo, 8, dt);
     const bobAmp = this.bobAmp;
     const c = Math.cos(this.bobPhase);
-    this.bobY = -c * c * bobAmp;
+    this.bobY = this.swimming ? Math.sin(this.swimPhase) * 0.015 : -c * c * bobAmp;
     // (4.0) lean into a sidestep with the body's real sideways speed, not the key: it eases in and out with it
     const vR = this.vx * cy - this.vz * sy;
     this.roll = damp(this.roll, Math.sin(this.bobPhase) * bobAmp * 0.35 - vR * 0.0042, 10, dt);

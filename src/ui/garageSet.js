@@ -743,18 +743,16 @@ export function buildCarWheels(opts = {}, only = -1) {
     b.cylinder(10, r * 0.62, r * 0.62, 0.03, P, { y0: -0.015, capBottom: true }); // (3.1o: the tyre's hole is a 12-gon of 0.58 r; this 10-gon's flats sit at 0.59 r. At 0.55 r a ring of daylight showed round the rim)
     b.place(cx, cy, cz + sz * w * 0.45, PI / 2, 0, 0);
     b.cylinder(6, 0.07, 0.07, 0.03, GK.CHROME, { y0: -0.015 });
-    // A wheel has to look like a wheel that turns: four spokes and a valve stem on its face.
-    // (3.0m fix) What used to be here was a second ring of tread blocks at r*0.96 — cut straight through the
-    // first ring the tyre already carries — and a BONE-white valve cube driven into the sidewall at 45°, where
-    // it poked out of the tyre and shimmered. Both are gone: the tyre keeps its own treads, and the valve is a
-    // chrome stem sitting inside the rim's face, clear of the rubber.
-    for (let k = 0; k < 4; k++) {
-      const a = (k / 4) * Math.PI;
-      b.place(cx + Math.cos(a) * r * 0.28, cy + Math.sin(a) * r * 0.28, cz + sz * (w * 0.4), 0, 0, a);
-      b.box(r * 0.5, 0.045, 0.02, GK.CHROME);
+    // Stamped recesses, not chrome bars sharing the disc's outer plane (±0.11 m): the old
+    // coplanar faces fought for depth and flashed as white shards when the lobby camera moved.
+    for (let k = 0; k < 5; k++) {
+      const a = (k / 5) * PI * 2;
+      b.place(cx + Math.cos(a) * r * 0.37, cy + Math.sin(a) * r * 0.37, cz + sz * (w / 2 + 0.004), PI / 2, 0, 0);
+      b.cylinder(6, 0.025, 0.025, 0.006, GK.DARK, { y0: -0.003, capBottom: true });
     }
-    b.place(cx + r * 0.5, cy, cz + sz * (w * 0.4), PI / 2, 0, 0);
-    b.cylinder(6, 0.02, 0.02, 0.03, GK.CHROME, { y0: -0.015 });
+    b.place(cx + r * 0.5, cy, cz + sz * (w / 2 + 0.009), PI / 2, 0, 0);
+    b.cylinder(6, 0.012, 0.012, 0.012, GK.DARK, { y0: -0.006, capBottom: true });
+
   });
   return b.toArrays();
 }

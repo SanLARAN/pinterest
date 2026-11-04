@@ -44,7 +44,7 @@ export class Stones {
       }
       if (!hit && world.lake) {
         const L = world.lake;
-        if (Math.hypot(nx - L.x, nz - L.z) < L.r + 2 && ny <= L.y + 0.05) hit = { x: nx, y: L.y, z: nz, water: true };
+        if (Math.hypot(nx - L.x, nz - L.z) < (L.meshR ?? L.r) + 2 && ny <= L.y + 0.05) hit = { x: nx, y: L.y, z: nz, water: true };
       }
       if (hit || s.t > 4) {
         this.list.splice(i, 1);

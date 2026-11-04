@@ -281,7 +281,7 @@ test('a friend in the air tucks, lands with a fold, and no pose ever snaps (sett
   // their feet off the ground travel in the state (PF.air), and the remote animates from it
   assert.equal(PF.air, 256);
   assert.ok(Object.values(PF).every((v, i, a) => a.indexOf(v) === i));
-  assert.match(src('src/game/netsync.js'), /if \(p\.grounded === false\) f \|= PF\.air;/);
+  assert.match(src('src/game/netsync.js'), /if \(p\.grounded === false && !p\.swimming\) f \|= PF\.air;/);
   assert.match(src('src/game/remote.js'), /settleRig\(this\.rig, dt\);/);
 });
 

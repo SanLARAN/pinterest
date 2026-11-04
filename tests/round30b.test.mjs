@@ -118,10 +118,10 @@ test('a running pump pushes the water line down, and the echo comes back with it
   assert.equal(echoOf(w, d.x, d.z).scale, 0.6, 'and the water wins again when the pump stops');
 });
 
-test('the forest has no water, so none of this happens there', () => {
+test('outside the forest lake the water rules remain a no-op (4.1)', () => {
   const w = forestWorld();
-  assert.equal(w.water, null);
-  for (const [x, z] of [[0, 0], [58, -74], [-114, 40], [152, -30]]) {
+  assert.ok(w.water?.swim, '4.1: the forest has a local swimmable lake now');
+  for (const [x, z] of [[0, 0], [58, -74], [-114, 40]]) {
     assert.equal(wading(w, x, z), false);
     assert.equal(wet(w, x, z), false);
     assert.equal(mistScale(w, x, z), 1);

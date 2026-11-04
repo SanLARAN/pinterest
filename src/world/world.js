@@ -5,6 +5,7 @@ import { CFG } from '../core/config.js';
 import { RNG, smoothstep } from '../core/rng.js';
 import { MeshBuilder, KIND } from './builder.js';
 import { Terrain } from './terrain.js';
+import { lakeSurface } from './lake.js';
 import { Collision } from './collision.js';
 import { ForestTrails } from './trails.js';
 import { Meadow } from './meadow.js';
@@ -921,26 +922,19 @@ export class World {
   lm_lake(L, rng) {
     const flat = this.terrain.flats.find((f) => f.x === L.x && f.z === L.z);
     const wy = (flat ? flat.h : this.terrain.height(L.x, L.z)) - 0.85;
-    this.lake = { x: L.x, z: L.z, r: L.r - 3.5, y: wy };
+    // The old 30 m disc ended inside the basin. Clip connected water against the actual
+    // terrain, 40 cm under the bank: shared grid edges cannot leave a hole between spokes.
+    const surface = lakeSurface(this.terrain, L, wy);
+    this.lake = { x: L.x, z: L.z, r: L.r - 3.5, meshR: surface.meshR, bank: surface.bank, y: wy };
+    this.water = {
+      level: wy, swim: true,
+      depth: (x, z) => surface.contains(x, z) ? Math.max(0, wy - this.terrain.height(x, z)) : 0,
+      misted: () => false,
+    };
+    this.walks.push({ ax: L.x - L.r - 3, az: L.z, bx: L.x - L.r + 9, bz: L.z, w: 1.9, y: wy + 0.49 });
     this.addProp(L.x, L.z, (b) => {
       b.identity();
-      const segs = 40, rings = 5, R = L.r - 1.0;
-      for (let k = 0; k < rings; k++) {
-        const ra = (k / rings) * R, rb = ((k + 1) / rings) * R;
-        for (let i = 0; i < segs; i++) {
-          const a0 = (i / segs) * Math.PI * 2, a1 = ((i + 1) / segs) * Math.PI * 2;
-          const p0 = [L.x + Math.cos(a0) * ra, wy, L.z + Math.sin(a0) * ra];
-          const p1 = [L.x + Math.cos(a1) * ra, wy, L.z + Math.sin(a1) * ra];
-          const q0 = [L.x + Math.cos(a0) * rb, wy, L.z + Math.sin(a0) * rb];
-          const q1 = [L.x + Math.cos(a1) * rb, wy, L.z + Math.sin(a1) * rb];
-          if (k === 0) b.triN(p0, q0, q1, [0, 1, 0], KIND.WATER, 5);
-          else {
-            // hide radial edges, keep concentric rings (ripple look)
-            b.triN(p0, q0, q1, [0, 1, 0], KIND.WATER, 4 | 1);
-            b.triN(p0, q1, p1, [0, 1, 0], KIND.WATER, 1 | 2);
-          }
-        }
-      }
+      for (const t of surface.triangles) b.triN(...t.p, [0, 1, 0], KIND.WATER, t.hide);
       // dock on the west shore
       const dx0 = L.x - L.r - 3, dx1 = L.x - L.r + 9;
       for (let x = dx0; x < dx1; x += 0.55) {
@@ -957,7 +951,7 @@ export class World {
       b.place(L.x + 6, wy - 0.15, L.z + 8, 0.25, 0.8, 0.1, 1);
       b.taper(0.6, 2.6, 1.2, 3.0, 0.6, KIND.WOOD);
     });
-    this.col.circle(L.x, L.z, L.r - 3.5, 0, CAP.WATER);
+    // Water is not a solid capsule. Depth, buoyancy and the lake itself keep the rules now.
   }
 
   lm_graves(L, rng) {

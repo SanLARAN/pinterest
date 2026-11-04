@@ -7,7 +7,7 @@
 // x across, z from the forest side −d/2 to the highway side +d/2; the yard isn't rotated).
 import * as THREE from 'three';
 import { CFG } from '../core/config.js';
-import { RNG, smoothstep } from '../core/rng.js';
+import { RNG, smoothstep, lerp } from '../core/rng.js';
 import { MeshBuilder, KIND } from './builder.js';
 import { GK, tyre } from '../ui/garageSet.js';
 
@@ -358,6 +358,9 @@ export function roadHeight() {
 // west hills) to z1 (well past the far side of the road). The fog has all of it long before its edge.
 export const FAR = { x0: -520, x1: 640, z0: 0, z1: 560, cell: 5 };
 
+// (4.1) the post of the lamp over the mouth of the cut stands this far east of its head, off the gravel
+export const JUNCTION_POST = 2.6;
+
 // the highway's lamps stand every lampEvery metres, one of them right where the road from the cut comes in
 export function lampFirst() {
   const R = CFG.ROAD;
@@ -453,11 +456,16 @@ function highway(b, x0, x1, HY, lamps) {
   for (let x = lampFirst(); x < FAR.x1; x += R.lampEvery) {
     if (x < x0 || x >= x1) continue;
     const zp = R.z - 7.2;
-    b.place(x, HY - 0.4, zp);
+    // (4.1) the one where the cut comes in stood in the middle of the gravel: the УАЗ went through its post on the
+    // way in and on the way out. The post steps off the road; its arm reaches back, and the head (and its light,
+    // which the shader keeps on the lamps' own spacing) stays where it was, over the mouth of the cut
+    const px = Math.abs(x - Y.x) < 1 ? x + JUNCTION_POST : x;
+    b.place(px, HY - 0.4, zp);
     b.cylinder(6, 0.12, 0.08, 9.2, T, { capTop: true });
     b.identity();
-    b.limb([x, HY + 8.6, zp], [x, HY + 9.05, zp + 2.0], 0.05, 0.045, T, 4);
-    b.limb([x, HY + 9.05, zp + 2.0], [x, HY + 8.95, zp + 4.6], 0.045, 0.04, T, 4);
+    const mx = lerp(px, x, 0.45);
+    b.limb([px, HY + 8.6, zp], [mx, HY + 9.05, zp + 2.0], 0.05, 0.045, T, 4);
+    b.limb([mx, HY + 9.05, zp + 2.0], [x, HY + 8.95, zp + 4.6], 0.045, 0.04, T, 4);
     b.place(x, HY + 8.88, zp + 4.6);
     b.box(0.28, 0.12, 0.6, GK.DARK);
     b.place(x, HY + 8.81, zp + 4.6);

@@ -6,7 +6,7 @@
 
 export const CARD_V = 1;
 const int = (v, max = 1e9) => Math.max(0, Math.min(max, Math.floor(Number(v) || 0)));
-const KILLERS = ['listener', 'crawler', 'watcher', 'howler', 'shkaf', 'angler', 'stray', 'drowned', 'razlom', 'scream'];
+const KILLERS = ['listener', 'crawler', 'watcher', 'howler', 'shkaf', 'angler', 'stray', 'drowned', 'razlom', 'shark', 'scream'];
 const CREATURES = ['listener', 'crawler', 'watcher', 'howler', 'shkaf', 'angler', 'stray', 'shade', 'drowned', 'gnat'];
 
 export function buildCard({ atlas = {}, scores = [], wallet = {}, strayMet = 0, fit = null, now = Date.now() } = {}) {

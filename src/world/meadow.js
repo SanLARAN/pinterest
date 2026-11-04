@@ -9,6 +9,7 @@ export class Meadow {
   allowed(x,z) {
     const w=this.world,L=w.lake,Y=w.zarya;
     if(L&&Math.hypot(x-L.x,z-L.z)<L.r+3)return false;
+    if(w.water?.swim&&w.water.depth(x,z)>.04)return false;
     if(Math.abs(x-96)<17&&z>230)return false; // forestry yard, gate and escape road
     if(w.trails?.near(x,z,.32)||!w.col.free(x,z,.2))return false;
     for(const f of Y?.floors||[])if(Math.abs(x-f.x)<f.w/2+.35&&Math.abs(z-f.z)<f.d/2+.35)return false;

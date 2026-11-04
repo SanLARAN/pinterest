@@ -1345,6 +1345,21 @@ export function poseRider(rig, lean = 0, steer = 0, t = 0) {
   }
 }
 
+// (4.1) floating forward: the hips stream into the water, the head stays level, hands stroke and feet flutter.
+export function poseSwimming(rig, phase = 0) {
+  const n = rig.nodes, kick = Math.sin(phase * 2);
+  n.hips.position.set(0, 0.94, 0);
+  n.hips.rotation.set(1, 0, 0);
+  n.chest.rotation.set(-0.25, Math.sin(phase) * 0.035, 0);
+  n.head.rotation.set(-0.75, 0, 0);
+  for (const [side, sign] of [['L', -1], ['R', 1]]) {
+    n['th' + side].rotation.set(sign * kick * 0.13, 0, sign * 0.08);
+    n['kn' + side].rotation.x = 0.15 + Math.max(0, sign * kick) * 0.25;
+    n['sh' + side].rotation.set(-1.7 + Math.sin(phase) * 0.45, 0, sign * (0.45 + Math.cos(phase) * 0.3));
+    n['el' + side].rotation.x = -0.5 - Math.max(0, Math.cos(phase)) * 0.45;
+  }
+}
+
 // down, propped in a seat: slumped sideways, head lolling (the caller places the root as for poseSeated)
 export function poseSlumped(rig, t = 0) {
   poseSeated(rig, false, 0);

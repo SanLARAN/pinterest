@@ -109,12 +109,12 @@ test('the forest did not change when the bog arrived', () => {
   const w = forestWorld();
   assert.equal(w.mapId, 'forest');
   assert.equal(w.half, 300, 'still 600 m of forest');
-  assert.equal(w.water, null, 'no water line in the forest');
+  assert.ok(w.water?.swim && w.water.depth(0, 0) === 0, '4.1: only the local lake has water');
   assert.equal(w.landmarks.length, 20, 'every one of its places is still there');
   assert.equal(w.sites.length, 6, 'camp + five sites');
   assert.ok(w.lake && w.lake.r > 20, 'the lake is still the lake');
   assert.ok(w.meshes.length > 50, 'and it is still built out of chunks');
-  assert.ok(w.walks.length === 0, 'no plank roads in the forest');
+  assert.equal(w.walks.length, 1, '4.1: the existing lake pier is walkable, no other plank roads');
 });
 
 test('a map can be swapped in place: the old ground leaves the scene with it', () => {

@@ -125,7 +125,9 @@ export class AudioEngine {
     this.ambOn = false;
     this.nextAmbEvent = 0;
     this.nextBeat = 0;
-    this.listener = { x: 0, y: 0, z: 0, fx: 0, fz: -1 };
+    this.listener = { x: 0, y: 0, z: 0, fx: 0, fy: 0, fz: -1 };
+    this._healthAt = -Infinity;
+    this._repairAt = -Infinity;
     this._outBuf = null;
     this.offline = false; // true when rendering into an OfflineAudioContext (sound tests)
     this.voices = new Map(); // co-op: friends' microphones
@@ -256,28 +258,91 @@ export class AudioEngine {
     const b = this._gateBuf;
     this.gateAnalyser.getFloatTimeDomainData(b);
     let s = 0;
-    for (let i = 0; i < b.length; i++) s += b[i] * b[i];
+    for (let i = 0; i < b.length; i++) {
+      if (!Number.isFinite(b[i])) return -100;
+      s += b[i] * b[i];
+    }
     const vol = Math.max(0.001, this.master.gain.value);
     return 20 * Math.log10(Math.sqrt(s / b.length) * vol + 1e-9);
   }
 
   setListener(x, y, z, fx, fy, fz) {
-    this.listener.x = x; this.listener.y = y; this.listener.z = z;
-    this.listener.fx = fx; this.listener.fz = fz;
+    const old = this.listener;
+    x = Number.isFinite(x) ? x : old.x;
+    y = Number.isFinite(y) ? y : old.y;
+    z = Number.isFinite(z) ? z : old.z;
+    let len = Math.hypot(fx, fy, fz);
+    if (!Number.isFinite(len) || len < 1e-6) {
+      fx = old.fx; fy = old.fy || 0; fz = old.fz;
+      len = Math.hypot(fx, fy, fz) || 1;
+    }
+    fx /= len; fy /= len; fz /= len;
+    // HRTF needs a real basis. Looking straight up must not make forward parallel to up.
+    const flat = Math.hypot(fx, fz);
+    if (flat < 0.02) {
+      const yawLen = Math.hypot(old.fx, old.fz) || 1;
+      fx = old.fx / yawLen * 0.02; fz = old.fz / yawLen * 0.02;
+      fy = Math.sign(fy) * Math.sqrt(1 - 0.02 * 0.02);
+    }
+    Object.assign(old, { x, y, z, fx, fy, fz });
     if (!this.ctx) return;
-    const L = this.ctx.listener;
-    const t = this.now;
+    const L = this.ctx.listener, t = this.now;
     if (L.positionX) {
       L.positionX.setTargetAtTime(x, t, 0.02);
       L.positionY.setTargetAtTime(y, t, 0.02);
       L.positionZ.setTargetAtTime(z, t, 0.02);
-      L.forwardX.setTargetAtTime(fx, t, 0.02);
-      L.forwardY.setTargetAtTime(fy, t, 0.02);
-      L.forwardZ.setTargetAtTime(fz, t, 0.02);
+      // Do not interpolate opposite look vectors THROUGH (0,0,0). One poisoned HRTF can silence the mix.
+      for (const [param, value] of [[L.forwardX, fx], [L.forwardY, fy], [L.forwardZ, fz]]) {
+        param.cancelScheduledValues(t);
+        param.setValueAtTime(value, t);
+      }
     } else if (L.setPosition) {
       L.setPosition(x, y, z);
       L.setOrientation(fx, fy, fz, 0, 1, 0);
     }
+    this.watchdog();
+  }
+
+  // A safety net, not a silence detector: quiet gameplay is valid. Only invalid samples rebuild the
+  // stateful output filters. A browser/driver interruption is resumed without replacing sources or voices.
+  watchdog(wall = performance.now() / 1000) {
+    if (!this.ctx || this.offline || wall - this._healthAt < 0.5) return;
+    this._healthAt = wall;
+    if (this.ctx.state === 'closed') return;
+    if (this.ctx.state !== 'running') {
+      if (!this.pausedFlag && !this._resuming) {
+        this._resuming = true;
+        Promise.resolve(this.ctx.resume()).catch(() => {}).finally(() => { this._resuming = false; });
+      }
+      return;
+    }
+    if (!this.outAnalyser || !this._outBuf) return;
+    this.outAnalyser.getFloatTimeDomainData(this._outBuf);
+    if (this._outBuf.every(Number.isFinite) || wall - this._repairAt < 3) return;
+    this._repairAt = wall;
+    this._repairOutput();
+  }
+
+  _repairOutput() {
+    const ctx = this.ctx, old = this.stunLP;
+    const freq = Number.isFinite(old.frequency.value) ? old.frequency.value : 20000;
+    for (const bus of [this.pauseGain, this.voiceBus, this.deathBus]) {
+      if (bus) { try { bus.disconnect(old); } catch { /* already detached */ } }
+    }
+    old.disconnect();
+    this.master.disconnect(this.limiter);
+    this.limiter.disconnect();
+    this.stunLP = this._filter('lowpass', Math.max(40, Math.min(ctx.sampleRate * 0.45, freq)), 0.6);
+    this.stunLP.connect(this.master);
+    for (const bus of [this.pauseGain, this.voiceBus, this.deathBus]) bus?.connect(this.stunLP);
+    this.limiter = ctx.createDynamicsCompressor();
+    Object.assign(this.limiter.threshold, { value: -9 });
+    this.limiter.knee.value = 6; this.limiter.ratio.value = 14;
+    this.limiter.attack.value = 0.002; this.limiter.release.value = 0.22;
+    this.master.connect(this.limiter);
+    this.limiter.connect(ctx.destination);
+    this.limiter.connect(this.outAnalyser);
+    this._audioRepairs = (this._audioRepairs || 0) + 1;
   }
 
   // pan [-1,1] of a world point relative to the listener (cheap stereo)
@@ -330,6 +395,9 @@ export class AudioEngine {
     return t + a + hold + d;
   }
   _panner(x, y, z, ref = 3, roll = 1.1) {
+    x = Number.isFinite(x) ? x : this.listener.x;
+    y = Number.isFinite(y) ? y : this.listener.y;
+    z = Number.isFinite(z) ? z : this.listener.z;
     const p = this.ctx.createPanner();
     p.panningModel = 'HRTF';
     p.distanceModel = 'inverse';
@@ -2248,6 +2316,52 @@ export class AudioEngine {
     if (this.moto) this.moto.kill();
   }
 
+  // Positional traffic for the opening. Independent of the training bike loop: skipping the film
+  // stops every source, and the Doppler estimate is bounded across the film's deliberate jump cuts.
+  policeSiren(x, y, z) { return this._trafficLoop(true, x, y, z); }
+  filmMoto(x, y, z) { return this._trafficLoop(false, x, y, z); }
+  _trafficLoop(siren, x, y, z) {
+    if (!this.ready) return null;
+    x = Number.isFinite(x) ? x : this.listener.x;
+    y = Number.isFinite(y) ? y : this.listener.y;
+    z = Number.isFinite(z) ? z : this.listener.z;
+    const t = this.now, pn = this._panner(x, y, z, siren ? 12 : 5, 0.9);
+    const out = this._gain(0), lp = this._filter('lowpass', siren ? 2400 : 1800, 0.7);
+    const osc = this._osc(siren ? 'triangle' : 'sawtooth', siren ? 770 : 145);
+    const harmonic = this._osc('sine', siren ? 1540 : 292), hg = this._gain(siren ? 0.15 : 0.35);
+    const lfo = this._osc('sine', siren ? 0.9 : 19), lg = this._gain(siren ? 280 : 9);
+    osc.connect(lp); harmonic.connect(hg).connect(lp);
+    lfo.connect(lg).connect(osc.frequency);
+    lp.connect(out).connect(pn).connect(this.sfx);
+    out.gain.setTargetAtTime(siren ? 0.17 : 0.11, t, 0.12);
+    const sources = [osc, harmonic, lfo]; sources.forEach((s) => s.start(t));
+    let dead = false, lastT = t, lastD = Math.hypot(x - this.listener.x, z - this.listener.z);
+    const self = this;
+    return {
+      move(px, py, pz) {
+        if (dead || ![px, py, pz].every(Number.isFinite)) return;
+        const now = self.now, d = Math.hypot(px - self.listener.x, pz - self.listener.z);
+        const dt = now - lastT;
+        const radial = dt > 0.01 ? Math.max(-45, Math.min(45, (d - lastD) / dt)) : 0;
+        const doppler = 343 / (343 + radial);
+        osc.frequency.setTargetAtTime((siren ? 770 : 145) * doppler, now, 0.07);
+        harmonic.frequency.setTargetAtTime((siren ? 1540 : 292) * doppler, now, 0.07);
+        if (pn.positionX) {
+          pn.positionX.setTargetAtTime(px, now, 0.025); pn.positionY.setTargetAtTime(py, now, 0.025); pn.positionZ.setTargetAtTime(pz, now, 0.025);
+        } else pn.setPosition(px, py, pz);
+        lastD = d; lastT = now;
+      },
+      stop() {
+        if (dead) return;
+        dead = true;
+        const now = self.now;
+        out.gain.setTargetAtTime(0, now, 0.06);
+        osc.onended = () => { for (const n of [osc, harmonic, lfo, lg, hg, lp, out, pn]) { try { n.disconnect(); } catch { /* */ } } };
+        sources.forEach((s) => s.stop(now + 0.35));
+      },
+    };
+  }
+
   genHum(x, y, z, spinning = false) {
     if (!this.ready) return null;
     const t = this.now;
@@ -2271,6 +2385,7 @@ export class AudioEngine {
     srcs.forEach((q) => q.start(t));
     const self = this;
     const set = (lvl, tc = 0.25) => {
+      lvl = Number.isFinite(lvl) ? Math.min(1, Math.max(0, lvl)) : 0;
       const now = self.now;
       o1.frequency.setTargetAtTime(30 + 22 * lvl, now, tc);
       o2.frequency.setTargetAtTime(60 + 44.5 * lvl, now, tc);

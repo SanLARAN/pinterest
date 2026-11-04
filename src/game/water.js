@@ -17,6 +17,8 @@ export const WATER = {
   ringRadius: 8, // the ring a step draws on the surface, visible from here
   mistScale: 0.35, // inside a vapour patch the echo does not come back
   depthWade: 0.25, // knee-deep: the speed and the echo are affected from here
+  depthSwim: 1.25, // a lake deep enough to float in (the bog keeps its own drowning rules)
+  swimSpeed: 0.48,
   depthWet: 0.06, // ankle-deep: a step splashes
 };
 
@@ -25,9 +27,20 @@ export function onPlanks(world, x, z) {
   return !!world?.onWalk?.(x, z, 0);
 }
 
-// the water on the map, or nothing (the forest has none — every function below is then a no-op)
+// the water on the map, or nothing (a forest has one local lake; a bog owns its whole water table)
 export function waterOf(world) {
   return world?.water || null;
+}
+
+export function depthOf(world, x, z) {
+  const w = waterOf(world);
+  if (!w || onPlanks(world, x, z)) return 0;
+  const d = w.depth(x, z);
+  return Number.isFinite(d) ? Math.max(0, d) : 0;
+}
+
+export function swimming(world, x, z) {
+  return !!waterOf(world)?.swim && depthOf(world, x, z) > WATER.depthSwim;
 }
 
 export function wading(world, x, z) {
@@ -49,7 +62,7 @@ export function inMist(world, x, z) {
 
 // speed multiplier for a player standing here (crouching, carrying and all the rest are applied on top)
 export function speedScale(world, x, z) {
-  return wading(world, x, z) ? WATER.wadeSpeed : 1;
+  return swimming(world, x, z) ? WATER.swimSpeed : wading(world, x, z) ? WATER.wadeSpeed : 1;
 }
 
 // the echo a player at (x, z) is about to make: how much of the wave survives the water, and how fast it runs

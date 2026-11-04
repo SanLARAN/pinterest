@@ -38,6 +38,7 @@ export class Undergrowth {
     const w = this.world, L = w.lake, Y = w.zarya;
     if (Math.hypot(x, z - 3) < 13) return false; // the camp: trodden flat
     if (L && Math.hypot(x - L.x, z - L.z) < L.r + 4) return false;
+    if (w.water?.swim && w.water.depth(x, z) > 0.04) return false;
     if (Math.abs(x - 96) < 19 && z > 226) return false; // the forestry yard, its gate and the escape road
     if (w.trails?.near(x, z, r + 0.7)) return false;
     if (!w.col.free(x, z, r * 0.6 + 0.2)) return false;

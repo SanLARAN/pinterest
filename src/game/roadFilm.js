@@ -26,7 +26,8 @@ import { buildSurvivor, poseSeated, poseSurvivor } from './survivor.js';
 import { createPersonMaterial, dressPerson, undressPerson } from '../render/people.js';
 import { PLAYER_HEX } from './remote.js';
 import { myFit, cleanFit } from './outfit.js';
-import { CAR_AT } from '../world/yard.js';
+import { CAR_AT, groundAt, inYard } from '../world/yard.js';
+import { RoadTraffic } from './roadTraffic.js';
 
 const PI = Math.PI;
 const Y = CFG.YARD;
@@ -53,7 +54,9 @@ export const ROAD_SHOTS = [
 export function arrivalPath() {
   const X = Y.x, Z = Y.z, hd = Y.d / 2;
   return [
-    [X + 80, LANE], [X + 50, LANE], [X + 22, LANE], [X + 9, R.z - 2.6], [X + 1.6, R.z - 6.2], [X + 0.2, R.z - 14],
+    // (4.1: a wider swing off the highway, past the lamp's post — it used to cut the corner through it)
+    [X + 80, LANE], [X + 50, LANE], [X + 22, LANE], [X + 8, R.z - 2.1], [X + 2.6, R.z - 3.4], [X - 0.4, R.z - 5.8],
+    [X - 0.8, R.z - 8.6], [X + 0.2, R.z - 14],
     [X - 0.4, Z + hd + 44], [X + 0.2, Z + hd + 22], [X + 0.6, Z + hd + 4], [X + 0.7, Z + 9], [X + 4, Z + 4],
     [X + 9, Z], [X + 11.5, Z - 4], [X + 10, Z - 8.5], [X + 5.5, Z - 9], [X + 2.8, Z - 5.5], [X + CAR_AT.x, Z - 1],
     [X + CAR_AT.x, Z + CAR_AT.z],
@@ -124,6 +127,8 @@ export class RoadFilm {
       if (a.map) a.map.removeFromParent();
     }
     this.cast.length = 0;
+    this.traffic?.dispose();
+    this.traffic = null;
     if (this.car) { this.car.removeFromParent(); this.car = null; }
     if (this.engine) { this.engine.stop(0.3); this.engine = null; }
     if (this.radio) { this.radio.off(0.2); this.radio = null; }
@@ -166,11 +171,14 @@ export class RoadFilm {
     return out.filter((p) => (seen.has(p.slot) ? false : (seen.add(p.slot), true))).sort((a, b) => a.slot - b.slot);
   }
 
+  // the ground the car stands on: the forest's, or past the edge the land the cut and the lowland are built from
+  // (4.1: it said "the highway's level" for everything past the edge — and the land there climbs up to the yard,
+  // so the car drove into the cut buried to its windows). The gravel strip and the yard's slabs sit a little above it.
   _ground(x, z) {
     const w = this.g.world;
     if (!w?.terrain) return R.y;
     const half = CFG.WORLD_HALF;
-    const h = Math.abs(x) <= half && Math.abs(z) <= half ? w.terrain.height(x, z) : R.y;
+    const h = groundAt(w, x, z) + (inYard(x, z, 0.3) ? 0.085 : Math.abs(z) > half - 2 ? 0.05 : 0);
     return Math.abs(z - R.z) < 6 ? Math.max(h, R.y) : h; // the highway is a built road, flat at its own level
   }
 
@@ -182,6 +190,7 @@ export class RoadFilm {
     const glass = this.car.getObjectByName('glass');
     if (glass) glass.visible = false; // an open УАЗ, windscreen folded: up close the glass reads as a white board
     g.scene.add(this.car);
+    this.traffic = new RoadTraffic(g.scene, this.mat);
     const players = this._players();
     // alone you are the driver; a crew fills the seats in their lobby order
     players.forEach((p, i) => {
@@ -334,6 +343,7 @@ export class RoadFilm {
     for (const w of this.car.userData.wheels || []) w.rotation.z = c.dist / WHEEL_R;
     this.car.updateMatrixWorld(true);
     this._crew(tt, steer);
+    this.traffic?.update(tt, c);
     if (!silent) this._sound(tt, c);
     this._hud(tt);
     if (tt < 1.0) this.g.fx.fade = smoothstep(0, 1.0, tt);
@@ -373,6 +383,12 @@ export class RoadFilm {
       a.rig.root.visible = true;
       if (a.map) a.map.visible = true;
       this._role(a, n, tt, beat, song);
+      // A glance, not a frozen pose: the bike lifts beside them; later the siren wakes the back seat.
+      const glance = Math.max(smoothstep(14.8, 15.7, tt) * (1 - smoothstep(18, 19.4, tt)),
+        smoothstep(27.5, 28.4, tt) * (1 - smoothstep(30.7, 32.1, tt)));
+      n.head.rotation.y = lerp(n.head.rotation.y, 0.8, glance * (driver ? 0.5 : 1));
+      if (a.role === 'sleep') n.head.rotation.z *= 1 - glance;
+
     }
   }
 
@@ -483,6 +499,7 @@ export class RoadFilm {
   _sound(tt, c) {
     const g = this.g, au = g.audio;
     if (!au) return;
+    this.traffic?.sound(au);
     const hit = (key, at, fn) => { if (tt >= at && !this.cues[key]) { this.cues[key] = true; fn(); } };
     hit('engine', 0.05, () => {
       this.engine = au.uazStart?.(c.x, c.y + 0.7, c.z) || null;
@@ -548,9 +565,9 @@ export class RoadFilm {
         fov = 54;
         break;
       case 'side': // running alongside on the driver's side, low, the lamps sweeping past behind
-        p = local(lerp(1.4, 0.2, k), 1.2, 4.6);
-        l = local(0.55, 1.15, 0);
-        fov = 46;
+        p = local(lerp(1.4, 0.2, k), 1.55, 6.4);
+        l = local(-0.6, 1.3, 0.8);
+        fov = 54;
         break;
       case 'rear': // at the back window: the map in front, the sleeper beyond
         p = local(1.75, 1.82, -2.45);

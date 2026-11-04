@@ -47,7 +47,8 @@ import { buildStrayBody, poseStrayLunge } from './strayBody.js'; // 3.0t: her mu
 import { echoOf, mistScale, speedScale } from './water.js'; // 3.0b: what water does to a sound
 import { inert } from '../core/inert.js'; // 3.0: a system the current map does not have
 import { syncPumps } from '../world/bog.js'; // 3.0c: a running pump drains its sector
-import { Drowned } from './drowned.js'; // 3.0d: the one in the water
+import { Drowned } from './drowned.js';
+import { LakeShark } from './lakeShark.js'; // 3.0d: the one in the water
 import { Gnats } from './gnat.js'; // 3.0e: the swarm that eats your echo
 import { Magpies } from './magpies.js'; // 3.1c: the birds that tell
 import { Winch } from './winch.js'; // 3.0f: the way out of the bog
@@ -90,6 +91,7 @@ export class Game {
     this.angler = new Angler(this); // the man with the lantern, from the third night (see CFG.ANGLER)
     this.stray = new Stray(this); // the fourth night's girl: walk past her, never run (see CFG.STRAY)
     this.drowned = new Drowned(this); // 3.0d: the bog's own — it waits in the water (see game/drowned.js)
+    this.lakeShark = new LakeShark(this);
     this.gnats = new Gnats(this); // 3.0e: the swarm that eats your echo (see game/gnat.js)
     this.magpies = new Magpies(this); // 3.1c: flocks in the dead trees that go up rattling (see game/magpies.js)
     this.winch = new Winch(this); // 3.0f: the УАЗ in the bog, the cable and the drum (see game/winch.js)
@@ -297,12 +299,14 @@ export class Game {
     this.localDeath = false;
     this.inputMuted = false;
     this.teamOverAt = 0;
+    this._duskQueued = false;
     this.netT = 0;
     this.rescue.reset();
     this.rescue.resetPlayer(this.player);
     for (const r of this.remotes.values()) this.rescue.resetPlayer(r);
     this.angler.reset(); // the rope, the hunt, the clock — a new night owes him nothing
     this.stray.reset(); // she is not out there until the night puts her there (2.1v)
+    this.lakeShark?.reset();
     this.drowned.reset(); // ...and neither is the one in the water (3.0d)
     this.gnats.reset(); // ...nor the midges (3.0e)
     this.magpies.reset(); // ...nor the birds (3.1c)
@@ -426,6 +430,20 @@ export class Game {
       this.audio.setMorning(true);
     }
     this.netFrame(dt);
+    if (this.teamOverAt && this.time >= this.teamOverAt) return this.endOnline(false);
+    if (this._duskQueued && !this.lakeShark?.attacks.size) {
+      this.startDusk();
+      return;
+    }
+    if (!p.alive && this.killType === 'shark' && this.localDeath) {
+      if (this.localDeath === true) this.updateDying(dt);
+      else if (this.spectate && !this.spectate.target?.alive) this.nextSpectate();
+      this.pulses.update(this.time); this._waterFrame();
+      this.doors.update(dt); this.flares.update(dt); this.torch.update(dt); this.glows.update(dt);
+      this._commonFx(dt);
+      if (this.morningT >= CFG.SHIFT.MORNING && this.auth) this.startDusk();
+      return;
+    }
     for (const e of this.inputMuted ? [] : raw.events) {
       if (e === 'confirm' || e === 'skip') {
         if (this.auth) {
@@ -457,9 +475,13 @@ export class Game {
     // Player.update has no alive-guard and would happily walk the corpse around by keyboard)
     const pev = !p.alive ? { step: null, bump: null, breath: null }
       : this.angler.myCap() ? (this.angler.captiveFrame(dt, this.inputMuted ? NO_LOOK : raw.look), { step: null, bump: null, breath: null })
-      : p.update(dt, this.input, this.inputMuted || this.inventory.active ? NO_LOOK : raw.look, this.inputMuted || this.inventory.active);
+      : p.update(dt, this.input, this.inputMuted || this.inventory.active ? NO_LOOK : raw.look, this.inputMuted || this.inventory.active || this.lakeShark?.holds(p.id));
     this.angler.update(dt);
-    if (pev.step) this.audio.footstep(pev.step.intensity * 0.8);
+    if (pev.step?.water) {
+      this.audio.wade(pev.step.intensity, pev.step.depth);
+      waterKick(this.waves, this.world, p.x, p.z, this.time, 'step');
+      this.pulses.emitStep(p.x, this.world.water.level, p.z, this.time, { radius: 8, strength: 0.5, speed: 12, decay: 1.6, kind: 'step' });
+    } else if (pev.step) this.audio.footstep(pev.step.intensity * 0.8);
     if (pev.bump) {
       this.audio.bump();
       this.addTrauma(0.12);
@@ -650,6 +672,10 @@ export class Game {
 
   startDusk() {
     if (this.state !== 'morning') return;
+    // Finish a breach and its victim's short camera sequence before changing the clock.
+    // A guest queues the host's dusk event too, so a delayed packet cannot strand the death animation.
+    if (this.lakeShark?.attacks.size) { this._duskQueued = true; return; }
+    this._duskQueued = false;
     this.state = 'dusk';
     this.duskT = 0;
     this.duskHit = false;
@@ -1820,6 +1846,7 @@ export class Game {
 
   // the kill: it's in your face. solo → game over; co-op → you watch the others
   updateDying(dt) {
+    if (this.killType === 'shark') return this.lakeShark.dying(dt);
     if (this.killType === 'shkaf') return this._dyingShkaf(dt);
     this.deathT += dt;
     const p = this.player;
@@ -2193,6 +2220,7 @@ export class Game {
       r.rig.root.visible = watched !== r && !this.onShoulder(r)
         && (range ? r.alive : (lit > 0.03 || r.near > 0.01) && this.state !== 'idle' && !this.cabinets.hides(r));
       if (lit > 0.06 && !day) r.revealT = this.time;
+      this.lakeShark?.poseRemote(r);
     }
   }
 
@@ -2211,6 +2239,7 @@ export class Game {
     this.events = raw.events;
     this.tools.update(dt);
     this.expedition.update(dt);
+    this.lakeShark?.update(dt);
     if (this.expedition.viewing) look = { dx: look.dx * 0.3, dy: look.dy * 0.3 };
     if (this.state === 'intro') return this.updateOpening(dt, raw);
     if (this.state === 'morning') return this.updateMorning(dt, raw);
@@ -2331,7 +2360,7 @@ export class Game {
     // she is wearing you (2.1v): you stand exactly where you were, and only your head is yours
     const pev = heldByHim ? (this.angler.captiveFrame(dt, this.inputMuted ? NO_LOOK : raw.look), { step: null, bump: null, breath: null })
       : heldByWater ? this.drowned.dragFrame(dt)
-      : this.strayWorn ? this.seatedLook(look) : es.mySeat >= 0 || caught || (this.expedition.onTower && !this.expedition.walkTop) ? this.seatedLook(look) : p.update(dt, input, look, this.inputMuted || this.inventory.active || this.seizedByWatcher || p.heldByStray, es.load(p.id));
+      : this.strayWorn ? this.seatedLook(look) : es.mySeat >= 0 || caught || (this.expedition.onTower && !this.expedition.walkTop) ? this.seatedLook(look) : p.update(dt, input, look, this.inputMuted || this.inventory.active || this.seizedByWatcher || p.heldByStray || this.lakeShark?.holds(p.id), es.load(p.id));
     if (this.expedition.walkTop) this.expedition.clampDeck(); // (2.1s: the lookout's rails)
     if (pev.step) {
       const s = pev.step;
