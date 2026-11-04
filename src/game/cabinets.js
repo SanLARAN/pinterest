@@ -24,6 +24,7 @@ import { createPersonMaterial } from '../render/people.js';
 import { dyeColors, poseGrabbed, poseRescuer, poseSprawled } from './survivor.js';
 import { myFit } from './outfit.js';
 import { buildPadlock } from './toolModels.js';
+import { cameraArrays } from './photo.js';
 
 const PI = Math.PI;
 export const TRAP = { time: 15, lead: 1.4, period: 0.74, window: 0.17, perfect: 0.075, grace: 0.34 };
@@ -342,7 +343,7 @@ export class Cabinets {
     this.mat = world.material;
     const shared = new Map();
     const geo = (key, make) => shared.get(key) || (shared.set(key, geometryOf(make())), shared.get(key));
-    this.itemGeo = { ...Object.fromEntries(ITEMS.map((k) => [k, itemOf(k)])), syringe: itemOf('syringe') };
+    this.itemGeo = { ...Object.fromEntries(ITEMS.map((k) => [k, itemOf(k)])), syringe: itemOf('syringe'), camera: geometryOf(cameraArrays()) };
     this.list = (world.cabinets || []).map((spec, i) => {
       const D = CABINET_DIMS[spec.kind];
       const group = new THREE.Group();
@@ -468,6 +469,28 @@ export class Cabinets {
       this._placeDoors(c);
     }
     if (g.online) this._seedAdrenaline(rng); // the second dose, in a locked cabinet (co-op only)
+    this._seedCamera(rng); // (4.2) and a camera on a shelf: one a shift, besides the ones lying out there
+  }
+
+  // (4.2) «the camera is a rare find»: the forest had one lying about (two in co-op) — now there are more out there
+  // (photo.js cameraCount) and one more is always left on a shelf. Any real cupboard with room on it, an unlocked
+  // one twice as likely; the pick is the night's own seed stream (drawn last, so nothing before it moves)
+  _seedCamera(rng) {
+    const room = this.list.filter((c) => !c.mimic && c.items.length < 3 && SLOT_X[c.kind]?.[c.items.length] !== undefined);
+    if (!room.length) return false;
+    const w = room.map((c) => (c.locked ? 1 : 2));
+    let x = rng.next() * w.reduce((s, v) => s + v, 0), c = room[room.length - 1];
+    for (let i = 0; i < room.length; i++) {
+      if (x < w[i]) { c = room[i]; break; }
+      x -= w[i];
+    }
+    const slot = c.items.length;
+    const mesh = new THREE.Mesh(this.itemGeo.camera, this.mat);
+    mesh.position.set(SLOT_X[c.kind][slot], SHELF_Y[c.kind][slot] ?? 0.08, -0.02 + (slot % 2) * 0.05);
+    mesh.rotation.y = (rng.next() - 0.5) * 1.2;
+    c.group.add(mesh);
+    c.items.push({ kind: 'camera', mesh, taken: false });
+    return true;
   }
 
   // the second adrenaline dose hides in a locked cabinet somewhere out there: one a shift. The
@@ -532,7 +555,7 @@ export class Cabinets {
     let full = null;
     for (const it of c.items) {
       if (it.taken) continue;
-      if (it.kind === 'nuts' && p.stones >= CFG.PLAYER.maxStones) {
+      if ((it.kind === 'nuts' && p.stones >= CFG.PLAYER.maxStones) || (it.kind === 'camera' && this.g.inventory && !this.g.inventory.canReceive('camera'))) {
         full = full || it;
         continue;
       }
@@ -690,6 +713,8 @@ export class Cabinets {
       g.inventory.syringes = Math.min(CFG.BAG_LIMIT?.syringe ?? 2, (g.inventory.syringes | 0) + 1);
       g.hud.popup(`+ ${name}`, 'amber');
       if (a.ready && a.cabinetItem) a.cabinetItem('nuts');
+    } else if (kind === 'camera') {
+      g.camItem?.got(); // (4.2) five flashes, the same as one found on the ground (its own popup and sound)
     } else {
       g.setFlares((p.flares | 0) + 1, !!p.hasFlare);
       if (a.ready && a.cabinetItem) a.cabinetItem('flare');

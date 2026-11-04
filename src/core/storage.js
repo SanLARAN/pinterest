@@ -78,6 +78,7 @@ export function freshAtlas() {
     parts: [0, 0, 0, 0, 0], // generator #k started (fuel, plug, fuses, belt, battery)
     carFit: [0, 0, 0, 0], // the УАЗ's parts you fitted yourself (wheel, battery, carburettor, can)
     torches: 0, tapes: 0, crowbars: 0, pried: 0, surveys: 0, lookouts: 0, camps: 0, farms: 0,
+    syringes: 0, cameras: 0, photos: 0, // (4.2: the syringe's page counted a stat nobody kept; the camera got a page)
     carParts: 0, escapes: 0, // ...all of them, and the nights you drove out of the forest
     bogWins: 0, // (3.0s) shifts won on the peat bog: wins − bogWins > 0 is «the forestry is cleared» (see core/mapUnlock.js)
     sites: {}, // site id -> generators started there
@@ -120,7 +121,7 @@ export function recordNight(stats, res, started = []) {
   a.glows += stats.glows | 0;
   a.revives += stats.revives | 0;
   a.torches += stats.torch | 0;
-  for (const k of ['tapes', 'crowbars', 'pried', 'surveys', 'lookouts', 'camps', 'farms']) a[k] += stats[k] | 0;
+  for (const k of ['tapes', 'crowbars', 'pried', 'surveys', 'lookouts', 'camps', 'farms', 'syringes', 'cameras', 'photos']) a[k] += stats[k] | 0;
   a.carParts += stats.parts | 0;
   for (let i = 0; i < 4; i++) a.carFit[i] += (stats.carFit && stats.carFit[i]) | 0;
   if (res.escaped && res.won) a.escapes++;

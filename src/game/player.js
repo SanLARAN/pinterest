@@ -25,6 +25,10 @@ export class Player {
 
   // slot: co-op seat — everyone wakes up around the same fire
   reset(slot = 0) {
+    // (4.2) and it is kept: the opening films seat everyone by slot (RoadFilm/CampFilm/BogArrival read player.slot).
+    // It never was — every guest was slot 0 to their own films, the same seat as the host, and the dedupe by slot
+    // dropped the host: a friend's УАЗ drove off without the one at the wheel.
+    this.slot = slot | 0;
     const s = this.world.spawn;
     const [ox, oz] = SLOT_OFFSET[slot % 4] || [0, 0];
     const cy = Math.cos(s.yaw), sy = Math.sin(s.yaw);

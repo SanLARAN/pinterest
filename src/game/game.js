@@ -2217,7 +2217,9 @@ export class Game {
       const nd = Math.hypot(r.x - cp.x, r.y + (r.alive ? 1 : 0.3) - cp.y, r.z - cp.z);
       r.near = day ? 0 : 1 - smoothstep(3, 9, nd);
       r.mat.uniforms.uNear.value = r.near;
-      r.rig.root.visible = watched !== r && !this.onShoulder(r)
+      // (4.2) not during the opening either: the road and the campfire films seat their own copies of everyone, and
+      // the real rigs standing at their spawn points by the fire were lit by it — two of every friend round the fire
+      r.rig.root.visible = watched !== r && !this.onShoulder(r) && this.state !== 'intro'
         && (range ? r.alive : (lit > 0.03 || r.near > 0.01) && this.state !== 'idle' && !this.cabinets.hides(r));
       if (lit > 0.06 && !day) r.revealT = this.time;
       this.lakeShark?.poseRemote(r);

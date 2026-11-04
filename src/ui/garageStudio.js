@@ -100,6 +100,7 @@ export class GarageStudio {
     for(const peer of g.figs)if(peer)peer.rig.root.visible=!active;
     g.carRoot.rotation.y=dressing&&this.adapter?.carOn?this.adapter.orbit.yaw-.3:0;
     for(const mesh of g.carParts)if(mesh.material===g.matSet||mesh.material===this.carPreviewMat)mesh.material=dressing&&this.adapter?.carOn?this.carPreviewMat:g.matSet;
+    if(g.decalMesh)g.decalMesh.material=g.decalMatFor(dressing&&this.adapter?.carOn?this.carPreviewMat:g.matSet); // (4.2: the stickers too)
     g.carRoot.updateMatrixWorld(true);
     g.u.uHeadD.value.set(-1,-.04,0).normalize().applyAxisAngle(new THREE.Vector3(0,1,0),g.carRoot.rotation.y);
     g._carPoint(g.CP.head[0],g.u.uHeadP0.value);g._carPoint(g.CP.head[1],g.u.uHeadP1.value);
@@ -181,7 +182,7 @@ export class GarageMannequin {
   resize(){}
   ping(){const p=this.rig.nodes.head.getWorldPosition(new THREE.Vector3());this.g.ping(p.x,p.y,p.z,4,.13);}
   play(type){this.gesture={type,t:0};}
-  showCar(id,colors){this.carOn=!!id;if(id)this.g.setCar(id,colors);else{const f=myFit();this.g.setCar(f.car,f.cc);this.g.u.uHeadI.value=0;this.g.u.uTail.value.w=0;this.g.carRoot.rotation.y=0;}}
+  showCar(id,colors,look=null){this.carOn=!!id;if(id)this.g.setCar(id,colors,look);else{const f=myFit();this.g.setCar(f.car,f.cc,f.ct);this.g.u.uHeadI.value=0;this.g.u.uTail.value.w=0;this.g.carRoot.rotation.y=0;}}
   toggleLights(){this.g.u.uHeadI.value=this.g.u.uHeadI.value>.1?0:.75;}
   frame(dt){this.g.frame(dt);}
   headScreen(lift=.3){const p=this.rig.nodes.head.getWorldPosition(new THREE.Vector3());p.y+=lift;p.project(this.g.camera);const r=this.host?.getBoundingClientRect();return r&&!this.carOn?{x:(p.x*.5+.5)*this.g.w-r.x,y:(.5-p.y*.5)*this.g.h-r.y}:null;}

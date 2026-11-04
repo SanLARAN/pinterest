@@ -647,6 +647,8 @@ export class Objectives {
     if (game.cabinets && !seated && !riding) game.cabinets.consider(consider, !p.carrying && !(es && es.held));
     // (2.1r: and in the morning, a friend on the ground or on the cot — dawn raised nobody, so hands do it)
     if ((doorsOnly || (day && !hands)) && game.rescue && !seated && !riding) game.rescue.consider(consider);
+    // (4.2) a friend tied to the angler's tree: night, dawn's winch, morning — hands free, on your feet
+    if (game.angler && !p.carrying && !(es && es.held) && !seated && !riding) game.angler.consider(consider);
     if (best && this.target && best.obj !== this.target.obj) this.searchT = 0;
     this.target = best;
     if (!best || best.kind !== 'lookout') game.expedition?.idle();
@@ -672,6 +674,7 @@ export class Objectives {
     }
     const o = best.obj;
     if (best.kind === 'bagDrop') { this.searchT = 0; game.inventory.interact(o, pressed, T); return; }
+    if (best.kind === 'untie') { this.searchT = 0; game.angler.interactUntie(dt, held, T); return; }
     if (best.kind === 'winch' || best.kind === 'bogCar' || best.kind === 'bogCarNote') {
       this.searchT = 0;
       game.winch.interact(best, dt, held, still, T);

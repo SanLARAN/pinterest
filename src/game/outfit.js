@@ -4,13 +4,14 @@ import {readJSON,writeJSON} from '../core/persistence.js';
 // A third slot is the car in the co-op garage (the host's is the one everybody sees). Clothes never change the
 // rules — only how your friends see you in the echoes (and under the work lamps) on a co-op night.
 //
-// An outfit ("fit"): { head, body, hc: [main, accent], bc: [main, accent], car, cc: [main, accent] } with
-// colours as '#rrggbb'. Locally every piece remembers its own colours, so trying something on never loses
+// An outfit ("fit"): { head, body, hc: [main, accent], bc: [main, accent], car, cc: [main, accent], ct } with
+// colours as '#rrggbb' and ct the car's tuning (4.2: rims, tint, stickers — see carLook.js). Locally every piece remembers its own colours, so trying something on never loses
 // what you had. Shop pieces (shop: product id) can only be worn once bought (see wallet.js).
 import { getLang } from '../core/i18n.js';
 import { hasProduct } from './wallet.js';
 import { straySkinUnlocked, strayMet, STRAY_MEET } from '../core/strayLog.js';
 import { cleanScreen, screenKey, DEFAULT_SCREEN } from './screenFace.js';
+import { cleanLook, lookKey, isDefaultLook, DEFAULT_LOOK } from './carLook.js';
 
 export const SLOTS = ['head', 'body', 'car'];
 export const WEAR = ['head', 'body']; // what a survivor wears (the car stays in the garage)
@@ -130,6 +131,7 @@ export function cleanFit(f) {
     bc: [cleanHex(bc[0], bd[0]), cleanHex(bc[1], bd[1])],
     car, screen:cleanScreen(o.screen),
     cc: [cleanHex(cc[0], cd[0]), cleanHex(cc[1], cd[1])],
+    ct: cleanLook(o.ct),
   };
 }
 
@@ -140,7 +142,7 @@ export function shapeKey(fit) {
   return `${fit.head}+${fit.body}${fit.head==='screen'?'@'+screenKey(fit.screen):''}`;
 }
 export function fitKey(fit) {
-  return `${fit.head}:${fit.hc.join(',')}|${fit.body}:${fit.bc.join(',')}|${fit.car}:${fit.cc.join(',')}|${screenKey(fit.screen)}`;
+  return `${fit.head}:${fit.hc.join(',')}|${fit.body}:${fit.bc.join(',')}|${fit.car}:${fit.cc.join(',')}|${screenKey(fit.screen)}|${lookKey(fit.ct)}`;
 }
 
 // ---------------- your wardrobe (localStorage) ----------------
@@ -148,7 +150,7 @@ const KEY = 'hush.outfit.v1';
 
 function load() {
   const raw=readJSON(KEY);
-  const w = { head: ITEMS.head[0].id, body: ITEMS.body[0].id, car: ITEMS.car[0].id, colors: {}, screen:{...DEFAULT_SCREEN} };
+  const w = { head: ITEMS.head[0].id, body: ITEMS.body[0].id, car: ITEMS.car[0].id, colors: {}, screen:{...DEFAULT_SCREEN}, tune: {} };
   if (raw && typeof raw === 'object') {
     for (const slot of SLOTS) {
       const id = cleanId(slot, raw[slot]);
@@ -159,8 +161,21 @@ function load() {
     for (const id of Object.keys(byId)) {
       if (Array.isArray(c[id])) w.colors[id] = [cleanHex(c[id][0], byId[id].c[0]), cleanHex(c[id][1], byId[id].c[1])];
     }
+    w.tune = cleanTunes(raw.tune);
   }
   return w;
+}
+
+// (4.2) every car's tuning, by car id (only the ones that differ from the factory's)
+export function cleanTunes(raw) {
+  const out = {};
+  const v = raw && typeof raw === 'object' ? raw : {};
+  for (const it of ITEMS.car) {
+    if (!Object.prototype.hasOwnProperty.call(v, it.id)) continue;
+    const l = cleanLook(v[it.id]);
+    if (!isDefaultLook(l)) out[it.id] = l;
+  }
+  return out;
 }
 
 export const wardrobe = load();
@@ -183,6 +198,18 @@ export function resetColors(id) {
   delete wardrobe.colors[id];
 }
 
+// a car's tuning (4.2): what it wears in the garage and in the road film when the room is yours
+export function tuneOf(id) {
+  return (wardrobe.tune && byId[id]?.slot === 'car' && wardrobe.tune[id]) || DEFAULT_LOOK;
+}
+export function setTune(id, look) {
+  if (byId[id]?.slot !== 'car') return;
+  if (!wardrobe.tune || typeof wardrobe.tune !== 'object') wardrobe.tune = {};
+  const l = cleanLook(look);
+  if (isDefaultLook(l)) delete wardrobe.tune[id];
+  else wardrobe.tune[id] = l;
+}
+
 export function isDefaultColors(id) {
   const c = colorsOf(id), d = byId[id].c;
   return c[0] === d[0] && c[1] === d[1];
@@ -192,7 +219,7 @@ export function isDefaultColors(id) {
 export function myFit() {
   return cleanFit({
     head: wardrobe.head, body: wardrobe.body, hc: colorsOf(wardrobe.head), bc: colorsOf(wardrobe.body),
-    car: wardrobe.car, cc: colorsOf(wardrobe.car), screen:wardrobe.screen,
+    car: wardrobe.car, cc: colorsOf(wardrobe.car), screen:wardrobe.screen, ct: tuneOf(wardrobe.car),
   });
 }
 
@@ -205,6 +232,7 @@ export function fitWith(...ids) {
     if (!it) continue;
     f[it.slot] = id;
     f[COL[it.slot]] = colorsOf(id);
+    if (it.slot === 'car') f.ct = tuneOf(id);
   }
   return f;
 }
@@ -248,7 +276,7 @@ const TEXT = {
         leshy: { name: 'Леший', desc: 'Голова из мха с рогами-ветками и светящимися глазами, шкура из лохмотьев мха и коры. Лучшая маскировка в этом лесу — стать его частью.' },
         plague: { name: 'Чумной доктор', desc: 'Маска с клювом и круглыми стёклами, широкополая шляпа, вощёный плащ до пят. Врач из другого века пришёл лечить этот лес.' },
         cosmos: { name: 'Космонавт', desc: 'Гермошлем с золотым светофильтром (светится в темноте) и белый скафандр с ранцем. Вместо Байконура — тайга.' },
-        trueno: { name: 'Toyota Sprinter Trueno', desc: 'AE86 «панда» с фарами-раскладушками — встаёт в гараже лобби вместо УАЗа, когда комнату создаёшь ты. При заводке фары поднимаются.' },
+        trueno: { name: 'Toyota Sprinter Trueno', desc: 'AE86 «панда» с фарами-раскладушками, кабриолет — встаёт в гараже лобби вместо УАЗа, когда комнату создаёшь ты. При заводке фары поднимаются.' },
       },
     },
     swatch: {
@@ -275,7 +303,7 @@ const TEXT = {
       plaguecoat: { name: 'Чумной плащ', parts: ['Плащ', 'Ремни'], desc: 'Вощёный плащ до пят, пелерина, перчатки и сапоги. Ни одной открытой полоски кожи — кто знает, что здесь заразно.' },
       spacesuit: { name: 'Скафандр', parts: ['Скафандр', 'Отделка'], desc: 'Белый скафандр с пультом на груди, шлангами и ранцем жизнеобеспечения. Сел не в том лесу.' },
       uaz: { name: 'УАЗ-469', parts: ['Кузов', 'Тент'], desc: 'Тот самый, без тента: заводится с третьего раза, гремит на каждой кочке, вывезет откуда угодно.' },
-      trueno: { name: 'Sprinter Trueno', parts: ['Верх', 'Низ'], desc: 'AE86: «панда», фары-раскладушки, ручка КПП как влитая. Шильдик на двери — семейная лавка тофу. Стоит в гараже, если хозяин комнаты в гараже — ты.' },
+      trueno: { name: 'Sprinter Trueno', parts: ['Верх', 'Низ'], desc: 'AE86-кабриолет: «панда», фары-раскладушки, мягкий верх сложен за задним сиденьем, ручка КПП как влитая. Шильдик на двери — семейная лавка тофу. Стоит в гараже, если хозяин комнаты в гараже — ты.' },
       seifuku: { name: 'Матроска', parts: ['Блузка', 'Юбка и воротник'], desc: 'Сэйлор-фуку: матросский воротник в полоску, бант, плиссированная юбка, гольфы и лоферы. Ближайшая школа — в трёхстах километрах. Чья это форма, лес не говорит.' },
       keanuhair: { name: 'Киану', parts: ['Волосы', 'Борода'], desc: 'Тёмные волосы до плеч с пробором по центру и короткая борода человека, который не спал со вторника. Он уже всё видел и всё равно пошёл в лес.' },
       keanusuit: { name: 'Чёрный костюм', parts: ['Костюм', 'Рубашка'], desc: 'Чёрная двойка, белая рубашка, галстук ослаблен две ночи назад. Этот костюм видал леса и похуже.' },
@@ -316,7 +344,7 @@ const TEXT = {
         leshy: { name: 'Leshy', desc: 'A moss head with branch antlers and glowing eyes, a hide of moss rags and bark. The best disguise in this forest is to become part of it.' },
         plague: { name: 'Plague doctor', desc: 'A beaked mask with round lenses, a wide-brimmed hat, a waxed coat to the heels. A doctor from another century came to treat this forest.' },
         cosmos: { name: 'Cosmonaut', desc: 'A helmet with a gold sun visor (it glows in the dark) and a white spacesuit with a pack. Instead of Baikonur — the taiga.' },
-        trueno: { name: 'Toyota Sprinter Trueno', desc: 'An AE86 "panda" with pop-up headlights — it takes the UAZ\'s place in the lobby garage when you make the room. The lights flip up when it starts.' },
+        trueno: { name: 'Toyota Sprinter Trueno', desc: 'An AE86 "panda" convertible with pop-up headlights — it takes the UAZ\'s place in the lobby garage when you make the room. The lights flip up when it starts.' },
       },
     },
     swatch: {
@@ -343,7 +371,7 @@ const TEXT = {
       plaguecoat: { name: 'Plague coat', parts: ['Coat', 'Straps'], desc: 'A waxed coat to the heels, a cape, gloves and boots. Not one strip of skin showing — who knows what is catching around here.' },
       spacesuit: { name: 'Spacesuit', parts: ['Suit', 'Trim'], desc: 'A white suit with a chest console, hoses and a life-support pack. Landed in the wrong forest.' },
       uaz: { name: 'UAZ-469', parts: ['Body', 'Canvas'], desc: 'The very one, top off: starts on the third try, rattles over every bump, gets you out of anywhere.' },
-      trueno: { name: 'Sprinter Trueno', parts: ['Top', 'Bottom'], desc: 'AE86: "panda" paint, pop-up headlights, a gear stick like it grew there. The door says family tofu shop. It stands in the garage when the room is yours.' },
+      trueno: { name: 'Sprinter Trueno', parts: ['Top', 'Bottom'], desc: 'AE86 convertible: "panda" paint, pop-up headlights, the soft top folded behind the back seat, a gear stick like it grew there. The door says family tofu shop. It stands in the garage when the room is yours.' },
       seifuku: { name: 'Sailor fuku', parts: ['Blouse', 'Skirt & collar'], desc: "A sailor collar with stripes, a ribbon, a pleated skirt, knee socks and loafers. The nearest school is three hundred kilometres away. Whose uniform this was, the forest won't say." },
       keanuhair: { name: 'Keanu', parts: ['Hair', 'Beard'], desc: 'Shoulder-length dark hair with a centre parting and the short beard of a man awake since Tuesday. He has seen all of it before and went into the forest anyway.' },
       keanusuit: { name: 'Black suit', parts: ['Suit', 'Shirt'], desc: 'A black two-piece, a white shirt, the tie loosened two nights ago. This suit has seen worse forests.' },

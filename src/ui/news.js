@@ -7,6 +7,25 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v:'4.2',date:'2026-11-05',
+    ru:{title:'Своя машина во вступлении и верёвка, которую видно',items:[
+      'У дерева Удильщика снова видно «E · развязать»: подсказку стирало в том же кадре, поэтому друга было нечем отвязать. Подойди к верёвке и держи E три секунды.',
+      'Фотоаппаратов больше: в лесу их лежит два в одиночку и три в коопе, и ещё один всегда ждёт на полке какого-нибудь шкафа. У фотоаппарата появилась страница в атласе — с моделью, звуком вспышки и счётчиком кадров.',
+      'Во вступлении у друзей в машине снова сидит хост: раньше каждый гость занимал его место, и хост пропадал из кадра. У костра больше не стоят по две копии каждого игрока.',
+      'Во вступлении едет машина хоста: УАЗ или Trueno, в его цветах. Колёса крутятся и поворачивают, кузов кренится в поворотах, руль вертится в руках водителя.',
+      'AE86 теперь кабриолет: без крыши, с низким лобовым и сложенным верхом за задним сиденьем. Во вступлении он встаёт у задних ворот лесхоза, задние пассажиры перепрыгивают через борт, и все идут во двор пешком. Мотор звучит выше и звонче, чем у УАЗа.',
+      'Тюнинг УАЗа и Trueno — гардероб → «Машина» → «Покраска»: шесть видов дисков в восьми цветах, четыре степени тонировки и свои наклейки на двери, капот, задние крылья и корму. Картинка сжимается до 64×64 и 15 цветов. Машину хоста с тюнингом видит вся комната — в гараже и на дороге.',
+    ]},
+    en:{title:'Your own car in the opening, and a rope you can see',items:[
+      'The Angler\'s tree shows "E · untie" again: the prompt was being wiped in the same frame, so there was no way to free a friend. Walk up to the rope and hold E for three seconds.',
+      'More cameras: two lie in the forest solo and three in co-op, and one more always waits on a shelf in some cupboard. The camera has its own atlas page now, with a model, the flash sound and a frame counter.',
+      'Friends see the host in the car during the opening again: every guest used to take the host\'s seat, and the host vanished from the shot. The campfire no longer has two copies of every player.',
+      'The opening drives the host\'s own car: the UAZ or the Trueno, in the host\'s colours. The wheels roll and steer, the body leans into the turns, the steering wheel turns in the driver\'s hands.',
+      'The AE86 is a convertible now: no roof, a low windscreen and the top folded behind the back seat. In the opening it stops at the forestry yard\'s back gate, the back seat hops out over the side and everyone walks in. Its engine sings higher than the UAZ\'s.',
+      'Tuning for the UAZ and the Trueno — wardrobe → Car → Paint: six wheel styles in eight colours, four tint levels and your own stickers on the doors, the bonnet, the rear wings and the tail. A picture is cut down to 64×64 and 15 colours. The whole room sees the host\'s tuned car, in the garage and on the road.',
+    ]},
+  },
+  {
     v:'4.1',date:'2026-11-04',
     ru:{title:'Обгон на заднем и то, что под водой',items:[
       'На дороге в лесхоз вас обгоняет Kugoo: байкер поднимает переднее колесо прямо рядом с УАЗом, а следом пролетает полиция с мигалками и позиционной сиреной. Пассажиры оборачиваются на обгон и погоню.',

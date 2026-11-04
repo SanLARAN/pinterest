@@ -16,7 +16,7 @@ export const BOOKS = [
     id: 'forest', // the forestry, the journal the forest is written in
     chapters: [
       { id: 'beasts', num: 'I', entries: ['listener', 'crawler', 'watcher', 'howler', 'shkaf', 'angler', 'stray', 'shade'] },
-      { id: 'tasks', num: 'II', entries: ['generator', 'corpse', 'fuel', 'plug', 'fuses', 'belt', 'battery', 'shard', 'stone', 'flare', 'glowstick', 'flashlight', 'tape', 'crowbar', 'binoculars', 'syringe'] },
+      { id: 'tasks', num: 'II', entries: ['generator', 'corpse', 'fuel', 'plug', 'fuses', 'belt', 'battery', 'shard', 'stone', 'flare', 'glowstick', 'flashlight', 'camera', 'tape', 'crowbar', 'binoculars', 'syringe'] },
       { id: 'places', num: 'III', entries: ['camp', 'medhut', 'cabin', 'tower', 'stones', 'wreck', 'sovkhoz', 'firetower', 'zarya'] },
       { id: 'way', num: 'IV', entries: ['yard', 'uaz', 'wheel', 'carbattery', 'carb', 'jerrycan'] },
     ],
@@ -64,6 +64,7 @@ export const ENTRIES = {
   crowbar: { model: 'crowbar', sound: 'crowbar', kind: 'thing', log: [['found', 'crowbars'], ['pried', 'pried']] },
   binoculars: { model: 'binoculars', kind: 'thing', log: [['surveyed', 'surveys']] },
   syringe: { model: 'syringe', kind: 'thing', log: [['jabbed', 'syringes']] },
+  camera: { model: 'camera', sound: 'camera', kind: 'thing', log: [['found', 'cameras'], ['shot', 'photos']] }, // 4.2 (the camera came in 4.0 without a page)
   firetower: { model: 'firetower', kind: 'place', log: [['visited', 'lookouts']] },
   zarya: { model: 'zarya', sound: 'speaker', kind: 'place', log: [['visited', 'camps']] },
   sovkhoz: { model: 'sovkhoz', kind: 'place', log: [['visited', 'farms']] },
@@ -139,7 +140,7 @@ const TEXT = {
     log: {
       seen: 'ночей рядом', killed: 'убил тебя', appeared: 'являлась', met: 'встреч', started: 'запущено при тебе', wins: 'побед',
       searched: 'обыскано тел', fitted: 'поставлено', found: 'найдено', thrown: 'брошено', fired: 'выпущено', startedHere: 'запущено здесь',
-      visited: 'посещений', surveyed: 'осмотров', pried: 'взломано замков',
+      visited: 'посещений', surveyed: 'осмотров', pried: 'взломано замков', shot: 'снято кадров',
       cracked: 'зажжено', revived: 'вернул к жизни', escaped: 'уехал отсюда', fittedCar: 'деталей поставил',
       nights: 'ночей', best: 'дольше всего', deaths: 'смертей', screams: 'закричал', gens: 'генераторов',
     },
@@ -574,6 +575,20 @@ const TEXT = {
         tips: ['Утром она не нужна — прибереги до темноты.', 'Наблюдатель в её свет не шагнёт: брось её между собой и им.', 'Под конец она тускнеет и мигает — значит, осталось секунд пятнадцать.', 'Если упадёшь, палочка выпадет из руки и будет светить там, где ты лежишь, — друзьям проще тебя найти.'],
         facts: [['с собой', '1 на ночь'], ['горит', '~2,5 мин'], ['свет', 'на ~6 м'], ['щелчок', 'слышно в паре шагов']],
       },
+      camera: {
+        name: 'Фотоаппарат', latin: 'Oculus fulgurans',
+        text: [
+          'Старая «мыльница» со вспышкой. Лежит у охотничьих избушек, у пожарной вышки, у камней — там, где кто-то до тебя останавливался посмотреть. Лампочка заряда мигает красным: в темноте её видно раньше, чем сам аппарат. В одиночной ночи на земле их два, в кооперативе три — и ещё один всегда стоит на полке в каком-нибудь шкафу.',
+          'Вспышка — свет, какого больше нет: на шестую долю секунды она освещает всё перед тобой метров на тридцать — деревья такими, какие они есть, и то, что стоит между ними. Каждая вспышка — снимок: плёнку покажут в конце смены.',
+        ],
+        tips: [
+          'Возьми в руки из рюкзака; ЛКМ — снимок. Пять вспышек, и зарядить нечем.',
+          'Наблюдатель её не выносит: пойманный во вспышку ближе 24 м, он отпускает того, кого держит, и пропадает почти на минуту.',
+          'Щелчок и свет — это шум. Друзья видят вспышку белым всполохом издалека; твари тоже.',
+        ],
+        facts: [['вспышек', '5'], ['достаёт', '~34 м'], ['перезаряд', '1,7 с'], ['Наблюдатель', 'пропадает на 40–60 с'], ['видно', 'за ~140 м']],
+        quote: 'Плёнка помнит то, что ты не успел разглядеть.',
+      },
       syringe: {
         name: 'Шприц адреналина', latin: 'друг или своё бедро',
         text: [
@@ -759,7 +774,7 @@ const TEXT = {
     log: {
       seen: 'nights near it', killed: 'killed you', appeared: 'appeared', met: 'meetings', started: 'started with you', wins: 'wins',
       searched: 'bodies searched', fitted: 'fitted', found: 'found', thrown: 'thrown', fired: 'fired', startedHere: 'started here',
-      visited: 'visits', surveyed: 'surveys', pried: 'locks broken',
+      visited: 'visits', surveyed: 'surveys', pried: 'locks broken', shot: 'frames shot',
       cracked: 'cracked', revived: 'brought back', escaped: 'drove out', fittedCar: 'parts fitted',
       nights: 'nights', best: 'longest', deaths: 'deaths', screams: 'screamed', gens: 'generators',
     },
@@ -1193,6 +1208,20 @@ const TEXT = {
         ],
         tips: ["You won't need it in the morning — save it for the dark.", "The Watcher won't step into its light: throw it between you and it.", 'Near the end it dims and flickers — fifteen seconds or so left.', "If you go down it falls from your hand and keeps glowing where you lie — easier for your friends to find you."],
         facts: [['carry', '1 a night'], ['burns', '~2.5 min'], ['light', '~6 m'], ['the snap', 'heard a couple of steps away']],
+      },
+      camera: {
+        name: 'Camera', latin: 'Oculus fulgurans',
+        text: [
+          "An old point-and-shoot with a flash. It lies by the hunters' cabins, the fire tower, the stones — places someone before you stopped to look. Its charge lamp blinks red: in the dark you see it before you see the camera. Two lie about on a solo night, three in co-op — and one more always waits on a shelf in some cupboard.",
+          'The flash is a light like no other: for a sixth of a second it lights everything in front of you for thirty-odd metres — the trees as they are, and whatever stands between them. Every flash is a photograph: the film is shown at the end of the shift.',
+        ],
+        tips: [
+          'Take it in hand from the backpack; LMB takes a picture. Five flashes and nothing to charge it with.',
+          'The Watcher cannot stand it: caught in the flash closer than 24 m, it lets go of whoever it holds and is gone for most of a minute.',
+          'The click and the light are a noise. Friends see the flash as a white burst from far off; so do the things out there.',
+        ],
+        facts: [['flashes', '5'], ['reach', '~34 m'], ['recharge', '1.7 s'], ['the Watcher', 'gone for 40–60 s'], ['seen', 'from ~140 m']],
+        quote: 'The film remembers what you had no time to look at.',
       },
       syringe: {
         name: 'Adrenaline syringe', latin: 'a friend, or your own thigh',

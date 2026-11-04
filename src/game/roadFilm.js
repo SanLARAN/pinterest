@@ -1,5 +1,9 @@
-// The forest's opening, first half (3.1n): «Дорога». The squad drives out to the forestry at sunset in the УАЗ, the
-// radio on, and leaves the car in the yard; then the camp's last evening (campFilm.js) takes over.
+// The forest's opening, first half (3.1n): «Дорога». The squad drives out to the forestry at sunset in the host's
+// car, the radio on, and leaves it at the yard; then the camp's last evening (campFilm.js) takes over.
+//
+// (4.2) The car is the host's own out of the garage (filmCar.js): their УАЗ — or their Trueno, roof down, which
+// does not go in. It stops outside the open back gate (the yard's stripped УАЗ keeps its spot all shift), the back
+// seat hops out over the side, and they walk in through the gate. Their paint, rims, tint and stickers ride along.
 //
 //   0 – 39 s   the highway: a wide shot of the car coming out of the low sun; the passenger finds the station
 //              (static, then the song); a side shot alongside, the back seats, an arm out of the window in the
@@ -21,7 +25,7 @@ import { t } from '../core/i18n.js';
 import { CFG } from '../core/config.js';
 import { MeshBuilder, KIND } from '../world/builder.js';
 import { createWorldMaterial, shared } from '../render/sonar.js';
-import { buildCrewCar, SEATS as CAR_SEATS } from './uaz.js';
+import { buildFilmCar, disposeFilmCar, FILM_CARS } from './filmCar.js';
 import { buildSurvivor, poseSeated, poseSurvivor } from './survivor.js';
 import { createPersonMaterial, dressPerson, undressPerson } from '../render/people.js';
 import { PLAYER_HEX } from './remote.js';
@@ -38,7 +42,7 @@ export const BEAT0 = 0.409; // ...the first downbeat, in song seconds
 export const TUNE_AT = 8.2; // the passenger turns the knob
 export const TUNE_DUR = 1.7; // static, then the station
 export const TF = 39.5; // the arrival's continuous drive begins
-const WHEEL_R = 0.39;
+export const TRUENO_STOP = 6.5; // (4.2) how far outside the back gate the Trueno stops (its centre, metres)
 
 // the highway shots: a stretch of road each (x from → to, heading west), cut together
 export const ROAD_SHOTS = [
@@ -50,14 +54,19 @@ export const ROAD_SHOTS = [
   { k: 'drone', t0: 32.5, t1: TF, hw: [262, 168] },
 ];
 
-// the way in, world x/z: off the highway, down the cut, through the back gate and round the yard to the spot
-export function arrivalPath() {
+// the way in, world x/z: off the highway, down the cut, through the back gate and round the yard to the spot.
+// (4.2) The Trueno's way ends outside the back gate, nose to it: the yard's own УАЗ is on the spot.
+export function arrivalPath(car = 'uaz') {
   const X = Y.x, Z = Y.z, hd = Y.d / 2;
-  return [
+  const road = [
     // (4.1: a wider swing off the highway, past the lamp's post — it used to cut the corner through it)
     [X + 80, LANE], [X + 50, LANE], [X + 22, LANE], [X + 8, R.z - 2.1], [X + 2.6, R.z - 3.4], [X - 0.4, R.z - 5.8],
     [X - 0.8, R.z - 8.6], [X + 0.2, R.z - 14],
-    [X - 0.4, Z + hd + 44], [X + 0.2, Z + hd + 22], [X + 0.6, Z + hd + 4], [X + 0.7, Z + 9], [X + 4, Z + 4],
+    [X - 0.4, Z + hd + 44], [X + 0.2, Z + hd + 22],
+  ];
+  if (car === 'trueno') return [...road, [X + 0.5, Z + hd + 12], [X + 0.4, Z + hd + TRUENO_STOP]];
+  return [
+    ...road, [X + 0.6, Z + hd + 4], [X + 0.7, Z + 9], [X + 4, Z + 4],
     [X + 9, Z], [X + 11.5, Z - 4], [X + 10, Z - 8.5], [X + 5.5, Z - 9], [X + 2.8, Z - 5.5], [X + CAR_AT.x, Z - 1],
     [X + CAR_AT.x, Z + CAR_AT.z],
   ];
@@ -129,17 +138,18 @@ export class RoadFilm {
     this.cast.length = 0;
     this.traffic?.dispose();
     this.traffic = null;
-    if (this.car) { this.car.removeFromParent(); this.car = null; }
+    if (this.car) { disposeFilmCar(this.car); this.car = null; }
     if (this.engine) { this.engine.stop(0.3); this.engine = null; }
     if (this.radio) { this.radio.off(0.2); this.radio = null; }
     this._yardBack(false);
   }
 
   // the game's own УАЗ (the stripped one) gives the spot to the film's car, and the back gate stands open for it
+  // (a Trueno stops outside: the УАЗ stays where it stands, and the gate is open for the crew walking in)
   _yardBack(film) {
     const es = this.g.escape;
     if (!es) return;
-    if (es.car) es.car.visible = !film;
+    if (es.car) es.car.visible = !film || this.carId === 'trueno';
     for (const L of es.backLeaves || []) {
       L.ang = film ? 1.45 : 0;
       L.vel = 0;
@@ -182,13 +192,23 @@ export class RoadFilm {
     return Math.abs(z - R.z) < 6 ? Math.max(h, R.y) : h; // the highway is a built road, flat at its own level
   }
 
+  // (4.2) whose car it is: the host's (alone, or hosting: yours)
+  _hostFit() {
+    const g = this.g;
+    if (!g.online || g.auth) return myFit();
+    const hid = g.coop?.hostId;
+    for (const r of g.remotes.values()) if (hid && r.id === hid) return r.fit;
+    for (const r of g.remotes.values()) if ((r.slot | 0) === 0) return r.fit;
+    return myFit();
+  }
+
   _build() {
     this.built = true;
     const g = this.g;
     this.mat = this.mat || createWorldMaterial();
-    this.car = buildCrewCar(this.mat);
-    const glass = this.car.getObjectByName('glass');
-    if (glass) glass.visible = false; // an open УАЗ, windscreen folded: up close the glass reads as a white board
+    this.car = buildFilmCar(this._hostFit());
+    this.carId = this.car.userData.id;
+    this.fc = FILM_CARS[this.carId];
     g.scene.add(this.car);
     this.traffic = new RoadTraffic(g.scene, this.mat);
     const players = this._players();
@@ -225,7 +245,8 @@ export class RoadFilm {
 
   // the arrival, baked once: the car's distance along the way in, every 1/60 s from TF until it stops
   _plan() {
-    const pts = arrivalPath().map(([x, z]) => new THREE.Vector3(x, this._ground(x, z), z));
+    const tr = this.carId === 'trueno';
+    const pts = arrivalPath(this.carId).map(([x, z]) => new THREE.Vector3(x, this._ground(x, z), z));
     this.curve = new THREE.CatmullRomCurve3(pts, false, 'centripetal', 0.5);
     this.L = this.curve.getLength();
     const at = (s) => this.curve.getPointAt(clamp(s / this.L, 0, 1));
@@ -234,8 +255,9 @@ export class RoadFilm {
     for (let s = 0; s < this.L; s += 0.5) {
       const p = at(s);
       if (!sTurn && p.z < R.z - 3) sTurn = s;
-      if (!sGate && p.z < Y.z + Y.d / 2 + 1) { sGate = s; break; }
+      if (!sGate && p.z < Y.z + Y.d / 2 + (tr ? 13 : 1)) { sGate = s; break; }
     }
+    if (!sGate) sGate = this.L;
     this.sTurn = sTurn;
     this.sGate = sGate;
     const want = (s) => {
@@ -258,7 +280,7 @@ export class RoadFilm {
     this.S = S;
     const tOf = (pred) => { for (let i = 0; i < S.length; i++) if (pred(at(S[i]))) return TF + i / 60; return TF + S.length / 60; };
     this.tCut = tOf((p) => p.z < R.z - 18);
-    this.tGate = tOf((p) => p.z < Y.z + Y.d / 2 + 3);
+    this.tGate = tOf((p) => p.z < Y.z + Y.d / 2 + (tr ? 16 : 3));
     this.tStop = TF + (S.length - 1) / 60;
     this.tOff = this.tStop + 0.6; // the ignition: the song stops mid-line
     this.tDoor = this.tStop + 1.3;
@@ -271,8 +293,13 @@ export class RoadFilm {
       { k: 'yard', t0: this.tGate, t1: this.tStop + 1.0 },
       { k: 'out', t0: this.tStop + 1.0, t1: this.dur + 1 },
     ];
-    // where each of them walks to when they are out: toward the front gate (and the camera), a little apart
-    this.walkTo = [[-1.6, -7.4], [0.3, -8.2], [1.9, -7.2], [-0.2, -6.2]].map(([lx, lz]) => ({ x: Y.x + lx, z: Y.z + lz }));
+    // where each of them walks to when they are out: toward the front gate (and the camera), a little apart.
+    // Out of the Trueno: in through the back gate (its middle first), to a few steps inside it.
+    const hd = Y.d / 2;
+    this.walkTo = tr
+      ? [[-1.5, hd - 4.4], [0.5, hd - 5.2], [1.9, hd - 4.0], [-0.3, hd - 3.3]].map(([lx, lz]) => ({ x: Y.x + lx, z: Y.z + lz }))
+      : [[-1.6, -7.4], [0.3, -8.2], [1.9, -7.2], [-0.2, -6.2]].map(([lx, lz]) => ({ x: Y.x + lx, z: Y.z + lz }));
+    this.walkVia = tr ? [-0.5, 0.3, 0.6, -0.2].map((lx) => ({ x: Y.x + lx, z: Y.z + hd + 0.8 })) : null;
   }
 
   shotAt(tt) {
@@ -314,10 +341,11 @@ export class RoadFilm {
     return o;
   }
 
-  // car-local → world, for the car where it is now
+  // car-local → world, for the car where it is now (on its springs: the body, not the axles)
   toWorld(lx, ly, lz, out = new THREE.Vector3()) {
-    this.car.updateMatrixWorld(true);
-    return out.set(lx, ly, lz).applyMatrix4(this.car.matrixWorld);
+    const b = this.car.userData.body || this.car;
+    b.updateMatrixWorld(true);
+    return out.set(lx, ly, lz).applyMatrix4(b.matrixWorld);
   }
 
   // ---------------- the frame ----------------
@@ -327,6 +355,7 @@ export class RoadFilm {
     const silent = this.seeking;
     this.seeking = false;
     if (!this.hold) this.t += dt;
+    this._dt = silent ? 1 : dt;
     const tt = this.t;
     const ev = Array.isArray(events) ? events : [];
     if (!silent && (ev.includes('confirm') || ev.includes('skip')) && !this.skipAll) {
@@ -340,7 +369,7 @@ export class RoadFilm {
     _e.set(0, c.yaw, c.pitch, 'YXZ');
     this.car.quaternion.setFromEuler(_e);
     const steer = this._steer(tt);
-    for (const w of this.car.userData.wheels || []) w.rotation.z = c.dist / WHEEL_R;
+    this._springs(tt, c, steer);
     this.car.updateMatrixWorld(true);
     this._crew(tt, steer);
     this.traffic?.update(tt, c);
@@ -350,6 +379,27 @@ export class RoadFilm {
     else if (tt >= this.tFade) this.g.fx.fade = 1 - smoothstep(this.tFade, this.dur, tt);
     else this.g.fx.fade = 1;
     if (tt >= this.dur) this.end();
+  }
+
+  // (4.2) the wheels roll and the front ones steer; the body leans out of the turns and dips when it brakes;
+  // the steering wheel turns in the driver's hands; a Trueno's lamps are up while it drives (it is dusk)
+  _springs(tt, c, steer) {
+    const U = this.car.userData, R0 = this.fc.wheelR;
+    U.wheels.forEach((w, i) => {
+      w.rotation.z = c.dist / R0;
+      w.rotation.y = i < 2 ? steer * 0.32 : 0;
+    });
+    if (U.steer) U.steer.rotation.x = -steer * 1.6;
+    const a = (this.carAt(tt + 0.1, { ...this.pose }).v - this.carAt(tt - 0.1, { ...this.pose }).v) / 0.2;
+    const fast = clamp(c.v / 9, 0, 1);
+    const k = 1 - Math.exp(-(this._dt || 1 / 60) * 6);
+    this._roll = lerp(this._roll || 0, -steer * 0.045 * fast, k);
+    this._dip = lerp(this._dip || 0, clamp(-a * 0.007, -0.03, 0.035), k);
+    U.pivot.rotation.set(this._roll + 0.004 * Math.sin(tt * 9.3) * fast, 0, this._dip);
+    if (U.pods.length) {
+      const up = 1 - smoothstep(this.tOff ?? Infinity, (this.tOff ?? Infinity) + 0.6, tt);
+      for (const p of U.pods) p.rotation.z = -U.M.P.pod.open * up;
+    }
   }
 
   // the wheel follows the way's curvature (and a hand's small corrections on the straight)
@@ -375,8 +425,9 @@ export class RoadFilm {
       if (tt >= this.tDoor + a.seat * 0.4) { this._outside(a, tt); continue; }
       const n = a.rig.nodes;
       const driver = a.seat === 0;
-      poseSeated(a.rig, driver, tt + a.seat * 1.7, steer);
-      const hip = CAR_SEATS[a.seat].hip;
+      const P = this.fc.pose;
+      poseSeated(a.rig, driver, tt + a.seat * 1.7, steer, P ? (a.seat < 2 ? P.front : P.rear) : null);
+      const hip = this.fc.seats[a.seat].hip;
       this.toWorld(hip[0], hip[1], hip[2], _v);
       a.rig.root.position.copy(_v);
       a.rig.root.rotation.set(0, this.pose.yaw - PI / 2, 0);
@@ -410,6 +461,12 @@ export class RoadFilm {
         n.elR.rotation.x = lerp(n.elR.rotation.x, -0.35, r);
         n.head.rotation.y -= 0.4 * r;
         n.head.rotation.x += 0.25 * r;
+      }
+      // (4.2) roof down: on the open road an elbow goes up on the door, one hand on the wheel
+      if (this.carId === 'trueno') {
+        const e = smoothstep(2.5, 4, tt) * (1 - smoothstep(TF - 2, TF, tt));
+        n.shL.rotation.set(lerp(n.shL.rotation.x, -0.25, e), 0, lerp(n.shL.rotation.z, 1.0, e));
+        n.elL.rotation.x = lerp(n.elL.rotation.x, -1.35, e);
       }
       // at the spot: hands off the wheel, a breath, the key
       n.shL.rotation.x = lerp(n.shL.rotation.x, -0.4, settle);
@@ -462,35 +519,66 @@ export class RoadFilm {
   }
 
   // out of the car: beside its door, a stretch (the sleeper), then a walk toward the front gate
+  // (4.2: out of a Trueno the back seat hops over the side first, and the walk goes in through the back gate)
   _outside(a, tt) {
     const t0 = this.tDoor + a.seat * 0.4;
     const k = tt - t0;
-    const door = CAR_SEATS[a.seat].door;
+    const S = this.fc.seats[a.seat], door = S.door;
     if (!a.out) {
       this.toWorld(door[0], 0, door[2] + Math.sign(door[2]) * 0.25, _v);
-      a.out = { x: _v.x, z: _v.z, phase: a.seat * 0.7 };
+      const via = this.walkVia ? this.walkVia[a.seat] : null;
+      const pts = [{ x: _v.x, z: _v.z }, ...(via ? [via] : []), this.walkTo[a.seat]];
+      this.toWorld(S.hip[0], S.hip[1] - 0.08, S.hip[2], _w);
+      a.out = { x: _v.x, z: _v.z, phase: a.seat * 0.7, pts, seat: { x: _w.x, y: _w.y, z: _w.z } };
       if (a.map) a.map.visible = false;
     }
-    const o = a.out, to = this.walkTo[a.seat];
+    const o = a.out;
+    const hop = S.over ? 0.55 : 0; // over the side, out of the seat
+    if (k < hop) {
+      const e = smoothstep(0, 1, k / hop), up = Math.sin(e * PI);
+      poseSurvivor(a.rig, 0, 0, false, false);
+      const n = a.rig.nodes;
+      n.thL.rotation.x = n.thR.rotation.x = -1.2 * up;
+      n.knL.rotation.x = n.knR.rotation.x = 1.6 * up;
+      n.shL.rotation.z = 0.5 * up;
+      n.shR.rotation.z = -0.5 * up;
+      const gy = this._ground(o.x, o.z);
+      a.rig.root.position.set(lerp(o.seat.x, o.x, e), lerp(o.seat.y - 0.5, gy, e) + up * 0.5, lerp(o.seat.z, o.z, e));
+      a.rig.root.rotation.set(0, Math.atan2(o.x - o.seat.x, o.z - o.seat.z), 0);
+      a.rig.root.visible = true;
+      return;
+    }
+    // along the walk (a polyline: the door, the gate's middle, the spot)
+    const legs = [];
+    let total = 0;
+    for (let i = 1; i < o.pts.length; i++) {
+      const L = Math.hypot(o.pts[i].x - o.pts[i - 1].x, o.pts[i].z - o.pts[i - 1].z);
+      legs.push(L);
+      total += L;
+    }
     const stretch = a.role === 'sleep' ? 1.6 : 0.5;
-    const go = Math.max(0, k - stretch);
-    const dx = to.x - o.x, dz = to.z - o.z, d = Math.hypot(dx, dz) || 1;
-    const along = Math.min(d, go * 1.25);
-    const x = o.x + (dx / d) * along, z = o.z + (dz / d) * along;
-    const walking = along < d - 0.05 && go > 0;
+    const go = Math.max(0, k - hop - stretch);
+    const along = Math.min(total, go * 1.25);
+    let rest = along, li = 0;
+    while (li < legs.length - 1 && rest > legs[li]) { rest -= legs[li]; li++; }
+    const A = o.pts[li], B = o.pts[li + 1];
+    const f = legs[li] > 1e-4 ? clamp(rest / legs[li], 0, 1) : 1;
+    const x = lerp(A.x, B.x, f), z = lerp(A.z, B.z, f);
+    const dx = B.x - A.x, dz = B.z - A.z;
+    const walking = along < total - 0.05 && go > 0;
     const sp = walking ? 1.25 : 0;
     o.phase += 0; // (phase is the distance walked: the steps follow the ground, not the clock)
     poseSurvivor(a.rig, along / 0.62 + o.phase, sp, false, false);
     const n = a.rig.nodes;
-    if (k < stretch) {
+    if (k - hop < stretch) {
       // the sleeper stretches, arms up; the others just stand a moment by the door
-      const s = a.role === 'sleep' ? Math.sin(clamp(k / stretch, 0, 1) * PI) : 0;
+      const s = a.role === 'sleep' ? Math.sin(clamp((k - hop) / stretch, 0, 1) * PI) : 0;
       n.shL.rotation.x = -2.6 * s;
       n.shR.rotation.x = -2.6 * s;
       n.chest.rotation.x = -0.15 * s;
     }
     a.rig.root.position.set(x, this._ground(x, z), z);
-    const face = walking || k > stretch ? Math.atan2(dx, dz) : Math.atan2(Math.sign(door[2]) * Math.sin(this.pose.yaw), Math.sign(door[2]) * Math.cos(this.pose.yaw));
+    const face = walking || k - hop > stretch ? Math.atan2(dx, dz) : Math.atan2(Math.sign(door[2]) * Math.sin(this.pose.yaw), Math.sign(door[2]) * Math.cos(this.pose.yaw));
     a.rig.root.rotation.set(0, face, 0);
     a.rig.root.visible = k > 0.05;
   }
@@ -502,7 +590,7 @@ export class RoadFilm {
     this.traffic?.sound(au);
     const hit = (key, at, fn) => { if (tt >= at && !this.cues[key]) { this.cues[key] = true; fn(); } };
     hit('engine', 0.05, () => {
-      this.engine = au.uazStart?.(c.x, c.y + 0.7, c.z) || null;
+      this.engine = au.uazStart?.(c.x, c.y + 0.7, c.z, this.carId) || null; // (4.2: a Trueno's twin-cam sings higher)
     });
     if (this.engine && tt < this.tOff) {
       const k = clamp(c.v / 16, 0.12, 1);
@@ -522,8 +610,9 @@ export class RoadFilm {
       if (this.radio) { this.radio.off(0.08); this.radio = null; }
     });
     for (const a of this.cast) {
+      if (this.fc.seats[a.seat].over) continue; // (over the side: no door)
       hit('door' + a.seat, this.tDoor + a.seat * 0.4, () => {
-        const d = CAR_SEATS[a.seat].door;
+        const d = this.fc.seats[a.seat].door;
         this.toWorld(d[0], 0.8, d[2], _w);
         au.carDoor?.(_w.x, _w.y, _w.z, false);
       });
@@ -553,6 +642,8 @@ export class RoadFilm {
       return [c.x + lx * cy + lz * sy, c.y + ly, c.z - lx * sy + lz * cy];
     };
     let p, l, fov = 52;
+    const cam = this.fc?.cam || 0; // (4.2) the Trueno sits lower: the close shots come down with it
+    const tr = this.carId === 'trueno';
     switch (sh.k) {
       case 'wide': // far down the road ahead, a long lens on the car coming out of the low sun
         p = [140, R.y + 5.5 - 2 * k, LANE + 0.8];
@@ -560,23 +651,23 @@ export class RoadFilm {
         fov = lerp(26, 34, k);
         break;
       case 'radio': // beside the passenger's open window: both of them and the dash
-        p = local(lerp(0.65, 0.45, k), 1.78, -2.35);
-        l = local(-0.45, 1.2, 0.1);
+        p = local(lerp(0.65, 0.45, k), 1.78 + cam, -2.35);
+        l = local(-0.45, 1.2 + cam, 0.1);
         fov = 54;
         break;
       case 'side': // running alongside on the driver's side, low, the lamps sweeping past behind
-        p = local(lerp(1.4, 0.2, k), 1.55, 6.4);
-        l = local(-0.6, 1.3, 0.8);
+        p = local(lerp(1.4, 0.2, k), 1.55 + cam * 0.6, 6.4);
+        l = local(-0.6, 1.3 + cam, 0.8);
         fov = 54;
         break;
       case 'rear': // at the back window: the map in front, the sleeper beyond
-        p = local(1.75, 1.82, -2.45);
-        l = local(1.0, 1.3, 0.1);
+        p = local(1.75, 1.82 + cam, -2.45);
+        l = local(1.0, 1.3 + cam, 0.1);
         fov = 48;
         break;
       case 'pass': // on the verge, low: it comes, the arm out in the wind, and it is gone
         p = [176, R.y + 0.9, R.z - 3.7];
-        l = [c.x, c.y + 1.15, c.z];
+        l = [c.x, c.y + 1.15 + cam * 0.8, c.z];
         fov = 44;
         break;
       case 'drone': // behind and above, the road running into the sun, the forest's edge on the left
@@ -595,11 +686,23 @@ export class RoadFilm {
         fov = 52;
         break;
       case 'yard': // the yard's corner by the booth: round the yard, onto its spot
+        if (tr) { // (4.2) the Trueno: beside the open back gate, outside; it comes down the cut and stops short of us
+          const px = Y.x + 4.2, pz = Y.z + Y.d / 2 + 1.8;
+          p = [px, this._ground(px, pz) + 1.9, pz];
+          l = [c.x, c.y + 0.6, c.z];
+          fov = 50;
+          break;
+        }
         p = [Y.x + 14, this._ground(Y.x + 14, Y.z + 8) + 5.2, Y.z + 8]; // (from the tyres: the lamp pole out of the frame)
         l = [c.x, c.y + 0.8, c.z];
         fov = 50;
         break;
-      default: { // out: low, inside the front gate, the car behind them as they come toward us
+      default: if (tr) { // (4.2) in the yard, left of its own УАЗ: they come in through the back gate, the car outside
+        const px = Y.x - 2.6, pz = Y.z + Y.d / 2 - 8;
+        p = [px, this._ground(px, pz) + 1.6, pz];
+        l = [Y.x + 0.4, this._ground(Y.x, Y.z + Y.d / 2) + 1.15, Y.z + Y.d / 2 + lerp(1.2, -1.5, k)];
+        fov = 50;
+      } else { // out: low, inside the front gate, the car behind them as they come toward us
         const px = Y.x + 5.5, pz = Y.z - 10.5;
         p = [px, this._ground(px, pz) + 1.6, pz];
         l = [Y.x + 1.2, this._ground(Y.x, Y.z) + 1.1, Y.z + lerp(1.5, -2.5, k)];

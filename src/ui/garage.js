@@ -21,6 +21,8 @@ import {
   buildItems, buildPack, buildPackFlap, buildCigarette, buildCup, buildLighter, buildFlame, buildPasser, buildGateLeaf,
 } from './garageSet.js';
 import { departPlan } from './departure.js';
+import { cleanLook, lookKey } from '../game/carLook.js'; // 4.2: rims, tint, stickers
+import { decalMaterialFrom, stickerTexture, decalGeometry } from '../render/carPaint.js';
 import { BOARD, boardingPlan, poseBoarding } from './boarding.js'; // 3.0u: everyone gets in before the key turns
 
 const PI = Math.PI;
@@ -76,6 +78,7 @@ uniform float uGate;
 uniform float uAppear;  // 1 = here; 0..1 = materialising from the feet up
 uniform vec2 uAppearY;
 uniform float uAlpha;   // < 1: glass
+uniform float uTint;    // 0..1: the windscreen's tint (4.2)
 varying vec3 vWorld;
 varying vec3 vBary;
 varying float vKind;
@@ -250,6 +253,9 @@ void main() {
     float facing = clamp(dot(N, V), 0.0, 1.0);
     a = uAlpha * (0.35 + 0.65 * pow(1.0 - facing, 2.0)) + spec * 0.35;
     col = vec3(0.5, 0.6, 0.66) * (0.08 + lum * 0.4) + spec * vec3(1.0, 0.9, 0.75) * 0.6;
+    // (4.2) tinted: darker, and you see less of what is behind it (the reflections stay)
+    a = mix(a, 0.5 + 0.45 * pow(1.0 - facing, 1.5) + spec * 0.35, uTint);
+    col = mix(col, vec3(0.02, 0.025, 0.03) + spec * vec3(1.0, 0.9, 0.75) * 0.5, uTint * 0.85);
   }
   gl_FragColor = vec4(col * uFade, clamp(a, 0.0, 1.0));
 }
@@ -553,7 +559,10 @@ export class Garage {
       uGate: { value: 0 }, // the gates under the pointer: a lit edge, and they crack open
     };
     this.matSet = this._mat({}, { side: THREE.DoubleSide });
-    this.matGlass = this._mat({ uAlpha: { value: 0.16 } }, { transparent: true, depthWrite: false, side: THREE.DoubleSide });
+    this.uTintU = { value: 0 }; // (4.2) the host's tint on the windscreen
+    this.matGlass = this._mat({ uAlpha: { value: 0.16 }, uTint: this.uTintU }, { transparent: true, depthWrite: false, side: THREE.DoubleSide });
+    this.uDecalU = { value: null }; // ...and their stickers' atlas, for every sticker material
+    this.decalMats = new Map();
     this._build();
     this.figs = [null, null, null, null];
     this.cut = null; // the engine start
@@ -578,6 +587,7 @@ export class Garage {
       uAppear: { value: 1 },
       uAppearY: { value: new THREE.Vector2(0, 2.1) },
       uAlpha: { value: 1 },
+      uTint: { value: 0 },
       ...own,
     };
     return new THREE.ShaderMaterial({ uniforms, vertexShader: VERT, fragmentShader: FRAG, ...opts });
@@ -848,7 +858,7 @@ export class Garage {
     const host = list.find((q) => q.slot === 0);
     if (host) {
       const fit = cleanFit(host.fit);
-      this.setCar(fit.car, fit.cc);
+      this.setCar(fit.car, fit.cc, fit.ct);
     }
     for (let s = 0; s < 4; s++) {
       const p = list.find((q) => q.slot === s);
@@ -1010,14 +1020,20 @@ export class Garage {
 
   // ---------------- the car starts ----------------
   // ---------------- the car: the host's, from their wardrobe ----------------
-  setCar(id, colors = null) {
+  // look: its tuning (4.2, game/carLook.js) — rims, the windscreen's tint, stickers. Only what changed is rebuilt.
+  setCar(id, colors = null, look = null) {
     const M = CAR_MODELS[id] || CAR_MODELS.uaz;
     if (colors) {
       this.u.uCarDye.value[0].set(colors[0]);
       this.u.uCarDye.value[1].set(colors[1]);
     }
-    if (this.carId === (CAR_MODELS[id] ? id : 'uaz')) return;
-    this.carId = CAR_MODELS[id] ? id : 'uaz';
+    const L = cleanLook(look);
+    const cid = CAR_MODELS[id] ? id : 'uaz';
+    if (this.carId === cid) {
+      if (this.lookKey !== lookKey(L)) this._carLook(L);
+      return;
+    }
+    this.carId = cid;
     for (const m of this.carParts) {
       if (m.parent) m.parent.remove(m);
       m.geometry.dispose();
@@ -1028,16 +1044,8 @@ export class Garage {
     this.model = M;
     this.CP = M.P;
     const keep = (m) => (this.carParts.push(m), m);
-    // four wheels, one mesh each, hung at their axles: the car may stand still all evening, but when
-    // it rolls out through the gates the wheels turn with the road
-    this.wheelMeshes = [];
-    this.wheelSpin = 0;
-    [[-1, -1], [-1, 1], [1, -1], [1, 1]].forEach(([sx, sz], i) => {
-      const m = keep(this._mesh(M.wheels(i), this.matSet, this.carRoot));
-      m.position.set(sx * this.CP.wheelX, this.CP.wheelR, sz * this.CP.wheelZ);
-      this.wheelMeshes.push(m);
-    });
-    keep(this._mesh(M.body(), this.matSet, this.carMesh));
+    this.bodyMesh = keep(this._mesh(M.body(L), this.matSet, this.carMesh));
+    this.bodyKey = M.bodyKey ? M.bodyKey(L) : '';
     const glass = keep(this._mesh(M.glass(), this.matGlass, this.carMesh));
     glass.renderOrder = 5;
     this.steering.position.set(...this.CP.wheelC);
@@ -1056,9 +1064,64 @@ export class Garage {
     this.podA = 0;
     this.CP.head.forEach(([x, y, z], i) => this.headBeams[i].position.set(x - 0.02, y, z));
     this.u.uCarBox.value.set(CAR.x, CAR.z, M.len / 2 + 0.05, M.wid / 2 + 0.02);
+    this.lookKey = null;
+    this._carLook(L);
     // the driver changes cars too
     const f = this.figs && this.figs[0];
     if (f && f.rig) f.rig.root.position.set(...(f.board?.seated ? M.driver.pos : DRIVER_STAND));
+  }
+
+  // the tuning on the car that stands here: four wheels with its rims, the stickers, the tint
+  _carLook(L) {
+    const M = this.model;
+    this.lookKey = lookKey(L);
+    this.look = L;
+    const drop = (m) => {
+      if (!m) return;
+      if (m.parent) m.parent.remove(m);
+      m.geometry.dispose();
+      const i = this.carParts.indexOf(m);
+      if (i >= 0) this.carParts.splice(i, 1);
+    };
+    for (const m of this.wheelMeshes || []) drop(m);
+    // (a sticker on the Trueno's door takes the tofu shop's place: the body is built again without its letters)
+    if (M.bodyKey && this.bodyMesh && M.bodyKey(L) !== this.bodyKey) {
+      drop(this.bodyMesh);
+      this.bodyMesh = this._mesh(M.body(L), this.matSet, this.carMesh);
+      this.carParts.push(this.bodyMesh);
+      this.bodyKey = M.bodyKey(L);
+    }
+    drop(this.decalMesh);
+    this.decalMesh = null;
+    // four wheels, one mesh each, hung at their axles: the car may stand still all evening, but when
+    // it rolls out through the gates the wheels turn with the road
+    this.wheelMeshes = [];
+    [[-1, -1], [-1, 1], [1, -1], [1, 1]].forEach(([sx, sz], i) => {
+      const m = this._mesh(M.wheels(i, L), this.matSet, this.carRoot);
+      this.carParts.push(m);
+      m.position.set(sx * this.CP.wheelX, this.CP.wheelR, sz * this.CP.wheelZ);
+      m.rotation.z = this.wheelSpin || 0;
+      this.wheelMeshes.push(m);
+    });
+    const dg = decalGeometry(M, L);
+    if (dg) {
+      this.uDecalU.value = stickerTexture(L);
+      this.decalMesh = new THREE.Mesh(dg, this.decalMatFor(this.matSet));
+      this.decalMesh.frustumCulled = false;
+      this.decalMesh.renderOrder = 1;
+      this.carMesh.add(this.decalMesh);
+    }
+    this.uTintU.value = L.tint / 3;
+  }
+
+  // a sticker material for one of the car's materials (the set's, the dressing room's preview)
+  decalMatFor(base) {
+    let m = this.decalMats.get(base);
+    if (!m) {
+      m = decalMaterialFrom(base, this.uDecalU);
+      this.decalMats.set(base, m);
+    }
+    return m;
   }
 
   // (3.0u) the film's clock starts below zero: first everyone gets in (boarding.js), and the key — and every
@@ -1214,7 +1277,7 @@ export class Garage {
     const plan = boardingPlan(this.figs.map((f) => !!(f && !f.leaving)));
     for (const s of plan.slots) {
       const f = this.figs[s];
-      f.board = { slot: s, attached: false, seated: false, packed: false, flicked: false, P: { from: [0, 0], fromYaw: 0, seat: s === 0 ? this.model.driver.pos : null, D: this.model.driver } };
+      f.board = { slot: s, attached: false, seated: false, packed: false, flicked: false, P: { from: [0, 0], fromYaw: 0, seat: s === 0 ? this.model.driver.pos : this.model.seats?.[s] || null, D: this.model.driver } }; // (4.2: the Trueno's own seats)
     }
     this.boarding = plan;
     return plan.dur;

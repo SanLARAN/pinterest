@@ -734,19 +734,28 @@ export class Angler {
   }
 
   // ---------------- a friend at the rope ----------------
-  _rescuerFrame(dt) {
-    const g = this.g, a = A();
-    this.untieWait = Math.max(0, this.untieWait - dt);
-    const cap = this.cap, p = g.player;
-    if (!cap || cap.phase !== 'bound' || !p.alive || p.held || (g.state !== 'play' && g.state !== 'dawn' && g.state !== 'morning')) {
-      this.untieT = 0;
-      return;
-    }
+  // (4.2) the rope is a thing in front of you like any other: Objectives._interact asks here (consider) and hands the
+  // frame back (interactUntie). It used to write its own prompt from update(), which runs before _interact — and
+  // _interact, finding nothing of its own in front of you, wiped the line the same frame: no «E · untie» ever showed.
+  _untieCandidate() {
+    const g = this.g, cap = this.cap, p = g.player;
+    if (!cap || cap.phase !== 'bound' || !p.alive || p.held) return null;
+    if (g.state !== 'play' && g.state !== 'dawn' && g.state !== 'morning') return null;
     const v = g.playerById(cap.pid);
-    if (!v || v === p) { this.untieT = 0; return; }
-    const d = Math.hypot(p.x - cap.tree.ax, p.z - cap.tree.az);
-    if (d > a.untieR || Math.abs(p.y - v.y) > 2.6) { this.untieT = 0; return; }
-    if (g.input.useHeld && !g.inventory.active) {
+    if (!v || v === p || Math.abs(p.y - v.y) > 2.6) return null;
+    return v;
+  }
+
+  consider(fn) {
+    if (this._untieCandidate()) fn(this.cap, this.cap.tree.ax, this.cap.tree.az, A().untieR, 'untie');
+  }
+
+  interactUntie(dt, held, T) {
+    const g = this.g, a = A(), cap = this.cap, p = g.player;
+    const v = this._untieCandidate();
+    this._untieSeen = true;
+    if (!v) return;
+    if (held && !g.inventory.active) {
       this.untieT += dt;
       if (g.audio.ready && Math.random() < dt * 3) g.audio.ropeRub(cap.tree.ax, p.y + 1.1, cap.tree.az);
       if (this.untieT >= a.untie && this.untieWait <= 0) {
@@ -754,10 +763,29 @@ export class Angler {
         this.untieWait = 1.2;
         if (this.auth) this.hostUntie(cap.pid, p.id);
         else if (g.coop) g.coop.toHost('au', cap.pid);
+        g.hud.setUse(null);
         return;
       }
     } else this.untieT = Math.max(0, this.untieT - dt * 2);
-    g.hud.setUse(`${t('useUntie').replace('{name}', g.nameOf(v))}`, this.untieT / a.untie, true);
+    g.hud.setUse(T('useUntie').replace('{name}', g.nameOf(v)), Math.min(1, this.untieT / a.untie), true);
+  }
+
+  _rescuerFrame(dt) {
+    const g = this.g;
+    this.untieWait = Math.max(0, this.untieWait - dt);
+    // the forest's dawn runs no _interact at all (only the bog's winch dawn does) — there the rope asks for itself
+    if (g.state === 'dawn' && !(g.map === 'bog' && g.winch)) {
+      const cap = this.cap, p = g.player;
+      if (this._untieCandidate() && Math.hypot(p.x - cap.tree.ax, p.z - cap.tree.az) <= A().untieR) {
+        this.interactUntie(dt, g.input.useHeld, (k) => t(g.input.touch ? k + 'T' : k));
+        this._dawnUse = true;
+      } else if (this._dawnUse) {
+        this._dawnUse = false;
+        g.hud.setUse(null);
+      }
+    }
+    if (!this._untieSeen) this.untieT = 0; // walked off the rope (or it was cut): the count starts over
+    this._untieSeen = false;
   }
 
   // ---------------- how a captive friend looks to you ----------------

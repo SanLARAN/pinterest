@@ -11,6 +11,8 @@ import { RNG, clamp, lerp, damp } from '../core/rng.js';
 import { buildSurvivor, poseSurvivor, poseFur, dyeColors } from '../game/survivor.js';
 import { cleanFit, shapeKey, item } from '../game/outfit.js';
 import { CAR_MODELS, GPAL_GLSL, buildSteering } from './garageSet.js';
+import { cleanLook, lookKey } from '../game/carLook.js';
+import { decalMaterialFrom, stickerTexture, decalGeometry, tintMaterial } from '../render/carPaint.js';
 
 const VERT = /* glsl */ `
 attribute vec4 data;
@@ -221,9 +223,11 @@ const FOCUS = {
   car: { y: 0.72, h: 1.7 },
 };
 
-// a car for the wardrobe's car slot: the garage's model, on the stage's ground
-function carGroup(id, mat) {
+// a car for the wardrobe's car slot: the garage's model, on the stage's ground — with its tuning (4.2)
+const _decalMats = new WeakMap();
+function carGroup(id, mat, look = null) {
   const M = CAR_MODELS[id] || CAR_MODELS.uaz;
+  const L = cleanLook(look);
   const g = new THREE.Group();
   const add = (arr, parent = g) => {
     const m = new THREE.Mesh(geometryFrom(arr), mat);
@@ -231,8 +235,23 @@ function carGroup(id, mat) {
     parent.add(m);
     return m;
   };
-  add(M.wheels());
-  add(M.body());
+  add(M.wheels(-1, L));
+  add(M.body(L));
+  const dg = decalGeometry(M, L);
+  if (dg) {
+    let dm = _decalMats.get(mat);
+    if (!dm) _decalMats.set(mat, (dm = decalMaterialFrom(mat, { value: null })));
+    const m = new THREE.Mesh(dg, dm);
+    m.frustumCulled = false;
+    m.onBeforeRender = () => { dm.uniforms.uDecal.value = stickerTexture(L); }; // (one material, many looks)
+    g.add(m);
+  }
+  if (L.tint > 0) {
+    const gm = new THREE.Mesh(geometryFrom(M.glass()), tintMaterial(L.tint));
+    gm.frustumCulled = false;
+    gm.renderOrder = 3;
+    g.add(gm);
+  }
   const st = new THREE.Group();
   st.position.set(...M.P.wheelC);
   st.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), new THREE.Vector3(...M.P.wheelN).normalize());
@@ -253,7 +272,10 @@ function carGroup(id, mat) {
   return g;
 }
 function disposeGroup(g) {
-  g.traverse((o) => { if (o.geometry) o.geometry.dispose(); });
+  g.traverse((o) => {
+    if (o.geometry) o.geometry.dispose();
+    if (o.material && o.material.isMeshBasicMaterial) o.material.dispose();
+  });
 }
 
 export class Mannequin {
@@ -406,7 +428,7 @@ export class Mannequin {
   }
 
   // the car slot: the car stands on the stage instead of you (id null: you again)
-  showCar(id, colors = null) {
+  showCar(id, colors = null, look = null) {
     if (!id) {
       if (!this.carOn) return;
       this.carOn = false;
@@ -415,15 +437,19 @@ export class Mannequin {
       this.ground.scale.setScalar(1);
       return;
     }
-    if (!this.car || this.carId !== id) {
+    const lk = lookKey(look);
+    if (!this.car || this.carId !== id || this.carLook !== lk) {
+      const fresh = this.carId !== id;
       if (this.car) {
         this.scene.remove(this.car);
         disposeGroup(this.car);
       }
-      this.car = carGroup(id, this.mat);
+      this.car = carGroup(id, this.mat, look);
       this.carId = id;
+      this.carLook = lk;
+      if (!fresh) for (const pg of this.car.userData.pods) pg.rotation.z = -this.pod.a;
       this.scene.add(this.car);
-      this.pod = { a: 0, want: 0, t: 0 };
+      if (fresh) this.pod = { a: 0, want: 0, t: 0 };
     }
     if (colors) {
       this.u.uCarDye.value[0].set(colors[0]);
@@ -941,11 +967,18 @@ export class Mannequin {
   // a car's card: three-quarters from the front, lamps up if it has the kind that flip
   _carStill(fit, canvas) {
     const W = canvas.width, H = canvas.height;
-    let car = this.tcars.get(fit.car);
+    const key = fit.car + '|' + lookKey(fit.ct);
+    let car = this.tcars.get(key);
     if (!car) {
-      car = carGroup(fit.car, this.tmat);
+      for (const [k, c] of this.tcars) {
+        if (!k.startsWith(fit.car + '|')) continue;
+        this.tscene.remove(c); // (that car's old tuning)
+        disposeGroup(c);
+        this.tcars.delete(k);
+      }
+      car = carGroup(fit.car, this.tmat, fit.ct);
       for (const g of car.userData.pods) g.rotation.z = -car.userData.open;
-      this.tcars.set(fit.car, car);
+      this.tcars.set(key, car);
       this.tscene.add(car);
     }
     for (const r of this.trigs.values()) r.root.visible = false;

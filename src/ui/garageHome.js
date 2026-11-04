@@ -25,7 +25,7 @@ export class GarageHome {
   }
   enter() {
     const g=this.ensureGarage();if(!g)return;
-    if(g.view!=='menu'||!g.visible){g.open('menu');g.setPlayers([]);const f=myFit();g.setCar(f.car,f.cc);g.studio?.setFit(f);}
+    if(g.view!=='menu'||!g.visible){g.open('menu');g.setPlayers([]);const f=myFit();g.setCar(f.car,f.cc,f.ct);g.studio?.setFit(f);}
   }
   setActive(active) {
     this.active=active;this.book.hidden=!active;this.caption.hidden=!active;

@@ -6,6 +6,7 @@
 import * as THREE from 'three';
 import { MeshBuilder, KIND } from '../world/builder.js';
 import { RNG } from '../core/rng.js';
+import { cleanLook, RIM_TONES, RIM_DEFAULT } from '../game/carLook.js';
 
 export const GK = {
   CONCRETE: 19, BLOCK: 20, PAINTWALL: 21, CARPAINT: 22, CHROME: 23, RUBBER: 24, DARK: 25, HEADLAMP: 26,
@@ -727,18 +728,91 @@ export function buildSteering(R = CARP.wheelRad) {
   return b.toArrays();
 }
 
+// (4.2) a rim of one of the tuning styles (game/carLook.js RIMS), in a wheel's frame: b's matrix sits at the
+// wheel's centre with its local +y along the axle; sz (±1) is the side that faces out. K: what it is painted
+// with. Everything stays inside the tyre's hole (0.58 r) or on its sidewall's inner edge.
+export function rim(b, r, w, sz, style, K) {
+  const m = b.m.clone();
+  const out = (d) => sz * d; // the local y of a plane d out from the wheel's middle
+  const disc = (rr, d, h, kind, segs = 10) => b.cylinder(segs, rr, rr, h, kind, { y0: out(d) - h / 2, capBottom: true });
+  const spoke = (a, r0, r1, d, t, kind, twist = 0) => {
+    b.limb([Math.cos(a) * r0, out(d), Math.sin(a) * r0], [Math.cos(a + twist) * r1, out(d), Math.sin(a + twist) * r1], t, t, kind, 4);
+  };
+  const lip = (r0, r1, d, kind) => ring(b, r0, r1, out(d), 14, kind, sz < 0);
+  const nut = (rr, n, d, kind, size = 0.012) => {
+    for (let k = 0; k < n; k++) {
+      const a = (k / n) * PI * 2 + 0.3;
+      b.setMatrix(m.clone().multiply(_m.makeTranslation(Math.cos(a) * rr, 0, Math.sin(a) * rr)));
+      b.cylinder(6, size, size, 0.012, kind, { y0: out(d) - 0.006, capBottom: true });
+    }
+    b.setMatrix(m);
+  };
+  const D = GK.DARK, CH = GK.CHROME;
+  if (style === 'steel') { // a plain pressed-steel wheel: the dish, eight round holes, a little cap
+    disc(r * 0.62, w * 0.36, 0.03, K);
+    lip(r * 0.5, r * 0.6, w * 0.36 + 0.016, K);
+    nut(r * 0.4, 8, w * 0.36 + 0.017, D, r * 0.07);
+    disc(r * 0.2, w * 0.4, 0.04, K, 8);
+    disc(r * 0.12, w * 0.44, 0.03, CH, 8);
+  } else if (style === 'spoke5') { // a five-spoke alloy: dark between the spokes, a polished lip
+    disc(r * 0.6, w * 0.22, 0.02, D);
+    lip(r * 0.5, r * 0.62, w * 0.44, K);
+    for (let k = 0; k < 5; k++) spoke((k / 5) * PI * 2 + PI / 2, r * 0.12, r * 0.53, w * 0.42, r * 0.07, K);
+    disc(r * 0.17, w * 0.42, 0.05, K, 10);
+    nut(r * 0.1, 5, w * 0.45, CH, 0.009);
+  } else if (style === 'mesh') { // a cross-spoke mesh (the BBS on the Trueno in every second film)
+    disc(r * 0.6, w * 0.2, 0.02, D);
+    lip(r * 0.52, r * 0.62, w * 0.45, CH);
+    for (let k = 0; k < 10; k++) {
+      const a = (k / 10) * PI * 2;
+      spoke(a, r * 0.15, r * 0.53, w * 0.4, r * 0.022, K, 0.42);
+      spoke(a, r * 0.15, r * 0.53, w * 0.42, r * 0.022, K, -0.42);
+    }
+    disc(r * 0.17, w * 0.42, 0.05, K, 10);
+    disc(r * 0.08, w * 0.46, 0.03, CH, 8);
+  } else if (style === 'dish') { // a deep dish: a wide polished lip, the face set deep inside it
+    disc(r * 0.6, w * 0.12, 0.02, K);
+    lip(r * 0.34, r * 0.62, w * 0.46, CH);
+    b.cylinder(14, r * 0.34, r * 0.34, w * 0.34, CH, { y0: sz > 0 ? w * 0.12 : -w * 0.46, capTop: false });
+    for (let k = 0; k < 4; k++) spoke((k / 4) * PI * 2 + PI / 4, r * 0.1, r * 0.33, w * 0.14, r * 0.05, K);
+    disc(r * 0.13, w * 0.16, 0.04, K, 8);
+    nut(r * 0.08, 4, w * 0.19, CH, 0.008);
+  } else if (style === 'turbine') { // a turbine: a ring of slanted blades
+    disc(r * 0.6, w * 0.3, 0.02, K);
+    lip(r * 0.53, r * 0.62, w * 0.42, K);
+    for (let k = 0; k < 14; k++) spoke((k / 14) * PI * 2, r * 0.2, r * 0.52, w * 0.4, r * 0.026, k % 2 ? K : D, 0.55);
+    disc(r * 0.2, w * 0.42, 0.04, K, 10);
+    disc(r * 0.1, w * 0.46, 0.02, CH, 8);
+  }
+  b.setMatrix(m);
+}
+
+// a rim's paint: the tuning's tone, or the style's own (stock keeps the model's: fallback)
+function rimKind(look, fallback) {
+  const L = cleanLook(look);
+  const t = RIM_TONES[L.rt];
+  if (t >= 0) return t;
+  return L.rim === 'stock' ? fallback : RIM_DEFAULT[L.rim];
+}
+
 // `only` (0..3) builds just that one wheel, centred on the origin with its axle along z — the garage
 // hangs four of those at the axles so the departure film can spin them (the set is kept for the
-// mannequin and anything that wants the old single mesh)
+// mannequin and anything that wants the old single mesh). opts.look: the tuning (4.2)
 export function buildCarWheels(opts = {}, only = -1) {
   const b = new MeshBuilder(4096);
   const { wheelX: x, wheelZ: z, wheelR: r, wheelW: w } = CARP;
-  const P = opts.paint ?? GK.CARPAINT;
+  const L = cleanLook(opts.look);
+  const P = rimKind(L, opts.paint ?? GK.CARPAINT);
   [[-1, -1], [-1, 1], [1, -1], [1, 1]].forEach(([sx, sz], i) => {
     if (only >= 0 && i !== only) return;
     const cx = only >= 0 ? 0 : sx * x, cz = only >= 0 ? 0 : sz * z, cy = only >= 0 ? 0 : r;
     b.place(cx, cy, cz, PI / 2, 0, 0);
     tyre(b, r, w, GK.RUBBER, 12, true);
+    if (L.rim !== 'stock') {
+      b.place(cx, cy, cz, PI / 2, 0, 0);
+      rim(b, r, w, sz, L.rim, P);
+      return;
+    }
     b.place(cx, cy, cz + sz * w * 0.38, PI / 2, 0, 0);
     b.cylinder(10, r * 0.62, r * 0.62, 0.03, P, { y0: -0.015, capBottom: true }); // (3.1o: the tyre's hole is a 12-gon of 0.58 r; this 10-gon's flats sit at 0.59 r. At 0.55 r a ring of daylight showed round the rim)
     b.place(cx, cy, cz + sz * w * 0.45, PI / 2, 0, 0);
@@ -767,8 +841,11 @@ export function buildCarGlass() {
 
 // ---------------- the other car: a Toyota Sprinter Trueno (AE86), from the shop ----------------
 // Same frame as the УАЗ (nose toward −x, driver's side +z, facing you). Low and long: two-tone "panda" paint
-// (CK.A over CK.B), pop-up headlights on their own hinges (see buildTruenoPod), a hatch with a spoiler,
-// the wide tail-lamp bar. The cabin is hollow: the side windows are open, so the driver shows.
+// (CK.A over CK.B), pop-up headlights on their own hinges (see buildTruenoPod), the wide tail-lamp bar.
+// (4.2) A convertible now: the roof, the B- and C-pillars and the hatch are gone; a low windscreen in its frame,
+// the belt line kicking up behind the doors to a short boot lid with a ducktail, the soft top folded down
+// behind the back seat under its boot cover. With a roof, everyone who vaulted in over the side in the garage
+// (ui/boarding.js) went through it — and the road film could not see who was in the car.
 export const TRUENO_P = {
   wheelX: 1.2, wheelZ: 0.68, wheelR: 0.29, wheelW: 0.19,
   head: [[-1.79, 0.91, 0.52], [-1.79, 0.91, -0.52]], // the lamps, flipped up
@@ -781,13 +858,16 @@ export const TRUENO_P = {
   wheelRad: 0.18,
   horn: [-0.3, 0.92, 0.36],
   pod: { x: -1.62, y: 0.8, z: 0.52, len: 0.3, open: 1.3 }, // the pop-ups' hinges (rear edge), and how far they open
+  screen: { x0: -0.76, y0: 0.8, x1: -0.27, y1: 1.2 }, // the windscreen's frame: its foot and its top rail
 };
 
-export function buildTruenoBody() {
+// letters: the tofu shop on the driver's door (4.2: a sticker of your own on the door takes its place)
+export function buildTruenoBody(letters = true) {
   const b = new MeshBuilder(8192);
   const A = CK.A, B = CK.B, D = GK.DARK;
   const W = 0.8; // half width
   const SPLIT = 0.46; // the side moulding: black below, white above
+  const SC = TRUENO_P.screen;
   // the nose: in front of the front wheels, over them, the engine bay between them
   boxAt(b, -1.76, (0.22 + SPLIT) / 2, 0, 0.44, SPLIT - 0.22, 2 * W, B);
   boxAt(b, -1.76, (SPLIT + 0.74) / 2, 0, 0.44, 0.74 - SPLIT, 2 * W, A);
@@ -803,30 +883,43 @@ export function buildTruenoBody() {
   boxAt(b, -2.03, 0.33, 0, 0.12, 0.2, 2 * W + 0.02, D);
   for (const s of [-1, 1]) boxAt(b, -2.095, 0.35, s * 0.6, 0.012, 0.05, 0.16, GK.YELLOW);
   boxAt(b, 2.06, 0.33, 0, 0.12, 0.2, 2 * W + 0.02, D);
-  // the cabin's sides (hollow inside): the doors, the rear quarters over the rear wheels
+  // the cowl under the windscreen, side to side
+  boxAt(b, -0.68, 0.8, 0, 0.2, 0.03, 2 * W - 0.04, A);
+  // the sides (the cabin open above them): the doors, the rear quarters over the rear wheels
   for (const s of [-1, 1]) {
     const z = s * (W - 0.025);
+    const z0 = s > 0 ? W - 0.05 : -W, z1 = s > 0 ? W : -W + 0.05;
     boxAt(b, 0.0, (0.22 + SPLIT) / 2, z, 1.76, SPLIT - 0.22, 0.05, B);
     boxAt(b, 0.0, (SPLIT + 0.79) / 2, z, 1.76, 0.79 - SPLIT, 0.05, A);
     boxAt(b, 1.2, 0.695, z, 0.64, 0.19, 0.05, A); // over the rear wheel
+    // the rear quarter: from the door's back edge the belt line rises to the boot lid
+    slab(b, [[0.46, 0.785], [1.54, 0.785], [1.54, 0.935], [1.0, 0.915], [0.46, 0.83]], z0, z1, A);
     boxAt(b, 1.2, 0.45, s * 0.53, 0.64, 0.32, 0.03, D); // its inner well
     boxAt(b, -1.2, 0.45, s * 0.53, 0.64, 0.32, 0.03, D);
     boxAt(b, 0.0, SPLIT, z + s * 0.03, 3.9, 0.035, 0.02, D); // the moulding
-    // door seams, the handle
+    // door seams, the handle; the rubber along the top of the door (the side glass is wound down into it)
     boxAt(b, -0.76, 0.52, z + s * 0.028, 0.012, 0.52, 0.008, D);
-    boxAt(b, 0.46, 0.52, z + s * 0.028, 0.012, 0.52, 0.008, D);
+    boxAt(b, 0.46, 0.55, z + s * 0.028, 0.012, 0.58, 0.008, D);
     boxAt(b, 0.3, 0.7, z + s * 0.034, 0.12, 0.022, 0.02, D);
-    // a mirror
+    boxAt(b, -0.15, 0.8, s * (W - 0.03), 1.22, 0.022, 0.065, D);
+    boxAt(b, -0.15, 0.62, s * (W - 0.056), 1.12, 0.28, 0.012, D); // the door's inside, a black card
+    boxAt(b, 0.98, 0.7, s * (W - 0.056), 0.86, 0.22, 0.012, D); // ...and beside the back seat
+    // a mirror on the door's corner
     b.place(-0.66, 0.9, s * 0.86, 0, s * 0.25, 0);
     b.box(0.08, 0.07, 0.12, D);
-    // the A-pillar, the B-pillar, the C-pillar (a wide panel down to the hatch)
     b.identity();
-    b.limb([-0.76, 0.8, s * 0.74], [-0.12, 1.33, s * 0.67], 0.028, 0.026, D, 4);
-    b.limb([0.46, 0.8, s * 0.76], [0.42, 1.33, s * 0.68], 0.03, 0.03, D, 4);
-    quadS(b, [0.6, 0.8, s * 0.785], [1.98, 0.8, s * 0.8], [1.2, 1.33, s * 0.66], [0.62, 1.34, s * 0.68], A, s);
+    b.limb([-0.66, 0.81, s * 0.79], [-0.66, 0.88, s * 0.84], 0.012, 0.012, D, 4);
+    // the windscreen's frame: its pillar, raked like the coupé's, a hand shorter
+    b.identity();
+    b.limb([SC.x0, SC.y0, s * 0.74], [SC.x1, SC.y1, s * 0.685], 0.026, 0.024, D, 4);
   }
+  boxAt(b, SC.x1, SC.y1 + 0.005, 0, 0.06, 0.04, 1.4, D); // the top rail
+  b.place(SC.x1 + 0.03, SC.y1 - 0.05, 0.0, 0, 0.1, 0);
+  b.box(0.03, 0.05, 0.18, D); // the rear-view mirror on it
+  b.place(SC.x1 + 0.02, SC.y1 - 0.02, 0.0);
+  b.box(0.012, 0.03, 0.012, D);
   // "藤原とうふ店（自家用）" on the driver's door — strokes of black, the way it reads from across a garage
-  {
+  if (letters) {
     const zf = W + 0.004;
     let x = -0.6;
     for (let g = 0; g < 9; g++) {
@@ -839,17 +932,20 @@ export function buildTruenoBody() {
       x += w + 0.025;
     }
   }
-  // the roof, the windscreen's top rail, the hatch's frame and its spoiler
-  boxAt(b, 0.39, 1.35, 0, 1.02, 0.04, 1.38, A);
-  boxAt(b, -0.12, 1.33, 0, 0.06, 0.04, 1.36, D);
-  for (const s of [-1, 1]) {
-    b.identity();
-    b.limb([0.9, 1.33, s * 0.64], [1.96, 0.96, s * 0.76], 0.02, 0.02, D, 4);
-  }
-  boxAt(b, 1.98, 0.97, 0, 0.12, 0.035, 1.5, D); // the spoiler
-  // the tail: the panel, the lamp bar across it, the plate
+  // behind the back seat: the soft top folded down in its well, under a black boot cover
+  b.place(1.39, 0.9, 0, PI / 2, 0, 0);
+  b.cylinder(8, 0.085, 0.085, 1.34, D, { y0: -0.67, capBottom: true });
+  boxAt(b, 1.4, 0.875, 0, 0.26, 0.05, 1.46, D);
+  for (const z of [-0.5, 0, 0.5]) boxAt(b, 1.39, 0.99, z, 0.05, 0.012, 0.05, GK.CHROME); // its press studs
+  // the boot: the tail's panel, its lid, a little ducktail on the lid, the lamp bar across the tail, the plate
   boxAt(b, 1.78, (0.22 + SPLIT) / 2, 0, 0.5, SPLIT - 0.22, 2 * W, B);
   boxAt(b, 1.78, (SPLIT + 0.94) / 2, 0, 0.5, 0.94 - SPLIT, 2 * W, A);
+  boxAt(b, 1.53, 0.9, 0, 0.04, 0.06, 2 * W - 0.1, A); // the front edge of the boot, behind the cover
+  b.place(1.79, 0.945, 0, 0, 0, -0.02);
+  b.box(0.52, 0.025, 2 * W - 0.06, A); // the lid
+  boxAt(b, 1.535, 0.95, 0, 0.012, 0.006, 2 * W - 0.1, D); // its seam
+  b.place(2.0, 0.972, 0, 0, 0, -0.18);
+  b.box(0.1, 0.022, 2 * W - 0.14, A); // the ducktail
   boxAt(b, 2.035, 0.76, 0, 0.02, 0.1, 1.5, GK.TAILLAMP);
   boxAt(b, 2.04, 0.76, 0, 0.012, 0.025, 0.3, D); // the garnish between the lamps
   boxAt(b, 2.04, 0.55, 0, 0.012, 0.11, 0.33, GK.PAPER); // the plate
@@ -876,18 +972,12 @@ export function buildTruenoBody() {
   boxAt(b, 1.0, 0.4, 0, 0.42, 0.1, 1.3, GK.SEAT);
   b.place(1.22, 0.45, 0, 0, 0, 0.28);
   b.box(0.08, 0.45, 1.28, GK.SEAT, { bottom: true });
+  boxAt(b, 0.36, 0.42, 0, 0.5, 0.16, 0.2, D); // the tunnel's console between the buckets
   b.place(-0.26, 0.36, 0.0, 0, 0, -0.2);
   b.box(0.02, 0.3, 0.02, D, { bottom: true });
   b.place(-0.2, 0.65, 0.0);
   b.octa(0.028, 0.028, D);
   return b.toArrays();
-}
-
-// a quad that faces out on side s (+1 / -1 in z)
-function quadS(b, p0, p1, p2, p3, kind, s) {
-  b.identity();
-  b.quadN(p0, p1, p2, p3, [0, 0, s], kind);
-  b.quadN(p0, p3, p2, p1, [0, 0, -s], kind); // (and from inside the cabin)
 }
 
 // one pop-up headlight, in its hinge's frame: the white lid on top (flush with the hood when shut), the
@@ -902,16 +992,23 @@ export function buildTruenoPod() {
   return b.toArrays();
 }
 
-export function buildTruenoWheels(only = -1) {
+export function buildTruenoWheels(only = -1, look = null) {
   const b = new MeshBuilder(4096);
   const { wheelX: x, wheelZ: z, wheelR: r, wheelW: w } = TRUENO_P;
+  const L = cleanLook(look);
+  const K = rimKind(L, GK.CHROME);
   [[-1, -1], [-1, 1], [1, -1], [1, 1]].forEach(([sx, sz], i) => {
     if (only >= 0 && i !== only) return;
     const cx = only >= 0 ? 0 : sx * x, cz = only >= 0 ? 0 : sz * z, cy = only >= 0 ? 0 : r;
     b.place(cx, cy, cz, PI / 2, 0, 0);
     tyre(b, r, w, GK.RUBBER, 12, true);
+    if (L.rim !== 'stock') {
+      b.place(cx, cy, cz, PI / 2, 0, 0);
+      rim(b, r, w, sz, L.rim, K);
+      return;
+    }
     b.place(cx, cy, cz + sz * w * 0.38, PI / 2, 0, 0);
-    b.cylinder(10, r * 0.62, r * 0.62, 0.025, GK.CHROME, { y0: -0.012, capBottom: true });
+    b.cylinder(10, r * 0.62, r * 0.62, 0.025, K, { y0: -0.012, capBottom: true });
     for (let k = 0; k < 4; k++) { // four spokes of black
       b.place(cx, cy, cz + sz * w * 0.46, PI / 2, (k / 4) * PI * 2 + 0.4, 0);
       b.box(0.035, 0.02, r * 1.05, GK.DARK);
@@ -920,28 +1017,48 @@ export function buildTruenoWheels(only = -1) {
   return b.toArrays();
 }
 
-// faint glass: the windscreen and the hatch (the side windows are down)
+// faint glass: the windscreen in its frame (the side windows are down, the roof is off)
 export function buildTruenoGlass() {
   const b = new MeshBuilder(64);
+  const SC = TRUENO_P.screen;
   b.identity();
-  b.quadN([-0.74, 0.81, 0.74], [-0.74, 0.81, -0.74], [-0.13, 1.32, -0.66], [-0.13, 1.32, 0.66], [-1, 0.8, 0], GK.GLASS);
-  b.quadN([0.92, 1.32, 0.62], [0.92, 1.32, -0.62], [1.95, 0.97, -0.74], [1.95, 0.97, 0.74], [1, 0.9, 0], GK.GLASS);
+  b.quadN([SC.x0 + 0.02, SC.y0 + 0.01, 0.73], [SC.x0 + 0.02, SC.y0 + 0.01, -0.73], [SC.x1 - 0.01, SC.y1 - 0.01, -0.68], [SC.x1 - 0.01, SC.y1 - 0.01, 0.68], [-1, 0.8, 0], GK.GLASS);
   return b.toArrays();
 }
 
-// the lobby's cars: what each is built of, and where its driver sits (car-local) and how
+// the lobby's cars: what each is built of, and where its driver sits (car-local) and how.
+// seats (4.2): the lobby places' seats when it is not the УАЗ (ui/boarding.js keeps the УАЗ's own);
+// decals: where the tuning's stickers go (game/carLook.js) — the middle of each, which way is out, which way up,
+// how big at ×1 (a door and a quarter on each side; the hood; the tail: the УАЗ's spare, the Trueno's boot lid)
+const HOOD_N = (a) => [-Math.sin(a), Math.cos(a), 0];
+const HOOD_UP = (a) => [Math.cos(a), Math.sin(a), 0];
+const doorSticker = (look) => cleanLook(look).st.some((s) => s.at === 'door');
 export const CAR_MODELS = {
   uaz: {
     P: CARP, len: 4.0, wid: 1.78,
-    body: () => buildCarBody({ paint: CK.A, canvas: CK.B }), wheels: (only = -1) => buildCarWheels({ paint: CK.A }, only), glass: () => buildCarGlass(),
+    body: () => buildCarBody({ paint: CK.A, canvas: CK.B }), wheels: (only = -1, look = null) => buildCarWheels({ paint: CK.A, look }, only), glass: () => buildCarGlass(),
     driver: { pos: [0.1, 0, 0.42], hips: 1.02, recline: -0.1, thigh: -1.5, knee: 0.88 },
     engine: [-1.3, 1.1, 0], mirror: [-0.62, 1.62, 0.02], tailAt: [2.02, 0.95, 0],
+    decals: {
+      door: [1, -1].map((s) => ({ p: [-0.24, 0.92, s * 0.893], n: [0, 0, s], up: [0, 1, 0], s: 0.5 })),
+      hood: [{ p: [-1.36, 1.092, 0], n: HOOD_N(0.025), up: HOOD_UP(0.025), s: 0.7 }],
+      rear: [1, -1].map((s) => ({ p: [0.52, 1.0, s * 0.893], n: [0, 0, s], up: [0, 1, 0], s: 0.32 })),
+      tail: [{ p: [2.292, 0.98, 0.3], n: [1, 0, 0], up: [0, 1, 0], s: 0.44 }],
+    },
   },
   trueno: {
     P: TRUENO_P, len: 4.24, wid: 1.64,
-    body: buildTruenoBody, wheels: (only = -1) => buildTruenoWheels(only), glass: buildTruenoGlass, pod: buildTruenoPod,
+    body: (look = null) => buildTruenoBody(!doorSticker(look)), bodyKey: (look) => (doorSticker(look) ? 'own' : 'tofu'),
+    wheels: (only = -1, look = null) => buildTruenoWheels(only, look), glass: buildTruenoGlass, pod: buildTruenoPod,
     driver: { pos: [-0.02, 0, 0.36], hips: 0.5, recline: -0.28, thigh: -1.22, knee: 0.55 },
-    engine: [-1.3, 0.9, 0], mirror: [-0.36, 1.26, 0.02], tailAt: [2.05, 0.76, 0],
+    seats: { 1: [0.98, 0, 0.34], 2: [-0.02, 0, -0.36], 3: [0.98, 0, -0.34] },
+    engine: [-1.3, 0.9, 0], mirror: [TRUENO_P.screen.x1 + 0.03, TRUENO_P.screen.y1 - 0.05, 0.02], tailAt: [2.05, 0.76, 0],
+    decals: {
+      door: [1, -1].map((s) => ({ p: [-0.2, 0.625, s * 0.8], n: [0, 0, s], up: [0, 1, 0], s: 0.3 })),
+      hood: [{ p: [-1.36, 0.811, 0], n: HOOD_N(0.035), up: HOOD_UP(0.035), s: 0.6 }],
+      rear: [1, -1].map((s) => ({ p: [1.2, 0.75, s * 0.8], n: [0, 0, s], up: [0, 1, 0], s: 0.26 })),
+      tail: [{ p: [1.765, 0.959, 0], n: [0.02, 1, 0], up: [-1, 0.02, 0], s: 0.38 }],
+    },
   },
 };
 

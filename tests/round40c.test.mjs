@@ -78,15 +78,15 @@ const watcher = (x, z, state = 'stalk') => ({
   vanish(sec) { this.vanished = sec; this.state = 'lurk'; },
 });
 
-test('where they lie: one a shift, two in co-op, by a cabin, the tower or the stones — the same for the room', () => {
-  assert.equal(cameraCount(false), 1);
-  assert.equal(cameraCount(true), 2);
+test('where they lie: two a shift, three in co-op (4.2), by a cabin, the tower or the stones — the same for the room', () => {
+  assert.equal(cameraCount(false), 2);
+  assert.equal(cameraCount(true), 3);
   for (const id of SPOTS) assert.ok(LANDMARKS.some((l) => l.id === id), id);
   const { g } = stubGame();
   const a = new PhotoCamera(g), b = new PhotoCamera(g);
   a.reset(new RNG(77), true);
   b.reset(new RNG(77), true);
-  assert.equal(a.items.length, 2);
+  assert.equal(a.items.length, 3);
   assert.deepEqual(a.items.map((i) => [i.x, i.z, i.site]), b.items.map((i) => [i.x, i.z, i.site]));
   assert.notEqual(a.items[0].site, a.items[1].site);
   for (const it of a.items) {
@@ -95,7 +95,7 @@ test('where they lie: one a shift, two in co-op, by a cabin, the tower or the st
     assert.ok(it.halo, 'the red lamp you see before you find it');
   }
   a.reset(new RNG(77), false);
-  assert.equal(a.items.length, 1);
+  assert.equal(a.items.length, 2);
   // a camera is picked up like the rest: claimed through the host
   assert.match(src('src/game/inventory.js'), /source==='camera'\) \{ obj=g\.camItem\.items\?\.\[a\]/);
 });
@@ -386,7 +386,7 @@ test('the site\'s album: the film as shifts, newest first, each in the order it 
 // ---------------------------------------------------------------- the release
 test('4.0: the patch note leads, in both languages; the protocol includes 4.0 and 4.1; every new string exists twice', () => {
   const n = NEWS.find((x) => x.v === '4.0');
-  assert.ok(n && NEWS.indexOf(n) <= 2, '4.0 leads (or sits under its own hotfix)');
+  assert.ok(n && NEWS.slice(0, NEWS.indexOf(n)).every((x) => /^4\./.test(x.v)), '4.0 leads (or sits under its own hotfix and the later 4.x notes)');
   assert.match(n.date, /^\d{4}-\d{2}-\d{2}$/);
   assert.equal(n.ru.items.length, n.en.items.length);
   assert.ok(n.ru.items.length >= 8);

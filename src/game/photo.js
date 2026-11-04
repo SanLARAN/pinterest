@@ -41,7 +41,8 @@ export const PHOTO = {
 };
 // where they lie: a hunter's cabin, the fire tower, the stones — places someone would have stopped to look
 export const SPOTS = ['cabin4', 'cabin5', 'cabin3', 'firetower', 'stones', 'cabin2', 'cabin'];
-export const cameraCount = (online) => (online ? 2 : 1);
+// (4.2: two lying about solo, three in co-op — one more always waits in a cupboard, see Cabinets._seedCamera)
+export const cameraCount = (online) => (online ? 3 : 2);
 const PI = Math.PI;
 
 // black plastic, a chrome strip, the lens, the flash window, the shutter button and the charge lamp (kinds 19…49)
@@ -205,6 +206,7 @@ export class PhotoCamera {
     this.has = true;
     this.shots = Math.max(0, Math.min(PHOTO.shots, shots | 0));
     const g = this.g;
+    if (g.stats) g.stats.cameras = (g.stats.cameras | 0) + 1; // (4.2: the atlas counts them)
     if (g.audio.ready) g.audio.cabinetItem('flare');
     g.hud.popup(t('cameraGot').replace('{n}', this.shots), 'amber');
   }
@@ -223,6 +225,7 @@ export class PhotoCamera {
       return false;
     }
     this.shots--;
+    if (g.stats) g.stats.photos = (g.stats.photos | 0) + 1;
     this.flashT = PHOTO.flash;
     this.recycleT = PHOTO.recycle;
     this.kick = 1;

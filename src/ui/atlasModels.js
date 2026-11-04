@@ -18,6 +18,7 @@ import { buildForestCar, buildPart, WHEELS, MISSING, HOOD_HINGE, HOOD_OPEN, PART
 import { buildYard, buildGateLeaf, buildBackLeaf, GATE, BACK, CAR_AT, LAMP_AT } from '../world/yard.js';
 import { cabinetGroup } from '../game/cabinets.js';
 import { torchArrays } from '../game/torch.js';
+import { cameraArrays } from '../game/photo.js';
 import { buildTape, buildCrowbar } from '../game/toolModels.js';
 import { FIRETOWER, buildBinoculars } from '../world/expedition.js';
 import { BOG_LANDMARKS, PLACES as BOG_PLACES, BOG } from '../world/bog.js';
@@ -510,6 +511,12 @@ function flashlight(mat) {
   root.add(mesh);
   return still(root, 0.35, { yaw: 1.1, pitch: 0.5 }, { lamp: { x: -0.04, y: 0.035, z: -0.14, r: 0.55, c: [1,0.93,0.8], core: 0xfff1cf, halo: 0xe6cc8e, s: 0.04 } });
 }
+// (4.2) the camera (4.0): black plastic, the lens, the flash window — and the charge lamp blinking red
+function camera(mat) {
+  const root = new THREE.Group();
+  root.add(new THREE.Mesh(geometryFrom(cameraArrays()), mat));
+  return still(root, 0.2, { yaw: 2.6, pitch: 0.3 }, { lamp: { x: -0.046, y: 0.076, z: 0.012, r: 0.3, c: [1, 0.25, 0.15], core: 0xffd0c0, halo: 0xff3a26, s: 0.03 } });
+}
 function syringe(mat) { // the adrenaline dose: a glass barrel with red in it, chrome flange and plunger, a needle
   const root = new THREE.Group();
   const b = new MeshBuilder(256);
@@ -962,7 +969,7 @@ const MODELS = {
   listener, crawler, watcher, howler, angler, shkaf, shade, stray,
   generator: (mat) => generator(mat, true),
   corpse, fuel, plug, fuses, belt, battery, shard, stone, flare, glowstick, flashlight,
-  syringe,
+  syringe, camera,
   tape: fieldTool(buildTape, { yaw: 0.6, pitch: 0.35 }),
   crowbar: fieldTool(buildCrowbar, { yaw: 0.65, pitch: 0.65 }),
   binoculars: fieldTool(buildBinoculars, { yaw: 0.65, pitch: 0.4 }),

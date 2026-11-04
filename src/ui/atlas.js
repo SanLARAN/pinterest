@@ -708,6 +708,11 @@ export class Atlas {
         later(1350, () => A.flareHiss(...at(-3, 8.5, 14), 2.6));
         dur = 4.2;
         break;
+      case 'camera': // (4.2) the whine of the capacitor, the click and the flash — then the empty click
+        A.cameraShot?.(...at(-0.4, -0.2, 1.2), true);
+        later(1900, () => A.cameraShot?.(...at(-0.4, -0.2, 1.2), true, true));
+        dur = 2.6;
+        break;
       case 'flashlight':
         A.torchClick(true);
         later(1000, () => A.torchClick(false));

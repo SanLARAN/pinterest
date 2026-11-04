@@ -8,7 +8,8 @@ import { ScreenEditor } from './screenEditor.js';
 import { t } from '../core/i18n.js';
 import {
   SLOTS, ITEMS, PALETTE, SHOP, item, product, owns, wardrobe, saveWardrobe, colorsOf, setColor, resetColors, isDefaultColors,
-  myFit, fitWith, fullSet, fitKey, wt, lockProgress } from '../game/outfit.js';
+  myFit, fitWith, fullSet, fitKey, wt, lockProgress, tuneOf, setTune } from '../game/outfit.js';
+import { RIMS, RIM_TONE_IDS, TINTS, DECAL_SLOTS, STICKER, withLook, withSticker, quantize, decodeSticker, isDefaultLook } from '../game/carLook.js';
 import { wallet, onWallet, buyProduct, hasProduct } from '../game/wallet.js';
 
 // the tabs: the three slots, and the shop
@@ -227,7 +228,7 @@ export class Wardrobe {
       const first = item(p.items[0]);
       if (first.slot === 'car') {
         mq.setFocus('car');
-        mq.showCar(first.id, colorsOf(first.id));
+        mq.showCar(first.id, colorsOf(first.id), tuneOf(first.id));
       } else {
         mq.showCar(null);
         mq.setFocus('body');
@@ -237,7 +238,7 @@ export class Wardrobe {
     }
     if (this.slot === 'car') {
       mq.setFocus('car');
-      mq.showCar(wardrobe.car, colorsOf(wardrobe.car));
+      mq.showCar(wardrobe.car, colorsOf(wardrobe.car), tuneOf(wardrobe.car));
       return;
     }
     mq.showCar(null);
@@ -280,7 +281,7 @@ export class Wardrobe {
     wardrobe[it.slot] = id;
     saveWardrobe();
     if (this.mq) {
-      if (it.slot === 'car') this.mq.showCar(id, colorsOf(id));
+      if (it.slot === 'car') this.mq.showCar(id, colorsOf(id), tuneOf(id));
       else this.mq.setFit(myFit(), it.slot === 'head' ? 'hat' : 'body');
     }
     this._sound(it.slot === 'head' ? 'hat' : it.slot === 'car' ? 'dye' : 'cloth');
@@ -347,7 +348,7 @@ export class Wardrobe {
     const car = item(p.items[0]).slot === 'car';
     if (this.mq) {
       if (car) {
-        this.mq.showCar(p.items[0], colorsOf(p.items[0]));
+        this.mq.showCar(p.items[0], colorsOf(p.items[0]), tuneOf(p.items[0]));
         this.mq.toggleLights();
       } else this.mq.setFit(myFit(), 'body');
       this.mq.ping();
@@ -399,7 +400,7 @@ export class Wardrobe {
   // a piece's colours changed: show it
   _restage(id) {
     if (!this.mq) return;
-    if (item(id).slot === 'car') this.mq.showCar(id, colorsOf(id));
+    if (item(id).slot === 'car') this.mq.showCar(id, colorsOf(id), tuneOf(id));
     else this.mq.setFit(myFit());
   }
 
@@ -570,6 +571,116 @@ export class Wardrobe {
     const sw = PALETTE.map(([hex, key]) => `<button class="wr-sw" data-hex="${hex}" style="--c:${hex}" title="${esc(T.swatch[key])}" aria-label="${esc(T.swatch[key])}"></button>`).join('');
     $('wrSwatches').innerHTML = `${sw}<label class="wr-sw custom" title="${esc(T.custom)}" aria-label="${esc(T.custom)}"><input type="color" id="wrPick" value="${c[this.part]}">${ICON.plus}</label>`;
     this._syncPaint();
+    this._renderTune();
+  }
+
+  // ---------------- (4.2) the car's tuning: rims, their colour, the tint, stickers of your own ----------------
+  _renderTune() {
+    const el = $('wrTune');
+    if (!el) return;
+    if (this.slot !== 'car') {
+      el.innerHTML = '';
+      return;
+    }
+    const id = wardrobe.car, L = tuneOf(id), main = colorsOf(id)[0];
+    const chip = (attr, v, label, on) => `<button type="button" class="wr-chip${on ? ' on' : ''}" ${attr}="${v}" aria-pressed="${on}">${esc(label)}</button>`;
+    const TONE = { stock: 'linear-gradient(135deg,#d8dadc 0 50%,#2a2c2e 50%)', chrome: '#cfd3d6', silver: '#9d9d99', black: '#19191b', gold: '#c39a2b', white: '#e9e3d2', red: '#a5231a', body: main };
+    const rims = RIMS.map((r) => chip('data-rim', r, t('tuneRim_' + r), L.rim === r)).join('');
+    const tones = RIM_TONE_IDS.map((k) => `<button type="button" class="wr-tone${L.rt === k ? ' on' : ''}" data-rt="${k}" style="--c:${TONE[k]}" title="${esc(t('tuneTone_' + k))}" aria-label="${esc(t('tuneTone_' + k))}" aria-pressed="${L.rt === k}"></button>`).join('');
+    const tints = Array.from({ length: TINTS }, (_, i) => chip('data-tint', i, t('tuneTint' + i), L.tint === i)).join('');
+    const stk = DECAL_SLOTS.map((at) => {
+      const s = L.st.find((x) => x.at === at);
+      return `<div class="wr-stk${s ? ' has' : ''}" data-at="${at}"><canvas width="64" height="64" data-stk="${at}" aria-hidden="true"></canvas>`
+        + `<span class="wr-stk-name">${esc(t('tuneSlot_' + at))}</span>`
+        + `<div class="wr-stk-acts"><label class="wr-chip wr-stk-up">${esc(s ? t('tuneReplace') : t('tuneUpload'))}<input type="file" accept="image/*" data-up="${at}"></label>`
+        + (s ? `<button type="button" class="wr-chip" data-size="${at}" title="${esc(t('tuneSize'))}">×${s.s.toFixed(2).replace(/0$/, '')}</button><button type="button" class="wr-chip wr-stk-del" data-del="${at}" title="${esc(t('tuneRemove'))}" aria-label="${esc(t('tuneRemove'))}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></svg></button>` : '')
+        + '</div></div>';
+    }).join('');
+    el.innerHTML = `<h4>${esc(t('tuneTitle'))}</h4>`
+      + `<div class="wr-tune-row"><span class="wr-lbl">${esc(t('tuneRims'))}</span><div class="wr-chips">${rims}</div></div>`
+      + `<div class="wr-tune-row"><span class="wr-lbl">${esc(t('tuneRimColor'))}</span><div class="wr-tones">${tones}</div></div>`
+      + `<div class="wr-tune-row"><span class="wr-lbl">${esc(t('tuneTint'))}</span><div class="wr-chips">${tints}</div></div>`
+      + `<div class="wr-tune-row"><span class="wr-lbl">${esc(t('tuneStickers'))}</span><div class="wr-stickers">${stk}</div><p class="wr-tune-note">${esc(t('tuneNote'))}</p></div>`
+      + `<div class="wr-tune-row"><button type="button" class="wr-chip" data-factory="1"${isDefaultLook(L) ? ' disabled' : ''}>${esc(t('tuneFactory'))}</button><span class="wr-tune-err" id="wrTuneErr" role="status"></span></div>`;
+    for (const cv of el.querySelectorAll('canvas[data-stk]')) this._drawSticker(cv, L.st.find((x) => x.at === cv.dataset.stk));
+  }
+
+  // a sticker on its little card (a checker under what is clear)
+  _drawSticker(cv, s) {
+    const ctx = cv.getContext('2d');
+    if (!ctx) return;
+    ctx.clearRect(0, 0, 64, 64);
+    const idx = s && decodeSticker(s.px);
+    if (!idx) return;
+    const img = ctx.createImageData(64, 64);
+    const pal = s.pal.map((h) => [1, 3, 5].map((o) => parseInt(h.slice(o, o + 2), 16)));
+    for (let i = 0; i < 4096; i++) {
+      const c = idx[i] && pal[idx[i] - 1];
+      if (!c) continue;
+      img.data.set([c[0], c[1], c[2], 255], i * 4);
+    }
+    ctx.putImageData(img, 0, 0);
+  }
+
+  // the tuning changed: keep it, show it (the room hears of it when you walk out: fitKey has it)
+  _tune(look, sound = 'dye') {
+    const id = wardrobe.car;
+    setTune(id, look);
+    saveWardrobe();
+    this._restage(id);
+    this._sound(sound);
+    if (this.mq) this.mq.ping();
+    this._renderTune();
+    this._queueStills();
+    this._touch();
+  }
+
+  tuneClick(b) {
+    const id = wardrobe.car, L = tuneOf(id);
+    if (b.dataset.rim) this._tune(withLook(L, { rim: b.dataset.rim }));
+    else if (b.dataset.rt) this._tune(withLook(L, { rt: b.dataset.rt }));
+    else if (b.dataset.tint !== undefined) this._tune(withLook(L, { tint: +b.dataset.tint }));
+    else if (b.dataset.size) {
+      const s = L.st.find((x) => x.at === b.dataset.size);
+      if (!s) return;
+      const steps = [0.5, 0.75, 1, 1.25];
+      const next = steps[(steps.indexOf(s.s) + 1) % steps.length] ?? 1;
+      this._tune(withSticker(L, s.at, { ...s, s: next }));
+    } else if (b.dataset.del) this._tune(withSticker(L, b.dataset.del, null), 'cloth');
+    else if (b.dataset.factory) this._tune(null, 'cloth');
+  }
+
+  // a picture from your disk → a sticker: fitted into 64×64 (aspect kept, centred), cut to 15 colours
+  async uploadSticker(at, file) {
+    const err = (on) => { const e = $('wrTuneErr'); if (e) e.textContent = on ? t('tuneBad') : ''; };
+    err(false);
+    if (!file || !DECAL_SLOTS.includes(at)) return;
+    try {
+      const url = URL.createObjectURL(file);
+      const img = await new Promise((res, rej) => {
+        const im = new Image();
+        im.onload = () => res(im);
+        im.onerror = rej;
+        im.src = url;
+      });
+      URL.revokeObjectURL(url);
+      const cv = document.createElement('canvas');
+      cv.width = STICKER.w;
+      cv.height = STICKER.h;
+      const ctx = cv.getContext('2d', { willReadFrequently: true });
+      const k = Math.min(STICKER.w / img.naturalWidth, STICKER.h / img.naturalHeight);
+      const w = Math.max(1, Math.round(img.naturalWidth * k)), h = Math.max(1, Math.round(img.naturalHeight * k));
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(img, (STICKER.w - w) >> 1, (STICKER.h - h) >> 1, w, h);
+      const q = quantize(ctx.getImageData(0, 0, STICKER.w, STICKER.h).data);
+      if (!q) throw new Error('empty');
+      const L = tuneOf(wardrobe.car);
+      this._tune(withSticker(L, at, { px: q.px, pal: q.pal, s: L.st.find((x) => x.at === at)?.s ?? 1 }));
+    } catch (e) {
+      console.warn('[wardrobe] sticker', e);
+      err(true);
+      this._sound('deny');
+    }
   }
 
   // swatch / chip states in place (the colour input may be open: don't rebuild it)
@@ -595,6 +706,8 @@ export class Wardrobe {
       if (pick && document.activeElement !== pick) pick.value = cur;
     }
     $('wrReset').disabled = isDefaultColors(id);
+    const body = this.slot === 'car' && this.el.querySelector('.wr-tone[data-rt="body"]');
+    if (body) body.style.setProperty('--c', c[0]); // (the rims «in the body's colour» follow the paint)
   }
 
   // your callsign above its head, in your colour — the way friends see it out there
@@ -717,6 +830,7 @@ export class Wardrobe {
         this._click();
         this.setPart(+t.dataset.part);
       } else if (t.dataset.hex) this.paint(t.dataset.hex);
+      else if (t.closest('#wrTune')) { this._click(); this.tuneClick(t); }
       else if (t.id === 'wrScreenEdit') this.screenEditor.open();
       else if (t.id === 'wrRandom') this.randomize();
       else if (t.id === 'wrReset') this.resetItem();
@@ -730,6 +844,7 @@ export class Wardrobe {
     });
     this.el.addEventListener('change', (e) => {
       if (e.target.id === 'wrPick') this.paint(e.target.value);
+      if (e.target.dataset && e.target.dataset.up) this.uploadSticker(e.target.dataset.up, e.target.files && e.target.files[0]);
     });
     // a click outside the room (on the dark around it) closes it
     this.el.addEventListener('pointerdown', (e) => {

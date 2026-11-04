@@ -1308,16 +1308,17 @@ export function poseCarryPart(rig, heavy = true) {
 
 // sitting in the УАЗ: the caller puts the root at the seat (the hips) and turns it the way the car faces.
 // driver: hands up on the wheel (steer turns them a little); t breathes
-export function poseSeated(rig, driver = false, t = 0, steer = 0) {
+// sit: (4.2) a car of its own can say how — { thigh, knee, recline } (the Trueno's buckets are low and laid back)
+export function poseSeated(rig, driver = false, t = 0, steer = 0, sit = null) {
   const n = rig.nodes;
   rig.root.rotation.x = 0;
   n.hips.position.set(0, 0, 0);
-  n.hips.rotation.set(0, 0, 0);
-  n.chest.rotation.set(-0.08 + Math.sin(t * 1.6) * 0.012, 0, 0);
+  n.hips.rotation.set(sit ? sit.recline : 0, 0, 0);
+  n.chest.rotation.set(-0.08 + Math.sin(t * 1.6) * 0.012 - (sit ? sit.recline * 0.6 : 0), 0, 0);
   n.head.rotation.set(0.05, 0, 0);
   for (const [A, s] of [['L', -1], ['R', 1]]) {
-    n['th' + A].rotation.set(-1.48, 0, s * 0.08);
-    n['kn' + A].rotation.x = 1.42;
+    n['th' + A].rotation.set(sit ? sit.thigh : -1.48, 0, s * 0.08);
+    n['kn' + A].rotation.x = sit ? sit.knee : 1.42;
     if (driver) {
       n['sh' + A].rotation.set(-1.05 + s * steer * 0.25, 0, s * 0.18);
       n['el' + A].rotation.x = -0.75;

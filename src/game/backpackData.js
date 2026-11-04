@@ -7,7 +7,7 @@ export const BAG_SIZE = 4;
 export const BAG_KINDS = ['stones', 'glow', 'torch', 'flare', 'battery', 'tape', 'crowbar', 'map', 'syringe', 'camera'];
 export const BAG_LIMIT = { stones: 3, glow: 3, torch: 1, flare: 6, battery: 3, tape: 1, crowbar: 1, map: 1, syringe: 2, camera: 1 };
 export const CAMERA_SHOTS = 5; // (game/photo.js PHOTO.shots: here too, so a parcel is checked without the renderer)
-export const LOOT_KIND = { nuts: 'stones', glow: 'glow', battery: 'battery', flare: 'flare', syringe: 'syringe' };
+export const LOOT_KIND = { nuts: 'stones', glow: 'glow', battery: 'battery', flare: 'flare', syringe: 'syringe', camera: 'camera' };
 export const kindIndex = (kind) => BAG_KINDS.indexOf(kind);
 
 // The inventory's shelves: the tabs across the top of the pack. Every kind lives in exactly one.

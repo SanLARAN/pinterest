@@ -4163,22 +4163,25 @@ export class AudioEngine {
 
   // it catches: a bang through the pipe, a rev, then a lumpy idle — in the world, where the car is.
   // { stop(fade), rev(k 0..1, pos) } — rev: the engine's pitch, and where it is now (it drives away)
-  uazStart(x, y, z) {
+  // (4.2) kind 'trueno': the AE86's twin-cam four — the same start, higher and thinner, less of the УАЗ's rumble
+  uazStart(x, y, z, kind = 'uaz') {
     if (!this.ready) return null;
     const t = this.now;
+    const hi = kind === 'trueno';
+    const fk = hi ? 1.6 : 1, lk = hi ? 1.5 : 1;
     const pn = this._far(x, y, z, 5, 0.75, 0.3);
     const out = this._gain(1);
     out.connect(pn);
     this._noiseBurst(t, { buf: this.brown, type: 'lowpass', f: 520, a: 0.004, d: 0.3, gain: 1.4, dest: out });
     const eng = this._gain(0);
-    const lp = this._filter('lowpass', 520, 0.9);
+    const lp = this._filter('lowpass', 520 * lk, 0.9);
     const sh = this._shaper(this.distSoft);
     const post = this._gain(0.13);
     eng.connect(sh).connect(lp).connect(post).connect(out);
-    const f = (rpm) => rpm / 30;
+    const f = (rpm) => (rpm / 30) * fk;
     const o1 = this._osc('sawtooth', f(500));
     const o2 = this._osc('square', f(500) / 2);
-    const o2g = this._gain(0.55);
+    const o2g = this._gain(hi ? 0.3 : 0.55);
     o1.connect(eng);
     o2.connect(o2g).connect(eng);
     const ex = this._noise(this.pink);
@@ -4186,7 +4189,7 @@ export class AudioEngine {
     const am = this._osc('sine', f(500));
     const amg = this._gain(0.5);
     am.connect(amg).connect(exg.gain);
-    const exlp = this._filter('lowpass', 650, 0.8);
+    const exlp = this._filter('lowpass', 650 * lk, 0.8);
     const exo = this._gain(0.4);
     ex.connect(exg).connect(exlp).connect(exo).connect(eng);
     const revs = [[0.12, 1400], [0.38, 2300], [0.75, 1500], [1.5, 900], [2.4, 840]];
@@ -4196,9 +4199,9 @@ export class AudioEngine {
     }
     o2.frequency.setValueAtTime(f(500) / 2, t);
     for (const [dt, rpm] of revs) o2.frequency.exponentialRampToValueAtTime(f(rpm) / 2, t + dt);
-    lp.frequency.setValueAtTime(380, t);
-    lp.frequency.linearRampToValueAtTime(1300, t + 0.38);
-    lp.frequency.linearRampToValueAtTime(560, t + 1.6);
+    lp.frequency.setValueAtTime(380 * lk, t);
+    lp.frequency.linearRampToValueAtTime(1300 * lk, t + 0.38);
+    lp.frequency.linearRampToValueAtTime(560 * lk, t + 1.6);
     eng.gain.setValueAtTime(0.0001, t);
     eng.gain.linearRampToValueAtTime(1.2, t + 0.08);
     eng.gain.linearRampToValueAtTime(0.65, t + 0.45);
@@ -4217,7 +4220,7 @@ export class AudioEngine {
           o1.frequency.setTargetAtTime(f(rpm), n, 0.12);
           am.frequency.setTargetAtTime(f(rpm), n, 0.12);
           o2.frequency.setTargetAtTime(f(rpm) / 2, n, 0.12);
-          lp.frequency.setTargetAtTime(560 + 1500 * k, n, 0.15);
+          lp.frequency.setTargetAtTime((560 + 1500 * k) * lk, n, 0.15);
           eng.gain.setTargetAtTime(0.32 + 0.55 * k, n, 0.15);
         }
         if (pos && pn.positionX) {
