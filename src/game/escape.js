@@ -374,29 +374,19 @@ export class Escape {
     return out.set(lx, ly, lz).applyMatrix4(this.car.matrixWorld);
   }
 
-  // ---------------- power: the yard comes alive, and the gate waits for the shelter ----------------
-  // (3.0q) The gate does not roll on the generators' power any more. The five machines put the yard on the mains
-  // — floodlight, siren, the drive unit's beacon blinking — and the drive unit's contactor is down in the
-  // shelter's breaker, where the works wired it in the fifties. Pull that, and the gate rolls. (The shelter is
-  // under the peat works' camp on the other участок: game/bunker.js, which asks for openGate() here.)
+  // ---------------- power: the yard comes alive, and the gate rolls by itself ----------------
+  // All five machines put the yard on the mains — floodlight, siren, the drive unit's beacon blinking — and the
+  // gate rolls, just as the guard's note on it says: start all five and it opens by itself. There is no breaker
+  // on the forestry участок. (4.0a: 3.0q had hung the drive's contactor off a shelter's breaker; the shelter then
+  // went under the peat works' camp on the other участок, and this gate was left waiting for a lever that is not
+  // here — the night could not be finished. The breaker is the bog's way out only: game/bunker.js.)
   powerOn() {
     if (this.power) return;
     this.power = true;
-    const g = this.g, yd = this.Y;
     this.flood = 0.001;
     this.floodFlick = 1.4;
     this.beacon.visible = true;
-    const a = g.audio;
-    if (a.ready) {
-      this.gate.siren = a.gateSiren ? a.gateSiren(yd.motor.x, yd.motor.y + 0.4, yd.motor.z, 6.5) : null;
-      a.gateFar && a.gateFar(yd.motor.x, yd.motor.z);
-    }
-    g.noise(yd.front.x, yd.front.z, 0.8, 'repair'); // the siren: everything in the north of the forest comes to look
-    g.hud.flashAlert(t('aYardPower'), 'dawn', 3.2);
-    g.hud.peek(5);
-    g.addTrauma(0.12);
-    g.bunker?.onPower?.(); // the cap under the camp: its lock lets go, with a clunk you can hear from the gate
-    this.beaconT = 4;
+    this.openGate(); // the siren, the alert, the hint up north: the gate is on its way
   }
 
   // is the gate moving / open?
@@ -404,7 +394,7 @@ export class Escape {
     return this.gate.state === 'opening' || this.gate.state === 'open';
   }
 
-  // ...and the gate itself: the shelter's breaker closes the contactor, and the motor answers up here
+  // ...and the gate itself: the mains reach the drive unit, and the motor answers
   openGate() {
     if (this.gate.state !== 'shut') return;
     const g = this.g, yd = this.Y, a = g.audio;
@@ -1470,7 +1460,7 @@ export class Escape {
   readNote(which) {
     const g = this.g, ob = g.objectives;
     if (which === 'gate') {
-      ob.openNote(t('noteGateKicker'), this.power ? (this.gateOpen ? t('noteGateMoving') : t('noteGateOn')) : t('noteGate'));
+      ob.openNote(t('noteGateKicker'), this.power ? t('noteGateMoving') : t('noteGate'));
       return;
     }
     const where = (key) => {
@@ -1490,8 +1480,6 @@ export class Escape {
   taskText() {
     if (!this.power) return '';
     if (this.engine === 'running') return t('taskGo');
-    // (3.0q) the yard has power, the gate has not moved: the breaker is under it
-    if (!this.gateOpen) return t('taskBunker');
     if (this.ready) return t('taskStart');
     if (!this.inYardOnce) return t('taskYard');
     if (!this.knows) return t('taskLog');
@@ -1508,13 +1496,7 @@ export class Escape {
     if (this.beaconT > 0) return;
     let tx = null, tz = null, kind = 'car';
     const held = this.held;
-    const sh = this.g.world.bunker;
-    if (this.power && !this.gateOpen && sh) {
-      // (3.0q) nothing moves until the shelter's breaker is down: the beacon points at the cap under the camp
-      tx = sh.hatch.x;
-      tz = sh.hatch.z - sh.hatch.d / 2 - 1.1;
-      kind = '';
-    } else if (!this.inYardOnce || held || this.ready) {
+    if (!this.inYardOnce || held || this.ready) {
       const c = held ? this.slotPos(held.key, _v) : this.car.position;
       tx = c.x;
       tz = c.z;

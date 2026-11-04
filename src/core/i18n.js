@@ -667,7 +667,6 @@ const STR = {
     hintGate: 'на севере, у края леса, воет сирена — там ворота лесхоза и машина',
     hintWorks: 'выезд с участка — затвор на насыпи, и он под током убежища: рубильник внизу, под лагерем',
     // (3.0q) the shelter under the yard
-    aYardPower: 'ЛЕСХОЗ ПОД ТОКОМ',
     aShelterUnlocked: 'ЗАМОК КОЛПАКА ЩЁЛКНУЛ',
     hintShelter: 'на краю лагеря, у воды, стоит бетонный колпак с дверью: контактор затвора — внизу, в убежище',
     aShelterOpen: 'ДВЕРЬ КОЛПАКА ОТКРЫТА',
@@ -740,7 +739,6 @@ const STR = {
     hintGoTouch: 'РУКИ — поехали: кто в машине, тот и уедет',
     noteGateKicker: 'листок на приводе ворот',
     noteGate: 'ВОРОТА ОТ СЕТИ. Сети нет — генераторы в лесу стоят. Запустите все пять — ворота поедут сами. Через забор не лезть: по колючке ток. — сторож',
-    noteGateOn: 'ВОРОТА ОТ СЕТИ. Ток пошёл, а ворота стоят: контактор у них в убежище под лагерем, на другом участке. Рубильник — в дальнем конце коридора. Не задерживайся там. — сторож',
     noteLogKicker: 'журнал сторожа',
     noteLog: 'УАЗ на приколе — раздели кто во что горазд. Колесо — {wheel}. Аккумулятор — {battery}. Карбюратор — {carb}. Канистра — {can}. Соберёте — уезжайте по просеке на шоссе. Задние ворота на цепи — машина её порвёт.',
     logFitted: 'уже на месте',
@@ -1736,7 +1734,6 @@ const STR = {
     hintGate: 'up north, by the edge of the forest, a siren is howling — the forestry gate, and the car',
     hintWorks: 'the way off the site is the gate on the causeway, and it runs on the shelter\'s mains: the breaker is under the camp',
     // (3.0q) the shelter under the yard
-    aYardPower: 'THE FORESTRY YARD HAS POWER',
     aShelterUnlocked: 'THE CAP\'S LOCK LET GO',
     hintShelter: 'at the edge of the camp, by the water, a concrete cap with a door: the gate\'s contactor is under it',
     aShelterOpen: 'THE CAP\'S DOOR IS OPEN',
@@ -1809,7 +1806,6 @@ const STR = {
     hintGoTouch: 'HANDS — go: whoever is in the car leaves with it',
     noteGateKicker: 'a sheet taped to the gate drive',
     noteGate: 'GATE RUNS ON MAINS. No mains — the generators out in the forest are dead. Start all five and the gate opens by itself. Don\'t climb the fence: the barbed wire is live. — the guard',
-    noteGateOn: 'GATE RUNS ON MAINS. The power is on, but the gate stands: its contactor is in the shelter under the yard. The breaker is at the far end of the corridor. Don\'t linger down there. — the guard',
     noteLogKicker: 'the guard\'s log',
     noteLog: 'The UAZ is laid up — everybody took a piece. The wheel — {wheel}. The battery — {battery}. The carburettor — {carb}. The jerry can — {can}. Put it together and take the cut to the highway. The back gate is chained — the car will snap it.',
     logFitted: 'already fitted',

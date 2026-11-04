@@ -45,7 +45,7 @@ export class Bunker {
   constructor(game) {
     this.g = game;
     this.world = game.world;
-    this.B = this.world.bunker || null; // the bog has no shelter
+    this.B = this.world.bunker || null; // the forest has no shelter: every call below is a no-op there
     this.script = new ShelterScript();
     this.gate = false;
     this._inside = false;
@@ -480,7 +480,6 @@ export class Bunker {
   _beat(ev) {
     const g = this.g, B = this.B, R = B.rift;
     if (ev === 'gate') {
-      g.escape?.openGate?.(); // the forest's gate, if this were the forest (it is not: it has no shelter now)
       this._openWorks(); // the works' gate on the track out: motor, siren, the whole участок hears it
       this.gate = true;
       g.hud.flashAlert(t('aGateOpen'), 'dawn', 3.2);

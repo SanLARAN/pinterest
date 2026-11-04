@@ -224,16 +224,16 @@ test('out of the shelter the clock stops: the door is not your problem any more'
 });
 
 // ---- 3. the joining-up ----
-test('the five pumps unlock the cap; only the shelter\'s breaker moves the gate', () => {
+test('the five pumps unlock the cap; the forestry gate rolls on its own five generators (4.0a)', () => {
   const esc = src('src/game/escape.js');
   const power = esc.slice(esc.indexOf('  powerOn() {'), esc.indexOf('  // is the gate moving / open?'));
-  assert.ok(power.length > 200, 'powerOn is there');
-  assert.ok(!power.includes("gate.state = 'opening'"), 'the участок\'s power does not open the gate by itself');
-  assert.ok(power.includes('bunker?.onPower'), 'it tells the shelter the lock can let go');
+  assert.ok(power.length > 100, 'powerOn is there');
+  assert.ok(power.includes('this.openGate()'), 'the yard\'s power rolls the gate by itself: there is no breaker in the forest');
+  assert.ok(!power.includes('bunker'), 'and the forest does not wait on a shelter it does not have');
   const open = esc.slice(esc.indexOf('  openGate() {'), esc.indexOf('  gateShut() {'));
   assert.ok(open.includes("gate.state = 'opening'"), 'openGate is the one that rolls it');
   assert.ok(esc.includes('get gateOpen()'), 'and the rest of the escape can ask');
-  assert.ok(esc.includes("if (!this.gateOpen) return t('taskBunker')"), 'the task line says where the gate is held');
+  assert.ok(!esc.includes('taskBunker') && !esc.includes('world.bunker'), 'the forest\'s task line and beacon never point at a shelter');
   // on the bog the escape is a stand-in, so the game tells the shelter itself
   const game = src('src/game/game.js');
   assert.ok(game.includes('this.bunker.onPower()'), 'the five pumps reach the cap on every участок');
@@ -296,10 +296,10 @@ test('the siren for the closing doors is its own sound, and the gate\'s is not t
 });
 
 test('every string the shelter shows exists in both languages', () => {
-  const keys = ['aYardPower', 'aShelterUnlocked', 'hintShelter', 'aShelterOpen', 'aShelterIn', 'aBreath', 'aStir',
+  const keys = ['aShelterUnlocked', 'hintShelter', 'aShelterOpen', 'aShelterIn', 'aBreath', 'aStir',
     'aDoorsClose', 'aRun', 'aDoorLeft', 'aShelterShut', 'hintRun', 'taskBunker', 'taskRunOut', 'aWorksOpen',
     'hintWorksOpen', 'hintWorks', 'noteGateBog', 'winchGateShut', 'winchGateShutHint',
-    'useShelterLocked', 'useShelterUnlock', 'useShelterDown', 'useShelterUp', 'useBreaker', 'noteGateMoving', 'noteGateOn'];
+    'useShelterLocked', 'useShelterUnlock', 'useShelterDown', 'useShelterUp', 'useBreaker', 'noteGateMoving'];
   const was = getLang();
   const ru = {};
   for (const k of keys) {
@@ -368,7 +368,7 @@ test('power, the cap, the ladder, the breaker, the gate, the blackout, the alarm
   assert.equal(bun.gateOpen, false, 'the gate answers half a second later, not on the same frame');
   step(0.8);
   assert.equal(bun.gateOpen, true, 'and the gate on the track out is on its way up');
-  assert.equal(game.escape.opened, 1, 'the escape was told as well (the forest\'s gate, if it were the forest)');
+  assert.equal(game.escape.opened, 0, 'the forest\'s gate is not the shelter\'s business: it rolls on its own generators (4.0a)');
   assert.ok(bun.worksOpen > 0, 'the works\' leaf has started to lift');
   assert.ok(bun.worksLeaf.position.y > w.worksGate.leafY, 'and it is moving up its guides');
   step(2.0);

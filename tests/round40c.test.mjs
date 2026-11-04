@@ -385,8 +385,8 @@ test('the site\'s album: the film as shifts, newest first, each in the order it 
 
 // ---------------------------------------------------------------- the release
 test('4.0: the patch note leads, in both languages; the protocol is 21; every new string exists twice', () => {
-  const n = NEWS[0];
-  assert.equal(n.v, '4.0');
+  const n = NEWS.find((x) => x.v === '4.0');
+  assert.ok(n && NEWS.indexOf(n) <= 1, '4.0 leads (or sits under its own hotfix)');
   assert.match(n.date, /^\d{4}-\d{2}-\d{2}$/);
   assert.equal(n.ru.items.length, n.en.items.length);
   assert.ok(n.ru.items.length >= 8);

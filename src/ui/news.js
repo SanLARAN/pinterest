@@ -7,6 +7,17 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v:'4.0a',date:'2026-11-04',
+    ru:{title:'Ворота лесхоза снова открываются сами',items:[
+      'Ворота лесхоза снова едут сами, как и написано на табличке у них: запустил все пять генераторов — двор под током, воет сирена, ворота откатываются. Рубильника в лесу нет и не нужно: задание больше не отправляет в убежище, которого на этом участке нет, и ночь в лесу снова проходится до машины.',
+      'Убежище с рубильником осталось там, где ему место, — под лагерем торфяника: там выезд с участка по-прежнему держит затвор на насыпи.',
+    ]},
+    en:{title:'The forestry gate opens by itself again',items:[
+      'The forestry gate rolls by itself again, just as the sign on it says: start all five generators — the yard goes on the mains, the siren howls, the gate slides open. There is no breaker in the forest and none is needed: the task line no longer sends you to a shelter this site does not have, and a forest night can be finished at the car again.',
+      'The shelter and its breaker stay where they belong — under the peat works\' camp: there the way off the site is still held by the gate on the causeway.',
+    ]},
+  },
+  {
     v:'4.0',date:'2026-11-04',
     ru:{title:'ULTRA: подлесок, утро сквозь туман, щупальца на горизонте и фотоаппарат',items:[
       'Подлесок. Между деревьями теперь кусты, папоротник, молодые ёлочки и сухой валежник — по всему лесу, кроме троп, лагеря и построек. В чаще ноги вязнут (идёшь до четверти медленнее), и каждый шаг сквозь неё шуршит, а это слышно тварям. Пригнувшись, шуршишь еле-еле, но сухие ветки трещат всё равно. Эхо проявляет подлесок так же, как деревья.',
