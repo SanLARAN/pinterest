@@ -111,7 +111,6 @@ test('the forest: five generators, and the gate opens by itself — no shelter, 
   run(game, 1.6);
   assert.equal(esc.power, true, 'all five: the yard is on the mains');
   assert.equal(esc.gate.state, 'opening', 'and the gate rolls on its own');
-  assert.equal(game.bunker.needsBreaker, false, 'there is no breaker to send anyone to');
   // the task line and the note on the gate: the way out, not a shelter
   const was = getLang();
   for (const L of ['ru', 'en']) {
@@ -134,7 +133,6 @@ test('the forest: five generators, and the gate opens by itself — no shelter, 
   run(game, 9.5);
   assert.equal(esc.gate.state, 'open', 'the gate is fully open');
   assert.ok(esc.gate.open > 0.99, 'all the way along its track');
-  assert.equal(game.winch.shut(), false, 'and nothing holds the car up');
 });
 
 test('the strings of the old wait are gone, and the shelter does not reach for the forest\'s gate', () => {
@@ -146,8 +144,6 @@ test('the strings of the old wait are gone, and the shelter does not reach for t
     assert.ok(t('aGateOpen') !== 'aGateOpen' && t('hintGate') !== 'hintGate', `${L}: the gate opening says so`);
     setLang(was);
   }
-  const bun = src('src/game/bunker.js');
-  assert.ok(!bun.includes('escape?.openGate'), 'the bog\'s breaker only lifts the bog\'s gate');
   const esc = src('src/game/escape.js');
   assert.ok(!/taskBunker|world\.bunker|noteGateOn|aYardPower/.test(esc), 'the forest\'s escape knows nothing of a shelter');
 });

@@ -319,14 +319,13 @@ export class Menus {
   showOver(res, stats, rank, list, team = null) {
     const won = res.won;
     const isEsc = !!res.escaped;
-    const bog = res.map === 'bog'; // (3.0r) the bog leaves by the old track and counts pumps; it has no car parts to find
-    const B = (k) => t(bog ? k + 'Bog' : k);
+    const bog = res.map === 'bog'; // (5.0a) «Топь» counts chapters: it has no generators and no car parts
     $('over').classList.toggle('won', won);
     $('overKicker').textContent = won
-      ? `${isEsc ? B('escKicker') : t('winKicker')} · ${fmtTime(stats.time)}`
-      : `${t('survived')} ${fmtTime(stats.time)} · ${t(bog ? 'pumps' : 'generators')} ${stats.gens | 0}/5`;
+      ? `${bog ? t('l2WinKicker') : isEsc ? t('escKicker') : t('winKicker')} · ${fmtTime(stats.time)}`
+      : `${t('survived')} ${fmtTime(stats.time)} · ${bog ? `${t('l2Chapters')} ${stats.chapter | 0}/7` : `${t('generators')} ${stats.gens | 0}/5`}`;
     const titles = { scream: 'deadScream', crawler: 'deadCrawler', watcher: 'deadWatcher', howler: 'deadHowler', shkaf: 'deadShkaf', angler: 'deadAngler', razlom: 'deadRazlom', shiftEnd: 'deadShiftEnd' };
-    let title = won ? (isEsc ? B('escTitle') : t('winTitle')) : t(titles[res.cause] || 'deadTitle');
+    let title = won ? (bog ? t('l2WinTitle') : isEsc ? t('escTitle') : t('winTitle')) : t(titles[res.cause] || 'deadTitle');
     const who = !won && res.cause !== 'scream' ? (t('deathBy')[res.cause] || '') : '';
     let sub = won ? (isEsc ? (res.alive === false ? t('escSubHurt') : B('escSub')) : t('winSub')) : who ? `— ${who}` : '';
     if (res.cause === 'shiftEnd' && !won) {
@@ -355,7 +354,7 @@ export class Menus {
     $('newRecord').classList.toggle('show', rank === 0 && stats.score > 0);
     const loud = `${Math.round((stats.loudest / 0.78) * 100)}%`;
     const cells = [
-      [`${stats.gens | 0}/5`, t(bog ? 'pumps' : 'gensGot')],
+      bog ? [`${stats.chapter | 0}/7`, t('l2Chapters')] : [`${stats.gens | 0}/5`, t('gensGot')],
       ...(stats.gens >= 5 && !bog ? [[`${stats.carParts | 0}/4`, t('partsGot')]] : []),
       [stats.shards, t('shardsGot')],
       [stats.close, t('closeCalls')],

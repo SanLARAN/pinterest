@@ -245,11 +245,8 @@ export class NetSync {
       // ---- from any player ----
       case 've': if (isHostMsg) g.voiceMimic.hear(a); break;
       case 'sw': if (a != null) g.stray?.netWear(a, b, c); break; // 2.1v: she is wearing someone
-      case 'gb': if (isHostMsg && typeof a === 'string') g.gnats?.apply(a, +b); break; // 3.0e: the midges blinded someone
       case 'lksh': if (isHostMsg && !this.host && typeof a === 'string' && [b, c, e].every(Number.isFinite)) g.lakeShark?.start(a, b, c, e); break;
       case 'mp': if (isHostMsg && Number.isInteger(a)) g.magpies?.netTakeoff(a, b, c); break; // 3.1c: a flock went up
-      case 'wn': if (isHostMsg && g.winch) { g.winch.p = 1; g.winch.done = true; g.winch.update(0); } break; // 3.0f: the car is on the planks
-      case 'xG': g.bunker?.remoteGate?.(); break; // 3.0q: the breaker is down and the gate on the track out is up
       case 'ibp': if (isHostMsg) g.inventory.applyParcel(a); break;
       case 'ibg': if (isHostMsg) g.inventory.applyClaim(a); break;
       case 'gd': if (r && typeof a === 'string') { const s = g.glows.find(a); if (s?.owner === pid && s.state === 'held') g.glows.dropFor(pid, +b, +c); } break;
@@ -350,6 +347,8 @@ export class NetSync {
           case 'iu': g.cabinets.netUnlock(a); break;
           case 'spe': g.expedition.netMerge(a); break;
           case 'du': if (g.state === 'morning') g.startDusk(); break;
+          // (5.0a) «Топь»: the host's chapter (its index; one past the last is the end of the level)
+          case 'l2': if (g.level2 && g.state === 'level2' && Number.isInteger(a)) { if (a >= g.level2.constructor.COUNT) g.level2.finish(); else g.level2.goto(a, true); } break;
           case 'tn': if (Number.isFinite(+a)) g.startTentacles(+a >>> 0); break; // (4.0) the arms on the horizon
           case 'cw': // (4.0) a flash drove a Watcher off: where it stood (and if it was your flash, you hear it)
             if ([b, c, e].every((v) => Number.isFinite(+v))) g.camItem.driven(+b, +c, +e);

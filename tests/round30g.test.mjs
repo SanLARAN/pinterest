@@ -58,14 +58,12 @@ test('both panels and both languages name the two участка', () => {
       assert.ok(s && s !== key, `${lang}: ${key} is translated`);
     }
     assert.notEqual(t('mapForest'), t('mapBog'));
-    // the bog's own five notes, and the pump that stands in for a generator
-    const notes = t('notesBog');
-    assert.equal(notes.length, 5);
-    // the first four point at the next pump; the fifth is the last thing anyone wrote
-    for (const n of notes.slice(0, 4)) assert.ok(n.includes('{next}'), 'the chain says where to go next');
-    assert.ok(!notes[4].includes('{next}'));
-    assert.ok(t('aPumpOn').includes('{n}'));
-    assert.ok(t('winchTurn') && t('winchSlip').includes('{n}'));
+    // (5.0a) the second ground is told in chapters: each has a name and a goal in both languages
+    assert.ok(t('l2Ch').includes('{n}'));
+    for (const id of ['convoy', 'road', 'crash', 'village', 'generator', 'escape', 'cliff']) {
+      assert.notEqual(t('l2_' + id), 'l2_' + id, `${lang}: chapter ${id} has a name`);
+      assert.notEqual(t('l2Goal_' + id), 'l2Goal_' + id, `${lang}: chapter ${id} has a goal`);
+    }
   }
   setLang('ru');
 });

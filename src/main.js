@@ -90,10 +90,10 @@ const DEBUG = {
   seats: parseInt(params.get('seats'), 10) || 0, // preview a lobby's four goodnights alone
   nomic: params.has('nomic'),
   fps: params.has('fps'),
-  map: params.get('map') || '', // ?map=bog: walk the peat bog (3.0: the second участок)
+  map: params.get('map') || '', // ?map=bog: the second level, «Топь» (5.0)
   days: +params.get('days') || 0, // ?days=2|4|6: the shift length a pick in the menu asked for
-  shelter: params.has('shelter'), // (3.0q) start on the peat works' camp with the cap unlocked: the shelter, without five pumps
-  unlock: params.has('unlock') || params.has('shelter'), // (3.0s) the bog without a forest win: for the harness and for testing a build
+  chapter: parseInt(params.get('chapter'), 10) || 0, // (5.0a) ?map=bog&chapter=N: start «Топь» at chapter N (1–7)
+  unlock: params.has('unlock') || params.has('chapter'), // (3.0s) the bog without a forest win: for the harness and for testing a build
   tentacles: params.has('tentacles'), // (4.0) the arms on the horizon come up 4 s into every night
 };
 
@@ -120,7 +120,7 @@ const sunShadow = new SunShadow(renderer, shadows); // (4.0) ...and in the morni
 
 // ---------------- systems ----------------
 const worldMat = createWorldMaterial();
-const world = new World(scene, worldMat, DEBUG.map === 'bog' || DEBUG.shelter ? 'bog' : 'forest'); // (3.0q: the shelter is on the bog)
+const world = new World(scene, worldMat, DEBUG.map === 'bog' || DEBUG.chapter ? 'bog' : 'forest');
 const pulses = new Pulses();
 const ghosts = new Ghosts(scene);
 const eyes = new Eyes(scene);
@@ -597,7 +597,7 @@ window.addEventListener('pointerdown', splashKey, { capture: true });
 // once a launch, not on every reload (a map switch reloads the page), never for an invite link, a debug start
 // or a browser driven by a test
 function wantSplash() {
-  if (DEBUG.nosplash || DEBUG.range || DEBUG.autostart || DEBUG.night || DEBUG.nointro || DEBUG.t > 0 || DEBUG.shelter) return false;
+  if (DEBUG.nosplash || DEBUG.range || DEBUG.autostart || DEBUG.night || DEBUG.nointro || DEBUG.t > 0 || DEBUG.chapter) return false;
   if (cleanCode(params.get('room')).length >= 4 || (typeof navigator !== 'undefined' && navigator.webdriver)) return false;
   try { return !sessionStorage.getItem('hush.splash'); } catch { return true; }
 }
@@ -776,36 +776,17 @@ function startRun(opts = {}) {
   if (online) {
     const me = opts.coop.players.find((p) => p.id === coop.selfId);
     game.setupSolo();
-    game.reset({ seed: opts.coop.seed, slot: me ? me.slot : 0, online: true, training, days: opts.coop.rules?.days });
+    game.reset({ seed: opts.coop.seed, slot: me ? me.slot : 0, online: true, training, days: opts.coop.rules?.days, chapter: DEBUG.chapter ? DEBUG.chapter - 1 : undefined });
     game.setupOnline(coop, opts.coop.players);
   } else {
     game.setupSolo();
     game.opening.forceSeats = DEBUG.seats;
-    game.reset({ training, days: DEBUG.days || settings.shiftDays });
-    if (DEBUG.night || DEBUG.nointro || DEBUG.t > 0 || DEBUG.shelter) game.startNight();
+    game.reset({ training, days: DEBUG.days || settings.shiftDays, chapter: DEBUG.chapter ? DEBUG.chapter - 1 : undefined });
+    if (DEBUG.night || DEBUG.nointro || DEBUG.t > 0) game.startNight();
     if (DEBUG.t > 0) {
       game.time = DEBUG.t;
       game.firstPingT = Math.max(0, DEBUG.t - 30);
       game.tut.done = true;
-    }
-    // (3.0q) ?shelter: the camp on the mains and the cap unlocked, you standing in front of it. What is down
-    // there still has to be walked, and the breaker still has to be thrown by hand.
-    if (DEBUG.shelter) {
-      game.tut.done = true;
-      try {
-        game.bunker.onPower(); // the camps have power: the cap's lock lets go (the pumps are not needed for this)
-        game.bunker.unlock();
-        const H = game.world.bunker && game.world.bunker.hatch;
-        if (H) {
-          const p2 = game.player;
-          p2.x = H.x;
-          p2.z = H.z - H.d / 2 - 1.8;
-          p2.y = game.world.terrain.height(p2.x, p2.z) + 0.08;
-          p2.yaw = Math.PI; // facing the cap
-        }
-      } catch (e) {
-        console.warn('[shelter] debug start failed', e);
-      }
     }
   }
   beginRewards();
@@ -838,7 +819,7 @@ function startTrainingSolo() {
 // (3.0u) a solo shift starts in the garage too: you get into the car and it drives out through the gates, and the
 // shift's own opening (the УАЗ at the flooded проезд, the camp) picks it up from there. Debug jumps skip it.
 function startSoloShift() {
-  if (state !== 'menu' || DEBUG.nointro || DEBUG.night || DEBUG.t > 0 || DEBUG.shelter) { startRun(); return; }
+  if (state !== 'menu' || DEBUG.nointro || DEBUG.night || DEBUG.t > 0 || DEBUG.chapter) { startRun(); return; }
   playGarageFilm(() => startRun());
 }
 
@@ -897,7 +878,7 @@ function pause() {
   $('pauseStats').innerHTML = training
     ? t('trainingSmall')
     : night
-    ? `${fmtTime(game.time)} · ${t(game.map === 'bog' ? 'pumps' : 'generators')} ${game.objectives.count}/5<br>${t('score')} ${fmtScore(game.score)} ×${game.mult.toFixed(1)}`
+    ? `${fmtTime(game.time)} · ${t('generators')} ${game.objectives.count}/5<br>${t('score')} ${fmtScore(game.score)} ×${game.mult.toFixed(1)}`
     : `${t('morningBig')}`;
   $('btnRestartP').hidden = training;
   renderPauseVoices();
@@ -1011,6 +992,7 @@ function onEnd(res) {
   const stats = {
     ...game.stats,
     gens: game.objectives.count,
+    chapter: game.level2 ? Math.min(7, game.level2.i + (res.won ? 1 : 0)) : 0, // (5.0a) how far into «Топь»
     carParts: game.escape.count,
     time: game.time,
     score: game.score,
@@ -1499,7 +1481,7 @@ function boot() {
     updateMicUI();
     // 3.0g: a link that names the ground wins over the remembered one — otherwise ?map=bog would bounce the
     // player back to the forest the moment the shift started
-    if (DEBUG.map === 'bog' || DEBUG.shelter) { settings.shiftMap = 'bog'; saveSettings(); } // (3.0q: the shelter is on the bog)
+    if (DEBUG.map === 'bog' || DEBUG.chapter) { settings.shiftMap = 'bog'; saveSettings(); }
     if (DEBUG.range) startTrainingSolo(); // (3.0u) arrived from the bog on the way to the range: its film, then the range
     else if (DEBUG.autostart) startRun();
     if (params.has('sfx')) import('./ui/sfxtest.js').then((m) => m.mountSfxPanel(audio));

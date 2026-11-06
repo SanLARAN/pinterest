@@ -386,11 +386,11 @@ test('the site\'s album: the film as shifts, newest first, each in the order it 
 // ---------------------------------------------------------------- the release
 test('4.0: the patch note leads, in both languages; the protocol includes 4.0 and 4.1; every new string exists twice', () => {
   const n = NEWS.find((x) => x.v === '4.0');
-  assert.ok(n && NEWS.slice(0, NEWS.indexOf(n)).every((x) => /^4\./.test(x.v)), '4.0 leads (or sits under its own hotfix and the later 4.x notes)');
+  assert.ok(n && NEWS.slice(0, NEWS.indexOf(n)).every((x) => /^[45]\./.test(x.v)), '4.0 leads (or sits under its own hotfix and the later 4.x / 5.x notes)');
   assert.match(n.date, /^\d{4}-\d{2}-\d{2}$/);
   assert.equal(n.ru.items.length, n.en.items.length);
   assert.ok(n.ru.items.length >= 8);
-  assert.equal(PROTOCOL, 22, 'a 3.x build in the room would not know the camera, the jump or the arms');
+  assert.ok(PROTOCOL >= 22, 'a 3.x build in the room would not know the camera, the jump or the arms');
   const keys = ['cameraItem', 'cameraGot', 'cameraShot', 'cameraLast', 'cameraEmpty', 'cameraCharging', 'cameraScared', 'useCamera', 'useCameraT',
     'bagShots', 'bagAbout_camera', 'bagSub_camera', 'filmTitle', 'filmCount', 'filmSave', 'filmSaving', 'filmSaved', 'filmOpen', 'filmZip', 'filmFail',
     'filmHint', 'filmNight', 'filmMorning', 'filmWatcher', 'touchJump'];

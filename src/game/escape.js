@@ -379,7 +379,7 @@ export class Escape {
   // gate rolls, just as the guard's note on it says: start all five and it opens by itself. There is no breaker
   // on the forestry участок. (4.0a: 3.0q had hung the drive's contactor off a shelter's breaker; the shelter then
   // went under the peat works' camp on the other участок, and this gate was left waiting for a lever that is not
-  // here — the night could not be finished. The breaker is the bog's way out only: game/bunker.js.)
+  // here — the night could not be finished. The old bog's breaker went with it in 5.0a.)
   powerOn() {
     if (this.power) return;
     this.power = true;

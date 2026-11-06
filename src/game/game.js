@@ -21,7 +21,6 @@ import { GlowSticks } from './glowsticks.js';
 import { MedHut } from './medhut.js';
 import { Rescue } from './rescue.js';
 import { Escape } from './escape.js';
-import { Bunker } from './bunker.js'; // 3.0q: the shelter under the peat works' camp, and what is in it
 import { Cabinets } from './cabinets.js';
 import { Torches } from './torch.js';
 import { PhotoCamera } from './photo.js'; // 4.0: the camera and its flash
@@ -46,13 +45,10 @@ import { Stray } from './stray.js'; // 2.1v: the girl who takes the voice (see C
 import { buildStrayBody, poseStrayLunge } from './strayBody.js'; // 3.0t: her muzzle, for the death close-up
 import { echoOf, mistScale, speedScale } from './water.js'; // 3.0b: what water does to a sound
 import { inert } from '../core/inert.js'; // 3.0: a system the current map does not have
-import { syncPumps } from '../world/bog.js'; // 3.0c: a running pump drains its sector
-import { Drowned } from './drowned.js';
 import { LakeShark } from './lakeShark.js'; // 3.0d: the one in the water
-import { Gnats } from './gnat.js'; // 3.0e: the swarm that eats your echo
 import { Magpies } from './magpies.js'; // 3.1c: the birds that tell
-import { Winch } from './winch.js'; // 3.0f: the way out of the bog
 import { Rain } from '../render/rain.js'; // 3.0i: the bog's own weather — a fine drizzle, nothing more
+import { Level2 } from './level2.js'; // 5.0a: «Топь», the second level, told in chapters
 import { Tentacles, TENT } from '../render/tentacles.js'; // 4.0: the arms on the horizon
 
 const RED = [1.0, 0.13, 0.08];
@@ -79,7 +75,8 @@ export class Game {
     this.shards = new Shards(this.scene);
     this.stones = new Stones();
     this.shade = new ShadeRig();
-    this.objectives = new Objectives(this);
+    // (5.0a) «Топь» has no generator chain: its chapters (game/level2.js) are the whole night
+    this.objectives = this.map === 'bog' ? inert(Objectives, this, { gens: [], bodies: [], chain: [], sites: [], scrap: [], glows: [], note: null, target: null, count: 0, task: () => '', siteAt: () => '' }) : new Objectives(this);
     this.doors = new Doors(this);
     this.flares = new Flares(this);
     this.tentacles = new Tentacles(this.scene); // (4.0) far out past the edge, some nights
@@ -90,11 +87,9 @@ export class Game {
     this.rescue = new Rescue(this);
     this.angler = new Angler(this); // the man with the lantern, from the third night (see CFG.ANGLER)
     this.stray = new Stray(this); // the fourth night's girl: walk past her, never run (see CFG.STRAY)
-    this.drowned = new Drowned(this); // 3.0d: the bog's own — it waits in the water (see game/drowned.js)
     this.lakeShark = new LakeShark(this);
-    this.gnats = new Gnats(this); // 3.0e: the swarm that eats your echo (see game/gnat.js)
     this.magpies = new Magpies(this); // 3.1c: flocks in the dead trees that go up rattling (see game/magpies.js)
-    this.winch = new Winch(this); // 3.0f: the УАЗ in the bog, the cable and the drum (see game/winch.js)
+    this.level2 = this.map === 'bog' ? new Level2(this) : null; // (5.0a) the chapter machine
     // (3.0i) the bog drizzles. It is scenery, not mechanics: no sound, no effect on the echo, no doused flares
     this.rain = this.map === 'bog' ? new Rain(this.scene) : null;
     // the forestry yard, the УАЗ and its four parts, the way out — the forest's, not the bog's
@@ -102,10 +97,6 @@ export class Game {
     // your hands" test asks about (a missing one made the wristwatch refuse to come up on the bog — TAB was
     // dead, and the pack's own checks read it too), and the torch's charge is read as a number.
     this.escape = this.map === 'forest' ? new Escape(this) : inert(Escape, this, { load: () => null, seatOf: () => -1, mySeat: -1, seats: [], count: 0 });
-    // (3.0q) the shelter under the peat works' camp: the cap, the corridor, the breaker at the far end, the crack
-    // — and the works' gate on the track out, which is the same circuit. The forest has none of it: there is no
-    // world.bunker out there, and the class says so itself (every call a no-op, every field false)
-    this.bunker = new Bunker(this);
     this.cabinets = new Cabinets(this); // cupboards in the buildings (and the шкафандр)
     this.torch = this.map === 'forest' ? new Torches(this) : inert(Torches, this, { hasLight: false, has: false, on: false, charge: 0, items: [], spare: 0 }); // flashlights (3.0r: `items`/`spare` too — a guest's torch claim used to throw on the host)
     this.tools = new ForestTools(this);
@@ -286,7 +277,7 @@ export class Game {
     this.score = 0;
     this.mult = 1;
     this.stats = { shards: 0, close: 0, escapes: 0, loudest: 0, hunts: 0, gens: 0, bodies: 0, thrown: 0, flares: 0, glows: 0, revives: 0, syringes: 0, parts: 0, seen: {} }; // seen: creatures that showed themselves (the atlas); syringes: friends raised with the needle
-    this.state = this.training ? 'training' : 'morning'; // the schoolyard has no dusk to wait out
+    this.state = this.training ? 'training' : this.level2 ? 'level2' : 'morning'; // the schoolyard has no dusk to wait out; «Топь» has chapters
     this.finale = false; // (3.1m) the forest's last morning
     this.grace = true;
     this.fx = this._fxDefaults();
@@ -307,10 +298,7 @@ export class Game {
     this.angler.reset(); // the rope, the hunt, the clock — a new night owes him nothing
     this.stray.reset(); // she is not out there until the night puts her there (2.1v)
     this.lakeShark?.reset();
-    this.drowned.reset(); // ...and neither is the one in the water (3.0d)
-    this.gnats.reset(); // ...nor the midges (3.0e)
     this.magpies.reset(); // ...nor the birds (3.1c)
-    this.winch.reset(); // ...and the car is back in the water where it went down (3.0f)
     this.echoMul = 1; // how much longer an echo takes to come back (the Гнус: 2)
     this.echoMulT = 0;
     this.strayWorn = false;
@@ -332,7 +320,6 @@ export class Game {
     this.shards.reset(this.world, this.rng);
     this.objectives.reset(this.rng);
     this.escape.reset(new RNG((this.rng.next() * 4294967296) >>> 0)); // (its own stream: the same on every machine)
-    this.bunker.reset(); // (3.0q) the shelter: the cap locked, the lamps burning, nothing out of the crack
     this.cabinets.reset(new RNG((this.rng.next() * 4294967296) >>> 0));
     const torchSeed = (this.rng.next() * 4294967296) >>> 0;
     this.torch.reset(new RNG(torchSeed), opts.online || this.online);
@@ -360,7 +347,6 @@ export class Game {
     this.morningAudio = false;
     this.events = [];
     this._resetNight();
-    if (this.map === 'bog') syncPumps(this.world, this.objectives.gens); // no pump runs yet: the water is where it was
     shared.uDawn.value = MORNING_LIGHT;
     shared.uMorning.value = 1;
     this._morningSun(0); // (4.0: the first morning's sun comes up low too — updateMorning lifts it)
@@ -386,7 +372,13 @@ export class Game {
     // four of them get out and start the camp pump, and the first night begins when the picture goes dark (see
     // intro.js, 3.0l). A debug jump into the night (main.js) calls startNight itself, which puts the film away.
     this.fadeIn = 0;
-    if (!this.training) this.opening.begin();
+    if (this.level2) {
+      // (5.0a) «Топь»: no opening film and no morning — the night is its chapters, from the first (or ?chapter=N)
+      shared.uDawn.value = 0;
+      shared.uMorning.value = 0;
+      this.objectives.setMorning(false);
+      this.level2.begin(Number.isInteger(opts.chapter) ? opts.chapter : 0);
+    } else if (!this.training) this.opening.begin();
   }
 
   // the opening cut scene is playing: the world is posed for it, the player is not on their feet yet
@@ -494,10 +486,9 @@ export class Game {
     else hud.setIntro(null);
     let hint = null;
     if (this.morningT > 8 && this.morningT < 17) hint = this.input.touch ? t('morningHintTouch') : t('morningHint');
-    else if (this.morningT > 19 && this.morningT < 26) hint = t(this.map === 'bog' ? 'morningGenBog' : 'morningGen');
+    else if (this.morningT > 19 && this.morningT < 26) hint = t('morningGen');
     hud.setHint(hint);
     this.objectives.update(dt, false);
-    if (this.map === 'bog') syncPumps(this.world, this.objectives.gens); // the bog's water (3.0c)
     this.doors.update(dt);
     this.stones.update(dt, this); // (3.1p: a stone thrown by day has to land)
     this.flares.update(dt);
@@ -566,7 +557,6 @@ export class Game {
 
     // the same lamps, doors, cupboards and kit as a night — just without the night
     this.objectives.update(dt, false); // lamps + the camp generator's hum (no night logic when night=false)
-    if (this.map === 'bog') syncPumps(this.world, this.objectives.gens);
     this.objectives._interact(dt); // E: the rack, a bike, a door, a cupboard
     this.train?.update(dt); // the targets
     this.doors.update(dt);
@@ -586,6 +576,50 @@ export class Game {
 
     this.fx.danger = 0;
     this._commonFx(dt);
+  }
+
+  // ---------------- «Топь» (5.0) ----------------
+  // One night in chapters (game/level2.js): the chapter machine moves the player and decides when a chapter is
+  // over; this is everything around it — the net, the echo, doors, the water's rings, the post.
+  updateLevel2(dt, raw) {
+    this.time += dt;
+    if (this.online) {
+      this.netFrame(dt);
+      this.updateRemotes(dt);
+    }
+    for (const e of this.inputMuted ? [] : raw.events) {
+      if (e === 'pingDown') this.pingPress();
+      else if (e === 'primary') this.inventory.primary();
+      else if (e === 'secondary') this.inventory.secondary();
+    }
+    this._echoClock(dt);
+    const p = this.player;
+    const pev = this.level2.update(dt, raw);
+    if (this.state !== 'level2') return; // (the last chapter ended the level this frame)
+    if (pev?.step?.water) {
+      this.audio.wade(pev.step.intensity, pev.step.depth);
+      waterKick(this.waves, this.world, p.x, p.z, this.time, 'step');
+      this.pulses.emitStep(p.x, this.world.water.level, p.z, this.time, { radius: 8, strength: 0.5, speed: 12, decay: 1.6, kind: 'step' });
+    } else if (pev?.step) this.audio.footstep(pev.step.intensity * 0.8);
+    if (pev?.bump) { this.audio.bump(); this.addTrauma(0.12); }
+    if (pev) this._jumpEvents(pev, false);
+    this.doors.update(dt);
+    this.stones.update(dt, this);
+    this.flares.update(dt);
+    this.glows.update(dt);
+    this.pulses.update(this.time);
+    this._waterFrame();
+    this.fx.danger = 0;
+    this._commonFx(dt);
+  }
+
+  // the last chapter is over: the level is won (the pier film and the old fisherman come in 5.0f)
+  winLevel2() {
+    if (this.state !== 'level2') return;
+    this.state = 'won';
+    this.fx.fade = 0;
+    this.audio.setAmbience(0, 0);
+    if (this.onEnd) this.onEnd({ won: true, level2: true, coop: this.online, alive: this.player.alive });
   }
 
   // the morning of the next day: the camp again, the shift goes on (the first morning starts from reset)
@@ -709,7 +743,6 @@ export class Game {
       this.fx.shockAmp = 0.7;
     }
     this.objectives.update(dt, false);
-    if (this.map === 'bog') syncPumps(this.world, this.objectives.gens); // a pump started or stopped (3.0c)
     this.doors.update(dt);
     this.rescue.update(dt);
     this.pulses.update(this.time);
@@ -719,6 +752,7 @@ export class Game {
   }
 
   startNight() {
+    if (this.level2) return; // (5.0a) «Топь» has no nights of this kind: its chapters run it (a debug ?night does nothing there)
     // (the opening film is over by now, or a debug jump / a skip is putting it away)
     // (finish() marks itself 'done' before calling this, so the film's own hand-over is fadeIn > 0)
     const fromFilm = (this.opening && this.opening.state === 'run') || this.fadeIn > 0;
@@ -740,8 +774,6 @@ export class Game {
     this.audio.setMorning(false);
     this.objectives.setMorning(false);
     this.objectives.startNight(this.day, this.baseSeed);
-    if (this.map === 'bog' && this.drowned) this.drowned.spawnNight(); // 3.0d: it is already in the water
-    if (this.map === 'bog' && this.gnats) this.gnats.startNight();
     if (this.map === 'forest' && this.magpies) this.magpies.startNight(this.day, this.baseSeed); // 3.1c
     this._resetNight();
     this.dread.reset();
@@ -800,12 +832,7 @@ export class Game {
   wake() {
     this.awake = true;
     let m = null;
-    if (this.map === 'bog') {
-      // (3.0k) the bog wakes its own. The forest's listeners and crawlers were never here: what comes up out
-      // of the water is the Дrowned, and the first cloud of the Гнус takes to the air at the same moment.
-      m = this.drowned?.spawnNight?.() || null;
-      this.gnats?.wakeNow?.();
-    } else {
+    if (this.map !== 'bog') {
       const a = this.spawnMonster('listener', 70, 95);
       const b = this.spawnMonster('listener', 75, 100);
       m = a || b;
@@ -827,19 +854,6 @@ export class Game {
       const a = this.rng.float(0, Math.PI * 2);
       wx = p.x + Math.cos(a) * 85;
       wz = p.z + Math.sin(a) * 85;
-    }
-    if (this.map === 'bog') {
-      // (3.0k) a bog has no howl in it: the sound of the night starting is water moving where nothing
-      // should be moving. Same warning, the map's own voice.
-      this.audio.splash(0.7);
-      this.audio.sting(0.3);
-      if (this.player.alive || this.spectate) {
-        this.hud.flashAlert(t('aDrowned'), 'warn', 2.8);
-        this.hud.peek(3.5);
-        this.addTrauma(0.12);
-      }
-      this.radar.blip(wx, wz, 'unknown');
-      return;
     }
     this.audio.forestWake(wx, this.world.terrain.height(wx, wz) + 2.5, wz);
     if (this.player.alive || this.spectate) {
@@ -883,8 +897,8 @@ export class Game {
   }
 
   spawnMonster(type, dmin, dmax) {
-    // (3.0k) a belt on the braces: every forest creature goes through here, and none of them belongs on the
-    // bog. (The bog's own — the Дrowned, the Гнус — are not monsters of this kind and do not come through here.)
+    // (3.0k) a belt on the braces: every forest creature goes through here, and none of them belongs on «Топь»
+    // (5.0: its own — the Корень, the Сторож — are its chapters' business, game/level2.js)
     if (this.map === 'bog') return null;
     const p = this._around();
     const w = this.world.wall - 6;
@@ -922,7 +936,6 @@ export class Game {
   // a sound happened in the world (authoritative side: the monsters hear it). pid = who made it
   noise(x, z, loud, source, scream = false, pid = null) {
     if (loud <= 0 || this.state !== 'play' || !this.auth) return 0;
-    if (this.map === 'bog') this.gnats.hear(x, z, loud, source); // 3.0e: the midges come to whatever is loudest
     if (this.map === 'forest') this.magpies.hear(x, z, loud, source, pid); // 3.1c: a loud noise by their tree sends them up
     let n = 0;
     for (const m of this.monsters) {
@@ -1057,7 +1070,7 @@ export class Game {
     this.radar.noiseR = Math.max(this.radar.noiseR, CFG.hearRadius(E.noise));
   }
 
-  // the device refills (at half speed while the gnats are in your eyes — see game/gnat.js); a soft double tick
+  // the device refills; a soft double tick
   // when it is ready again
   _echoClock(dt) {
     if (this.pingCD <= 0) return;
@@ -1539,10 +1552,9 @@ export class Game {
     g.paid = true;
     this.score += pts;
     this.hud.popup(pts > 0
-      ? (by ? `+${Math.round(pts)} · ${t(this.map === 'bog' ? 'mateStartedBog' : 'mateStarted').replace('{name}', this.nameOf(by))}` : `+${Math.round(pts)}`)
-      : t(this.map === 'bog' ? 'genRestartedBog' : 'genRestarted'), 'amber');
-    // (3.0g) on the bog the chain is pumps: same five, different machine
-    this.hud.flashAlert(t(this.map === 'bog' ? 'aPumpOn' : 'aGenOn').replace('{n}', count), 'dawn', 2.6);
+      ? (by ? `+${Math.round(pts)} · ${t('mateStarted').replace('{name}', this.nameOf(by))}` : `+${Math.round(pts)}`)
+      : t('genRestarted'), 'amber');
+    this.hud.flashAlert(t('aGenOn').replace('{n}', count), 'dawn', 2.6);
     this.hud.peek(4);
     // the light coming back: a warm wave rolls out from the lamp
     const L = g.site.lamp;
@@ -1551,9 +1563,8 @@ export class Game {
     this.fx.white = Math.max(this.fx.white, 0.08);
     this.addTrauma(0.15);
     this.noise(g.x, g.z, g.spec.startLoud, 'repair'); // the engine roars — the host's monsters hear it whoever started it
-    // all five: there's power — the forestry yard's floodlight and siren, or the peat works' camp and the lock on
-    // its cap (3.0q: on the bog the escape is a stand-in, so the shelter is told directly)
-    if (count >= 5) this.timeline.push({ at: this.time + 1.8, fn: () => { if (this.state !== 'play') return; this.escape.powerOn(); this.bunker.onPower(); } });
+    // all five: there's power — the forestry yard's floodlight and siren
+    if (count >= 5) this.timeline.push({ at: this.time + 1.8, fn: () => { if (this.state !== 'play') return; this.escape.powerOn(); } });
   }
 
   // a thing beat a running generator until it stopped (2.1q): the count falls and the task points back
@@ -1561,7 +1572,7 @@ export class Game {
     this.hlNote('genBroken');
     this.stats.gens = this.objectives.count;
     if (!remote && this.sab && this.sab.day === this.day) this.sab.done++;
-    this.hud.flashAlert(t(this.map === 'bog' ? 'aGenBrokenBog' : 'aGenBroken').replace('{site}', this.objectives.siteAt(g.site)), 'danger', 3);
+    this.hud.flashAlert(t('aGenBroken').replace('{site}', this.objectives.siteAt(g.site)), 'danger', 3);
     this.hud.peek(4);
     this.audio.sting(0.4);
     this.noise(g.x, g.z, g.spec.startLoud, 'repair'); // the death rattle carries: things come to look
@@ -1984,7 +1995,6 @@ export class Game {
   // the night is over. Dawns one to three are a breather for whoever is still standing;
   // the fourth is the end of the shift and the win. The host's word starts it for everyone.
   startDawn() {
-    this.bunker?.evacuate?.(); // (3.0q) the shelter does not keep anyone past the night
     this.tentacles?.stop(); // (4.0: whatever was out there goes back down with the light)
     this.tentAt = -1;
     this.state = 'dawn';
@@ -1999,11 +2009,9 @@ export class Game {
     const noneStanding = this.rescue.dawnPeace(); // dawn raises nobody (2.1q), but rescue goes on in daylight (2.1r)
     if (noneStanding && this.day < this.daysTotal) { this.endOnline(false); return; } // nobody left to come for anyone
     const last = this.day >= this.daysTotal;
-    // (3.0f) on the bog the last dawn is not the win: the car is still in the water, and the winch pays for it
-    const bogFinal = last && this.map === 'bog' && !!this.winch && !this.winch.driven;
-    // (3.1m) ...and in the forest it is not the win either: the УАЗ is. Outlasting the shift buys one more morning
+    // (3.1m) in the forest the last dawn is not the win: the УАЗ is. Outlasting the shift buys one more morning
     const forestFinal = last && this.map !== 'bog';
-    if (last && !bogFinal && !forestFinal) {
+    if (last && !forestFinal) {
       this.winBonus = CFG.SCORE.win;
       if (!this.player.alive) this.winBonus = Math.round(this.winBonus * 0.3); // your team made it; you didn't
       this.score += this.winBonus;
@@ -2016,8 +2024,8 @@ export class Game {
     this.audio.setAmbience(0.25, 0);
     this.hud.setHint(null);
     for (const m of this.monsters) m.setState('flee');
-    const line = bogFinal ? t('winchFinale') : forestFinal ? t('finaleDawn') : t(last ? 'winTitle' : 'dawnSurvived');
-    this.hud.flashAlert(line.replace('{n}', this.day).replace('{d}', this.daysTotal), 'dawn', bogFinal || forestFinal ? 4 : 3);
+    const line = forestFinal ? t('finaleDawn') : t(last ? 'winTitle' : 'dawnSurvived');
+    this.hud.flashAlert(line.replace('{n}', this.day).replace('{d}', this.daysTotal), 'dawn', forestFinal ? 4 : 3);
   }
 
   // (3.1m) the forest's last morning. The shift is won by driving out, not by outlasting it: daylight, nothing
@@ -2074,9 +2082,6 @@ export class Game {
     }
     if (this.dawnT > DAWN_SECONDS && this.state === 'dawn') {
       if (this.day >= this.daysTotal) {
-        // (3.0f) the bog's last dawn is not the end of the shift: the car is. Light, no monsters, and one
-        // machine still in the water — everything the level was about, in one last thing to do by hand
-        if (this.map === 'bog' && this.winch && !this.winch.driven) { this.winch.finale(); return; }
         if (this.map !== 'bog') { this.startFinale(); return; } // (3.1m) the forest: drive out, or the shift is lost
         this.state = 'won';
         if (this.onEnd) this.onEnd({ won: true, coop: this.online, alive: this.player.alive });
@@ -2247,6 +2252,7 @@ export class Game {
     if (this.state === 'morning') return this.updateMorning(dt, raw);
     if (this.state === 'dusk') return this.updateDusk(dt, raw);
     if (this.state === 'training') return this.updateTraining(dt, raw);
+    if (this.state === 'level2') return this.updateLevel2(dt, raw);
 
     if (this.state === 'dying') {
       this._updateEars();
@@ -2280,12 +2286,6 @@ export class Game {
     if (this.state === 'dawn') {
       this.netFrame(dt);
       this.updateDawn(dt);
-      if (this.map === 'bog' && this.winch) {
-        // (3.0f) the only dawn you can still work in: the car has to come out of the water, and dawn is light enough
-        this.winch.update(dt);
-        this.objectives.update(dt, false);
-        if (this.player.alive) this.objectives._interact(dt, true);
-      }
       this.doors.update(dt);
       this.flares.update(dt);
       this.medhut.update(dt);
@@ -2336,7 +2336,6 @@ export class Game {
     const caught = this.cabinets.busy; // (caught, or pulling someone out: your hands are on that)
     const heldByHim = !!this.angler.myCap(); // 2.1o: in the Angler's hands your keys are for struggling, nothing else
     const heldByHer = !!this.player.heldByStray || this.strayWorn; // 2.1v: her hand on your throat, or her voice in your mouth
-    const heldByWater = this.drowned.captiveLocal(); // 3.0d: a hand round your ankle, and the water is patient
     for (const e of raw.events) {
       if (heldByHim || heldByHer) continue;
       if (caught && e !== 'pingDown') continue;
@@ -2361,7 +2360,6 @@ export class Game {
     // (in the УАЗ you sit still and look about: see Escape._seated)
     // she is wearing you (2.1v): you stand exactly where you were, and only your head is yours
     const pev = heldByHim ? (this.angler.captiveFrame(dt, this.inputMuted ? NO_LOOK : raw.look), { step: null, bump: null, breath: null })
-      : heldByWater ? this.drowned.dragFrame(dt)
       : this.strayWorn ? this.seatedLook(look) : es.mySeat >= 0 || caught || (this.expedition.onTower && !this.expedition.walkTop) ? this.seatedLook(look) : p.update(dt, input, look, this.inputMuted || this.inventory.active || this.seizedByWatcher || p.heldByStray || this.lakeShark?.holds(p.id), es.load(p.id));
     if (this.expedition.walkTop) this.expedition.clampDeck(); // (2.1s: the lookout's rails)
     if (pev.step) {
@@ -2442,19 +2440,12 @@ export class Game {
     const nearest = this.updateMonsters(dt);
     this.angler.update(dt);
     this.stray.update(dt);
-    this.drowned.update(dt); // the bog: it drags you out into the deep (3.0d)
-    this.gnats.update(dt); // ...and the midges eat your echo (3.0e)
     this.magpies.update(dt); // ...and the birds tell on you (3.1c)
-    this.winch.update(dt); // ...and the water comes back unless the drum keeps turning (3.0f)
     if (this.state !== 'play') return; // killed this frame
     if (!this.player.alive) return; // co-op: caught this frame — the death plays from the next one
     this.shards.update(dt, this);
     this.objectives.update(dt, true);
     if (this.state !== 'play') return; // (the car left)
-    // (3.0q) the shelter: its lamps write the last word into the light slots, its script runs the beats, and the
-    // ones it lets out are its own. (It can end the night, so ask again before going on.)
-    this.bunker.update(dt);
-    if (this.state !== 'play') return;
     es.beacons(dt);
     if (this.auth && !this.finale) this.updateArrivals();
     this.updateFronts();
@@ -2714,13 +2705,7 @@ export class Game {
     this.dirT = (this.dirT || 0) - dt;
     if (this.dirT > 0) return;
     this.dirT = 1.0;
-    if (this.map === 'bog') {
-      // (3.0k) the bog keeps its own books: the Дrowned is in the water (see game/drowned.js) and the Гнус has
-      // its own clock (see game/gnat.js). Nothing here reads the forest's table of listeners and crawlers.
-      if (this.drowned && !this.drowned.bodyObj()) this.drowned.spawnNight();
-      this._sabotageTick();
-      return;
-    }
+    if (this.map === 'bog') return; // (5.0a) «Топь» has no director: its chapters bring their own
     const want = monsterTargets(this.time, this.diffDay());
     let L = 0, C = 0;
     for (const m of this.monsters) {
@@ -2779,7 +2764,7 @@ export class Game {
       hud.setHint(touch ? t('tutMoveTouch') : t('tutMove'));
       if (tut.t > 7) { tut.step = 2; tut.t = 0; }
     } else if (tut.step === 2) {
-      hud.setHint(touch ? t('tutUseTouch') : t(this.map === 'bog' ? 'tutUseBog' : 'tutUse')); // (3.0r: the bog's machine is a pump)
+      hud.setHint(touch ? t('tutUseTouch') : t('tutUse')); // (3.0r: the bog's machine is a pump)
       if (tut.t > 9 || this.stats.bodies > 0) { tut.step = 3; tut.t = 0; }
     } else if (tut.step === 3) {
       hud.setHint(touch ? t('tutStoneTouch') : t('tutStone'));
@@ -2822,7 +2807,7 @@ export class Game {
     }
     // the bog's drizzle: it follows you, it thins at dawn and it stops when the shift does
     if (this.rain) {
-      const live = this.state === 'play' || this.state === 'morning' || this.state === 'dawn' || this.state === 'dusk' || this.state === 'dying' || this.state === 'escape';
+      const live = this.state === 'level2' || this.state === 'play' || this.state === 'morning' || this.state === 'dawn' || this.state === 'dusk' || this.state === 'dying' || this.state === 'escape';
       this.rain.setVisible(live);
       if (live) {
         const p = this.player;

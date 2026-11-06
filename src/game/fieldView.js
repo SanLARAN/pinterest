@@ -130,13 +130,13 @@ export class FieldView {
   drawLCD() {
     const g=this.g,p=g.player;
     if(!this.lcd) return;
-    const bog=g.map==='bog'; // (3.0r) the bog counts pumps and the winch's cable, not generators and car parts
-    const task=g.objectives.taskText()||t(bog?'watchFindBog':'watchFind');
+    const bog=g.map==='bog'; // (5.0a) «Топь» counts chapters, not generators and car parts
+    const ch=bog&&g.level2?.chapter;const task=bog?(ch?t('l2Goal_'+ch.id):''):(g.objectives.taskText()||t('watchFind'));
     const calm=Math.ceil(g.calmLeft?.()||0),state=g.state,S=CFG.SHIFT;
     // the shift has four days: the big number counts DOWN — to dusk in the morning, to dawn at night
     const fin=!!g.finale; // (3.1m) the last morning counts down to the end of the shift
     const rem=fin?Math.max(0,S.FINALE-(g.time||0)):state==='play'?Math.max(0,S.NIGHT-(g.time||0)):state==='morning'?Math.max(0,S.MORNING-(g.morningT||0)):(g.time||0);
-    const info={time:fmtTime(rem),day:`${g.day||1}/${g.daysTotal||S.DAYS}`,gens:g.objectives.count||0,parts:g.escape.count||0,winch:bog?Math.round((g.winch?.p||0)*100):0,score:Math.floor(g.score||0),mult:(g.mult||1).toFixed(1),team:g.online?`${g.livePlayers().length}/${g.remotes.size+1}`:'1/1',pos:fmtPos(p.x,p.z),calm,task,torch:g.torch.has?Math.ceil(g.torch.charge*100):null};
+    const info={time:fmtTime(rem),day:`${g.day||1}/${g.daysTotal||S.DAYS}`,gens:g.objectives.count||0,parts:g.escape.count||0,chapter:bog?(g.level2?.i??0)+1:0,score:Math.floor(g.score||0),mult:(g.mult||1).toFixed(1),team:g.online?`${g.livePlayers().length}/${g.remotes.size+1}`:'1/1',pos:fmtPos(p.x,p.z),calm,task,torch:g.torch.has?Math.ceil(g.torch.charge*100):null};
     // (3.1l) the task walks through its one line a character every 0.2 s (the LCD's own refresh)
     const step=Math.floor(performance.now()/200);
     const line=marquee(task.toUpperCase(),30,step);
@@ -175,10 +175,10 @@ export class FieldView {
     c.setTransform(1,0,0,1,0,0);
     // the readouts, two short lines
     c.textAlign='left';c.font='bold 22px monospace';c.fillStyle=ink;
-    c.fillText(`${t(bog?'watchGensBog':'watchGens')} ${info.gens}/5`,46,320);
+    c.fillText(bog?`${t('l2Ch').replace('{n}',info.chapter)} / 7`:`${t('watchGens')} ${info.gens}/5`,46,320);
     for(let i=0;i<5;i++){c.fillStyle=i<info.gens?ink:ghost;c.fillRect(176+i*24,302,17,20);}
     c.fillStyle=ink;c.textAlign='right';c.fillText(`${t('watchAlive')} ${info.team}`,468,320);
-    c.textAlign='left';c.fillText(bog?`${t('watchWinch')} ${info.winch}%`:`${t('watchCar')} ${info.parts}/4`,46,352);
+    c.textAlign='left';c.fillText(bog?(ch?t('l2_'+ch.id):''):`${t('watchCar')} ${info.parts}/4`,46,352);
     c.textAlign='right';c.fillText(`${t('watchScore')} ${String(info.score).padStart(5,'0')} x${info.mult}`,468,352);
     c.fillRect(46,366,422,2);
     // the task, one walking line; then where you stand and the one gauge that matters right now
@@ -190,7 +190,7 @@ export class FieldView {
     c.fillStyle='#7f8f8b';c.font='bold 15px monospace';c.textAlign='left';c.fillText('LIGHT',30,490);
     c.textAlign='right';c.fillText('MODE',482,490);c.textAlign='center';c.fillStyle='#5d6b67';c.fillText('ILLUMINATOR',256,512);c.textAlign='left';
     this.lcdTex.needsUpdate=true;
-    if(this.a11y) this.a11y.textContent=`${t('watchDayN').replace('{n}',g.day||1).replace('{d}',g.daysTotal||S.DAYS)}. ${info.time}. ${t(bog?'pumps':'generators')} ${info.gens}/5. ${bog?`${t('watchWinch')} ${info.winch}%`:`${t('watchCar')} ${info.parts}/4`}. ${t('score')} ${info.score} x${info.mult}. ${t('watchAlive')} ${info.team}. ${t('watchPos')} ${info.pos}. ${calm?`${t('watchCalm')} ${calm}. `:''}${task}`;
+    if(this.a11y) this.a11y.textContent=`${t('watchDayN').replace('{n}',g.day||1).replace('{d}',g.daysTotal||S.DAYS)}. ${info.time}. ${bog?`${t('l2Ch').replace('{n}',info.chapter)} / 7. ${ch?t('l2_'+ch.id):''}`:`${t('generators')} ${info.gens}/5. ${t('watchCar')} ${info.parts}/4`}. ${t('score')} ${info.score} x${info.mult}. ${t('watchAlive')} ${info.team}. ${t('watchPos')} ${info.pos}. ${calm?`${t('watchCalm')} ${calm}. `:''}${task}`;
   }
   place(camera,show) {
     const g=this.g,bag=g.inventory,reach=bag.progress,k=ease(clamp(this.watch,0,1));

@@ -773,8 +773,8 @@ export class Angler {
   _rescuerFrame(dt) {
     const g = this.g;
     this.untieWait = Math.max(0, this.untieWait - dt);
-    // the forest's dawn runs no _interact at all (only the bog's winch dawn does) — there the rope asks for itself
-    if (g.state === 'dawn' && !(g.map === 'bog' && g.winch)) {
+    // the forest's dawn runs no _interact at all — there the rope asks for itself
+    if (g.state === 'dawn') {
       const cap = this.cap, p = g.player;
       if (this._untieCandidate() && Math.hypot(p.x - cap.tree.ax, p.z - cap.tree.az) <= A().untieR) {
         this.interactUntie(dt, g.input.useHeld, (k) => t(g.input.touch ? k + 'T' : k));

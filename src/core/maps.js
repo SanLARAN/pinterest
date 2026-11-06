@@ -1,5 +1,5 @@
 // Which участок a shift is played on. Two of them now: the forest the game began in, and the peat bog
-// (3.0, world/bog.js). The World is built once at boot from the URL (?map=bog), and the menu offers the
+// (3.0; since 5.0 «Топь», world/swamp.js). The World is built once at boot from the URL (?map=bog), and the menu offers the
 // choice; picking the one that is not loaded is a reload with the map in the query — the level is a whole
 // piece of ground, not a switch you can throw under a running shift.
 export const MAP_IDS = ['forest', 'bog'];

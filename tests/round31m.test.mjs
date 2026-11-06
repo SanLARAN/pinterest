@@ -109,9 +109,9 @@ test('the forest\'s last dawn opens the last morning: no monsters, the УАЗ ca
   assert.deepEqual(ended, { won: false, cause: 'shiftEnd' });
 });
 
-test('the bog keeps its own finale; the end screen and the words for the forest\'s', () => {
+test('the forest keeps its own finale; the end screen and the words for it', () => {
   const game = src('src/game/game.js');
-  assert.match(game, /if \(this\.map === 'bog' && this\.winch && !this\.winch\.driven\) \{ this\.winch\.finale\(\); return; \}\n\s+if \(this\.map !== 'bog'\) \{ this\.startFinale\(\); return; \}/);
+  assert.match(game, /if \(this\.map !== 'bog'\) \{ this\.startFinale\(\); return; \}/);
   assert.match(game, /if \(!this\.finale\) this\.updateDirector\(dt\);/);
   assert.match(game, /if \(!this\.finale && this\.day >= this\.daysTotal && this\.time >= CFG\.SHIFT\.LAST_WAKE && this\.auth\)/);
   const menus = src('src/ui/menus.js');

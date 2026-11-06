@@ -21,8 +21,6 @@ import { torchArrays } from '../game/torch.js';
 import { cameraArrays } from '../game/photo.js';
 import { buildTape, buildCrowbar } from '../game/toolModels.js';
 import { FIRETOWER, buildBinoculars } from '../world/expedition.js';
-import { BOG_LANDMARKS, PLACES as BOG_PLACES, BOG } from '../world/bog.js';
-import { buildDrowned } from '../game/drowned.js';
 
 const BEAM = 12; // a kind past the palette: the faint light pillar over a shard
 
@@ -732,7 +730,7 @@ function shkaf(mat) {
 
 // ---------------- the bog (chapter V) ----------------
 // Everything here lives on the second участок and nowhere else: the drowned forest, the dwarf pines, the reeds,
-// the топь, the pumps and the winch. The portraits are built from the same primitives the level itself uses, so
+// the топь. The portraits are built from the same primitives the level itself uses, so
 // a page in the book looks like the thing that will kill you at night.
 
 // a small still life out of a bare builder
@@ -744,27 +742,6 @@ function specimen(build, view = {}, base = 0.3) {
     const root = new THREE.Group();
     root.add(meshOf(b, mat));
     return still(root, base, view);
-  };
-}
-
-// a place from the bog, drawn with its own builder: flat stand-in ground, no colliders, the same seed
-function bogPlace(id, view = {}) {
-  return (mat) => {
-    const L = BOG_LANDMARKS.find((l) => l.id === id);
-    const props = [];
-    const fake = {
-      terrain: { height: () => 0 }, col: { add() {}, circle() {} },
-      addProp: (x, z, fn) => props.push(fn),
-    };
-    BOG_PLACES[id](fake, { ...L, x: 0, z: 0 }, new RNG(BOG.seed));
-    const b = new MeshBuilder(16384);
-    for (const fn of props) {
-      b.identity();
-      fn(b);
-    }
-    const root = new THREE.Group();
-    root.add(meshOf(b, mat));
-    return still(root, 0.26, view);
   };
 }
 
@@ -872,99 +849,6 @@ const plank = specimen((b) => {
   b.limb([2.6, 0.3, 1.3], [2.6, 1.3, 1.3], 0.05, 0.045, KIND.WOOD, 4);
 }, { yaw: 0.7, pitch: 0.42, fit: 0.95 }, 0.3);
 
-// a pump: two columns, a head, a flywheel, and the rising main running off into the bog
-const pump = specimen((b) => {
-  b.box(1.5, 0.16, 1.1, KIND.METAL, { bottom: true });
-  for (const x of [-0.34, 0.34]) {
-    b.place(x, 0.16, 0);
-    b.cylinder(6, 0.16, 0.13, 1.15, KIND.METAL);
-  }
-  b.place(0, 1.3, 0);
-  b.box(1.15, 0.34, 0.5, KIND.METAL, { bottom: true });
-  b.place(-0.62, 1.34, 0, 0, 0, -0.55);
-  b.limb([0, 0, 0], [0, 1.5, 0], 0.055, 0.05, KIND.METAL, 4);
-  b.place(0.62, 1.36, 0.28, 0, 0, Math.PI / 2);
-  b.cylinder(12, 0.36, 0.36, 0.1, KIND.METAL);
-  b.place(0, 1.32, -0.25);
-  b.limb([0, 0, 0], [0, 0.9, 0], 0.1, 0.1, KIND.METAL, 5);
-  b.limb([0, 0.9, 0], [0, 0.9, -1.7], 0.1, 0.1, KIND.METAL, 5);
-  b.limb([0, 0.9, -1.7], [0, -0.35, -1.7], 0.1, 0.1, KIND.METAL, 5);
-  b.place(-0.95, 0.16, 0.5);
-  b.limb([0, 0, 0], [0, 0.85, 0], 0.05, 0.045, KIND.METAL, 4);
-  b.place(0, 0.85, 0, 0, 0, Math.PI / 2);
-  b.cylinder(10, 0.18, 0.18, 0.06, KIND.METAL);
-}, { yaw: 0.75, pitch: 0.36, fit: 0.92 }, 0.32);
-
-// the winch: the nose of the УАЗ, the drum, and the cable run out to a leaning post
-const winch = specimen((b) => {
-  b.place(0, 0.4, 1.4);
-  b.box(1.86, 0.72, 2.6, KIND.METAL);
-  b.place(0, 0.8, 0.4);
-  b.box(1.7, 0.62, 1.6, KIND.LEAF);
-  for (const x of [-0.95, 0.95]) {
-    b.place(x, 0.36, -0.4, 0, 0, Math.PI / 2);
-    b.cylinder(10, 0.36, 0.36, 0.26, KIND.BARK);
-  }
-  b.place(0, 0.46, -1.1, 0, 0, Math.PI / 2);
-  b.cylinder(8, 0.16, 0.16, 0.42, KIND.METAL);
-  b.limb([0, 0.3, -1.4], [0, 0.25, -3.4], 0.03, 0.03, KIND.METAL, 3);
-  b.place(-3.4, 0, -0.6, 0.14, 0.6, 0.1);
-  b.limb([0, 0, 0], [0, 2.6, 0], 0.15, 0.12, KIND.WOOD, 5);
-  b.place(0, 2.2, 0);
-  b.box(0.9, 0.12, 0.12, KIND.WOOD);
-}, { yaw: 0.9, pitch: 0.3, fit: 0.95 }, 0.32);
-
-// the Дrowned: it hangs just under the surface and lets the water move it
-function drowned(mat) {
-  const rig = buildDrowned();
-  const root = rigMeshes(rig, mat);
-  const n = rig.nodes;
-  return {
-    root, base: 0.24, view: { yaw: 0.45, pitch: 0.12 },
-    tick(S) {
-      if (!n.hips) return;
-      n.hips.position.y = 0.62 + Math.sin(S.t * 0.85) * 0.03;
-      n.spine.rotation.x = Math.sin(S.t * 0.6) * 0.04 - 0.05;
-      n.spine.rotation.z = Math.sin(S.t * 0.45 + 1) * 0.05;
-      const want = S.react < 4 ? clamp(angleDiff(0, S.camAz), -1, 1) : 0;
-      n.head.rotation.y = lerp(n.head.rotation.y, want, 1 - Math.exp(-4 * S.dt));
-      n.head.rotation.x = -0.15;
-      for (const [k, s] of [['armL', 1], ['armR', -1]]) {
-        if (!n[k]) continue;
-        n[k].rotation.x = -0.12 + Math.sin(S.t * 0.7 + s) * 0.06;
-        n[k].rotation.z = s * 0.08;
-      }
-    },
-  };
-}
-
-// the Гнус: a cloud of specks the size of a room. In an echo it is a swarm, never a shape
-function gnat(mat) {
-  const root = new THREE.Group();
-  const cloud = [];
-  const rng = new RNG(4242);
-  for (let i = 0; i < 30; i++) {
-    const b = new MeshBuilder(32);
-    b.identity();
-    b.octa(0.1, 1, KIND.BARK);
-    const m = meshOf(b, mat);
-    const a = rng.float(0, 6.28), d = 0.2 + rng.float(0, 1.1), y = 0.2 + rng.float(0, 1.5);
-    m.position.set(Math.cos(a) * d, y, Math.sin(a) * d);
-    m.rotation.set(rng.float(0, 3), rng.float(0, 3), rng.float(0, 3));
-    root.add(m);
-    cloud.push({ m, a, d, y, ph: rng.float(0, 6.28), sp: 0.4 + rng.float(0, 0.5) });
-  }
-  return {
-    root, base: 0.22, view: { yaw: 0.3, pitch: 0.05, fit: 0.9 },
-    tick(S) {
-      for (const c of cloud) {
-        const a = c.a + S.t * c.sp;
-        c.m.position.set(Math.cos(a) * c.d, c.y + Math.sin(S.t * 1.7 + c.ph) * 0.12, Math.sin(a) * c.d);
-      }
-    },
-  };
-}
-
 const MODELS = {
   listener, crawler, watcher, howler, angler, shkaf, shade, stray,
   generator: (mat) => generator(mat, true),
@@ -988,11 +872,8 @@ const MODELS = {
   carb: carPart('carb', { yaw: 0.9, pitch: 0.35 }),
   jerrycan: carPart('can', { yaw: 1.1, pitch: 0.2 }),
   // chapter V: the bog
-  drowned, gnat, deadtree: deadTree, dwarfpine: dwarfPine, willow, reeds, tussock, cottongrass: cottonGrass,
-  sink, plank, pump, winch,
-  pumpshed: bogPlace('pumpstation', { yaw: 0.8, pitch: 0.28, fit: 0.85 }),
-  barracks: bogPlace('barracks', { yaw: 2.3, pitch: 0.3, fit: 0.9 }),
-  peatstacks: bogPlace('stacks', { yaw: 0.6, pitch: 0.42, fit: 0.9 }),
+  deadtree: deadTree, dwarfpine: dwarfPine, willow, reeds, tussock, cottongrass: cottonGrass,
+  sink, plank,
 };
 
 export function buildModel(key, mat, ctx = {}) {

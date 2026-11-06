@@ -5,7 +5,6 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { World } from '../src/world/world.js';
-import { CAMP_TRACK } from '../src/world/bog.js';
 import { WaveField, WAVES, waterKick } from '../src/game/waves.js';
 import { shared, WAVE_SLOTS, createWorldMaterial } from '../src/render/sonar.js';
 
@@ -22,9 +21,9 @@ globalThis.document ||= {
 
 let bog = null;
 const bogWorld = () => bog || (bog = new World(new THREE.Scene(), new THREE.MeshBasicMaterial(), 'bog').generate());
-// a point in the middle of the flooded проезд, and a dry one on the bank
-const flooded = { x: CAMP_TRACK.x * 18, z: CAMP_TRACK.z * 18 };
-const dry = { x: CAMP_TRACK.x * 26, z: CAMP_TRACK.z * 26 };
+// (5.0a) a knee-deep spot out in the Mire's bog (off the causeway), and a dry one at the gate
+const flooded = { x: 120, z: -120 };
+const dry = { x: 80, z: -170 };
 
 test('a ring is nothing until it arrives, loudest at its crest, and then it is spent', () => {
   const f = new WaveField();
@@ -127,8 +126,6 @@ test('the game owns a field and ticks it with the pulses', async () => {
   assert.ok(/waterKick\(this\.waves, this\.world, h\.x, h\.z/.test(src), 'a stone thrown into it');
   const remote = readFileSync(new URL('../src/game/remote.js', import.meta.url), 'utf8');
   assert.ok(/waterKick\(this\.game\.waves/.test(remote), 'a friend walking through it');
-  const drowned = readFileSync(new URL('../src/game/drowned.js', import.meta.url), 'utf8');
-  assert.ok(/waterKick\(g\.waves/.test(drowned), 'and the thing that lives in it');
 });
 
 test('the lobby lets the host pick the участок, and only the host', async () => {

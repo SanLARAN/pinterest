@@ -639,18 +639,6 @@ export class Atlas {
         later(4200, () => A.strayAnger(...at(-0.6, 0, 1.6), 0.8));
         dur = 5.6;
         break;
-      // chapter V, the bog (3.0i): the two things that live there
-      case 'drowned':
-        // water running off a body, then the hand closing on an ankle
-        A.drownedRise(...at(-1.1, -1.2, 3));
-        later(1600, () => A.drownedRise(...at(-1, -1.1, 2)));
-        later(3200, () => A.drownedGrab());
-        dur = 4.2;
-        break;
-      case 'gnat':
-        for (let k = 0; k < 5; k++) later(k * 700, () => A.gnatSwarm());
-        dur = 4;
-        break;
       case 'generator':
         for (let k = 0; k < 4; k++) later(k * 900, () => A.beacon(...at(-1, -0.4, 2)));
         dur = 3.4;

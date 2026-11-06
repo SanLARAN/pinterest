@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import { World } from '../src/world/world.js';
 import { CFG } from '../src/core/config.js';
 import { WATER, echoOf, mistScale, onPlanks, speedScale, stepOf, wading, wet } from '../src/game/water.js';
-import { BOG_MIST } from '../src/world/bog.js';
+import { SWAMP_MIST as BOG_MIST } from '../src/world/swamp.js'; // (5.0a: the Mire's vapour)
 
 let bog = null;
 let forest = null;
@@ -17,8 +17,8 @@ const forestWorld = () => forest || (forest = new World(new THREE.Scene(), new T
 
 // a point that is knee-deep (and shallow enough that a pump's 0.6 m would drain it), off the planks
 function deepSpot(w, lo = 0.3, hi = 0.6) {
-  for (let z = -150; z < 150; z += 3) {
-    for (let x = -150; x < 150; x += 3) {
+  for (let z = -360; z < 360; z += 3) {
+    for (let x = -360; x < 360; x += 3) {
       const d = w.water.depth(x, z);
       if (d > lo && d < hi && !w.onWalk(x, z, 1.2)) return { x, z };
     }
@@ -103,19 +103,6 @@ test('a footstep is worth what the ground makes it worth', () => {
   assert.deepEqual(dry, { loud: 0.085, plank: false, water: false, ring: 0, depth: 0 });
   const run = stepOf(w, 0, 0, 0.24);
   assert.equal(run.loud, 0.24, 'sprinting on dry ground is untouched');
-});
-
-test('a running pump pushes the water line down, and the echo comes back with it', () => {
-  const w = bogWorld();
-  const d = deepSpot(w);
-  w.water.drains.push({ x: d.x, z: d.z, r: 40, drop: 0.6 });
-  try {
-    assert.ok(w.water.depth(d.x, d.z) < 0.45, 'the sector is drained');
-    assert.equal(echoOf(w, d.x, d.z).scale, 1, 'drained ground echoes like dry ground');
-  } finally {
-    w.water.drains.length = 0;
-  }
-  assert.equal(echoOf(w, d.x, d.z).scale, 0.6, 'and the water wins again when the pump stops');
 });
 
 test('outside the forest lake the water rules remain a no-op (4.1)', () => {

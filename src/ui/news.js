@@ -7,6 +7,21 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v:'5.0a',date:'2026-11-06',
+    ru:{title:'Топь: второй уровень строится заново',items:[
+      'Старого Торфяника больше нет: насосы, лебёдка, Утопленник, Гнус и убежище под лагерем убраны целиком. На его месте строится новый второй уровень, «Топь». Это не смена, а одна ночь в семи главах: кортеж на трассе, грунтовка, авария, деревня, генератор, гать и обрыв.',
+      'Новая земля 760 × 760 метров, вчетверо больше старого болота. Вдоль южного края идёт трасса на насыпи. От неё в лес уходит грунтовка с тремя развилками, и две дороги из трёх кончаются тупиком. Посреди огромной поляны стоит деревня: шестнадцать домов и хижин с дверями, окнами и столбом внутри. На северо-востоке начинается болото: ворота с генератором, гать по воде, девятиметровый обрыв, под ним озеро и причал на дальнем берегу.',
+      'Главы уже переключаются, и уровень можно пройти от начала до конца. Пока каждая глава — заготовка: фильм показывает место, где он будет, а игровые главы проходятся пешком до цели. Кортеж, езда со штурманом, Корень, Сторож, куски карты, Kugoo и старый рыбак придут в следующих раундах, по главе за раз.',
+      'В коопе главу ведёт хозяин: глава заканчивается у него, и все переходят вместе.',
+    ]},
+    en:{title:'The Mire: the second level, rebuilt from scratch',items:[
+      'The old peat bog is gone: the pumps, the winch, the Drowned, the midges and the shelter under the camp, all of it. In its place a new second level is being built, the Mire. It is not a shift but one night in seven chapters: the convoy on the highway, the dirt road, the crash, the village, the generator, the causeway and the cliff.',
+      'The new ground is 760 × 760 metres, four times the old bog. A highway on an embankment runs along the south edge. From it a dirt road goes into the forest and forks three times, and two of the three roads are dead ends. In the middle of a huge clearing stands the village: sixteen houses and huts with doors, windows and a post inside. In the north-east the bog begins: a gate with a generator, a causeway across the water, a nine-metre cliff, and below it a lake with a pier on the far shore.',
+      'The chapters already change and the level can be played from start to finish. For now each chapter is a stand-in: a film shows the place where it will happen, and a play chapter is walked on foot to its goal. The convoy, driving with a navigator, the Root, the Warden, the map pieces, the Kugoo bikes and the old fisherman arrive in the next rounds, one chapter at a time.',
+      'In co-op the host runs the chapter: it ends on the host\'s machine and everyone moves on together.',
+    ]},
+  },
+  {
     v:'4.2',date:'2026-11-05',
     ru:{title:'Своя машина во вступлении и верёвка, которую видно',items:[
       'У дерева Удильщика снова видно «E · развязать»: подсказку стирало в том же кадре, поэтому друга было нечем отвязать. Подойди к верёвке и держи E три секунды.',

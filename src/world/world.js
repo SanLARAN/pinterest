@@ -17,7 +17,7 @@ import { FIRETOWER, ZARYA, buildFiretower, buildZarya, buildWaymarks } from './e
 
 export { CAP } from './caps.js'; // (re-exported: everything that imported it from here keeps working)
 import { CAP } from './caps.js';
-import { BOG, buildBog } from './bog.js';
+import { SWAMP, buildSwamp } from './swamp.js'; // 5.0a: the second level, «Топь», rebuilt from nothing
 const _pm = new THREE.Matrix4(), _pv = new THREE.Vector3(), _pq = new THREE.Quaternion(), _pe = new THREE.Euler(), _ps = new THREE.Vector3(); // (3.1c) perch spots
 
 // the cupboards in the buildings (game/cabinets.js opens them): body size and, for a wall cabinet, how high it hangs
@@ -132,10 +132,10 @@ export class World {
   }
 
   // Which piece of ground this World is. Swapping it changes the terrain, the colliders and the list of
-  // places; `generate()` then builds the map itself (the forest here, the peat bog in world/bog.js).
+  // places; `generate()` then builds the map itself (the forest here, «Топь» in world/swamp.js).
   setMap(id = 'forest') {
     this.mapId = id === 'bog' ? 'bog' : 'forest';
-    this.map = this.mapId === 'bog' ? BOG : null;
+    this.map = this.mapId === 'bog' ? SWAMP : null;
     this.seed = this.map ? this.map.seed : CFG.WORLD_SEED;
     this.half = this.map ? this.map.half : CFG.WORLD_HALF;
     this.terrain = this.map ? this.map.terrain(this.seed) : new Terrain(this.seed);
@@ -152,8 +152,10 @@ export class World {
     this.sovkhoz = null;
     this.yard = null;
     this.sites = [];
+    this.houses = []; // (5.0a) «Топь»: the village's houses and huts, each with its post
+    this.swamp = null; // (5.0a) «Топь»: the highway, the roads and forks, the gate, the causeway, the lake (world/swamp.js)
     this.walks = []; // plank roads (the bog): { ax, az, bx, bz, w, y } — see onWalk
-    this.water = null; // a map with water fills this in (world/bog.js), the game only asks it questions
+    this.water = null; // a map with water fills this in (world/swamp.js), the game only asks it questions
     this.props = []; // { cx, cz, build(b) }
     this.meshes = [];
     this.occluders = [];
@@ -195,7 +197,7 @@ export class World {
 
   generate() {
     const t0 = performance.now();
-    if (this.mapId === 'bog') return buildBog(this, t0);
+    if (this.mapId === 'bog') return buildSwamp(this, t0);
     const rng = new RNG(this.seed);
     const rnd = () => rng.next();
     const terr = this.terrain;
@@ -272,7 +274,7 @@ export class World {
   }
 
   // (3.0k) how high the deck is at this point — null off the planks. A road is built in pieces that each
-  // have their own height (world/bog.js), so this is the surface the player actually stands on: a boardwalk
+  // have their own height (world/swamp.js), so this is the surface the player actually stands on: a boardwalk
   // climbs over an island and runs flat over a channel, and the footstep follows it.
   walkHeight(x, z, pad = 0) {
     for (const w of this.walks) {
@@ -790,7 +792,6 @@ export class World {
   }
 
   // the forestry yard: fence, gates, booth, floodlight, junk — and where the УАЗ stands (see yard.js).
-  // (3.0q) the shelter is not here: it is under the peat works' camp, on the other участок (world/bunker.js)
   lm_yard(L) {
     buildYard(this, L);
   }

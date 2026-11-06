@@ -1,4 +1,4 @@
-// Water, as the rest of the game asks about it. The bog (world/bog.js) owns the water; this file owns what
+// Water, as the rest of the game asks about it. The map (world/swamp.js) owns the water; this file owns what
 // water *means* — and it is deliberately a set of small functions of (world, x, z) so every one of them can be
 // checked without a renderer.
 //

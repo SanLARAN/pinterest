@@ -2,8 +2,8 @@
 //
 // The menu asks which участок, and a word is not a map. These are rendered from the same terrain, water,
 // planks and landmarks the shift is played on, so what the card shows is what you get: a surveyor's plate of
-// the forestry (mostly land, the lake, the yard) and one of the peat bog (nearly half water, the plank roads,
-// the pumps, the car on the causeway).
+// the forestry (mostly land, the lake, the yard) and one of the Mire (5.0: the highway, the dirt road, the village, the bog,
+// the causeway, the cliff and the lake).
 //
 // Run after changing either map:  node scripts/mapPreview.mjs
 // Writes public/maps/forest.png and public/maps/bog.png (a few hundred kB, no dependencies).
@@ -187,6 +187,22 @@ function render(mapId) {
       if ((x * x) / (rx * rx) + (y * y) / (ry * ry) <= 1) plate.set(cx + x, cy + y, WATER, 0.78);
     }
     plate.ring(cx, cy, Math.max(rx, ry), INK, 0.35, 1);
+  }
+
+  // ---- (5.0a) the Mire: the highway along the south edge, the dirt road and its forks, the village's houses
+  const SW = world.swamp;
+  if (SW) {
+    const H = SW.highway;
+    plate.line(toX(H.x0), toY(H.z), toX(H.x1), toY(H.z), [60, 58, 52], 0.85, 5);
+    plate.dashed(toX(H.x0), toY(H.z), toX(H.x1), toY(H.z), [240, 236, 214], 0.9, 6, 6, 1);
+    for (const R of SW.roads) {
+      for (let i = 0; i + 1 < R.pts.length; i++) {
+        const [ax, az] = R.pts[i], [bx, bz] = R.pts[i + 1];
+        plate.line(toX(ax), toY(az), toX(bx), toY(bz), [128, 104, 62], R.dead ? 0.45 : 0.7, R.dead ? 2 : 3);
+      }
+    }
+    for (const h of world.houses || []) plate.box(toX(h.x), toY(h.z), h.kind === 'house' ? 3 : 2, INK, 0.85);
+    plate.cross(toX(SW.crash.x), toY(SW.crash.z), 5, MARK, 0.95, 2);
   }
 
   // ---- the plank roads (the bog's whole way of moving)

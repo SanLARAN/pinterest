@@ -24,8 +24,6 @@ const NOTE_SECONDS = 11;
 const PH = ['dead', 'work', 'cord', 'spin', 'running'];
 const ESC_KINDS = new Set(['part', 'carNote', 'carDoor', 'carFit', 'carSeat']); // see Escape.consider
 const CAB_KINDS = new Set(['cabinet', 'cabinetItem', 'trapGrab', 'trapSelf']); // see Cabinets.consider
-// (3.0q) the shelter under the peat works' camp: the cap on the island, the ladder, the breaker (game/bunker.js)
-const BUNKER_KINDS = new Set(['shelterCap', 'shelterUp', 'shelterBreaker']);
 
 const _m = new THREE.Matrix4();
 const _l = new THREE.Matrix4();
@@ -150,7 +148,7 @@ function shuffle(rng, a) {
 // camp first, then the sovkhoz and three of the four forest sites in a fresh order (2.1s):
 // every shift one forest generator stands down — its machine is scrap, its body keeps a note and nothing else
 export function pickChain(rng, siteCount = 6) {
-  // a smaller участок (the bog, 3.0c) has exactly five pumps, and all five are the shift: nothing to scrap
+  // a smaller chain (five sites or fewer) is the whole shift: nothing to scrap
   if (siteCount <= 5) return Array.from({ length: siteCount }, (_, i) => i);
   const dropped = 1 + Math.floor(rng.next() * 4);
   const pool = [1, 2, 3, 4, 5].filter((i) => i !== dropped && i < siteCount);
@@ -431,32 +429,20 @@ export class Objectives {
   }
 
   // the line shown on Tab / when the task changes
-  // (3.0l) On the bog the work is not "five generators for the yard": the camp is cut off because the проезд is
-  // under water, and what the shift does about it is start the pumps. Same chain, its own words.
   taskText() {
     const g = this.gens.find((q) => !q.running);
-    if (!g) {
-      // (3.0q) the pumps are running and the way out still has not moved: the contactor is in the shelter under
-      // the camp's own island. (On the forest the yard's escape says the same thing in its own words.)
-      const b = this.g.bunker;
-      if (b && b.needsBreaker) return t('taskBunker');
-      return this.g.escape ? this.g.escape.taskText() : '';
-    }
-    const bog = this.g.map === 'bog';
-    if (g.phase === 'spin') return t(bog ? 'taskPumpSpin' : 'taskSpin');
-    if (g.broken) return t(bog ? 'taskPumpRestart' : 'taskRestartGen').replace('{site}', this.siteAt(g.site));
-    if (g.hasPart) return t(bog ? 'taskPumpRepair' : 'taskRepair').replace('{site}', this.siteAt(g.site));
-    if (g.k === 0) return t(bog ? 'taskPumpFirst' : 'taskCamp');
-    if (!g.known) return t(bog ? 'taskPumpNext' : 'taskFindNext');
-    return t(bog ? 'taskPumpFollow' : 'taskFollow').replace('{site}', this.siteAt(g.site));
+    if (!g) return this.g.escape ? this.g.escape.taskText() : '';
+    if (g.phase === 'spin') return t('taskSpin');
+    if (g.broken) return t('taskRestartGen').replace('{site}', this.siteAt(g.site));
+    if (g.hasPart) return t('taskRepair').replace('{site}', this.siteAt(g.site));
+    if (g.k === 0) return t('taskCamp');
+    if (!g.known) return t('taskFindNext');
+    return t('taskFollow').replace('{site}', this.siteAt(g.site));
   }
 
-  // ---------------- which machine is under the chain (3.0l) ----------------
-  // The forest runs generators; the bog runs pumps. Same objectives, same repair, same sabotage — but a pump
-  // has its own voice (a cylinder and moving water) and must never borrow the generator's hum or its beep.
+  // the machine's voice (3.0l: once a pump's too, on the old bog)
   _voice(g, spinning = false) {
     const a = this.g.audio;
-    if (this.g.map === 'bog') return a.pumpRun(g.x, g.y + 0.5, g.z, spinning ? 0.25 : 1);
     return a.genHum(g.x, g.y + 0.5, g.z, spinning);
   }
 
@@ -636,18 +622,16 @@ export class Objectives {
       if (game.training) { game.train?.consider(consider); game.motos?.consider(consider); }
       for (const body of this.bodies) if (body.searched && body.gun?.visible) consider(body, body.x, body.z, USE_R_BODY, 'bodyGun');
       if (game.expedition) game.expedition.consider(day ? (o, x, z, r, k) => { if (k !== 'campSpeaker') consider(o, x, z, r, k); } : consider);
-      if (game.bunker && !day) game.bunker.consider(consider); // the shelter's cap, its ladder, its breaker
     }
     // (2.1q: the morning is for hauling too — a part may be picked up, carried and fitted in daylight;
     // sitting in the car and driving off still belong to the night)
     if (es && !riding) es.consider(doorsOnly || day ? (o, x, z, r, k) => { if (k === 'part' || k === 'carFit') consider(o, x, z, r, k); } : consider);
     if (game.doors && !seated && !riding) game.doors.consider(consider);
-    if (game.winch && !seated && !riding) game.winch.consider(consider); // 3.0f: the drum, and the car
     // cupboards (in the morning too: the first-aid hut is right by the camp) — and someone caught in one
     if (game.cabinets && !seated && !riding) game.cabinets.consider(consider, !p.carrying && !(es && es.held));
     // (2.1r: and in the morning, a friend on the ground or on the cot — dawn raised nobody, so hands do it)
     if ((doorsOnly || (day && !hands)) && game.rescue && !seated && !riding) game.rescue.consider(consider);
-    // (4.2) a friend tied to the angler's tree: night, dawn's winch, morning — hands free, on your feet
+    // (4.2) a friend tied to the angler's tree: night, dawn, morning — hands free, on your feet
     if (game.angler && !p.carrying && !(es && es.held) && !seated && !riding) game.angler.consider(consider);
     if (best && this.target && best.obj !== this.target.obj) this.searchT = 0;
     this.target = best;
@@ -675,11 +659,6 @@ export class Objectives {
     const o = best.obj;
     if (best.kind === 'bagDrop') { this.searchT = 0; game.inventory.interact(o, pressed, T); return; }
     if (best.kind === 'untie') { this.searchT = 0; game.angler.interactUntie(dt, held, T); return; }
-    if (best.kind === 'winch' || best.kind === 'bogCar' || best.kind === 'bogCarNote') {
-      this.searchT = 0;
-      game.winch.interact(best, dt, held, still, T);
-      return;
-    }
     if (best.kind === 'rack') { this.searchT = 0; game.train.interact(best, dt, held, still, T); return; }
     if (best.kind === 'moto') { this.searchT = 0; game.motos.interact(best, dt, held, still, T); return; }
     if (best.kind === 'bodyGun') {
@@ -703,11 +682,6 @@ export class Objectives {
     if (escKind) {
       this.searchT = 0;
       es.interact(best, dt, held, pressed, still, T);
-      return;
-    }
-    if (BUNKER_KINDS.has(best.kind)) {
-      this.searchT = 0;
-      game.bunker.interact(best, pressed, T);
       return;
     }
     if (CAB_KINDS.has(best.kind)) {
@@ -806,8 +780,7 @@ export class Objectives {
     }
     game.onCorpseSearched(body, k);
     const nextSite = next ? this.siteAt(next.site) : '';
-    // 3.0g: the bog has notes of its own — same chain, different ground
-    const text = t(game.map === 'bog' ? 'notesBog' : 'notes')[k].replace('{next}', nextSite);
+    const text = t('notes')[k].replace('{next}', nextSite);
     this.openNote(`${t('noteKicker')} · ${t('parts')[g.spec.part]}${gun ? ` + ${t('flareGun')}` : ''}`, text);
     if (gun) game.onFlareFound(false, body);
   }
@@ -895,8 +868,6 @@ export class Objectives {
     if (g.hum) this._voiceLevel(g.hum, 1); // a spun-up machine just keeps going
     this.count = this.gens.filter((q) => q.running).length;
     if (!by) this.dirty = true;
-    // (3.0l) on the bog there is nothing to start but a pump: a lever, a prime, and water — not a starter motor
-    if (game.map === 'bog') game.audio.pumpStart(g.x, g.y + 0.6, g.z);
     else game.audio.genStart(g.x, g.y + 0.6, g.z);
     game.onGeneratorStarted(g, this.count, by && by !== true ? by : null);
   }

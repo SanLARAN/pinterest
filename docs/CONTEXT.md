@@ -4,8 +4,8 @@
 > Он написан для человека и для агента: любой новый чат начинается с чтения `AGENTS.md`, а тот отправляет
 > сюда. Если код и этот файл расходятся — прав код, а файл надо поправить в том же коммите.
 >
-> Последнее обновление: раунд **4.1** (погоня во вступлении, подъезд УАЗа, колёса без мерцания,
-> настоящее озеро и плавание, акула в коопе, защитные меры аудиотракта).
+> Последнее обновление: раунд **5.0a** (второй уровень «Топь» с нуля: снос Торфяника, новая земля
+> `world/swamp.js`, машина глав `game/level2.js`). План уровня — `docs/LEVEL2.md`.
 
 ---
 
@@ -24,7 +24,7 @@
 
 ---
 
-## 1a. 3.0 — участок «Торфяник» (в работе)
+## 1a. 3.0 — участок «Торфяник» (снесён в 5.0a; ниже — история, файлов больше нет)
 
 Второй участок рядом с лесом: **340×340 м**, **38% под водой**, шесть мест (лагерь, насосная, затопленный
 барак, торфяные склады, мостки, гать). Играют его те же системы, но земля другая:
@@ -948,6 +948,44 @@
   камеры не внутри УАЗа и ниже на 0,3+ м; заметка 4.2 первая на двух языках, `PROTOCOL` 22. Браузер: меню-гараж, гардероб с тюнингом, фильм с Trueno (соло и 4 места),
   фильм с затюненным УАЗом.
 
+
+### 5.0a — «Топь»: снос старого болота и каркас уровня
+
+- **Решение владельца:** второй уровень — одна ночь в семи главах (`docs/LEVEL2.md`), выпуск по главам. Старый
+  Торфяник удалён целиком: `world/bog.js`, `world/bunker.js`, `game/bunker.js`, `game/winch.js`,
+  `game/drowned.js`, `game/gnat.js`, `BogArrival` в `intro.js` (там остался только `ForestOpening`), `?shelter`,
+  сетевые `gb`/`wn`/`xG`, строки насосов/лебёдки/убежища/тварей, страницы атласа (Утопленник, Гнус, насос,
+  лебёдка, три места; флора болота осталась), 13 тестовых файлов (30a, c, d, e, f, h, i, k, l, q, q-game, r, visual21l).
+- **Земля** — `world/swamp.js`, дескриптор `SWAMP` (id `bog`: меню, URL и `mapUnlock` не менялись). `HALF = 380`
+  (760 м), `SwampTerrain` с клеткой 3 м (≈ 128 тыс. треугольников земли), `baseHeight` — крупная форма, к ней
+  притираются дороги. Болото — маска `bogMask` (северо-восточная четверть), вода — `SwampWater` (`swim: true`:
+  озеро плавается по правилам 4.1), сетка воды 2 м (≈ 27 тыс. треугольников). Всего ≈ 0,53 млн треугольников,
+  как у леса; генерация ≈ 0,3 с в node.
+- **Места:** `HIGHWAY` (z = 334, насыпь 2,2 м, отбойник с разрывом у съезда, `block` — где ляжет щупальце);
+  `ROADS` + `FORKS` — грунтовка от съезда до сосны `CRASH`, три развилки, на каждой одна ветка — тупик
+  (поваленный ствол-коллайдер); `HOUSES` — 16 домов/хижин (`HOUSE_DIMS`), у каждого стены-коллайдеры, окно,
+  дверь (`world.doors` → `game/doors.js`), `world.navBuildings`, столб `post` в `world.houses`; `GATE` +
+  `GENERATOR` + `BIKES` у входа в болото, `world.swamp.lamps` вдоль гати; `CAUSEWAY` — настил без перил
+  (байк должен мочь с него упасть); `CLIFF` 9,5 м и `LAKE` (r 56, глубина 3 м) с обрывом ~7 м на 6 м пути;
+  `PIER` и хижина рыбака на своей отсыпке. Перенесены из старого болота `deck`/`addWalk` и `genGrowth`.
+- **Главы** — `game/level2.js`: `CHAPTERS` (convoy и crash — фильмы, остальные — игра), `chapterStart(id, world,
+  slot, seed)` — старт по местам (деревня: `houseFor(seed, slot)` — разные дома для четырёх мест, шаг 5 из 16),
+  `chapterGoal` — цель (сосна 14 м, ворота 22 м, генератор 3,2 м + E, конец гати 9 м, озеро — плавание).
+  Пока глава не получила свой раунд, она заглушка: фильм — заголовок на месте событий (Enter или `dur`), игра —
+  дойти пешком. Последняя глава: в озере 4,5 с затемнения, потом `winLevel2` → `onEnd({ won, level2 })`.
+- **Game:** на `bog` — `this.level2`, `state = 'level2'` сразу из `reset` (без утра и фильма), `updateLevel2`
+  (сеть, эхо, двери, волны, пост), `startNight` на Топи ничего не делает; `Objectives` — `inert` (у Топи нет
+  цепочки генераторов). Директор/спавны леса на `bog` выключены как и раньше. Дождь оставлен (идёт в `level2`).
+- **Кооп:** глава кончается только у хоста (`g.auth`), он шлёт `l2` с индексом (индекс = `CHAPTERS.length` —
+  конец уровня); гость делает `goto(i, true)` и сам ничего не объявляет. **PROTOCOL 23.**
+- **UI:** часы TAB (`fieldView`) и HUD показывают главу, экран итогов — «главы N/7» и свой заголовок победы
+  (`l2WinTitle`/`l2WinKicker`); `mapBog` теперь «ТОПЬ / THE MIRE», описания карты переписаны.
+  `scripts/mapPreview.mjs` рисует трассу, дороги, дома и сосну; `public/maps/bog.png` перерисован.
+- **Отладка:** `?map=bog&chapter=N` (1–7) — сразу в главу N (и открывает Топь без победы в лесу).
+- **Тесты:** `tests/round50a.test.mjs` (11). Поправлены под новое место: 30b (туман — `SWAMP_MIST`, без насоса),
+  30n (точки воды), 30g (имена глав), 31h, 31m, 40d (без убежища и лебёдки), протокол 23 в 21v, 40c, 42a,
+  angler21o, shift21.
+
 ## 2. Петля игры (и это надо понимать буквально)
 
 ```
@@ -1180,7 +1218,7 @@ src/
                    DEBUG-параметры URL, __hush для отладки, retina/качество/сглаживание
   core/            config.js (баланс), rng.js, i18n.js, storage.js (настройки/результаты), persistence.js,
                    identity.js (ник/анонимность), photoStore.js (4.0: IndexedDB альбома + zip)
-  world/           world.js (лес, локации), terrain.js, builder.js (MeshBuilder+KIND), collision.js, trails.js,
+  world/           world.js (лес, локации), swamp.js (5.0: «Топь»), terrain.js, builder.js (MeshBuilder+KIND), collision.js, trails.js,
                    meadow.js, navigation.js, yard.js (лесхоз/просека/шоссе), expedition.js (вышка/Зорька),
                    undergrowth.js (4.0: подлесок), decay.js (4.0: упадок леса по дням), lake.js (4.1: берег)
   render/          sonar.js (материал мира + shared-юниформы), pulses.js, ghosts.js, eyes.js, particles.js,
@@ -1190,7 +1228,8 @@ src/
                    objectives / escape / uaz / cabinets / doors / flares / glowsticks / torch / tools /
                    tapeCodec / toolModels / medhut / rescue / inventory / backpackData / partMap / shards /
                    stones / monsters / dread / mimics / player / remote / survivor / outfit / selfbody /
-                   fieldView / moto / training / expedition / campPower / campfire / intro / netsync / wallet /
+                   fieldView / moto / training / expedition / campPower / campfire / intro / level2 (5.0: главы Топи) /
+                   netsync / wallet /
                    highlights (2.1u: the highlight director; frames are opaque tokens, so it is testable) /
                    photo (4.0: фотоаппарат, вспышка, Наблюдатель) /
                    roadFilm / roadTraffic (4.1: дорожная погоня) / lakeShark (4.1: глубина озера)
@@ -1202,7 +1241,7 @@ src/
                    bag3d.js, touchButtons.js, radar.js, news.js, miccal.js, socialDock/Toasts/Words, account.js,
                    beyond.js, voicemix.js, sfxtest.js, reel.js (2.1u: plays the shift's highlights, writes .webm),
                    film.js (4.0: плёнка смены на экране итогов)
-tests/             node:test, 78 файлов / 650 тестов (на 4.2)
+tests/             node:test, 66 файлов / 560 тестов (на 5.0a)
 play/              собранная игра для GitHub Pages (артефакт сборки, коммитится)
 site/              сайт игры (3.1s) → /pinterest/site/: index.html, main.js (прокрутка, звук, микрофон, ленивые
                    секции), stage.js + forest.js (фоновый лес из World.prototype.*, sonar-материал, импульсы),
@@ -1230,7 +1269,7 @@ supabase/          миграции; 20261103180000_hush_mob_votes.sql — ур�
 
 ## 6. Проверка: как убедиться, что не сломал
 
-1. `npm test` — 650 тестов (4.2), все должны проходить (правка теста допустима только если изменилось **поведение по
+1. `npm test` — 560 тестов (5.0a), все должны проходить (правка теста допустима только если изменилось **поведение по
    замыслу**, и тогда в коммит-сообщении надо сказать, какое).
 2. `npm run build:pages` — сборка в `play/`; без неё деплой покажет старую версию.
 3. Живой прогон в браузере (headless-харнесс, рецепт ниже) на **конкретной сцене**, а не «в целом работает».

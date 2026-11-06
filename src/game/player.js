@@ -66,7 +66,7 @@ export class Player {
     this.carrying = null; // co-op: the id of a friend on your shoulder (see Rescue)
     this.held = false; // the Angler has this one (see angler.js): dragged, tied — not to be hunted by the rest
     this.floorY = null; // (2.1s: the lookout's deck — while set, you stand on it, not on the terrain)
-    this.col = null; // (3.0q: under the camp, the shelter's own walls — see game/bunker.js)
+    this.col = null; // (3.0q: a second collision set a place can lend the player; none uses it since 5.0a)
     this.underground = false; // (3.0q: five metres of clay between you and everything out there)
     this._initBody();
   }

@@ -441,16 +441,17 @@ test('4.2 strings exist in both languages', () => {
   setLang('ru');
 });
 
-test('4.2: the patch note leads, in both languages, and the protocol stays 22', async () => {
+test('4.2: the patch note leads its line (only 5.x above it), in both languages', async () => {
   const { NEWS } = await import('../src/ui/news.js');
   const { PROTOCOL } = await import('../src/net/net.js');
-  const n = NEWS[0];
-  assert.equal(n.v, '4.2');
+  const n = NEWS.find((x) => x.v === '4.2');
+  const i = NEWS.indexOf(n);
+  assert.ok(NEWS.slice(0, i).every((x) => /^5\./.test(x.v)), 'only the 5.x notes sit above it');
   assert.match(n.date, /^\d{4}-\d{2}-\d{2}$/);
-  assert.ok(n.date >= NEWS[1].date, 'not older than 4.1');
+  assert.ok(n.date >= NEWS[i + 1].date, 'not older than 4.1');
   assert.equal(n.ru.items.length, n.en.items.length);
   assert.ok(n.ru.items.length >= 5);
   assert.match(n.ru.items.join(' '), /развязать/);
   assert.match(n.en.items.join(' '), /convertible/);
-  assert.equal(PROTOCOL, 22, 'the look rides the existing outfit field; a 4.1 build in the room still plays');
+  assert.equal(PROTOCOL, 23, '(5.0a moved it for «Топь») the look rides the existing outfit field; a 4.1 build in the room still plays');
 });

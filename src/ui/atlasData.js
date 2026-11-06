@@ -24,10 +24,7 @@ export const BOOKS = [
   {
     id: 'bog', // the peat bog: its own creatures, its own ground, its own shift
     chapters: [
-      { id: 'bogbeasts', num: 'I', entries: ['drowned', 'gnat'] },
-      { id: 'bogland', num: 'II', entries: ['sink', 'plank', 'deadtree', 'dwarfpine', 'willow', 'reeds', 'tussock', 'cottongrass'] },
-      { id: 'bogtasks', num: 'III', entries: ['pump', 'winch'] },
-      { id: 'bogplaces', num: 'IV', entries: ['pumpshed', 'barracks', 'peatstacks'] },
+      { id: 'bogland', num: 'I', entries: ['sink', 'plank', 'deadtree', 'dwarfpine', 'willow', 'reeds', 'tussock', 'cottongrass'] },
     ],
   },
 ];
@@ -81,8 +78,6 @@ export const ENTRIES = {
   carb: { model: 'carb', sound: 'carb', kind: 'task', rate: [3, 3], log: [['fitted', 'car:2']] },
   jerrycan: { model: 'jerrycan', sound: 'jerrycan', kind: 'task', rate: [3, 3], log: [['fitted', 'car:3']] },
   // (3.0i) chapter V — the bog
-  drowned: { model: 'drowned', sound: 'drowned', kind: 'beast', rate: [5, 3, 1, 5], log: [['seen', 'seen:drowned'], ['killed', 'kills:drowned']] },
-  gnat: { model: 'gnat', sound: 'gnat', kind: 'beast', rate: [4, 1, 4, 3], log: [['seen', 'seen:gnat']] },
   sink: { model: 'sink', kind: 'thing' },
   plank: { model: 'plank', kind: 'thing' },
   deadtree: { model: 'deadtree', kind: 'thing' },
@@ -91,11 +86,6 @@ export const ENTRIES = {
   reeds: { model: 'reeds', kind: 'thing' },
   tussock: { model: 'tussock', kind: 'thing' },
   cottongrass: { model: 'cottongrass', kind: 'thing' },
-  pump: { model: 'pump', kind: 'task', rate: [3, 4], log: [['started', 'gens']] },
-  winch: { model: 'winch', kind: 'task', rate: [4, 5], log: [['escaped', 'escapes']] },
-  pumpshed: { model: 'pumpshed', kind: 'place' },
-  barracks: { model: 'barracks', kind: 'place', log: [['startedHere', 'site:barracks']] },
-  peatstacks: { model: 'peatstacks', kind: 'place', log: [['startedHere', 'site:stacks']] },
 };
 
 const TEXT = {
@@ -1371,39 +1361,9 @@ const TEXT = {
 
 
 // ---------------------------------------------------------------- chapter V: the bog (3.0i)
-// Everything here is measured in the bog's own code, not invented: DROWNED and GNAT in game/drowned.js and
-// game/gnat.js, PUMP in world/bog.js, WINCH in game/winch.js. Its chapter is blue on the shelf — see style.css.
+// The ground of the second level (its creatures and places went with the old bog in 5.0a; the Mire's own arrive
+// with their chapters). Its chapter is blue on the shelf — see style.css.
 const BOG_TEXT_RU = {
-  drowned: {
-    name: 'Утопленник', latin: 'Mergulus profundus',
-    text: [
-      'Он живёт в воде и только в воде. На гать не выходит, за тобой на сухое не идёт: там он никто. Под поверхностью его не видно вовсе — эхо находит не тело, а кольцо, которое расходится по воде там, где он шевельнулся. Кольцо и есть всё предупреждение, какое у тебя будет.',
-      'Голоса он не слышит: в голове у него не осталось того, чем слушают. Он идёт по воде, которую ты толкаешь. Шаг в болоте стоит ему трёх шагов — по звуку.',
-      'Он не рвёт. Он берёт за ногу и ведёт в глубину, а глубина терпелива. Медленно, 0.9 метра в секунду, медленнее шага: он никого никогда не догонит. Он ждёт того, кто зашёл слишком далеко.',
-    ],
-    tips: [
-      'Не заходи глубже, чем по колено, без причины. Он берёт на глубине, а не на берегу.',
-      'Увидел кольцо — уходи вбок, к настилу, и не беги по воде: бег стоит ему десяти шагов.',
-      'Он держит 2.6 секунды. Рвись назад, к мелкому: по колено и меньше — он отпускает.',
-      'На гати он тебя не достанет. Гать — это не удобство, это стена.',
-    ],
-    facts: [['рост', '{h}'], ['скорость', '0.9 м/с'], ['берёт', '1.2 м · 2.6 с'], ['тащит', '0.8 м/с'], ['слышит шаг', '×3'], ['держит район', '42 м'], ['всплывает', '26 м от тебя']],
-    quote: 'Оно не хватало. Оно просто вело.',
-  },
-  gnat: {
-    name: 'Гнус', latin: 'Simulium vorax',
-    text: [
-      'Облако мошки размером с комнату. Тебя оно не ест и не догоняет — ему нужен не ты, а самый громкий звук на участке: голос, бег, мотор, крик. Услышало — и идёт через всё болото, 3.6 метра в секунду: быстрее шага, медленнее бега.',
-      'Внутри облака через три секунды эхо начинает возвращаться вдвое дольше. Двадцать секунд ты видишь метров на десять — а на болоте, где вода и так режет волну, это значит не отличить кол от человека.',
-      'Единственное, что его поворачивает, — дым. Горящий костёр или файер в восьми метрах, и рой отходит на восемь секунд. Ровно за этим на лагере и стоит костёр.',
-    ],
-    tips: [
-      'Не беги, когда он рядом: бег — это самый громкий звук, какой ты можешь издать.',
-      'Мошка слепа в дыму. Костёр, файер, горящий столб — восемь метров спокойствия.',
-      'Ослеплённому не верь своим глазам двадцать секунд: стой и слушай, куда идут остальные.',
-    ],
-    facts: [['скорость', '3.6 м/с'], ['облако', 'r 6 м'], ['слышит', '0.4 · 80 м'], ['внутри', '3 с'], ['слепота', '20 с · эхо ×2'], ['дым', '8 м · 8 с'], ['первый рой', '55–90 с']],
-  },
   sink: {
     name: 'Топь', latin: 'Palus edax',
     text: [
@@ -1476,86 +1436,9 @@ const BOG_TEXT_RU = {
     tips: ['Белые точки в темноте — это пушица, а не глаза. Но проверь эхом, прежде чем подходить.'],
     facts: [['высота', '{h}'], ['растёт', 'на мокром торфе']],
   },
-  pump: {
-    name: 'Насос', latin: 'Machina sitiens',
-    text: [
-      'Ручной насос на чугунной плите: две колонки, голова, маховик и всасывающий патрубок, уходящий в воду. Пять штук на участке, по одному на место.',
-      'Каждый работающий насос опускает воду в своём секторе на 0.6 метра в радиусе сорока. Пять работающих — и проезд проходит целиком, до сухого берега за ним, а наш УАЗ выбирается из колеи.',
-      'Насос — это шум. Металл, маховик, вода: на весь сектор.',
-    ],
-    tips: ['Запускай насосы по дороге к машине, а не после: вода уходит, пока ты идёшь.', 'Пять — это не «хорошо бы». Меньше пяти, и гать не проходит.'],
-    facts: [['насосов', '5'], ['сектор', '40 м · −0.6 м'], ['шум', 'высокий'], ['запуск', 'один человек']],
-  },
-  winch: {
-    name: 'Лебёдка', latin: 'Trochlea ultima',
-    text: [
-      'Барабан на бампере нашего же УАЗа и трос к колышку на берегу. Машина стоит носом в проезде, задние колёса на сухом, и вытащить её можно только вручную: двадцать пять секунд ручки, которые никто не считает, потому что считать приходится вслух.',
-      'Каждый мёртвый насос отматывает назад 0.6 % в секунду против 4 %, которые ты наматываешь. Один-два — медленно. Три — ползком. Все пять — сто секунд у барабана, и всю ночь спиной к торфу.',
-      'Вытянул — не заводи. Пока проезд под водой, стартер крутит, а мотор хлебает: сначала насос в лагере, потом дверь. Три секунды, и это самые длинные три секунды на участке.',
-    ],
-    tips: ['Насос в лагере — до стартера, лебёдка — до насоса: пока крутишь, вода успевает уйти.', 'Трос гремит: пока крутишь, за спиной может кто-то стоять.'],
-    facts: [['крутить', '25 с'], ['потеря', '0.6 %/с за насос'], ['сдвиг', '2.2 м'], ['стартер', '3.0 с']],
-  },
-  pumpshed: {
-    name: 'Насосная', latin: 'Statio palustris',
-    text: [
-      'Открытый с одной стороны сарай на сваях: пол, три стены, железная крыша, маховик и главный насос. Внутри сухо — единственное сухое место на участке, кроме лагеря.',
-      'Стены держат эхо: изнутри ты видишь только дверной проём, зато и тебя не видно.',
-    ],
-    tips: ['В сарае можно переждать рой — но не Утопленника: он ждёт в воде.'],
-    facts: [['размер', '{len}'], ['стен', '3'], ['пол', 'на сваях']],
-  },
-  barracks: {
-    name: 'Барак на сваях', latin: 'Castra submersa',
-    text: [
-      'Длинная казарма на сваях, вода внутри по щиколотку. Койки стоят, как стояли; на одной до сих пор лежит чей-то матрас.',
-      'Сваи и стены держат вес, но не звук: под полом гудит вода, и по этому гулу слышно, кто ходит снаружи.',
-    ],
-    tips: ['Внутри барака вода — снаружи она глубже. Не выходи с той стороны, где нет настила.'],
-    facts: [['длина', '{len}'], ['пол', '0.9 м над торфом'], ['вода внутри', 'по щиколотку']],
-  },
-  peatstacks: {
-    name: 'Торфяные штабеля', latin: 'Turba siccans',
-    text: [
-      'Ряды тёмных брикетов в три слоя на сушильных стойках: резка, которую так и не вывезли. Торф лёгкий и горит жарко — если ночь совсем плоха, из него выйдет костёр.',
-      'Штабеля высокие и глухие: за ними прячутся, но и тебя за ними не видно.',
-    ],
-    tips: ['Брикет горит долго: один кусок — это десять минут дыма от мошки.'],
-    facts: [['брикетов', '36'], ['слоёв', '3'], ['размер', '{len}']],
-  },
 };
 
 const BOG_TEXT_EN = {
-  drowned: {
-    name: 'The Drowned', latin: 'Mergulus profundus',
-    text: [
-      'It lives in water and only in water. It does not come up onto the planks and will not follow you onto dry ground: there it is nothing. Under the surface it is not there at all — an echo finds no body, only a ring spreading on the water where it moved. That ring is the whole of the warning you get.',
-      'It cannot hear your voice: there is nothing left in its head to hear with. It goes by the water you push. One step in the bog is worth three steps to it.',
-      'It does not tear. It takes you by the leg and walks you out into the deep, and the deep is patient. Slowly — 0.9 metres a second, slower than a walk: it will never catch anyone. It waits for whoever goes in too far.',
-    ],
-    tips: [
-      'Do not wade deeper than your knee without a reason. It takes you in the deep, not at the shore.',
-      'Saw a ring — go sideways, to the decking, and do not run in the water: a run is worth ten steps to it.',
-      'It holds for 2.6 seconds. Tear back toward the shallows: knee-deep and less and it lets go.',
-      'On the planks it cannot reach you. The planks are not a convenience, they are a wall.',
-    ],
-    facts: [['height', '{h}'], ['speed', '0.9 m/s'], ['grabs', '1.2 m · 2.6 s'], ['drags', '0.8 m/s'], ['hears a step', 'at ×3'], ['keeps to', '42 m'], ['rises', '26 m away']],
-    quote: 'It did not grab. It simply led.',
-  },
-  gnat: {
-    name: 'The Gnat swarm', latin: 'Simulium vorax',
-    text: [
-      'A cloud of midges the size of a room. It does not eat you and does not chase you — it wants the loudest thing on the участок: a raised voice, a run, an engine, a scream. It hears one and comes across the whole bog at 3.6 metres a second: faster than a walk, slower than a run.',
-      'Inside the cloud, after three seconds, every echo starts coming back at twice the interval. For twenty seconds you see about ten metres — and on a bog, where the water already shortens every wave, that means you cannot tell a stake from a man.',
-      'The one thing that turns it is smoke. A lit fire or a flare within eight metres and the swarm breaks off for eight seconds. That is exactly what the campfire is for.',
-    ],
-    tips: [
-      'Do not run when it is near: a run is the loudest sound you can make.',
-      'It is blind in smoke. A fire, a flare, a burning stack — eight metres of peace.',
-      'While blinded, do not trust your eyes for twenty seconds: stand still and listen to where the others go.',
-    ],
-    facts: [['speed', '3.6 m/s'], ['cloud', 'r 6 m'], ['hears', '0.4 · 80 m'], ['inside', '3 s'], ['blind', '20 s · echo ×2'], ['smoke', '8 m · 8 s'], ['first swarm', '55–90 s']],
-  },
   sink: {
     name: 'The топь', latin: 'Palus edax',
     text: [
@@ -1627,53 +1510,6 @@ const BOG_TEXT_EN = {
     ],
     tips: ['White points in the dark are cotton grass, not eyes. But check with an echo before you go closer.'],
     facts: [['height', '{h}'], ['grows', 'wet peat']],
-  },
-  pump: {
-    name: 'The pump', latin: 'Machina sitiens',
-    text: [
-      'A hand pump on a cast-iron plate: two columns, a head, a flywheel, and a suction pipe running off into the water. Five of them on the участок, one to a place.',
-      'Every running pump lowers the water in its own sector by 0.6 metres within a radius of forty. All five and the проезд goes all the way through, to the dry bank beyond it, and our УАЗ comes out of the rut.',
-      'A pump is noise: metal, flywheel, water — across the whole sector.',
-    ],
-    tips: ['Start the pumps on your way to the car, not after: the water drains while you walk.', 'Five is not "would be nice". Fewer than five and the гать does not hold.'],
-    facts: [['pumps', '5'], ['sector', '40 m · −0.6 m'], ['noise', 'high'], ['to start', 'one person']],
-  },
-  winch: {
-    name: 'The winch', latin: 'Trochlea ultima',
-    text: [
-      'A drum on the bumper of our own УАЗ and a cable back to a stake on the bank. The car stands nose-in at the проезд with its rear wheels on dry ground, and the only way out is by hand: twenty-five seconds of handle that nobody counts, because the counting has to be done out loud.',
-      'Every dead pump unwinds 0.6 % a second against the 4 % you wind on. One or two — slow. Three — a crawl. All five — a hundred seconds at the drum, with your back to the peat.',
-      'Out — but not started. While the проезд is under water the starter turns and the engine drinks: the camp pump first, then the door. Three seconds, and they are the longest three seconds on the участок.',
-    ],
-    tips: ['The camp pump before the starter, the winch before the pump: the water drains while you crank.', 'The cable rings: while you turn it, someone may be standing behind you.'],
-    facts: [['turning', '25 s'], ['slip', '0.6 %/s per pump'], ['pull', '2.2 m'], ['starter', '3.0 s']],
-  },
-  pumpshed: {
-    name: 'The pump shed', latin: 'Statio palustris',
-    text: [
-      'A shed on stilts, open on one side: a floor, three walls, an iron roof, a flywheel and the master pump. Dry inside — the only dry place on the участок besides the camp.',
-      'The walls hold an echo: from inside you see only the doorway — and you cannot be seen either.',
-    ],
-    tips: ['You can wait out a swarm in the shed — but not the Drowned: it waits in the water.'],
-    facts: [['size', '{len}'], ['walls', '3'], ['floor', 'on stilts']],
-  },
-  barracks: {
-    name: 'The flooded barracks', latin: 'Castra submersa',
-    text: [
-      'A long hut on stilts with water ankle-deep inside. The bunks stand as they stood; somebody\'s mattress is still on one.',
-      'The stilts and walls carry weight, not sound: water booms under the floor, and by that boom you can hear who is walking outside.',
-    ],
-    tips: ['Inside the barracks there is water — outside it is deeper. Do not step out on the side with no decking.'],
-    facts: [['length', '{len}'], ['floor', '0.9 m over the peat'], ['water inside', 'ankle-deep']],
-  },
-  peatstacks: {
-    name: 'The peat stacks', latin: 'Turba siccans',
-    text: [
-      'Rows of dark bricks, three layers deep, on drying racks: a cutting nobody ever took away. Peat is light and burns hot — if the night gets bad enough, there is a fire in it.',
-      'The stacks are tall and blind: you can hide behind them, but nobody can see you there either.',
-    ],
-    tips: ['A peat brick burns long: one block is ten minutes of smoke against the midges.'],
-    facts: [['bricks', '36'], ['layers', '3'], ['size', '{len}']],
   },
 };
 

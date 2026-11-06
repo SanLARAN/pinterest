@@ -10,7 +10,7 @@ import * as THREE from 'three';
 
 globalThis.document ||= { body: { classList: { add() {}, remove() {} } } };
 globalThis.localStorage ||= { getItem: () => null, setItem() {}, removeItem() {} };
-const { IntroCutscene, BogArrival, ForestOpening } = await import('../src/game/intro.js');
+const { IntroCutscene, ForestOpening } = await import('../src/game/intro.js');
 const { CampFilm, choresFor, campObstacles, FIRE, BACKPACK, BENCH_A, BENCH_B, SEAT_OF } = await import('../src/game/campFilm.js');
 const { CAMP_TENT, tentPoint } = await import('../src/world/campLayout.js');
 const src = (p) => readFileSync(new URL('../' + p, import.meta.url), 'utf8');
@@ -47,11 +47,11 @@ function inTent(p) {
   return Math.abs(lx) < CAMP_TENT.halfWidth - 0.15 && Math.abs(lz) < CAMP_TENT.halfLength - 0.1;
 }
 
-test('the forestry gets the road and then the camp film, the bog keeps its arrival', () => {
+test('the forestry gets the road and then the camp film; the old bog arrival is gone (5.0a)', () => {
   const forest = new IntroCutscene({ map: 'forest', scene: new THREE.Scene() });
   assert.ok(forest instanceof ForestOpening);
   assert.ok(forest.camp instanceof CampFilm);
-  assert.ok(new IntroCutscene({ map: 'bog', scene: new THREE.Scene(), world: {} }) instanceof BogArrival);
+  assert.doesNotMatch(src('src/game/intro.js'), /BogArrival/, '«Топь» opens with its own first chapter (game/level2.js)');
   assert.match(src('src/game/intro.js'), /new CampFilm\(game\)/);
 });
 
