@@ -13,14 +13,24 @@
 //   7 cliff      play  off the cliff into the lake → the pier, the old fisherman, the end   (5.0f)
 //
 // Until a chapter has its round, it plays as a plain stand-in: a film is a title over the place it happens, a
-// play chapter is walked on foot to its goal. That is enough to cross the whole level end to end.
+// play chapter is walked on foot to its goal. That is enough to cross the whole level end to end. A chapter that
+// has its film (FILMS) runs it instead: the film owns the camera, the small lights and the picture's fade, and the
+// chapter ends when the film does (or the host skips it).
+//
+// (5.0b) The junction's lamps over the highway (world/swamp.js HIGHWAY.lamps) are lit for the whole level: the
+// shader's uRoad, and a sodium glow over each head.
 //
 // Co-op: the host's machine decides when a chapter ends and tells everyone ('l2', the chapter index); a guest
 // never ends a chapter by itself.
+import * as THREE from 'three';
 import { t } from '../core/i18n.js';
 import { smoothstep } from '../core/rng.js';
+import { shared } from '../render/sonar.js';
 import { HIGHWAY, ROADS, CRASH, HOUSES, GATE, GENERATOR, CAUSEWAY, CLIFF } from '../world/swamp.js';
 import { swimming } from './water.js';
+import { ConvoyFilm } from './convoyFilm.js';
+import { haloMaterial } from './glowsticks.js';
+import { beaconTexture } from './roadTraffic.js';
 
 export const CHAPTERS = [
   { id: 'convoy', film: true, dur: 9 },
@@ -34,6 +44,8 @@ export const CHAPTERS = [
 export const TITLE_T = 5; // s the chapter's title stays up
 const TAIL = 4.5; // s from the lake to the end of the level (the pier film arrives in 5.0f)
 const SLOT_GAP = 1.6; // m between players at a shared start
+// the chapters that have their own film (the rest of the films are still stand-ins)
+export const FILMS = { convoy: ConvoyFilm };
 
 // the yaw that looks from (fx, fz) toward (tx, tz) (the player looks along (-sin yaw, -cos yaw))
 export function faceYaw(fx, fz, tx, tz) {
@@ -54,8 +66,8 @@ export function chapterStart(id, world, slot = 0, seed = 0) {
   const main = ROADS[0].pts;
   const at = (x, z, tx, tz) => ({ x, z, yaw: faceYaw(x, z, tx, tz) });
   switch (id) {
-    case 'convoy': return at(HIGHWAY.turn - 46 - slot * SLOT_GAP, HIGHWAY.z - 1.8, HIGHWAY.turn, HIGHWAY.z - 1.8);
-    case 'road': return at(main[0][0] + side, main[0][1], main[1][0], main[1][1]);
+    // (5.0b) in the convoy film everyone is in the car: their bodies wait where it leaves them — the dirt road
+    case 'convoy': case 'road': return at(main[0][0] + side, main[0][1], main[1][0], main[1][1]);
     case 'crash': return at(CRASH.x + 9 + side, CRASH.z + 7, CRASH.x, CRASH.z);
     case 'village': {
       const H = (world.houses || []).find((h) => h.id === houseFor(seed, slot).id) || houseFor(seed, slot);
@@ -90,6 +102,13 @@ export class Level2 {
     this.t = 0;
     this.tail = -1; // s since the lake took you (the last chapter's end), -1 before
     this.done = false;
+    this.film = null; // the running chapter's film (FILMS), if it has one
+    this.lamps = null; // the sodium glows over the junction's lamp heads
+  }
+
+  // is a film on the screen right now? (the game keeps the player's hands, the remotes and the rain out of it)
+  get filming() {
+    return !!this.film && this.film.state === 'run';
   }
 
   get chapter() {
@@ -100,13 +119,39 @@ export class Level2 {
   begin(index = 0) {
     this.done = false;
     this.tail = -1;
+    this._roadLamps(true);
     this.goto(Math.max(0, Math.min(CHAPTERS.length - 1, index | 0)));
+  }
+
+  // (5.0b) the junction's sodium lamps: the shader's uRoad (their light), and a glow sprite on each head
+  _roadLamps(on) {
+    const L = HIGHWAY.lamps;
+    shared.uRoad.value.set(L.x0, L.every, L.z, HIGHWAY.y + L.h - 0.3);
+    shared.uRoadK.value.set(on ? 1.35 : 0, L.x0 - 1, L.x1 + 1);
+    const heads = this.g.world?.swamp?.roadLamps || [];
+    if (on && !this.lamps && heads.length && this.g.scene) {
+      this.lamps = heads.map((h) => {
+        const sp = new THREE.Sprite(haloMaterial(0xffa04a, beaconTexture()));
+        sp.position.set(h.x, h.y - 0.05, h.z);
+        sp.scale.setScalar(3.2);
+        sp.material.opacity = 1.3;
+        this.g.scene.add(sp);
+        return sp;
+      });
+    }
+    for (const sp of this.lamps || []) sp.visible = on;
+  }
+
+  _endFilm() {
+    if (this.film) this.film.end();
+    this.film = null;
   }
 
   // put everyone at this chapter's start. remote: the host said so (a guest does not announce)
   goto(index, remote = false) {
     const g = this.g;
     if (index < 0 || index >= CHAPTERS.length) return;
+    this._endFilm();
     this.i = index;
     this.t = 0;
     this.tail = -1;
@@ -124,6 +169,11 @@ export class Level2 {
     g.hud.setHint(null);
     g.hud.setSkip(!!C.film);
     if (!remote && g.role === 'host') g.sync?.ev?.('l2', index);
+    const F = FILMS[C.id];
+    if (F) {
+      this.film = new F(g);
+      this.film.begin();
+    }
   }
 
   next() {
@@ -134,8 +184,23 @@ export class Level2 {
   finish() {
     if (this.done) return;
     this.done = true;
+    this._endFilm();
     if (this.g.role === 'host') this.g.sync?.ev?.('l2', CHAPTERS.length);
     this.g.winLevel2?.();
+  }
+
+  // the film's camera (false when there is none): and the ears go where the camera is, so the small lights
+  // nearest the picture are the ones that get the shader's slots
+  applyCamera(camera) {
+    if (!this.filming || !this.film.applyCamera(camera)) return false;
+    const e = this.g._ears;
+    if (e) { e.x = camera.position.x; e.y = camera.position.y; e.z = camera.position.z; }
+    return true;
+  }
+
+  // the small lights the film wants this frame (GlowSticks.lightSources asks)
+  lightSources(out) {
+    if (this.filming) this.film.lightSources(out);
   }
 
   // one frame. Returns the player's step events for the game's sounds (or nothing in a film)
@@ -144,9 +209,15 @@ export class Level2 {
     const C = this.chapter;
     if (!C || this.done) return null;
     this.t += dt;
-    g.fx.fade = Math.max(g.fx.fade, smoothstep(0, 1.2, this.t));
     if (this.t > TITLE_T && this.t - dt <= TITLE_T) g.hud.setIntro(null);
     const events = raw?.events || [];
+    if (this.film) {
+      // the chapter's own film: it runs, and when it is over (or the host skipped it) the chapter is
+      this.film.update(dt, events);
+      if (this.film.done && g.auth) this.next();
+      return null;
+    }
+    g.fx.fade = Math.max(g.fx.fade, smoothstep(0, 1.2, this.t));
     if (C.film) {
       // (the stand-in film: you stand where it happens and look about; Enter goes on)
       g.player.update(dt, g.input, raw?.look || { dx: 0, dy: 0 }, true);

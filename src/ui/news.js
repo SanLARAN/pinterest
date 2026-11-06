@@ -7,6 +7,25 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v:'5.0b',date:'2026-11-06',
+    ru:{title:'Топь, глава 1: «Кортеж»',items:[
+      'Вторая карта теперь начинается с фильма. Ночь, трасса, машина хоста, в ней вся команда. Навстречу идёт фура и заливает салон светом фар. По радио играет ночная станция.',
+      'Сзади догоняет кортеж: полиция, скорая, две пожарные машины МЧС и ещё одна полицейская. Мигалки красят лес красным и синим, а сирены слышно с той стороны, где едут машины. Машина прижимается к обочине и пропускает колонну.',
+      'На развязке под фонарями дорога перекрыта. Поперёк лежит то самое щупальце с горизонта, огромное, с рядами бледных присосок. Вокруг стоит кортеж, пожарная машина светит на него прожектором, полицейский подходит с фонарём. Вы стоите в очереди и ждёте, а радио тонет в помехах.',
+      'Потом щупальце оживает. Оно поднимается над дорогой, падает на полицейскую машину, утаскивает скорую в кювет и кончиком накрывает фуру. Водитель бросает машину вправо, в просвет отбойника, и уводит её на грунтовку в лес.',
+      'Фильм длится полторы минуты. Enter пропускает его, в коопе пропускает хост. Вторая глава начинается на грунтовке.',
+      'Заодно исправлено: на «Топи» посреди карты горел костёр из лесного лагеря, а надпись «ПОЛИЦИЯ» на дальнем борту полицейской машины читалась задом наперёд.',
+    ]},
+    en:{title:'The Mire, chapter 1: «The Convoy»',items:[
+      'The second map now opens with a film. Night, the highway, the host\'s car with the whole crew inside. A lorry comes the other way and fills the cabin with its headlights. A night station plays on the radio.',
+      'A convoy comes up from behind: police, an ambulance, two fire engines and another police car. The beacons paint the forest red and blue, and you hear each siren from where its car is. The car pulls onto the shoulder and lets the column by.',
+      'At the junction under the lamps the road is shut. Across it lies the arm from the horizon, huge, with rows of pale suckers. The convoy stands round it, a fire engine shines its floodlight on it, a policeman walks up with a torch. You sit in the queue and wait while the radio drowns in static.',
+      'Then the arm moves. It rises over the road, comes down on the police car, drags the ambulance into the ditch and brings its tip down on the lorry. The driver throws the car right, through the gap in the rail, and onto the dirt road into the forest.',
+      'The film runs a minute and a half. Enter skips it; in co-op the host skips it. The second chapter starts on the dirt road.',
+      'Also fixed: on the Mire the forest camp\'s fire was burning in the middle of the map, and «ПОЛИЦИЯ» read backwards on the far side of the police car.',
+    ]},
+  },
+  {
     v:'5.0a',date:'2026-11-06',
     ru:{title:'Топь: второй уровень строится заново',items:[
       'Старого Торфяника больше нет: насосы, лебёдка, Утопленник, Гнус и убежище под лагерем убраны целиком. На его месте строится новый второй уровень, «Топь». Это не смена, а одна ночь в семи главах: кортеж на трассе, грунтовка, авария, деревня, генератор, гать и обрыв.',

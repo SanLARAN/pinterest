@@ -19,8 +19,20 @@ import { CAP } from './caps.js';
 const LEVEL = 0.34; // the water line, in world metres
 const HALF = 380; // 760 × 760 m
 
-// the highway: a raised two-lane road along the south edge
-export const HIGHWAY = { z: 334, y: 2.2, w: 9, x0: -HALF, x1: HALF, block: 70, turn: 18 };
+// the highway: a raised two-lane road along the south edge. Westbound traffic keeps to the north lane (`lane`,
+// the side the dirt road leaves from), eastbound to the south one. (5.0b) Round the junction the road is lit:
+// sodium lamps on arms over the north lane (`lamps`, the shader's uRoad), and `block` is where the arm lies
+// across it — west of the turn-off, so a car stopped in the queue has the way into the forest right beside it.
+export const HIGHWAY = {
+  z: 334, y: 2.2, w: 9, x0: -HALF, x1: HALF, block: -41, turn: 18,
+  lane: 331.8, oncoming: 336.2,
+  lamps: { x0: -120, x1: 120, every: 40, z: 332.4, h: 8.8, pole: 328.0 },
+};
+
+// (5.0b) the arm that lies across the highway (chapter 1): the line it lies along, from its base — buried in the
+// north forest — over the road to its tip, curled in the south ditch. The trees along it are down: it came out
+// of the forest, not through it
+export const ARM_PATH = [[-76, 294], [-68, 303], [-60, 312], [-53, 320], [-47, 327], [-43, 332], [-40, 336], [-36, 341], [-30, 347], [-23, 351], [-17, 350], [-14, 346], [-16, 342]];
 
 // The dirt road. `main` is the way through; the branches are the wrong turns (a dead end at the far end of
 // each one). The forks are where the navigator has to say left or right (chapter 2).
@@ -299,7 +311,7 @@ export function buildSwamp(world, t0) {
   world.water = new SwampWater(world);
   world.sites = [];
   world.houses = [];
-  world.swamp = { highway: HIGHWAY, roads: ROADS, forks: FORKS, crash: CRASH, gate: GATE, generator: GENERATOR, bikes: BIKES, causeway: CAUSEWAY, cliff: CLIFF, lake: LAKE, pier: PIER };
+  world.swamp = { highway: HIGHWAY, roads: ROADS, forks: FORKS, crash: CRASH, gate: GATE, generator: GENERATOR, bikes: BIKES, causeway: CAUSEWAY, cliff: CLIFF, lake: LAKE, pier: PIER, arm: ARM_PATH, roadLamps: [] };
   world.spawn = { x: HIGHWAY.turn - 30, z: HIGHWAY.z, yaw: -Math.PI / 2 };
 
   // level pads under every house, the gate and the crash site
@@ -344,16 +356,36 @@ function buildHighway(world) {
         // the dashes of the centre line
         b.quadN([xx + 0.5, y + 0.012, H.z - 0.08], [xx + 3.5, y + 0.012, H.z - 0.08], [xx + 3.5, y + 0.012, H.z + 0.08], [xx + 0.5, y + 0.012, H.z + 0.08], [0, 1, 0], KIND.BONE, 15);
       }
-      // the guard rail on the north shoulder, on its posts (gapped where the dirt road leaves)
+      // the guard rail on the north shoulder, on its posts (gapped where the dirt road leaves, and torn out
+      // where the arm came over it: 5.0b)
       const gz = z0 - 0.9;
       for (let xx = x; xx < x1; xx += 4) {
-        if (Math.abs(xx - H.turn) < 8) continue;
+        if (Math.abs(xx - H.turn) < 8 || Math.abs(xx - ARM_RAIL) < 6) continue;
         b.limb([xx, y - 0.3, gz], [xx, y + 0.72, gz], 0.06, 0.06, KIND.METAL, 4);
         b.limb([xx, y + 0.62, gz], [Math.min(x1, xx + 4), y + 0.62, gz], 0.09, 0.09, KIND.METAL, 4);
       }
     });
   }
+  // (5.0b) the junction's lamps: a pole behind the rail, an arm out over the north lane, a sodium head on it.
+  // Their light is the shader's (uRoad: game/level2.js turns it on); here they are things, and the heads are kept
+  // in world.swamp.roadLamps for the glow drawn over them
+  const L = H.lamps;
+  for (let x = L.x0; x <= L.x1; x += L.every) {
+    const g = world.terrain.height(x, L.pole);
+    const top = y + L.h;
+    world.swamp.roadLamps.push({ x, y: top - 0.25, z: L.z });
+    world.addProp(x, L.pole, (b) => {
+      b.identity();
+      b.limb([x, g - 0.4, L.pole], [x, top + 0.2, L.pole], 0.14, 0.09, KIND.METAL, 6);
+      b.limb([x, top + 0.1, L.pole], [x, top, L.z], 0.07, 0.06, KIND.METAL, 4);
+      b.place(x, top - 0.12, L.z);
+      b.box(0.36, 0.2, 0.62, KIND.METAL);
+    });
+    world.col.circle(x, L.pole, 0.2, 9, CAP.METAL);
+  }
 }
+// where along the north rail the arm came over it (the rail is missing there)
+const ARM_RAIL = -45;
 
 // a road that goes nowhere: it peters out in a felled tree across the ruts and a heap of brushwood
 function deadEnd(world, R, rng) {
@@ -567,8 +599,9 @@ function buildPier(world) {
 function genGrowth(world, rng) {
   const half = world.half - 10;
   const noise = new Simplex2(SWAMP.seed + 7);
-  const clear = (x, z, pad) => !world.inLandmark(x, z, pad) && !world.onWalk(x, z, pad) && !onRoad(x, z, pad) && Math.abs(z - HIGHWAY.z) > HIGHWAY.w / 2 + 3 + pad;
-  const nearHouse = (x, z, pad) => HOUSES.some((H) => Math.hypot(x - H.x, z - H.z) < 7 + pad);
+  // (5.0b) and nothing grows where the arm lies: it came out of the forest along that line (see the windfall below)
+  const clear = (x, z, pad) => !world.inLandmark(x, z, pad) && !world.onWalk(x, z, pad) && !onRoad(x, z, pad) && Math.abs(z - HIGHWAY.z) > HIGHWAY.w / 2 + 3 + pad && nearLine(ARM_PATH, x, z) > 7 + pad;
+  const nearHouse =(x, z, pad) => HOUSES.some((H) => Math.hypot(x - H.x, z - H.z) < 7 + pad);
   const thick = (x, z, sc = 55) => 0.5 + 0.5 * noise.fbm(x / sc, z / sc, 2);
   const depth = (x, z) => world.water.depth(x, z);
   // the village clearing: thin there, so the houses see each other's lights
@@ -667,6 +700,36 @@ function genGrowth(world, rng) {
       });
       world.col.circle(x, z, 0.4, 1.0, CAP.TREE);
     } else world.stump(x, y, z, rng);
+  }
+
+  // ---- (5.0b) the windfall along the arm: the pines it came through, snapped and pushed over away from it.
+  // (Last, on its own stream: everything above grows exactly where it did.)
+  const wr = new RNG(SWAMP.seed + 51);
+  for (let i = 0; i + 1 < ARM_PATH.length; i++) {
+    const [ax, az] = ARM_PATH[i], [bx, bz] = ARM_PATH[i + 1];
+    const len = Math.hypot(bx - ax, bz - az), px = -(bz - az) / len, pz = (bx - ax) / len;
+    for (const side of [-1, 1]) {
+      if (wr.chance(0.35)) continue;
+      const t = wr.float(0.15, 0.85), off = wr.float(7.5, 10.5) * side;
+      const x = ax + (bx - ax) * t + px * off, z = az + (bz - az) * t + pz * off;
+      if (Math.abs(z - HIGHWAY.z) < HIGHWAY.w / 2 + 2 || !world.col.free(x, z, 1.2)) continue;
+      const y = world.terrain.height(x, z), r = wr.float(0.18, 0.3), h = wr.float(5, 9);
+      // fallen outward, away from the arm, with the stump left standing and splintered
+      const fall = Math.atan2(px * side, pz * side) + wr.float(-0.5, 0.5);
+      world.addProp(x, z, (b) => {
+        b.identity();
+        b.place(x, y, z, 0, wr.float(0, 6.28), 0);
+        b.limb([0, -0.1, 0], [0, 0.9, 0], r * 1.2, r, KIND.BARK, 6);
+        b.limb([0, 0.9, 0], [wr.float(-0.1, 0.1), 1.25, wr.float(-0.1, 0.1)], r * 0.9, 0.03, KIND.BARK, 4);
+        b.place(x, y + 0.9, z, Math.PI / 2 - 0.12, fall, 0);
+        b.limb([0, 0, 0], [0, h, 0], r, r * 0.35, KIND.BARK, 5);
+        for (let k = 0; k < 3; k++) {
+          const up = h * wr.float(0.5, 0.9), a = wr.float(0, 6.28);
+          b.limb([0, up, 0], [Math.cos(a) * 1.1, up + 0.8, Math.sin(a) * 1.1], r * 0.3, 0.03, KIND.BARK, 3);
+        }
+      });
+      world.col.circle(x, z, r * 1.3, 1.2, CAP.TREE);
+    }
   }
 }
 

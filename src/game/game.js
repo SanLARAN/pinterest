@@ -307,6 +307,8 @@ export class Game {
     this.audio.prefetchAnglerFound?.(); // his entrance sting, fetched long before the third night
     this.glows.reset();
     this.fire.reset();
+    // (5.0b) the Mire has no camp: its fire stood burning at the map's origin, by the dirt road, and took a light slot
+    if (this.map === 'bog') { this.fire.lit = this.fire.ember = this.fire.I = 0; this.fire.group.visible = false; }
     this.pulses.clear();
     this.waves.clear(); // (3.0n) no ring survives into the next night
     this.ghosts.clear();
@@ -583,11 +585,13 @@ export class Game {
   // over; this is everything around it — the net, the echo, doors, the water's rings, the post.
   updateLevel2(dt, raw) {
     this.time += dt;
+    const film = this.level2.filming; // (5.0b) a film: everyone is in the car — no bodies on the road, no hands
     if (this.online) {
       this.netFrame(dt);
-      this.updateRemotes(dt);
+      if (!film) this.updateRemotes(dt);
+      else for (const r of this.remotes.values()) r.rig.root.visible = false;
     }
-    for (const e of this.inputMuted ? [] : raw.events) {
+    for (const e of this.inputMuted || film ? [] : raw.events) {
       if (e === 'pingDown') this.pingPress();
       else if (e === 'primary') this.inventory.primary();
       else if (e === 'secondary') this.inventory.secondary();
@@ -2807,7 +2811,7 @@ export class Game {
     }
     // the bog's drizzle: it follows you, it thins at dawn and it stops when the shift does
     if (this.rain) {
-      const live = this.state === 'level2' || this.state === 'play' || this.state === 'morning' || this.state === 'dawn' || this.state === 'dusk' || this.state === 'dying' || this.state === 'escape';
+      const live = (this.state === 'level2' && !this.level2?.filming) || this.state === 'play' || this.state === 'morning' || this.state === 'dawn' || this.state === 'dusk' || this.state === 'dying' || this.state === 'escape';
       this.rain.setVisible(live);
       if (live) {
         const p = this.player;
@@ -2824,7 +2828,8 @@ export class Game {
     const p = sp || this.player;
     const fx = this.fx;
     const sh = fx.trauma * fx.trauma;
-    const introCam = this.state === 'intro' && this.opening.applyCamera(camera);
+    // (5.0b) a chapter's film on «Топь» is a cut scene too: its camera, no hands, no body
+    const introCam = (this.state === 'intro' && this.opening.applyCamera(camera)) || (this.state === 'level2' && !!this.level2?.applyCamera(camera));
     const cutCam = introCam || ((this.state === 'escape' || this.state === 'won') && this.escape.applyCutCamera(camera));
     if (cutCam) {
       // the fly-by's camera (a hit from the gate still shakes it)

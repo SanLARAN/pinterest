@@ -205,9 +205,10 @@ test('seven chapters, each with a start on the map that is free to stand on', ()
   const seats = [0, 1, 2, 3].map((s) => houseFor(777, s).id);
   assert.equal(new Set(seats).size, 4, 'four seats, four houses');
   assert.notDeepEqual(seats, [0, 1, 2, 3].map((s) => houseFor(778, s).id));
-  // a start looks where it should: the convoy along the highway, the crash at the pine
-  const c = chapterStart('convoy', w, 0);
-  assert.ok(Math.abs(c.yaw - faceYaw(0, 0, 1, 0)) < 1e-9, 'the convoy chapter looks east, down the highway');
+  // (5.0b) in the convoy film everyone is in the car: their bodies wait where the film leaves them, on the dirt road
+  assert.deepEqual(chapterStart('convoy', w, 2), chapterStart('road', w, 2));
+  const c = chapterStart('road', w, 0);
+  assert.ok(Math.abs(c.yaw - faceYaw(ROADS[0].pts[0][0], ROADS[0].pts[0][1], ROADS[0].pts[1][0], ROADS[0].pts[1][1])) < 0.2, 'the road chapter looks up the dirt road');
 });
 
 test('a whole «Топь» Game: it starts in chapter 1 and walks every chapter to the end of the level', () => {
@@ -224,8 +225,10 @@ test('a whole «Топь» Game: it starts in chapter 1 and walks every chapter 
   game.startNight(); // (a debug ?night does nothing here)
   assert.equal(game.state, 'level2');
   for (let i = 0; i < 30; i++) frame(game);
-  // 1 → 2: a film, and Enter goes on
+  // 1 → 2: a film (5.0b: the real one), and Enter goes on — after a short fade
   frame(game, 1 / 60, ['confirm']);
+  assert.equal(game.level2.chapter.id, 'convoy', 'not on the same frame: the picture goes first');
+  for (let i = 0; i < 70; i++) frame(game);
   assert.equal(game.level2.chapter.id, 'road');
   const main = ROADS[0].pts;
   assert.ok(Math.hypot(game.player.x - main[0][0], game.player.z - main[0][1]) < 4, 'standing at the turn-off');

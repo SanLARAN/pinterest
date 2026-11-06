@@ -45,7 +45,7 @@ export function trafficAt(t, car) {
 }
 
 let _beaconTex;
-function beaconTexture() {
+export function beaconTexture() {
   if (_beaconTex) return _beaconTex;
   const n = 32, data = new Uint8Array(n * n * 4);
   for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
@@ -80,7 +80,8 @@ export function policeGeometry() {
     let col = 0;
     for (const letter of 'ПОЛИЦИЯ') {
       LETTERS[letter].forEach((row, j) => [...row].forEach((bit, i) => {
-        if (bit === '1') boxAt(b, (col + i - 13.5) * 0.043, 0.86 - j * 0.033, side * 0.847,
+        // (5.0b: side × — the far side read backwards, «ЯИЦИЛОП»)
+        if (bit === '1') boxAt(b, side * (col + i - 13.5) * 0.043, 0.86 - j * 0.033, side * 0.847,
           0.038, 0.028, 0.01, KIND.BONE);
       }));
       col += 4;

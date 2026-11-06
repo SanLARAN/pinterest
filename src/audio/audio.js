@@ -2362,6 +2362,305 @@ export class AudioEngine {
     };
   }
 
+  // ---------- (5.0b) «Кортеж»: the night highway, the convoy, the blockade, the arm ----------
+
+  // a convoy siren, where the car is: 'police' a quick wail, 'ambulance' the two-tone, 'fire' a slow deep wail.
+  // { move(x, y, z), stop() } — the same bounded Doppler as the opening's traffic
+  sirenLoop(kind, x, y, z) {
+    if (!this.ready) return null;
+    const P = {
+      police: { type: 'triangle', f: 900, lfo: 'sine', rate: 0.62, depth: 330, lp: 2600, g: 0.15 },
+      ambulance: { type: 'square', f: 730, lfo: 'square', rate: 0.95, depth: 115, lp: 1900, g: 0.09 },
+      fire: { type: 'sawtooth', f: 610, lfo: 'triangle', rate: 0.27, depth: 250, lp: 1700, g: 0.12 },
+    }[kind] || null;
+    if (!P) return null;
+    const t = this.now, pn = this._panner(x, y, z, 14, 0.85);
+    const out = this._gain(0), lp = this._filter('lowpass', P.lp, 0.8);
+    const osc = this._osc(P.type, P.f);
+    const sub = this._osc('sine', P.f / 2), sg = this._gain(0.25);
+    const lfo = this._osc(P.lfo, P.rate), lg = this._gain(P.depth), lg2 = this._gain(P.depth / 2);
+    lfo.connect(lg).connect(osc.frequency);
+    lfo.connect(lg2).connect(sub.frequency);
+    osc.connect(lp); sub.connect(sg).connect(lp);
+    const rs = this._gain(0.35);
+    lp.connect(out).connect(pn).connect(this.sfx);
+    pn.connect(rs).connect(this.revSend);
+    out.gain.setTargetAtTime(P.g, t, 0.25);
+    const srcs = [osc, sub, lfo];
+    srcs.forEach((s) => s.start(t));
+    let dead = false, lastT = t, lastD = Math.hypot(x - this.listener.x, z - this.listener.z);
+    const self = this;
+    return {
+      move(px, py, pz) {
+        if (dead || ![px, py, pz].every(Number.isFinite)) return;
+        const now = self.now, d = Math.hypot(px - self.listener.x, pz - self.listener.z), dt = now - lastT;
+        const radial = dt > 0.01 ? Math.max(-45, Math.min(45, (d - lastD) / dt)) : 0;
+        const dop = 343 / (343 + radial);
+        osc.frequency.setTargetAtTime(P.f * dop, now, 0.08);
+        sub.frequency.setTargetAtTime((P.f / 2) * dop, now, 0.08);
+        if (pn.positionX) {
+          pn.positionX.setTargetAtTime(px, now, 0.03); pn.positionY.setTargetAtTime(py, now, 0.03); pn.positionZ.setTargetAtTime(pz, now, 0.03);
+        } else pn.setPosition(px, py, pz);
+        lastD = d; lastT = now;
+      },
+      stop(fade = 0.4) {
+        if (dead) return;
+        dead = true;
+        const now = self.now;
+        out.gain.cancelScheduledValues(now);
+        out.gain.setTargetAtTime(0, now, fade / 3);
+        srcs.forEach((s) => { try { s.stop(now + fade + 0.2); } catch { /* */ } });
+      },
+    };
+  }
+
+  // The car radio of chapter 1: a night station, synthesized — a slow lo-fi loop (electric piano chords, a soft
+  // kit, the bass) through the same small speaker as carRadio. { tune(dur), cabin(k), crackle(k), off(fade) }:
+  // crackle 0..1 breaks the station up into static (something out there is drowning it), 1 is static alone.
+  nightRadio() {
+    if (!this.ready) return null;
+    const ctx = this.ctx;
+    const vol = () => Math.pow(settings.music ?? 0.55, 1.15) * 1.5;
+    const out = this._gain(0);
+    out.connect(this.master);
+    const cabin = this._filter('lowpass', 3400, 0.7);
+    cabin.connect(out);
+    const music = this._gain(0);
+    const hp = this._filter('highpass', 180, 0.7);
+    const peak = this._filter('peaking', 1300, 1.0);
+    peak.gain.value = 4;
+    const lp = this._filter('lowpass', 4200, 0.8);
+    const sh = this._shaper(this.distSoft);
+    const trim = this._gain(0.42);
+    music.connect(hp).connect(peak).connect(lp).connect(sh).connect(trim).connect(cabin);
+    const hiss = this._noise(this.pink), hissBand = this._filter('bandpass', 2600, 0.6), hissG = this._gain(0.011);
+    hiss.connect(hissBand).connect(hissG).connect(cabin);
+    const stat = this._noise(this.white), statBand = this._filter('bandpass', 1800, 1.6), statG = this._gain(0);
+    stat.connect(statBand).connect(statG).connect(cabin);
+    const t0 = this.now;
+    hiss.start(t0);
+    stat.start(t0);
+    out.gain.setValueAtTime(0.0001, t0);
+    out.gain.linearRampToValueAtTime(vol(), t0 + 0.4);
+    // the loop: 72 bpm, four chords a bar each (Am9, Fmaj9, Cmaj7, G6), a soft kit with a lazy swing
+    const BEAT = 60 / 72;
+    const midi = (m) => 440 * Math.pow(2, (m - 69) / 12);
+    const CH = [[45, 60, 64, 67, 71], [41, 57, 60, 64, 67], [48, 64, 67, 71, 74], [43, 59, 62, 64, 69]];
+    const key = (t, m, dur, g) => {
+      const f = midi(m);
+      for (const [mul, gg, d] of [[1, g, dur], [2, g * 0.22, dur * 0.35], [3.01, g * 0.06, dur * 0.18]]) {
+        const o = this._osc('sine', f * mul), e = this._gain(0);
+        o.connect(e).connect(music);
+        e.gain.setValueAtTime(0.0001, t);
+        e.gain.linearRampToValueAtTime(gg, t + 0.018);
+        e.gain.exponentialRampToValueAtTime(0.0001, t + d);
+        o.start(t); o.stop(t + d + 0.05);
+      }
+    };
+    const bass = (t, m, dur) => this._tone(t, { type: 'triangle', f: midi(m), a: 0.02, d: dur, gain: 0.22, dest: music });
+    const kick = (t) => this._tone(t, { f: 92, fEnd: 44, a: 0.004, d: 0.28, gain: 0.5, dest: music });
+    const snare = (t) => {
+      this._noiseBurst(t, { f: 1900, q: 0.9, a: 0.002, d: 0.16, gain: 0.16, dest: music });
+      this._tone(t, { f: 190, fEnd: 150, a: 0.002, d: 0.08, gain: 0.08, dest: music });
+    };
+    const hat = (t, g) => this._noiseBurst(t, { type: 'highpass', f: 7200, q: 0.7, a: 0.001, d: 0.045, gain: g, dest: music });
+    let next = 0, bar = 0, playing = false, dead = false;
+    const schedule = () => {
+      if (dead || !playing) return;
+      const now = this.now;
+      while (next < now + 0.6) {
+        const c = CH[bar % 4], t = next;
+        bass(t, c[0], BEAT * 1.7);
+        bass(t + BEAT * 2.5, c[0] + (bar % 2 ? 7 : 12), BEAT * 1.2);
+        c.slice(1).forEach((m, i) => key(t + 0.02 + i * 0.035, m, BEAT * 3.6, 0.05));
+        key(t + BEAT * 2.5, c[2 + (bar % 3)], BEAT * 1.4, 0.035); // a note picked out of the chord
+        for (let b = 0; b < 4; b++) {
+          const bt = t + b * BEAT;
+          if (b === 0 || (b === 2 && bar % 2)) kick(bt);
+          if (b === 2 && !(bar % 2)) kick(bt + BEAT * 0.55);
+          if (b === 1 || b === 3) snare(bt);
+          hat(bt, 0.05);
+          hat(bt + BEAT * 0.58, 0.03); // the swing
+        }
+        next += BEAT * 4;
+        bar++;
+      }
+    };
+    const timer = setInterval(schedule, 120);
+    let crackK = 0;
+    return {
+      tune: (dur = 1.4) => {
+        if (dead) return;
+        const n = this.now;
+        statG.gain.cancelScheduledValues(n);
+        statG.gain.setValueAtTime(0.0001, n);
+        statG.gain.linearRampToValueAtTime(0.15, n + 0.1);
+        for (let i = 0; i < 6; i++) statBand.frequency.setValueAtTime(900 + ((i * 1733) % 2600), n + (i * dur) / 6);
+        statG.gain.setValueAtTime(0.15, n + dur * 0.8);
+        statG.gain.linearRampToValueAtTime(0.0001, n + dur + 0.25);
+        music.gain.setValueAtTime(0.0001, n + dur * 0.75);
+        music.gain.linearRampToValueAtTime(1, n + dur + 0.3);
+        next = n + dur * 0.8;
+        playing = true;
+        schedule();
+      },
+      cabin: (k) => {
+        if (dead) return;
+        const n = this.now;
+        cabin.frequency.setTargetAtTime(1100 + 2300 * k, n, 0.12);
+        out.gain.setTargetAtTime(vol() * (0.4 + 0.6 * k), n, 0.12);
+      },
+      // the station breaks up: static rises, the music drops out in bursts, the band wanders
+      crackle: (k) => {
+        if (dead) return;
+        k = Math.max(0, Math.min(1, k));
+        const n = this.now;
+        if (Math.abs(k - crackK) < 0.01 && Math.random() > 0.3) return;
+        crackK = k;
+        const drop = Math.random() < k * 0.6;
+        statG.gain.setTargetAtTime(0.012 + 0.2 * k * (drop ? 1.4 : 0.7), n, 0.05);
+        music.gain.setTargetAtTime(drop ? 0.08 * (1 - k) : 1 - 0.85 * k, n, 0.04);
+        statBand.frequency.setTargetAtTime(700 + Math.random() * 2600, n, 0.08);
+      },
+      off: (fade = 0.15) => {
+        if (dead) return;
+        dead = true;
+        clearInterval(timer);
+        const n = this.now;
+        out.gain.cancelScheduledValues(n);
+        out.gain.setValueAtTime(out.gain.value, n);
+        out.gain.linearRampToValueAtTime(0.0001, n + fade);
+        setTimeout(() => {
+          try { hiss.stop(); stat.stop(); } catch { /* */ }
+          try { out.disconnect(); } catch { /* */ }
+        }, (fade + 0.2) * 1000);
+      },
+    };
+  }
+
+  // a police radio somewhere in the cordon: the beep, a voice you cannot make out, the squelch's tail
+  radioSquelch(x, y, z) {
+    if (!this.ready) return;
+    const t = this.now;
+    const pn = this._panner(x, y, z, 3.5, 1.0);
+    pn.connect(this.sfx);
+    this._tone(t, { type: 'square', f: 1420, a: 0.002, d: 0.07, gain: 0.05, dest: pn });
+    const dur = 0.9 + Math.random() * 1.1;
+    const n = this._noise(this.white), bp = this._filter('bandpass', 1150, 1.3), am = this._gain(0), g = this._gain(0);
+    const lfo = this._osc('square', 8 + Math.random() * 4), lfg = this._gain(0.5);
+    lfo.connect(lfg).connect(am.gain);
+    am.gain.value = 0.5;
+    n.connect(bp).connect(am).connect(g).connect(pn);
+    for (let i = 0; i < 8; i++) bp.frequency.setValueAtTime(800 + Math.random() * 1300, t + 0.1 + (i * dur) / 8);
+    g.gain.setValueAtTime(0.0001, t + 0.08);
+    g.gain.linearRampToValueAtTime(0.12, t + 0.12);
+    g.gain.setValueAtTime(0.12, t + 0.1 + dur);
+    g.gain.linearRampToValueAtTime(0.0001, t + 0.14 + dur);
+    n.start(t + 0.08, Math.random()); n.stop(t + 0.2 + dur);
+    lfo.start(t + 0.08); lfo.stop(t + 0.2 + dur);
+    this._noiseBurst(t + 0.16 + dur, { f: 2600, q: 0.6, a: 0.002, d: 0.14, gain: 0.08, dest: pn });
+  }
+
+  // the wait: a dread under everything, two low tones beating against each other. { set(k 0..1), stop() }
+  tensionDrone() {
+    if (!this.ready) return null;
+    const t = this.now;
+    const out = this._gain(0);
+    out.connect(this.sfx);
+    const a = this._osc('sine', 41.2), b = this._osc('sine', 43.7), c = this._osc('triangle', 82.4);
+    const cg = this._gain(0.2);
+    const n = this._noise(this.brown), lp = this._filter('lowpass', 120, 0.7), ng = this._gain(0.6);
+    a.connect(out); b.connect(out); c.connect(cg).connect(out);
+    n.connect(lp).connect(ng).connect(out);
+    const hi = this._osc('sine', 1318), hi2 = this._osc('sine', 1397), hg = this._gain(0);
+    hi.connect(hg); hi2.connect(hg); hg.connect(out);
+    const srcs = [a, b, c, n, hi, hi2];
+    srcs.forEach((s) => s.start(t));
+    let dead = false;
+    return {
+      set: (k) => {
+        if (dead) return;
+        const now = this.now;
+        k = Math.max(0, Math.min(1, k));
+        out.gain.setTargetAtTime(0.06 + 0.22 * k, now, 0.4);
+        lp.frequency.setTargetAtTime(90 + 180 * k, now, 0.4);
+        hg.gain.setTargetAtTime(0.004 * k * k, now, 0.6); // the thinnest whine on top, near the end
+      },
+      stop: (fade = 0.6) => {
+        if (dead) return;
+        dead = true;
+        const now = this.now;
+        out.gain.cancelScheduledValues(now);
+        out.gain.setTargetAtTime(0, now, fade / 3);
+        srcs.forEach((s) => { try { s.stop(now + fade + 0.3); } catch { /* */ } });
+      },
+    };
+  }
+
+  // the arm, up close: the earth under it giving, and a groan too low to have come from a throat
+  armGroan(x, y, z, k = 1) {
+    if (!this.ready) return;
+    const t = this.now, o = this._far(x, y, z, 12, 0.4, 0.6);
+    const n = this._noise(this.brown), lp = this._filter('lowpass', 70, 0.9), g = this._gain(0);
+    lp.frequency.setValueAtTime(60, t);
+    lp.frequency.linearRampToValueAtTime(240, t + 1.2);
+    lp.frequency.exponentialRampToValueAtTime(70, t + 3.6);
+    n.connect(lp).connect(g).connect(o);
+    this._env(g, t, 0.6, 0.5 * k, 3.0, 0.5);
+    n.start(t, Math.random() * 2); n.stop(t + 4.4);
+    this._tone(t + 0.2, { type: 'sawtooth', f: 37, fEnd: 26, a: 0.9, hold: 0.8, d: 2.4, gain: 0.09 * k, dest: o, rev: 0.6, detune: -10 });
+    this._tone(t + 0.35, { type: 'sawtooth', f: 55, fEnd: 41, a: 0.8, hold: 0.6, d: 2.0, gain: 0.05 * k, dest: o, rev: 0.6, detune: 13 });
+    for (let i = 0; i < 3; i++) this._noiseBurst(t + 0.3 + Math.random() * 1.6, { buf: this.brown, type: 'lowpass', f: 420, a: 0.02, d: 0.4, gain: 0.12 * k, dest: o }); // the wet creak of it
+  }
+
+  // it comes down on a car: a blow you feel, the roof folding, the glass going, the bits coming down after
+  armSlam(x, y, z, k = 1) {
+    if (!this.ready) return;
+    const t = this.now, o = this._far(x, y, z, 10, 0.45, 0.8);
+    this._tone(t, { f: 54, fEnd: 20, a: 0.004, d: 1.4, gain: 0.95 * k, dest: o, rev: 0.4 });
+    this._noiseBurst(t, { buf: this.brown, type: 'lowpass', f: 900, fEnd: 80, a: 0.003, d: 0.9, gain: 1.1 * k, dest: o, rev: 0.5 });
+    for (const [f, d] of [[183, 0.9], [262, 1.2], [397, 0.7], [523, 0.5]]) this._tone(t + 0.01, { type: 'square', f, fEnd: f * 0.82, a: 0.002, d, gain: 0.05 * k, dest: o, rev: 0.6 });
+    for (let i = 0; i < 10; i++) this._noiseBurst(t + i * 0.025 + Math.random() * 0.03, { f: 1500 + Math.random() * 3800, q: 3 + Math.random() * 5, a: 0.0008, d: 0.05 + Math.random() * 0.12, gain: 0.5 * k, dest: o });
+    for (let i = 0; i < 16; i++) this._noiseBurst(t + 0.04 + Math.random() * 0.7, { type: 'highpass', f: 4200 + Math.random() * 4500, q: 1, a: 0.0005, d: 0.03 + Math.random() * 0.08, gain: 0.22 * k, dest: o }); // glass
+    for (let i = 0; i < 6; i++) this._noiseBurst(t + 0.4 + i * 0.22 + Math.random() * 0.2, { buf: this.brown, type: 'lowpass', f: 320, a: 0.01, d: 0.35, gain: 0.25 * k, dest: o }); // what comes down after
+  }
+
+  // metal dragged along asphalt: a grinding shriek with a stutter in it
+  metalScrape(x, y, z, dur = 1.6) {
+    if (!this.ready) return;
+    const t = this.now, o = this._far(x, y, z, 8, 0.5, 0.6);
+    const n = this._noise(this.white), bp = this._filter('bandpass', 2300, 5), am = this._gain(0.6), g = this._gain(0);
+    const lfo = this._osc('square', 23), lg = this._gain(0.4);
+    lfo.connect(lg).connect(am.gain);
+    n.connect(bp).connect(am).connect(g).connect(o);
+    bp.frequency.setValueAtTime(1800, t);
+    bp.frequency.linearRampToValueAtTime(3100, t + dur);
+    this._env(g, t, 0.05, 0.3, dur * 0.6, dur * 0.4);
+    n.start(t, Math.random()); n.stop(t + dur + 0.2);
+    lfo.start(t); lfo.stop(t + dur + 0.2);
+    this._noiseBurst(t, { buf: this.brown, type: 'lowpass', f: 300, a: 0.02, d: dur, gain: 0.35, dest: o });
+  }
+
+  // tyres losing their grip on the asphalt
+  tyreScreech(x, y, z, dur = 1.0) {
+    if (!this.ready) return;
+    const t = this.now, o = this._far(x, y, z, 5, 0.7, 0.4);
+    const n = this._noise(this.pink), bp = this._filter('bandpass', 1700, 11), g = this._gain(0);
+    bp.frequency.setValueAtTime(1600, t);
+    bp.frequency.linearRampToValueAtTime(2300, t + dur * 0.4);
+    bp.frequency.linearRampToValueAtTime(1900, t + dur);
+    n.connect(bp).connect(g).connect(o);
+    this._env(g, t, 0.06, 0.55, dur * 0.5, dur * 0.4);
+    n.start(t, Math.random()); n.stop(t + dur + 0.2);
+  }
+
+  // a car horn in the queue, leaned on
+  filmHorn(x, y, z, dur = 0.5) {
+    if (!this.ready) return;
+    const t = this.now, o = this._far(x, y, z, 6, 0.6, 0.3);
+    for (const f of [415, 493]) this._tone(t, { type: 'square', f, a: 0.01, hold: dur, d: 0.08, gain: 0.05, dest: o });
+  }
+
   genHum(x, y, z, spinning = false) {
     if (!this.ready) return null;
     const t = this.now;
@@ -4258,12 +4557,13 @@ export class AudioEngine {
   }
 
   // a car on the highway, going by (far: a hiss of tyres and an engine note that drops as it passes)
-  carPass(x, y, z, dir, v) {
+  // (5.0b: dest — the film's cars go to the effects bus; the forest's far highway stays under the ambience)
+  carPass(x, y, z, dir, v, dest = null) {
     if (!this.ready) return;
     const t = this.now;
     const dur = 80 / v;
     const pn = this._panner(x, y, z, 14, 1.0);
-    pn.connect(this.amb);
+    pn.connect(dest || this.amb);
     if (pn.positionX) {
       pn.positionX.setValueAtTime(x, t);
       pn.positionX.linearRampToValueAtTime(x + dir * v * dur, t + dur);

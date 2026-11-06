@@ -441,6 +441,7 @@ export class GlowSticks {
     if (this.g.camItem) this.g.camItem.lightSources(out); // (4.0) a camera's flash: the brightest of them, for a sixth of a second
     if (this.g.fire) this.g.fire.lightSource(out); // the camp fire (only while there is one — see campfire.js)
     if (this.g.angler) this.g.angler.lightSource(out); // the Angler's storm lantern, from the third night
+    if (this.g.level2) this.g.level2.lightSources(out); // (5.0b) a chapter's film: beacons, a floodlight, a torch, the dash
     return out;
   }
 
