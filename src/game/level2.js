@@ -29,6 +29,7 @@ import { shared } from '../render/sonar.js';
 import { HIGHWAY, ROADS, CRASH, HOUSES, GATE, GENERATOR, CAUSEWAY, CLIFF } from '../world/swamp.js';
 import { swimming } from './water.js';
 import { ConvoyFilm } from './convoyFilm.js';
+import { RoadDrive } from './roadDrive.js';
 import { haloMaterial } from './glowsticks.js';
 import { beaconTexture } from './roadTraffic.js';
 
@@ -46,6 +47,9 @@ const TAIL = 4.5; // s from the lake to the end of the level (the pier film arri
 const SLOT_GAP = 1.6; // m between players at a shared start
 // the chapters that have their own film (the rest of the films are still stand-ins)
 export const FILMS = { convoy: ConvoyFilm };
+// (5.0c) the chapters that have their own play: the controller drives the chapter (its camera, its lights, its
+// end — `done` — and its restart after a death — `restart`, both decided on the host)
+export const PLAYS = { road: RoadDrive };
 
 // the yaw that looks from (fx, fz) toward (tx, tz) (the player looks along (-sin yaw, -cos yaw))
 export function faceYaw(fx, fz, tx, tz) {
@@ -103,12 +107,24 @@ export class Level2 {
     this.tail = -1; // s since the lake took you (the last chapter's end), -1 before
     this.done = false;
     this.film = null; // the running chapter's film (FILMS), if it has one
+    this.play = null; // ...or its play (PLAYS)
+    this.tries = 0; // deaths in this chapter (a retry starts a little gentler)
     this.lamps = null; // the sodium glows over the junction's lamp heads
   }
 
   // is a film on the screen right now? (the game keeps the player's hands, the remotes and the rain out of it)
   get filming() {
     return !!this.film && this.film.state === 'run';
+  }
+
+  // in a seat (the drive): the hands are on the wheel, not on the kit
+  get seated() {
+    return !!this.play?.seated;
+  }
+
+  // how close death is, for the picture (the game's fx.danger)
+  get danger() {
+    return this.play?.danger || 0;
   }
 
   get chapter() {
@@ -145,12 +161,15 @@ export class Level2 {
   _endFilm() {
     if (this.film) this.film.end();
     this.film = null;
+    this.play?.dispose();
+    this.play = null;
   }
 
   // put everyone at this chapter's start. remote: the host said so (a guest does not announce)
   goto(index, remote = false) {
     const g = this.g;
     if (index < 0 || index >= CHAPTERS.length) return;
+    this.tries = index === this.i ? this.tries + 1 : 0;
     this._endFilm();
     this.i = index;
     this.t = 0;
@@ -174,6 +193,11 @@ export class Level2 {
       this.film = new F(g);
       this.film.begin();
     }
+    const P = PLAYS[C.id];
+    if (P) {
+      this.play = new P(g);
+      this.play.begin(this.tries);
+    }
   }
 
   next() {
@@ -192,7 +216,8 @@ export class Level2 {
   // the film's camera (false when there is none): and the ears go where the camera is, so the small lights
   // nearest the picture are the ones that get the shader's slots
   applyCamera(camera) {
-    if (!this.filming || !this.film.applyCamera(camera)) return false;
+    const cam = this.filming ? this.film.applyCamera(camera) : !!this.play?.applyCamera(camera);
+    if (!cam) return false;
     const e = this.g._ears;
     if (e) { e.x = camera.position.x; e.y = camera.position.y; e.z = camera.position.z; }
     return true;
@@ -201,6 +226,7 @@ export class Level2 {
   // the small lights the film wants this frame (GlowSticks.lightSources asks)
   lightSources(out) {
     if (this.filming) this.film.lightSources(out);
+    else this.play?.lightSources(out);
   }
 
   // one frame. Returns the player's step events for the game's sounds (or nothing in a film)
@@ -218,6 +244,13 @@ export class Level2 {
       return null;
     }
     g.fx.fade = Math.max(g.fx.fade, smoothstep(0, 1.2, this.t));
+    if (this.play) {
+      // the chapter's own play: it ends, or it starts again, on the host's word
+      this.play.update(dt, raw);
+      if (g.auth && this.play.restart) this.goto(this.i);
+      else if (g.auth && this.play.done) this.next();
+      return null;
+    }
     if (C.film) {
       // (the stand-in film: you stand where it happens and look about; Enter goes on)
       g.player.update(dt, g.input, raw?.look || { dx: 0, dy: 0 }, true);

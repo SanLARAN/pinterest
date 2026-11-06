@@ -232,6 +232,16 @@ export class RoadArm {
     this._skin();
   }
 
+  // (5.0c) put it on a spine worked out elsewhere — the chase, a Корень: pose = { pos, rad, roll } as armPose returns
+  // (the arrays are read, not kept)
+  bend(pose) {
+    this.pose.pos.set(pose.pos);
+    this.pose.rad.set(pose.rad);
+    this.pose.roll.set(pose.roll);
+    this._frames();
+    this._skin();
+  }
+
   _frames() {
     const n = ARM.seg + 1, P = this.pose.pos, T = this.T, N = this.N, B = this.B;
     for (let i = 0; i < n; i++) {

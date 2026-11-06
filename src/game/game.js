@@ -587,12 +587,13 @@ export class Game {
     this.time += dt;
     const film = this.level2.filming; // (5.0b) a film: everyone is in the car — no bodies on the road, no hands
     if (this.online) {
-      this.netFrame(dt);
-      if (!film) this.updateRemotes(dt);
-      else for (const r of this.remotes.values()) r.rig.root.visible = false;
+      this.netFrame(dt); // (it moves the remotes too: once a frame is enough)
+      if (film) for (const r of this.remotes.values()) r.rig.root.visible = false;
     }
+    const seated = this.level2.seated; // (5.0c) in the car the hands are busy: the echo, nothing from the pack
     for (const e of this.inputMuted || film ? [] : raw.events) {
       if (e === 'pingDown') this.pingPress();
+      else if (seated) continue;
       else if (e === 'primary') this.inventory.primary();
       else if (e === 'secondary') this.inventory.secondary();
     }
@@ -613,7 +614,7 @@ export class Game {
     this.glows.update(dt);
     this.pulses.update(this.time);
     this._waterFrame();
-    this.fx.danger = 0;
+    this.fx.danger = this.level2.danger; // (5.0c: the arm behind the car)
     this._commonFx(dt);
   }
 

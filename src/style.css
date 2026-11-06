@@ -1709,3 +1709,17 @@ body.reel-open .panel.over-panel { filter: blur(1px) brightness(0.5); }
 .film-note a { color: var(--amber); }
 .film-note[data-state="fail"] { color: #e0362c; }
 @media (max-height: 560px) { .film-frame { width: 104px; } }
+
+/* (5.0c) «Топь», chapter 2: in the car — no crosshair, no radar; the navigator's paper map over everything */
+body.driving #crosshair, body.driving #radar { opacity: 0; }
+#l2map {
+  position: fixed; inset: 0; z-index: 40; display: grid; place-items: center;
+  background: rgba(0, 0, 0, 0.86); opacity: 0; pointer-events: none; transition: opacity 0.16s ease-out;
+}
+#l2map.open { opacity: 1; }
+#l2map canvas {
+  width: min(84vmin, 780px); height: min(84vmin, 780px);
+  transform: translateY(14px) rotate(-1.4deg); transition: transform 0.22s ease-out;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.7);
+}
+#l2map.open canvas { transform: translateY(0) rotate(-1.4deg); }

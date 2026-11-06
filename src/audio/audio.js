@@ -2661,6 +2661,123 @@ export class AudioEngine {
     for (const f of [415, 493]) this._tone(t, { type: 'square', f, a: 0.01, hold: dur, d: 0.08, gain: 0.05, dest: o });
   }
 
+  // ---------- (5.0c) «Грунтовка»: the chase, the roots, the car on the ruts ----------
+
+  // the arm coming after you along the road: the ground grinding under it, a groan in it, where it is.
+  // { move(x, y, z), set(k 0..1), stop() }
+  chaseRumble() {
+    if (!this.ready) return null;
+    const t = this.now;
+    const pn = this._panner(this.listener.x, this.listener.y, this.listener.z, 10, 0.55);
+    const out = this._gain(0);
+    out.connect(pn).connect(this.sfx);
+    const rs = this._gain(0.3);
+    pn.connect(rs).connect(this.revSend);
+    const n = this._noise(this.brown), lp = this._filter('lowpass', 130, 0.8), ng = this._gain(0.9);
+    n.connect(lp).connect(ng).connect(out);
+    const o = this._osc('sawtooth', 31), olp = this._filter('lowpass', 160, 1), og = this._gain(0.35);
+    o.connect(olp).connect(og).connect(out);
+    const am = this._osc('sine', 0.7), amg = this._gain(0.4);
+    am.connect(amg).connect(ng.gain);
+    const cr = this._noise(this.white), cbp = this._filter('bandpass', 900, 3), cg = this._gain(0);
+    cr.connect(cbp).connect(cg).connect(out); // the crackle of what it breaks
+    const srcs = [n, o, am, cr];
+    srcs.forEach((q) => q.start(t));
+    let dead = false;
+    const self = this;
+    return {
+      move(x, y, z) {
+        if (dead || ![x, y, z].every(Number.isFinite)) return;
+        const now = self.now;
+        if (pn.positionX) {
+          pn.positionX.setTargetAtTime(x, now, 0.05); pn.positionY.setTargetAtTime(y, now, 0.05); pn.positionZ.setTargetAtTime(z, now, 0.05);
+        } else pn.setPosition(x, y, z);
+      },
+      set(k) {
+        if (dead) return;
+        const now = self.now;
+        k = Math.max(0, Math.min(1, k));
+        out.gain.setTargetAtTime(0.55 * k, now, 0.25);
+        lp.frequency.setTargetAtTime(90 + 140 * k, now, 0.3);
+        cg.gain.setTargetAtTime(0.05 * k * (Math.random() < 0.5 ? 1 : 0.2), now, 0.04);
+        cbp.frequency.setTargetAtTime(500 + Math.random() * 1600, now, 0.05);
+      },
+      stop() {
+        if (dead) return;
+        dead = true;
+        const now = self.now;
+        out.gain.cancelScheduledValues(now);
+        out.gain.setTargetAtTime(0, now, 0.2);
+        srcs.forEach((q) => { try { q.stop(now + 1); } catch { /* */ } });
+      },
+    };
+  }
+
+  // the car on a dirt road: gravel under the tyres, louder and rougher off it. { set(v m/s, off), stop() }
+  gravelRoll() {
+    if (!this.ready) return null;
+    const t = this.now;
+    const out = this._gain(0);
+    out.connect(this.sfx);
+    const n = this._noise(this.pink), bp = this._filter('bandpass', 700, 0.8);
+    const n2 = this._noise(this.brown), lp = this._filter('lowpass', 160, 0.7), g2 = this._gain(0.8);
+    n.connect(bp).connect(out);
+    n2.connect(lp).connect(g2).connect(out);
+    n.start(t);
+    n2.start(t);
+    let dead = false;
+    const self = this;
+    return {
+      set(v, off = false) {
+        if (dead) return;
+        const now = self.now, k = Math.min(1, Math.abs(v) / 15);
+        out.gain.setTargetAtTime(k * (off ? 0.16 : 0.09), now, 0.1);
+        bp.frequency.setTargetAtTime(500 + 900 * k + (off ? 300 : 0), now, 0.1);
+        bp.Q.setTargetAtTime(off ? 0.5 : 0.9, now, 0.2);
+      },
+      stop() {
+        if (dead) return;
+        dead = true;
+        const now = self.now;
+        out.gain.setTargetAtTime(0, now, 0.1);
+        try { n.stop(now + 0.6); n2.stop(now + 0.6); } catch { /* */ }
+      },
+    };
+  }
+
+  // the road swelling: the earth giving from underneath, a crunch that climbs, roots tearing
+  rootSwell(x, y, z) {
+    if (!this.ready) return;
+    const t = this.now, o = this._far(x, y, z, 7, 0.6, 0.3);
+    const n = this._noise(this.brown), lp = this._filter('lowpass', 60, 1.2), g = this._gain(0);
+    lp.frequency.setValueAtTime(60, t);
+    lp.frequency.linearRampToValueAtTime(420, t + 1.15);
+    n.connect(lp).connect(g).connect(o);
+    this._env(g, t, 0.9, 0.6, 0.35, 0.2);
+    n.start(t, Math.random()); n.stop(t + 1.6);
+    for (let i = 0; i < 9; i++) this._noiseBurst(t + 0.2 + (i / 9) * 0.95 + Math.random() * 0.05, { f: 700 + Math.random() * 1800, q: 4, a: 0.001, d: 0.03 + Math.random() * 0.04, gain: 0.12 + i * 0.03, dest: o });
+  }
+
+  // ...and out of it: the ground bursting, a wet lash
+  rootStrike(x, y, z) {
+    if (!this.ready) return;
+    const t = this.now, o = this._far(x, y, z, 7, 0.6, 0.5);
+    this._noiseBurst(t, { buf: this.brown, type: 'lowpass', f: 1100, fEnd: 120, a: 0.002, d: 0.5, gain: 1.1, dest: o, rev: 0.4 });
+    this._tone(t, { f: 70, fEnd: 30, a: 0.003, d: 0.5, gain: 0.6, dest: o });
+    this._noiseBurst(t + 0.05, { f: 2400, fEnd: 700, q: 1.5, a: 0.004, d: 0.22, gain: 0.35, dest: o }); // the lash
+    for (let i = 0; i < 8; i++) this._noiseBurst(t + 0.15 + Math.random() * 0.6, { buf: this.brown, type: 'lowpass', f: 400, a: 0.005, d: 0.12, gain: 0.18, dest: o }); // clods coming down
+  }
+
+  // the car into something: a dull thud in the body, the springs, a rattle of glass and tin
+  carHit(x, y, z, k = 0.5) {
+    if (!this.ready) return;
+    const t = this.now, o = this._far(x, y, z, 4, 0.8, 0.2);
+    this._tone(t, { f: 95, fEnd: 45, a: 0.002, d: 0.35, gain: 0.7 * k, dest: o });
+    this._noiseBurst(t, { buf: this.brown, type: 'lowpass', f: 700, a: 0.002, d: 0.25, gain: 0.9 * k, dest: o });
+    this._tone(t + 0.01, { type: 'square', f: 230, fEnd: 190, a: 0.002, d: 0.3, gain: 0.04 * k, dest: o });
+    for (let i = 0; i < Math.round(4 + 8 * k); i++) this._noiseBurst(t + 0.02 + Math.random() * 0.3, { type: 'highpass', f: 3500 + Math.random() * 4000, a: 0.0005, d: 0.03, gain: 0.12 * k, dest: o });
+  }
+
   genHum(x, y, z, spinning = false) {
     if (!this.ready) return null;
     const t = this.now;

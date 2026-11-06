@@ -160,6 +160,9 @@ export class NetSync {
       case 'sy':
         if (!this.host && isHostMsg && Array.isArray(d)) g.stray?.applyNet(d);
         break;
+      case 'dv': // (5.0c) «Топь», chapter 2: the host's car, the chase behind it, the roots (game/roadDrive.js)
+        if (!this.host && isHostMsg && d) g.level2?.play?.applyNet?.(d);
+        break;
       case 'ob':
         if (d) {
           g.objectives.netMerge(d, g.remotes.get(pid));

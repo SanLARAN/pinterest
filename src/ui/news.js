@@ -7,6 +7,23 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v:'5.0c',date:'2026-11-06',
+    ru:{title:'Топь, глава 2: «Грунтовка»',items:[
+      'После кортежа ты за рулём. Машина хоста съезжает на грунтовку, и вести её теперь тебе: W — газ, S — тормоз и задний ход, A/D — руль. На грунтовке УАЗ разгоняется примерно до 47 км/ч, в лесу между деревьями еле ползёт. В повороте его держит только сцепление с грунтом, а врезаться в сосну можно по-настоящему.',
+      'Сзади идёт щупальце. Оно ползёт по твоему же следу, раз в пару секунд выныривает из земли, встаёт аркой над дорогой и бьёт туда, где ты только что был. Отстанешь — ударит по машине. Его видно в собственном красном свете и в стоп-сигналах, а гул слышно с той стороны, где оно идёт.',
+      'Новый монстр — Корень. Впереди на дороге вспучивается земля: красное кольцо в эхе, бугор с красным свечением, хруст снизу. Через секунду оттуда бьёт отросток. Уходи на другую сторону колеи: зацепит — машину развернёт и отбросит, а наехать прямо на него на скорости значит перевернуться.',
+      'Дорога три раза ветвится, и две ветки из трёх кончаются поваленным деревом. Карта у штурмана — у того, кто сидит рядом с водителем: держи TAB, смотри и говори водителю, куда поворачивать. Задние смотрят по сторонам и назад, всем доступно эхо на ПРОБЕЛ. Один на один ты держишь карту сам, но пока смотришь в неё, дороги не видишь.',
+      'Поймало щупальце или машина перевернулась — глава начинается сначала, у всех сразу. В коопе машину, погоню и корни ведёт хост. Доехал до конца дороги — дальше глава 3.',
+    ]},
+    en:{title:'The Mire, chapter 2: «The Dirt Road»',items:[
+      'After the convoy you are at the wheel. The host\'s car turns onto the dirt road, and now it is yours to drive: W for gas, S to brake and reverse, A/D to steer. On the dirt road the UAZ makes about 47 km/h; in the trees it barely crawls. In a bend only the grip on the dirt holds it, and you can really drive it into a pine.',
+      'The arm is behind you. It crawls along your own track, surfaces every couple of seconds, rears over the road in an arch and comes down where you just were. Fall behind and it comes down on the car. You see it in its own red light and in your tail lamps, and you hear its rumble from where it is.',
+      'A new monster, the Root. Ahead of you the road swells: a red ring in the echo, a mound with a red glow, a crunch from below. A second later a limb strikes up out of it. Get to the other side of the ruts: if it catches you the car is spun and thrown aside, and driving straight over it at speed puts the car on its roof.',
+      'The road forks three times, and two ways out of three end in a felled tree. The map is with the navigator, whoever sits beside the driver: hold TAB, read it and tell the driver where to turn. The back seats watch the sides and behind, and everyone has the echo on SPACE. Alone, you hold the map yourself, but while you read it you cannot see the road.',
+      'If the arm catches you or the car goes over, the chapter starts again, for everyone at once. In co-op the host runs the car, the chase and the roots. Reach the end of the road and chapter 3 begins.',
+    ]},
+  },
+  {
     v:'5.0b',date:'2026-11-06',
     ru:{title:'Топь, глава 1: «Кортеж»',items:[
       'Вторая карта теперь начинается с фильма. Ночь, трасса, машина хоста, в ней вся команда. Навстречу идёт фура и заливает салон светом фар. По радио играет ночная станция.',
