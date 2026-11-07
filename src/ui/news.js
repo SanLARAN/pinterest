@@ -7,6 +7,23 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v:'5.0e',date:'2026-11-07',
+    ru:{title:'Топь, главы 4 и 5: карта и «Генератор»',items:[
+      'В деревне теперь есть карта болота, порванная на четыре куска. В коопе у каждого свой кусок, остальные лежат на столах в домах, мимо которых ходит Сторож. Одному: твой кусок при тебе, три других — в домах.',
+      'E — взять кусок со стола. E рядом со свободным другом — отдать ему все свои куски. Погибший роняет свои там, где упал. TAB держит перед глазами то, что у тебя есть: недостающие части — тёмные рваные дыры.',
+      'Деревня кончается, когда все живые свободны и все четыре куска у одного. Он несёт карту дальше.',
+      'Глава 5 — «Генератор». Никто никуда не переносится: вы выходите из деревни сами. По пути открытая земля, а под ней Корень: жилы в земле, их видно эхом. Иди по ним — ничего. Постоишь на месте — земля вспучится, и через секунду он выйдет. Читать карту, стоя на жилах, — плохая мысль.',
+      'У ворот болота стоит генератор. Когда соберутся все, держи E — три рывка шнура, третий заводит. Фонари вдоль гати загораются один за другим, ворота распахиваются, и у них стоят Kugoo — по одному на каждого.',
+    ]},
+    en:{title:'The Mire, chapters 4 and 5: the map and «The Generator»',items:[
+      'The village now holds a map of the bog, torn into four pieces. In co-op each of you has one; the rest lie on tables in the houses the Keeper walks past. Alone, your own piece is on you and the other three are in the houses.',
+      'E takes a piece off a table. E beside a friend who is free gives them all your pieces. Anyone who dies drops theirs where they fall. TAB holds up what you have; the missing parts are dark torn holes.',
+      'The village is over when everyone alive is free and all four pieces are in one pair of hands. That player carries the map on.',
+      'Chapter 5 is «The Generator». Nobody is moved anywhere: you walk out of the village yourselves. On the way there is open ground, and the Root is under it: veins in the earth that the echo shows. Keep walking over them and nothing happens. Stand still and the ground swells, and a second later it comes up. Reading the map while standing on the veins is a bad idea.',
+      'By the gate to the bog stands a generator. Once everyone is there, hold E: three pulls of the cord, and the third starts it. The lamps along the causeway come on one after another, the gate swings open, and the Kugoos stand beside it — one for each of you.',
+    ]},
+  },
+  {
     v:'5.0d',date:'2026-11-07',
     ru:{title:'Топь, главы 3 и 4: «Удар» и «Деревня»',items:[
       'Глава 3 — фильм. Щупальце в последний раз встаёт за машиной и бьёт мимо, водитель бросает руль, дорога кончается — и сосна. Белый удар, звон в ушах, темнота. А потом обрывки: обломки в свете уцелевшей фары, две высокие тени, земля под тобой в свете чужого фонаря, столб за спиной.',

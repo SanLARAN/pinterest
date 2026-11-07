@@ -11,6 +11,11 @@
 // The host decides everything (the keeper, the ropes, who is caught): a guest sends its struggle and its creaks
 // ('vq') and an untie it finished ('vu'); the host sends the keeper and every player's state ('vg', 10 Hz).
 // Death here is the chapter's own: solo it starts again; in co-op the fallen wait for the others to finish.
+//
+// (5.0e) The map of the bog, torn in four (game/bogMap.js): each of you comes to with the piece of your seat, and
+// the pieces nobody has lie on the tables of the keeper's houses. E takes one off a table, E at a friend hands them
+// all your pieces; a body that falls drops what it carried. TAB holds up what you have. The chapter is over when
+// everyone alive is free and the four pieces are in one pair of hands — that player carries the map into chapter 5.
 import * as THREE from 'three';
 import { clamp, damp, smoothstep, angleDiff } from '../core/rng.js';
 import { t } from '../core/i18n.js';
@@ -18,6 +23,8 @@ import { HOUSES, houseFor } from '../world/swamp.js';
 import { poseBound, poseCarried, poseSprawled } from './survivor.js';
 import { KeeperBody, KEEP, hears, sees, yawTo, detour, insideHouse } from './keeper.js';
 import { MOON } from './convoyFilm.js';
+import { MeshBuilder, KIND } from '../world/builder.js';
+import { PIECES, piecePlan, tableSpot, drawBogMap, MapOverlay } from './bogMap.js';
 
 const NO_LOOK = { dx: 0, dy: 0 };
 export const ROPE = {
@@ -28,6 +35,7 @@ export const ROPE = {
   untieR: 1.6,
 };
 export const VILLAGE = { allT: 2.2, deadT: 3.2, netHz: 10 };
+export const PIECE = { takeR: 1.5, giveR: 2.2 }; // (5.0e) m: a piece off a table, the map to a friend
 export const STATES = ['bound', 'free', 'carried', 'dead'];
 export const MODES = ['look', 'walk', 'go', 'enter', 'check', 'search', 'chase', 'carry', 'tie', 'kill', 'leave'];
 
@@ -90,6 +98,8 @@ export class VillagePlay {
     this.creakT = 0;
     this.local = { meter: 0, creak: 0, sentM: -1, sendT: 0, tight: 0 };
     this.cues = new Set();
+    this.pieces = []; // (5.0e) [{ k, holder, at: { x, y, z } }] — the host's word; a guest's copy follows 'vg'
+    this.papers = [];
   }
 
   get me() { return this.g.player.id ?? 'me'; }
@@ -121,6 +131,14 @@ export class VillagePlay {
     const at = d0 ? d0.out : this.houses[this.round[0]];
     this.K = { x: at.x, z: at.z, yaw: d0 ? yawTo(d0.out.x, d0.out.z, d0.mid.x, d0.mid.z) : 0, mode: 'look', t: tries > 0 ? KEEP.look : 1.0, ri: 0, hi: this.round[0], target: null, goal: null, lost: 0, phase: 0, spd: 0, lit: 1 };
     this.view = { x: this.K.x, z: this.K.z, yaw: this.K.yaw, mode: 'look', phase: 0, spd: 0 };
+    // (5.0e) the map's pieces: in the hands of their seats, the rest on the tables of his round (then the nearest)
+    const home = hostP ? this.houses[hostP.hi] : this.houses[first];
+    const byNear = this.houses.map((h, i) => [i, Math.hypot(h.x - home.x, h.z - home.z)]).sort((a, b) => a[1] - b[1]).map(([i]) => i);
+    const near = [...this.round, ...byNear.filter((i) => !this.round.includes(i))];
+    const seats = [...this.players.values()].map((P) => ({ id: P.id, slot: P.slot })).sort((a, b) => a.slot - b.slot);
+    this.pieces = piecePlan(seats, near, occ).map((q) => ({ k: q.k, holder: q.holder, at: q.hi === null ? null : tableSpot(this.houses[q.hi]), hi: q.hi }));
+    this._papers();
+    this.map = new MapOverlay();
     for (const d of g.doors?.list || []) if (this.byId.has(d.id)) { d.open = false; d.ang = 0; d.vel = 0; g.doors._place?.(d); }
     this._placeMe(true);
   }
@@ -128,7 +146,40 @@ export class VillagePlay {
   dispose() {
     this.body?.dispose();
     this.body = null;
+    for (const m of this.papers) { m.removeFromParent(); m.geometry.dispose(); }
+    this.papers = [];
+    this.map?.hide();
     this.g.hud?.setUse(null);
+  }
+
+  // a piece of the map lying somewhere: a folded sheet (in the world's material: a lamp or the echo finds it)
+  _papers() {
+    const g = this.g;
+    for (const q of this.pieces) {
+      const b = new MeshBuilder(64);
+      b.place(0, 0.006, 0, 0, 0.3 + q.k * 0.7, 0);
+      b.box(0.24, 0.012, 0.17, KIND.BONE);
+      b.place(0.05, 0.02, 0.02, 0, 0.3 + q.k * 0.7, 0.32);
+      b.box(0.12, 0.008, 0.16, KIND.BONE);
+      const m = new THREE.Mesh(b.toGeometry(), g.world.material);
+      m.frustumCulled = false;
+      m.visible = false;
+      g.scene?.add(m);
+      this.papers[q.k] = m;
+    }
+  }
+
+  // whose hands hold all four (alive), or null
+  _whole() {
+    const h = this.pieces[0]?.holder;
+    if (!h || this.pieces.length < PIECES || !this.pieces.every((q) => q.holder === h)) return null;
+    const P = this.players.get(h);
+    return P && P.st !== 'dead' ? h : null;
+  }
+
+  // how many pieces these hands hold
+  held(id = this.me) {
+    return this.pieces.filter((q) => q.holder === id).length;
   }
 
   // who is in the chapter: me and every friend; anyone new comes to tied in their own house
@@ -140,7 +191,7 @@ export class VillagePlay {
       if (this.players.has(id)) continue;
       const hid = houseFor(seed, slot).id, hi = this.byId.get(hid) ?? 0;
       const H = this.houses[hi], door = this._door(hi);
-      this.players.set(id, { id, st: 'bound', hi, H, door, seat: seatAt(H, door), meter: 0, caught: 0, creak: 0, tight: 0, spd: 0, px: null, pz: null });
+      this.players.set(id, { id, slot, st: 'bound', hi, H, door, seat: seatAt(H, door), meter: 0, caught: 0, creak: 0, tight: 0, spd: 0, px: null, pz: null });
     }
     for (const id of [...this.players.keys()]) if (!ids.some((q) => q.id === id)) this.players.delete(id);
   }
@@ -169,12 +220,16 @@ export class VillagePlay {
         g.sync.send('vg', this.pack());
       }
     }
-    // the end: everyone alive free and out under the sky; or nobody left
+    // the end: everyone alive free, and the four pieces of the map in one pair of hands (5.0e); or nobody left
     if (g.auth) {
       const live = [...this.players.values()].filter((P) => P.st !== 'dead');
-      const out = live.length > 0 && live.every((P) => P.st === 'free' && !this._indoors(P.id));
+      const whole = this._whole();
+      const out = live.length > 0 && !!whole && live.every((P) => P.st === 'free');
       this.allT = out ? this.allT + dt : 0;
-      if (this.allT >= VILLAGE.allT) this.done = true;
+      if (this.allT >= VILLAGE.allT) {
+        this.done = true;
+        if (g.level2) g.level2.mapHolder = whole; // (the map goes on into chapter 5 in these hands)
+      }
       this.deadT = live.length ? 0 : this.deadT + dt;
       if (this.deadT >= VILLAGE.deadT) this.restart = true;
     }
@@ -197,6 +252,14 @@ export class VillagePlay {
       P.px = p.x; P.pz = p.z;
     }
     K.t += dt;
+    for (const q of this.pieces) {
+      if (!q.holder) continue;
+      const P = this.players.get(q.holder), p = this._pl(q.holder);
+      if (!P || P.st === 'dead') {
+        q.holder = null;
+        q.at = p ? { x: p.x, y: this._floor(p.x, p.z) + 0.02, z: p.z } : q.at;
+      }
+    }
     const free = [...this.players.values()].filter((P) => P.st === 'free');
     // what his lantern shows him (not while his hands are full)
     if (!['carry', 'tie', 'kill'].includes(K.mode)) {
@@ -381,6 +444,31 @@ export class VillagePlay {
     P.meter = 1;
   }
 
+  // (5.0e) a piece off a table, or all of one's pieces to a friend ('vp': ['take', k] | ['give', id]); the host
+  // checks they were there
+  hostPiece(pid, d) {
+    if (!Array.isArray(d)) return false;
+    const P = this.players.get(pid), p = this._pl(pid);
+    if (!P || P.st !== 'free' || !p) return false;
+    if (d[0] === 'take') {
+      const q = this.pieces.find((x) => x.k === (d[1] | 0));
+      if (!q || q.holder || !q.at || Math.hypot(q.at.x - p.x, q.at.z - p.z) > PIECE.takeR + 1) return false;
+      q.holder = pid;
+      q.at = null;
+      this._cue('take:' + pid + ':' + q.k);
+      return true;
+    }
+    if (d[0] === 'give') {
+      const Q = this.players.get(d[1]), to = this._pl(d[1]);
+      if (!Q || Q.st !== 'free' || !to || Q.id === pid || Math.hypot(to.x - p.x, to.z - p.z) > PIECE.giveR + 1) return false;
+      let n = 0;
+      for (const q of this.pieces) if (q.holder === pid) { q.holder = Q.id; n++; }
+      if (n) this._cue('give:' + Q.id + ':' + pid + ':' + this.t.toFixed(1));
+      return n > 0;
+    }
+    return false;
+  }
+
   // ---------------- the wire ----------------
   pack() {
     const r2 = (v) => Math.round(v * 100) / 100, K = this.K;
@@ -388,6 +476,7 @@ export class VillagePlay {
       k: [r2(K.x), r2(K.z), r2(K.yaw), MODES.indexOf(K.mode), r2(K.spd), K.target || ''],
       p: [...this.players.values()].map((P) => [P.id, STATES.indexOf(P.st), P.hi, r2(P.meter), P.caught, P.creak, P.tight]),
       c: [...this.cues],
+      m: this.pieces.map((q) => [q.holder || '', q.at ? r2(q.at.x) : 0, q.at ? r2(q.at.y) : 0, q.at ? r2(q.at.z) : 0]),
     };
   }
 
@@ -415,6 +504,12 @@ export class VillagePlay {
       if ((e[6] | 0) !== P.tight) { P.tight = e[6] | 0; if (e[0] === this.me) this.local.meter = 0; }
     }
     for (const c of d.c || []) this.cues.add(c);
+    if (Array.isArray(d.m)) d.m.forEach((e, k) => {
+      const q = this.pieces[k];
+      if (!q || !Array.isArray(e)) return;
+      q.holder = e[0] || null;
+      q.at = q.holder ? null : { x: +e[1] || 0, y: +e[2] || 0, z: +e[3] || 0 };
+    });
   }
 
   // a guest: the keeper glides to where the host has him
@@ -437,9 +532,11 @@ export class VillagePlay {
       const pev = p.update(dt, g.input, look, g.inputMuted || g.inventory?.active);
       p.roll = damp(p.roll || 0, 0, 4, dt);
       this._interact(dt, raw);
+      this._map();
       return pev;
     }
     g.hud.setUse(null);
+    this.map?.hide();
     p.vx = p.vz = 0;
     p.speed = 0;
     p.sprinting = false;
@@ -465,6 +562,14 @@ export class VillagePlay {
       g.fx.fade = Math.min(g.fx.fade, 1 - smoothstep(0, 1.6, this.deadClock = (this.deadClock || 0) + dt) * 0.8);
     }
     return null;
+  }
+
+  // TAB: what you have of the map, held up (hands free only)
+  _map() {
+    const g = this.g, have = [0, 1, 2, 3].map((k) => this.pieces[k]?.holder === this.me);
+    const want = have.some(Boolean) && !g.inputMuted && !!g.input?.peekHeld;
+    this.mapOpen = want;
+    this.map?.show(want, (ctx, S) => drawBogMap(ctx, S, have, g.player, this.houses));
   }
 
   _floor(x, z) {
@@ -535,6 +640,21 @@ export class VillagePlay {
       if (d < ROPE.untieR && d < bd) { bd = d; best = { kind: 'rope', P }; }
     }
     if (!best) {
+      for (const q of this.pieces) {
+        if (q.holder || !q.at) continue;
+        const d = Math.hypot(q.at.x - p.x, q.at.z - p.z);
+        if (d < PIECE.takeR && d < bd) { bd = d; best = { kind: 'piece', q }; }
+      }
+    }
+    if (!best && this.held() > 0) {
+      for (const P of this.players.values()) {
+        if (P.id === this.me || P.st !== 'free') continue;
+        const q = this._pl(P.id);
+        const d = q ? Math.hypot(q.x - p.x, q.z - p.z) : Infinity;
+        if (d < PIECE.giveR && d < bd) { bd = d; best = { kind: 'give', P }; }
+      }
+    }
+    if (!best) {
       g.doors?.consider((d, x, z, r) => {
         const dx = x - p.x, dz = z - p.z, dd = Math.hypot(dx, dz);
         if (dd > r || dd > bd) return;
@@ -544,6 +664,24 @@ export class VillagePlay {
       });
     }
     if (!best) { this.untieT = 0; g.hud.setUse(null); return; }
+    if (best.kind === 'piece') {
+      this.untieT = 0;
+      g.hud.setUse(t('usePiece'), 0, true);
+      if (ev.includes('useDown')) {
+        if (g.auth) this.hostPiece(this.me, ['take', best.q.k]);
+        else g.coop?.toHost('vp', ['take', best.q.k]);
+      }
+      return;
+    }
+    if (best.kind === 'give') {
+      this.untieT = 0;
+      g.hud.setUse(t('useGiveMap').replace('{name}', g.nameOf(this._pl(best.P.id) || best.P.id)), 0, true);
+      if (ev.includes('useDown')) {
+        if (g.auth) this.hostPiece(this.me, ['give', best.P.id]);
+        else g.coop?.toHost('vp', ['give', best.P.id]);
+      }
+      return;
+    }
     if (best.kind === 'door') {
       this.untieT = 0;
       g.hud.setUse(t(g.doors.prompt(best.d)), 0, true);
@@ -566,6 +704,12 @@ export class VillagePlay {
 
   // ---------------- drawing ----------------
   _draw(dt) {
+    for (const q of this.pieces) {
+      const m = this.papers[q.k];
+      if (!m) continue;
+      m.visible = !q.holder && !!q.at;
+      if (m.visible) m.position.set(q.at.x, q.at.y, q.at.z);
+    }
     const K = this.K, b = this.body;
     if (!K || !b) return;
     const y = this._floor(K.x, K.z);
@@ -638,7 +782,12 @@ export class VillagePlay {
       (this.heard ||= new Set()).add(c);
       const [kind, id] = c.split(':');
       const mine = id === this.me;
-      if (kind === 'caught') {
+      if (kind === 'take' || kind === 'give') {
+        // a piece of paper changing hands
+        const who = this._pl(id);
+        if (who) au.paperRustle?.(who.x, (who.y || 0) + 1.1, who.z);
+        if (mine) g.hud.flashAlert?.(t(kind === 'take' ? 'villageGotPiece' : 'villageGotMap').replace('{n}', this.held()).replace('{m}', PIECES), 'info', 1.6);
+      } else if (kind === 'caught') {
         g.addTrauma?.(mine ? 0.7 : 0.2);
         au.koThud?.(K.x, this._floor(K.x, K.z) + 1.2, K.z, mine ? 1.2 : 0.6);
         if (mine) { g.hud.setIntro(t('villageCaught'), t('villageCaughtS')); this.introT = this.t; }
@@ -664,8 +813,13 @@ export class VillagePlay {
       if (this.t > 5.2) g.hud.setHint(t(near ? 'villageNear' : 'villageWork'));
     } else if (P.st === 'carried') g.hud.setHint(t('villageCarried'));
     else if (P.st === 'free') {
+      if (this.mapOpen) { g.hud.setHint(null); return; }
       const others = [...this.players.values()].some((q) => q.id !== this.me && q.st === 'bound');
-      g.hud.setHint(t(others ? 'villageFind' : this._indoors(this.me) ? 'villageOut' : 'villageAll'));
+      const whole = this._whole();
+      const n = this.held();
+      if (others) g.hud.setHint(t('villageFind'));
+      else if (whole) g.hud.setHint(whole === this.me ? t('villageMapDone') : t('villageMapWith').replace('{name}', g.nameOf(this._pl(whole) || whole)));
+      else g.hud.setHint(t(n ? 'villagePieces' : 'villageNoPiece').replace('{n}', n).replace('{m}', PIECES));
     } else g.hud.setHint(null);
   }
 

@@ -244,16 +244,21 @@ test('a whole «Топь» Game: it starts in chapter 1 and walks every chapter 
   assert.equal(game.level2.chapter.id, 'village');
   const H = world.houses.find((h) => h.id === houseFor(game.baseSeed, 0).id);
   assert.ok(Math.hypot(game.player.x - H.x, game.player.z - H.z) < 4, 'you come to inside your house');
-  // 4 → 5 → 6: (5.0d) free of the rope and out of the house ends the village; the generator wants your hand on it
-  game.level2.play.mine.st = 'free';
-  game.level2.play.K.x += 400;
+  // 4 → 5 → 6: (5.0d/e) free of the rope with the map whole ends the village; the generator wants your hand on its cord
+  const vp = game.level2.play;
+  vp.mine.st = 'free';
+  vp.K.x += 400;
+  for (const q of vp.pieces) q.holder = vp.me;
   put(game, H.x + 12, H.z + 12);
   for (let i = 0; i < 60 * 3; i++) frame(game);
   assert.equal(game.level2.chapter.id, 'generator');
   put(game, GENERATOR.x + 1.6, GENERATOR.z + 1.2);
   for (let i = 0; i < 10; i++) frame(game);
   assert.equal(game.level2.chapter.id, 'generator', 'standing next to it is not starting it');
-  frame(game, 1 / 60, ['useDown']);
+  game.input.useHeld = true;
+  for (let i = 0; i < 60 * 3.2; i++) frame(game);
+  game.input.useHeld = false;
+  for (let i = 0; i < 60 * 6.2; i++) frame(game);
   assert.equal(game.level2.chapter.id, 'escape');
   // 6 → 7: the far end of the causeway
   const e = CAUSEWAY.pts[CAUSEWAY.pts.length - 1];

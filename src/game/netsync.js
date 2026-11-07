@@ -172,6 +172,15 @@ export class NetSync {
       case 'vu': // ...a guest untied someone (the host checks they were at the post)
         if (this.host && typeof d === 'string') g.level2?.play?.hostUntie?.(d, pid);
         break;
+      case 'vp': // (5.0e) ...a guest took a piece of the map off a table, or gave its pieces to a friend
+        if (this.host && Array.isArray(d)) g.level2?.play?.hostPiece?.(pid, d);
+        break;
+      case 'gv': // (5.0e) chapter 5, the mouth of the bog: who is alive, the strikes, the generator (game/bogMouth.js)
+        if (!this.host && isHostMsg && d) g.level2?.play?.applyMouth?.(d);
+        break;
+      case 'gq': // ...a guest pulled the cord to the end (the host checks everyone is there)
+        if (this.host) g.level2?.play?.hostStart?.(pid);
+        break;
       case 'ob':
         if (d) {
           g.objectives.netMerge(d, g.remotes.get(pid));

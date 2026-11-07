@@ -8,7 +8,7 @@
 //   2 road       play  the dirt road: the driver, the forks and the navigator, the Корень  (5.0c)
 //   3 crash      film  the arm missing, the pine, the black, the pieces                     (5.0d ✓)
 //   4 village    play  tied up in a random house, the Сторож, finding each other           (5.0d ✓)
-//   5 generator  play  the map pieces put together, the generator at the mouth of the bog  (5.0e)
+//   5 generator  play  the map in one pair of hands, the nerves, the generator, the gate   (5.0e ✓)
 //   6 escape     play  the Kugoo bikes down the causeway                                    (5.0f)
 //   7 cliff      play  off the cliff into the lake → the pier, the old fisherman, the end   (5.0f)
 //
@@ -16,6 +16,11 @@
 // play chapter is walked on foot to its goal. That is enough to cross the whole level end to end. A chapter that
 // has its film (FILMS) runs it instead: the film owns the camera, the small lights and the picture's fade, and the
 // chapter ends when the film does (or the host skips it).
+//
+// (5.0e) Chapter 5 starts where chapter 4 ended (`stay`): you walk out of the village yourselves. The mouth of the
+// bog — the gate's leaves, the causeway lamps, the bikes, the generator's hum — is the level's (game/bogMouth.js
+// BogMouth): shut and dark until the generator catches, open and lit for every chapter after it. The map of the bog
+// (game/bogMap.js) goes from the village into chapter 5 in the hands that put it together (`mapHolder`).
 //
 // (5.0b) The junction's lamps over the highway (world/swamp.js HIGHWAY.lamps) are lit for the whole level: the
 // shader's uRoad, and a sodium glow over each head.
@@ -32,6 +37,7 @@ import { ConvoyFilm } from './convoyFilm.js';
 import { RoadDrive } from './roadDrive.js';
 import { CrashFilm } from './crashFilm.js';
 import { VillagePlay } from './village.js';
+import { GeneratorPlay, BogMouth, EDGE } from './bogMouth.js';
 import { haloMaterial } from './glowsticks.js';
 import { beaconTexture } from './roadTraffic.js';
 
@@ -40,7 +46,7 @@ export const CHAPTERS = [
   { id: 'road' },
   { id: 'crash', film: true, dur: 19 },
   { id: 'village' },
-  { id: 'generator' },
+  { id: 'generator', stay: true }, // (5.0e: from where the village left you)
   { id: 'escape' },
   { id: 'cliff' },
 ];
@@ -51,7 +57,7 @@ const SLOT_GAP = 1.6; // m between players at a shared start
 export const FILMS = { convoy: ConvoyFilm, crash: CrashFilm };
 // (5.0c) the chapters that have their own play: the controller drives the chapter (its camera, its lights, its
 // end — `done` — and its restart after a death — `restart`, both decided on the host)
-export const PLAYS = { road: RoadDrive, village: VillagePlay }; // (5.0d: the village — the play walks you itself)
+export const PLAYS = { road: RoadDrive, village: VillagePlay, generator: GeneratorPlay }; // (5.0d/e: plays you walk in walk you themselves)
 
 // the yaw that looks from (fx, fz) toward (tx, tz) (the player looks along (-sin yaw, -cos yaw))
 export function faceYaw(fx, fz, tx, tz) {
@@ -75,7 +81,7 @@ export function chapterStart(id, world, slot = 0, seed = 0) {
       const p = H.post || { x: H.x, z: H.z };
       return at(p.x + (H.x - p.x) * 0.35, p.z + (H.z - p.z) * 0.35, H.x, H.z);
     }
-    case 'generator': return at(GATE.x - 18 + side, GATE.z + 6, GENERATOR.x, GENERATOR.z);
+    case 'generator': return at(EDGE.x + side * 0.3, EDGE.z + side, GATE.x, GATE.z); // (a retry, a debug jump: the edge of the village)
     case 'escape': return at(CAUSEWAY.pts[0][0] - 2, CAUSEWAY.pts[0][1] + side * 0.4, CAUSEWAY.pts[1][0], CAUSEWAY.pts[1][1]);
     case 'cliff': { const e = CAUSEWAY.pts[CAUSEWAY.pts.length - 1]; return at(e[0], e[1] + side * 0.4, CLIFF.x, CLIFF.z); }
     default: return at(world.spawn.x, world.spawn.z, 0, 0);
@@ -107,6 +113,8 @@ export class Level2 {
     this.play = null; // ...or its play (PLAYS)
     this.tries = 0; // deaths in this chapter (a retry starts a little gentler)
     this.lamps = null; // the sodium glows over the junction's lamp heads
+    this.mapHolder = null; // (5.0e) whose hands the map of the bog is in
+    this.mouth = null; // (5.0e) the gate, the causeway lamps, the bikes
   }
 
   // is a film on the screen right now? (the game keeps the player's hands, the remotes and the rain out of it)
@@ -132,7 +140,9 @@ export class Level2 {
   begin(index = 0) {
     this.done = false;
     this.tail = -1;
+    this.mapHolder = null;
     this._roadLamps(true);
+    if (!this.mouth && this.g.world?.swamp) this.mouth = new BogMouth(this.g);
     this.goto(Math.max(0, Math.min(CHAPTERS.length - 1, index | 0)));
   }
 
@@ -166,6 +176,7 @@ export class Level2 {
   goto(index, remote = false) {
     const g = this.g;
     if (index < 0 || index >= CHAPTERS.length) return;
+    const stay = !!CHAPTERS[index].stay && this.i === index - 1; // (on from the chapter before: nobody is moved)
     this.tries = index === this.i ? this.tries + 1 : 0;
     this._endFilm();
     this.i = index;
@@ -173,14 +184,18 @@ export class Level2 {
     this.tail = -1;
     const C = CHAPTERS[index];
     const p = g.player;
-    const s = chapterStart(C.id, g.world, p.slot || 0, g.baseSeed || 0);
-    p.x = s.x;
-    p.z = s.z;
-    p.yaw = s.yaw;
-    p.pitch = -0.04;
-    p.vx = p.vz = 0;
-    p.y = g.world.walkHeight?.(s.x, s.z) ?? g.world.terrain.height(s.x, s.z);
-    g.fx.fade = 0; // every chapter opens out of the black
+    if (!stay) {
+      const s = chapterStart(C.id, g.world, p.slot || 0, g.baseSeed || 0);
+      p.x = s.x;
+      p.z = s.z;
+      p.yaw = s.yaw;
+      p.pitch = -0.04;
+      p.vx = p.vz = 0;
+      p.y = g.world.walkHeight?.(s.x, s.z) ?? g.world.terrain.height(s.x, s.z);
+      g.fx.fade = 0; // every chapter opens out of the black
+    } else g.fx.fade = Math.min(g.fx.fade, 0.35); // (staying: a dip, not the black)
+    p.roll = 0;
+    this.mouth?.chapter(index);
     g.hud.setIntro(t('l2Ch').replace('{n}', index + 1) + ' · ' + t('l2_' + C.id), t('l2_' + C.id + 'S'));
     g.hud.setHint(null);
     g.hud.setSkip(!!C.film);
@@ -206,6 +221,7 @@ export class Level2 {
     if (this.done) return;
     this.done = true;
     this._endFilm();
+    this.mouth?.quiet();
     if (this.g.role === 'host') this.g.sync?.ev?.('l2', CHAPTERS.length);
     this.g.winLevel2?.();
   }
@@ -224,6 +240,7 @@ export class Level2 {
   lightSources(out) {
     if (this.filming) this.film.lightSources(out);
     else this.play?.lightSources(out);
+    if (!this.filming) this.mouth?.lightSources(out); // (5.0e: the causeway lamps, once lit)
   }
 
   // one frame. Returns the player's step events for the game's sounds (or nothing in a film)
@@ -232,6 +249,7 @@ export class Level2 {
     const C = this.chapter;
     if (!C || this.done) return null;
     this.t += dt;
+    this.mouth?.update(dt);
     if (this.t > TITLE_T && this.t - dt <= TITLE_T) g.hud.setIntro(null);
     const events = raw?.events || [];
     if (this.film) {

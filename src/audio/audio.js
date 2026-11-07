@@ -2848,6 +2848,42 @@ export class AudioEngine {
     this._tone(t + 0.16, { f: f * 1.1, fEnd: f * 0.96, a: 0.03, d: 0.1, gain: 0.025, dest: o });
   }
 
+  // (5.0e) a piece of the map changing hands: dry paper, folded and unfolded
+  paperRustle(x, y, z) {
+    if (!this.ready) return;
+    const t = this.now, o = this._far(x, y, z, 2.5, 1.2, 0.1);
+    for (let i = 0; i < 4; i++) this._noiseBurst(t + i * 0.06 + Math.random() * 0.04, { type: 'bandpass', f: 2600 + Math.random() * 2400, q: 1.2, a: 0.004, d: 0.05 + Math.random() * 0.05, gain: 0.16, dest: o });
+  }
+
+  // the generator's starter cord: a rip of rope, the engine coughing over (k = 1: the pull that catches)
+  cordPull(x, y, z, k = 0.6) {
+    if (!this.ready) return;
+    const t = this.now, o = this._far(x, y, z, 4, 0.8, 0.3);
+    this._noiseBurst(t, { type: 'bandpass', f: 900, fEnd: 2200, q: 2, a: 0.01, d: 0.28, gain: 0.32, dest: o }); // the rope
+    for (let i = 0; i < (k >= 1 ? 6 : 3); i++) this._tone(t + 0.18 + i * 0.07, { type: 'sawtooth', f: 48 + i * 4, fEnd: 40, a: 0.004, d: 0.06, gain: 0.22 * k, dest: o }); // the pistons
+    if (k >= 1) this._noiseBurst(t + 0.25, { buf: this.brown, type: 'lowpass', f: 300, a: 0.01, d: 0.5, gain: 0.5, dest: o });
+  }
+
+  // the bog gate's two leaves swinging open: old hinges, a long groan, wood knocking at the end
+  gateSwing(x, y, z) {
+    if (!this.ready) return;
+    const t = this.now, o = this._far(x, y, z, 6, 0.7, 0.4);
+    for (let i = 0; i < 2; i++) {
+      const f = 210 + i * 70;
+      this._noiseBurst(t + i * 0.3, { type: 'bandpass', f, fEnd: f * 0.6, q: 9, a: 0.1, d: 1.6, gain: 0.35, dest: o });
+      this._tone(t + i * 0.3, { type: 'sawtooth', f: f * 0.5, fEnd: f * 0.36, a: 0.1, d: 1.4, gain: 0.03, dest: o });
+    }
+    this._noiseBurst(t + 2.5, { buf: this.brown, type: 'lowpass', f: 500, a: 0.003, d: 0.2, gain: 0.5, dest: o }); // the leaves against their stops
+  }
+
+  // a lamp on the causeway coming on: the click of its switch, a filament's tick
+  lampOn(x, y, z) {
+    if (!this.ready) return;
+    const t = this.now, o = this._far(x, y, z, 6, 0.8, 0.4);
+    this._noiseBurst(t, { type: 'highpass', f: 3000, a: 0.0005, d: 0.02, gain: 0.25, dest: o });
+    this._tone(t + 0.01, { f: 100, fEnd: 100, a: 0.01, d: 0.25, gain: 0.04, dest: o });
+  }
+
   genHum(x, y, z, spinning = false) {
     if (!this.ready) return null;
     const t = this.now;
