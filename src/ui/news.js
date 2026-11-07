@@ -7,6 +7,19 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v:'5.0j',date:'2026-11-07',
+    ru:{title:'Друзья: «🎧 Слушает…»',items:[
+      'Аккаунт музыкального плеера Justify теперь тот же, что в игре. Если друг слушает музыку в Justify, у него в списке друзей появляется строка «🎧 Слушает: трек — исполнитель», а на паузе — «🎧 На паузе».',
+      'Во вкладке «Друзья» строка ведёт по ссылке на трек, ссылка открывается в твоём браузере. В личном деле друга — обложка, трек, исполнитель и альбом, сколько уже сыграло и кнопка «Открыть трек».',
+      'Видят это только друзья. Если Justify закрыли и не остановили музыку, строка пропадёт сама через несколько минут.',
+    ]},
+    en:{title:'Friends: «🎧 Listening…»',items:[
+      'The Justify music player now uses the same account as the game. When a friend is playing music in Justify, their row in your friends list reads «🎧 Listening: track — artist», or «🎧 Paused» while it is paused.',
+      'In the Friends tab the line links to the track and opens it in your own browser. A friend\'s personnel file shows the cover, the track, the artist and album, how far it has played and an «Open the track» button.',
+      'Only friends can see it. If Justify was closed without stopping the music, the line disappears on its own after a few minutes.',
+    ]},
+  },
+  {
     v:'5.0c',date:'2026-11-06',
     ru:{title:'Топь, глава 2: «Грунтовка»',items:[
       'После кортежа ты за рулём. Машина хоста съезжает на грунтовку, и вести её теперь тебе: W — газ, S — тормоз и задний ход, A/D — руль. На грунтовке УАЗ разгоняется примерно до 47 км/ч, в лесу между деревьями еле ползёт. В повороте его держит только сцепление с грунтом, а врезаться в сосну можно по-настоящему.',

@@ -69,6 +69,26 @@
 .pf-status { min-height: 1.5em; margin: 0; font-size: 12px; color: var(--ash); }
 .pf-status.bad { color: var(--red); }
 
+/* 5.0j: what a friend plays in Justify — a strip under the name. Amber while it plays (the lit colour), ash on pause. */
+.pf-listen { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 14px; padding: 12px 14px; background: var(--panel); border: 1px solid var(--ash-faint); border-radius: 3px; }
+.pf-listen[hidden] { display: none; }
+.pf-listen-cover { flex: 0 0 auto; width: 72px; height: 72px; object-fit: cover; border: 1px solid var(--ash-faint); border-radius: 2px; background: rgba(0, 0, 0, .5); filter: saturate(.8) contrast(1.05); }
+.pf-listen-text { flex: 1 1 240px; min-width: 0; }
+.pf-listen-kicker { margin: 0 0 4px; font-size: 11px; letter-spacing: .2em; text-transform: uppercase; color: var(--amber); }
+.pf-listen[data-state="paused"] .pf-listen-kicker { color: var(--ash); }
+.pf-listen-title { margin: 0; font-size: 15px; font-weight: 700; line-height: 1.4; color: var(--bone); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pf-listen-artist { margin: 2px 0 0; font-size: 13px; line-height: 1.4; color: var(--bone-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pf-listen-time { display: flex; align-items: center; gap: 10px; margin: 8px 0 0; font-size: 12px; color: var(--ash); font-variant-numeric: tabular-nums; }
+.pf-listen-time i { flex: 1; max-width: 360px; height: 3px; border-radius: 1px; background: linear-gradient(90deg, var(--amber) var(--w, 0%), var(--ash-faint) var(--w, 0%)); }
+.pf-listen-time i[hidden] { display: none; }
+.pf-listen[data-state="paused"] .pf-listen-time i { background: linear-gradient(90deg, var(--ash) var(--w, 0%), var(--ash-faint) var(--w, 0%)); }
+.pf-listen-link {
+  flex: 0 0 auto; display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; font-size: 12px; letter-spacing: .1em; white-space: nowrap;
+  color: var(--bone); text-decoration: none; background: rgba(0, 0, 0, .6); border: 1px solid var(--ash-dim); border-radius: 3px;
+}
+.pf-listen-link:hover { border-color: var(--bone); }
+.profile-screen a:focus-visible { outline: 2px solid var(--bone); outline-offset: 2px; }
+
 /* the nick that opens a profile: it says so under the pointer */
 [data-profile] { cursor: pointer; }
 .social-name[data-profile]:hover, .lobby-name-link:hover { text-decoration: underline; text-underline-offset: 3px; }
@@ -79,5 +99,7 @@
   .pf-portrait { width: 84px; height: 84px; }
   .pf-big { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .pf-grid { grid-template-columns: 1fr; }
+  .pf-listen-cover { width: 56px; height: 56px; }
+  .pf-listen-text { flex-basis: 160px; }
 }
 @media (prefers-reduced-motion: reduce) { .pf-banner { transition: none; } }

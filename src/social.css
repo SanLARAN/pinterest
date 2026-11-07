@@ -30,6 +30,10 @@
 .social-friend button:not(:first-child) { padding: 4px 10px; border: 1px solid var(--ash-dim); border-radius: 3px; font-size: 11px; min-height: 32px; }
 .social-friend span { overflow: hidden; text-overflow: ellipsis; }
 .social-friend small { display: block; font-size: 11px; color: var(--ash); margin-top: 1px; }
+.social-friend button:first-child > span { min-width: 0; }
+/* 5.0j: what a friend plays in Justify — one line, cut short; the whole of it is in the tooltip and the profile */
+.social-friend small.social-listen { color: var(--amber); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.social-friend small.social-listen.paused { color: var(--ash); }
 .presence-dot { width: 7px; height: 7px; flex: 0 0 7px; border-radius: 50%; background: var(--ash-faint); border: 1px solid var(--ash-dim); }
 .presence-dot.online { background: var(--bone); border-color: var(--bone); }
 .presence-dot.lobby, .presence-dot.playing { background: var(--amber); border-color: var(--amber); }

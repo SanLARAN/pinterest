@@ -5,7 +5,11 @@ import {wallet} from '../game/wallet.js';
 import {reliableTouchButtons} from './touchButtons.js';
 import {socialWords} from './socialWords.js';
 import {copyText} from './clipboard.js';
+import {listenLine} from '../cloud/listening.js';
+import {t} from '../core/i18n.js';
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+// (5.0j) «🎧 Слушает: трек — исполнитель» under a friend; with a link it opens in the player's own browser
+export const listenHTML=l=>!l?'':l.link?`<a class="friend-listen ${esc(l.state)}" href="${esc(l.link)}" target="_blank" rel="noopener noreferrer" title="${esc(t('listenOpenHint'))}">${esc(listenLine(l))} ↗</a>`:`<small class="friend-listen ${esc(l.state)}">${esc(listenLine(l))}</small>`;
 export class AccountUI {
  constructor({cloud,canOpen=()=>true,canChange=()=>true,getRoom=()=>null,getInviteLink=()=>null,onJoin=()=>{},onNav=null,onProfile=null}){
   this.onNav=onNav;this.onProfile=onProfile; // (3.0x) the corner portrait opens the full profile; a name in a list opens theirs
@@ -13,7 +17,7 @@ export class AccountUI {
   this.el=document.createElement('section');this.el.id='accountPanel';this.el.className='account-panel';this.el.hidden=true;this.el.setAttribute('role','dialog');this.el.setAttribute('aria-modal','true');this.el.setAttribute('aria-labelledby','cloudTitle');document.body.append(this.el);
   this.disposeTouch=reliableTouchButtons(this.el,()=>this.opened,()=>this.cloud.user?.id||'guest');
   this.nav=document.getElementById('btnAccount');this.lobbyNav=document.getElementById('btnLobbyFriends');this.nav?.addEventListener('click',()=>this.onNav?this.onNav():this.open());this.lobbyNav?.addEventListener('click',()=>this.open('invite'));
-  this.el.addEventListener('keydown',e=>{e.stopPropagation();if(e.code==='Escape'){e.preventDefault();this.close();}if(e.code==='Tab'){const a=[...this.el.querySelectorAll('button,input,textarea')].filter(x=>!x.disabled&&x.getClientRects().length),i=a.indexOf(document.activeElement);if(a.length){e.preventDefault();a[(i+(e.shiftKey?-1:1)+a.length)%a.length].focus();}}});this.el.addEventListener('keyup',e=>e.stopPropagation());
+  this.el.addEventListener('keydown',e=>{e.stopPropagation();if(e.code==='Escape'){e.preventDefault();this.close();}if(e.code==='Tab'){const a=[...this.el.querySelectorAll('button,input,textarea,a[href]')].filter(x=>!x.disabled&&x.getClientRects().length),i=a.indexOf(document.activeElement);if(a.length){e.preventDefault();a[(i+(e.shiftKey?-1:1)+a.length)%a.length].focus();}}});this.el.addEventListener('keyup',e=>e.stopPropagation());
   this.el.addEventListener('submit',e=>{e.preventDefault();e.stopPropagation();if(!this.busy)this.submit(e.target);});
   this.el.addEventListener('click',e=>{const b=e.target.closest('button');if(!b||b.disabled||!b.dataset.action)return;if(b.dataset.action==='close'){this.close();return;}if(!this.busy)this.action(b.dataset.action,b.dataset.id);});
   this.el.addEventListener('input',e=>{if(e.target.name&&e.target.name!=='query')this.edited.add(e.target.name);if(e.target.name==='query'){this.query=e.target.value;clearTimeout(this.searchTimer);this.searchTimer=setTimeout(()=>this.find(),450);}});
@@ -25,7 +29,7 @@ export class AccountUI {
  open(view='profile'){
   if(!this.canOpen())return;this.previous=document.activeElement;this.scrollReset=true;this.view=view;this.opened=true;this.el.hidden=false;document.body.classList.add('account-open');if(this.cloud.recovery){this.mode='password';this.view='profile';}this.render();this.el.querySelector('[data-action="close"]')?.focus({preventScroll:true});this.cloud.ensure().catch(e=>{this.error=cloudError(e);this.render();});
  }
- close(){if(!this.opened)return;this.opened=false;this.confirm=null;this.clearPasswords();for(const k of['profile_name','profile_handle']){delete this.draft[k];this.edited.delete(k);}this.el.hidden=true;document.body.classList.remove('account-open');if(this.cloud.recovery)this.recoveryDismissed=true;(this.previous?.isConnected?this.previous:this.nav)?.focus({preventScroll:true});}
+ close(){if(!this.opened)return;this.opened=false;this.cloud.watchListening?.('account',false);this.confirm=null;this.clearPasswords();for(const k of['profile_name','profile_handle']){delete this.draft[k];this.edited.delete(k);}this.el.hidden=true;document.body.classList.remove('account-open');if(this.cloud.recovery)this.recoveryDismissed=true;(this.previous?.isConnected?this.previous:this.nav)?.focus({preventScroll:true});}
  capture(){if(this.skipCapture){this.skipCapture=false;return;}for(const input of this.el.querySelectorAll('input[name]'))if(input.name!=='query'&&(this.edited.has(input.name)||document.activeElement===input||input.type==='password'))this.draft[input.name]=input.value;}
  clearPasswords(){delete this.draft.password;delete this.draft.again;for(const input of this.el.querySelectorAll('input[type="password"]'))input.value='';}
  field(label,name,type='text',value='',attrs=''){return`<label>${esc(label)}<input name="${name}" type="${type}" value="${esc(value)}" ${attrs}></label>`;}
@@ -36,7 +40,7 @@ export class AccountUI {
   if(this.opened&&(this.pointerActive||this.composing)){this.renderPending=true;return;}if(this.renderFrame){cancelAnimationFrame(this.renderFrame);this.renderFrame=null;}this.renderPending=false;
   const W=cloudWords(),c=this.cloud,count=c.social.invites.length+c.social.requests.filter(r=>r.recipient_id===c.user?.id).length;
   if(this.nav&&!this.nav.dataset.portrait){this.nav.innerHTML=`<i class="cloud-indicator ${esc(c.status)}"></i><span>${esc(W.nav)}</span>${count?`<b class="cloud-badge">${count}</b>`:''}`;this.nav.title=W.states[c.status]||W.states.guest;}
-  if(this.lobbyNav)this.lobbyNav.textContent=socialWords().send;if(!this.opened)return;
+  if(this.lobbyNav)this.lobbyNav.textContent=socialWords().send;c.watchListening?.('account',this.opened&&this.view==='friends'&&!!c.user);if(!this.opened)return;
   const scroll=this.scrollReset?0:(this.el.querySelector('.account-card')?.scrollTop||0);this.scrollReset=false;
   const active=document.activeElement,focus=active?.closest?.('#accountPanel')?{name:active.name,action:active.dataset?.action,id:active.dataset?.id,start:active.selectionStart,end:active.selectionEnd}:null;this.capture();
   let body=this.view==='invite'?this.inviteHTML(W):this.view==='friends'&&c.user?this.friendsHTML(W):c.user&&!c.recovery?this.profileHTML(W):this.authHTML(W);
@@ -71,7 +75,7 @@ export class AccountUI {
   const section=(title,rows)=>`<section class="cloud-list"><h3>${title}</h3>${rows||`<p class="cloud-note">${W.empty}</p>`}</section>`;
   html+=section(W.invites,s.invites.map(i=>this.row(i,this.button('acceptInvite',W.join,i.id,'primary')+this.button('declineInvite',W.decline,i.id),`<small>${esc(i.room_code)}</small>`)).join(''));
   html+=section(W.incoming,s.requests.filter(r=>r.recipient_id===u).map(r=>this.row(r,this.button('accept',W.accept,r.id,'primary')+this.button('decline',W.decline,r.id))).join(''));
-  html+=section(W.list,s.friends.map(f=>{const fresh=f.seen_at&&Date.now()-Date.parse(f.seen_at)<90000,state=fresh?f.state:'offline';return this.row(f,(state==='lobby'?this.button('joinFriend',W.join,f.id):'')+(this.getRoom()?this.button('invite',W.invite,f.id):'')+this.button('remove',W.remove,f.id)+this.button('block',W.block,f.id),`<small class="friend-state ${esc(state)}">${esc(W.presence[state]||W.presence.offline)}</small>`);}).join(''));
+  html+=section(W.list,s.friends.map(f=>{const fresh=f.seen_at&&Date.now()-Date.parse(f.seen_at)<90000,state=fresh?f.state:'offline';return this.row(f,(state==='lobby'?this.button('joinFriend',W.join,f.id):'')+(this.getRoom()?this.button('invite',W.invite,f.id):'')+this.button('remove',W.remove,f.id)+this.button('block',W.block,f.id),`<small class="friend-state ${esc(state)}">${esc(W.presence[state]||W.presence.offline)}</small>${listenHTML(c.listeningOf?.(f.id))}`);}).join(''));
   html+=section(W.outgoing,s.requests.filter(r=>r.sender_id===u).map(r=>this.row(r,this.button('cancel',W.cancel,r.id))).join(''));
   html+=section(W.blocked,s.blocked.map(r=>this.row(r,this.button('unblock',W.unblock,r.id))).join(''));return html;
  }

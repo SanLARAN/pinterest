@@ -5,12 +5,13 @@ import {wallet,applyWallet,setPurchaseBackend} from '../game/wallet.js';
 import {rewardRows,removeReward,recoverAbandonedRewards,pendingRewards} from './rewards.js';
 import {createCloudClient,authRedirect,hasStoredSession,isAuthReturn,readAuthProviders,SUPABASE_URL} from './client.js';
 import {BANNER_BUCKET,BANNER_MAX,BANNER_EXT,bannerKind} from './banner.js';
+import {cleanListening,listeningKey,LISTEN_POLL,LISTEN_MIN,LISTEN_STALE} from './listening.js';
 const emptySocial=()=>({friends:[],requests:[],invites:[],blocked:[]});
 const err=e=>e instanceof Error?e:Object.assign(new Error(e?.message||'cloud_error'),{code:e?.code,status:e?.status});
 export class CloudController {
  constructor({clientFactory=createCloudClient,providers=readAuthProviders,navigate=url=>globalThis.location.assign(url),desktopAuth=globalThis.hushDesktop?.oauthBegin?globalThis.hushDesktop:null,canApply=()=>true,onApplied=()=>{},getPresence=()=>({state:'online',room:null,strategy:'default'}),onNotice=()=>{}}={}){
   this.providers=providers;this.navigate=navigate;this.desktopAuth=desktopAuth;this.clientFactory=clientFactory;this.canApply=canApply;this.onApplied=onApplied;this.getPresence=getPresence;this.onNotice=onNotice;
-  this.user=null;this.profile=null;this.client=null;this.ready=false;this.status=isAccountScope()?'cached':'guest';this.epoch=0;this.version=0;this.serverVersion=0;this.dirty=false;this.revision=0;this.social=emptySocial();this.listeners=new Set();this.clientId=newSaveId();this.lastSync=null;this.lastError=null;this.pendingSnapshot=null;this.importPending=false;this.conflict=null;this.recovery=false;this.disposed=false;this.fromEmailLink=isAuthReturn();
+  this.user=null;this.profile=null;this.client=null;this.ready=false;this.status=isAccountScope()?'cached':'guest';this.epoch=0;this.version=0;this.serverVersion=0;this.dirty=false;this.revision=0;this.social=emptySocial();this.listening=new Map();this.listenKey='';this.listenAt=0;this.listenWatch=new Set();this.listeners=new Set();this.clientId=newSaveId();this.lastSync=null;this.lastError=null;this.pendingSnapshot=null;this.importPending=false;this.conflict=null;this.recovery=false;this.disposed=false;this.fromEmailLink=isAuthReturn();
   this.unsubscribe=onSave(e=>this.changed(e));setPurchaseBackend(id=>this.purchase(id));
  }
  on(fn){this.listeners.add(fn);return()=>this.listeners.delete(fn);}
@@ -41,7 +42,7 @@ export class CloudController {
   const next=session?.user||null,uid=next?.id||null;
   if(uid===this.user?.id){this.user=next;if(this.loading)return this.loading;if(this.profile||!uid)return;}
   else if(!uid&&!this.user&&getScope()==='guest'){this.status='guest';this.emit();return;}
-  this.epoch++;const epoch=this.epoch;this.stopChannel();this.saving=false;this.savePromise=null;this.rewardsBusy=false;this.rewardPromise=null;this.pendingGuest=false;this.refreshPromise=null;this.refreshPending=false;this.user=next;if(!uid)this.recovery=false;this.profile=null;this.ready=false;this.importPending=false;this.conflict=null;this.pendingSnapshot=null;this.social=emptySocial();this.socialPrimed=false;this.lastError=null;this.dirty=false;this.revision=0;this.serverVersion=0;
+  this.epoch++;const epoch=this.epoch;this.stopChannel();this.saving=false;this.savePromise=null;this.rewardsBusy=false;this.rewardPromise=null;this.pendingGuest=false;this.refreshPromise=null;this.refreshPending=false;this.user=next;if(!uid)this.recovery=false;this.profile=null;this.ready=false;this.importPending=false;this.conflict=null;this.pendingSnapshot=null;this.social=emptySocial();this.socialPrimed=false;this.listening=new Map();this.listenKey='';this.listenAt=0;this.listenBusy=false;this.lastError=null;this.dirty=false;this.revision=0;this.serverVersion=0;
   if(!uid){this.status='guest';this.pendingGuest=true;this.safePoint();this.emit();return;}
   this.status='loading';this.emit();
   this.loading=(async()=>{const snapshot=await this.rpc('hush_bootstrap');if(epoch!==this.epoch)return;this.receive(snapshot);recoverAbandonedRewards(uid);await this.refreshSocial();this.subscribe();this.heartbeat().catch(()=>{});this.flushRewards().catch(()=>{});})();
@@ -176,7 +177,24 @@ export class CloudController {
   for(const item of after.requests.filter(r=>r.recipient_id===this.user.id&&!requests.has(r.id)).slice(0,3))this.onNotice({type:'friend_request',item});
   for(const item of after.invites.filter(r=>!invites.has(r.id)).slice(0,3))this.onNotice({type:'room_invite',item});
   if(this.socialPrimed)for(const item of after.friends.filter(f=>!friends.has(f.id)).slice(0,2))this.onNotice({type:'friend_accept',item});this.socialPrimed=true;
-  if(!this.channel||old!==after.friends.map(f=>f.id).join(','))this.subscribe();this.emit();}
+  if(!this.channel||old!==after.friends.map(f=>f.id).join(','))this.subscribe();this.emit();if(this.listenWatch.size&&!this.listenAt)this.refreshListening().catch(()=>{});}
+ // (5.0j) «Слушает…»: what friends play in Justify (src/cloud/listening.js). Asked for only while a list of friends is
+ // on screen — the corner, the friends tab, a friend's profile — every 45 s. It is a side line: a failure here never
+ // marks the cloud offline, the line is just not drawn (a database without Justify answers with an error, that is all).
+ watchListening(key,on){const had=this.listenWatch.size>0;if(on)this.listenWatch.add(key);else this.listenWatch.delete(key);
+  if(this.listenWatch.size&&!had){this.refreshListening().catch(()=>{});clearInterval(this.listenTimer);this.listenTimer=setInterval(()=>this.refreshListening().catch(()=>{}),LISTEN_POLL);}
+  else if(!this.listenWatch.size&&had){clearInterval(this.listenTimer);this.listenTimer=null;}}
+ listeningOf(id,now=Date.now()){const x=this.listening.get(id);return x&&now-x.at<LISTEN_STALE?x:null;}
+ async refreshListening(force=false){
+  if(!this.user||!this.client||this.listenBusy||this.disposed)return false;
+  if(!this.social.friends.length){if(this.listening.size){this.listening=new Map();this.listenKey='';this.emit();}return false;}
+  if(!force&&typeof document!=='undefined'&&document.hidden)return false;
+  if(!force&&Date.now()-this.listenAt<LISTEN_MIN)return false;
+  const epoch=this.epoch,owner=this.user.id;this.listenBusy=true;
+  try{const{data,error}=await this.client.rpc('justify_friends_listening');if(epoch!==this.epoch||owner!==this.user?.id||this.disposed)return false;this.listenAt=Date.now();if(error)return false;
+   const next=cleanListening(data,this.social.friends.map(f=>f.id)),key=listeningKey(next);this.listening=next;if(key!==this.listenKey){this.listenKey=key;this.emit();}return true;}
+  catch{return false;}finally{if(epoch===this.epoch)this.listenBusy=false;}
+ }
  async heartbeat(state=null){if(!this.user||!this.client)return;const p=this.getPresence();await this.rpc('hush_heartbeat',{p_owner:this.user.id,p_client:this.clientId,p_state:state||p.state,p_room:state==='offline'?null:p.room,p_strategy:p.strategy||'default'});}
  presenceChanged(){clearTimeout(this.presenceTimer);this.presenceTimer=setTimeout(()=>this.heartbeat().catch(()=>{}),500);}
  async invite(friend){await this.heartbeat();const r=await this.rpc('hush_send_invite',{p_owner:this.user.id,p_client:this.clientId,p_friend:friend});return r;}
@@ -196,6 +214,6 @@ export class CloudController {
   if(ids.length)for(const event of['INSERT','UPDATE'])ch=ch.on('postgres_changes',{event,schema:'public',table:'hush_presence',filter:`user_id=in.(${ids.join(',')})`},presence);
   this.channel=ch;ch.subscribe();
  }
- destroy(){this.disposed=true;this.epoch++;this.unsubscribe();this.authSubscription?.unsubscribe();this.stopChannel();for(const key of['timer','safeTimer','saveTimer','rewardTimer','retryTimer','presenceTimer','refreshTimer','socialTimer']){clearTimeout(this[key]);clearInterval(this[key]);}if(typeof window!=='undefined'){window.removeEventListener('online',this.online);window.removeEventListener('focus',this.focus);}if(typeof document!=='undefined')document.removeEventListener('visibilitychange',this.focus);setPurchaseBackend(null);this.listeners.clear();}
+ destroy(){this.disposed=true;this.epoch++;this.unsubscribe();this.authSubscription?.unsubscribe();this.stopChannel();for(const key of['listenTimer','timer','safeTimer','saveTimer','rewardTimer','retryTimer','presenceTimer','refreshTimer','socialTimer']){clearTimeout(this[key]);clearInterval(this[key]);}if(typeof window!=='undefined'){window.removeEventListener('online',this.online);window.removeEventListener('focus',this.focus);}if(typeof document!=='undefined')document.removeEventListener('visibilitychange',this.focus);setPurchaseBackend(null);this.listeners.clear();}
  get pending(){return pendingRewards();}
 }

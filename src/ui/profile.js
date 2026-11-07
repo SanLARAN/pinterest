@@ -8,6 +8,9 @@
 //
 // Motion: a video banner does not autoplay under prefers-reduced-motion and a GIF is frozen to its first frame.
 // (3.1e: the «pause the backdrop» button is gone — the author did not want it.) The banner never carries sound.
+//
+// (5.0j) Under a friend's name: what they play in Justify right now — the cover, the track, the clock, and a link
+// that opens in the player's own browser. Asked for while the profile is open (cloud.watchListening).
 import { t } from '../core/i18n.js';
 import { atlasLog, getScores } from '../core/storage.js';
 import { wallet } from '../game/wallet.js';
@@ -17,6 +20,7 @@ import { myName } from '../net/coop.js';
 import { buildCard, cleanCard, cardForest, cardCreatures } from '../core/profileCard.js';
 import { BANNER_ACCEPT, bannerKind, bannerProblem } from '../cloud/banner.js';
 import { cloudError } from '../cloud/words.js';
+import { listenPosition, clock } from '../cloud/listening.js';
 
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const mmss = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
@@ -75,6 +79,7 @@ export class ProfileScreen {
       <div class="pf-sheet"><header class="pf-head"><canvas class="pf-portrait" width="256" height="256" aria-hidden="true"></canvas>
       <div class="pf-who"><p class="pf-kicker"></p><h1 id="pfName" class="pf-name"></h1><p class="pf-handle"></p></div>
       <button type="button" class="pf-close" data-pf="close"></button></header>
+      <div class="pf-listen" hidden></div>
       <div class="pf-body"></div>
       <footer class="pf-actions"></footer>
       <p class="pf-status" role="status" aria-live="polite"></p></div>
@@ -86,7 +91,7 @@ export class ProfileScreen {
       e.stopPropagation();
       if (e.code === 'Escape') { e.preventDefault(); this.close(); return; }
       if (e.code === 'Tab') { // the focus stays inside the profile
-        const a = [...el.querySelectorAll('button')].filter((x) => !x.disabled && x.getClientRects().length);
+        const a = [...el.querySelectorAll('button, a[href]')].filter((x) => !x.disabled && x.getClientRects().length);
         if (!a.length) return;
         const i = a.indexOf(document.activeElement);
         e.preventDefault();
@@ -94,6 +99,8 @@ export class ProfileScreen {
       }
     });
     el.addEventListener('keyup', (e) => e.stopPropagation());
+    // (5.0j) the Justify strip follows the cloud; its clock moves once a second while the profile is open
+    this.offCloud = cloud.on?.(() => { if (this.opened) this.renderListen(); }) || (() => {});
     this.file.addEventListener('change', () => { const f = this.file.files && this.file.files[0]; this.file.value = ''; if (f) this.setBanner(f); });
   }
 
@@ -109,6 +116,10 @@ export class ProfileScreen {
     document.body.classList.add('profile-open');
     this.paused = reducedMotion();
     this.message = '';
+    const friend = !!who?.id && who.id !== this.cloud.user?.id && !who.self;
+    this.cloud.watchListening?.('profile', friend);
+    clearInterval(this.listenTick);
+    this.listenTick = friend ? setInterval(() => this.tickListen(), 1000) : 0;
     this.load();
     requestAnimationFrame(() => this.el.querySelector('.pf-close')?.focus({ preventScroll: true }));
   }
@@ -117,6 +128,9 @@ export class ProfileScreen {
     if (!this.opened) return;
     this.opened = false;
     this.seq++;
+    this.cloud.watchListening?.('profile', false);
+    clearInterval(this.listenTick);
+    this.listenTick = 0;
     this.el.hidden = true;
     document.body.classList.remove('profile-open');
     this.clearBanner();
@@ -295,8 +309,48 @@ export class ProfileScreen {
     const fit = d?.self ? myFit() : d?.card?.fit;
     cv.hidden = !fit;
     if (fit) { try { this.portrait(fit, cv); } catch { cv.hidden = true; } }
+    this.renderListen();
     el.querySelector('.pf-body').innerHTML = this.state === 'loading' ? `<p class="pf-note">${esc(t('pfLoading'))}</p>` : d?.stranger ? this.strangerHTML(d) : this.statsHTML(d);
     this.renderActions();
+  }
+
+  // (5.0j) what a friend plays in Justify: drawn when the track changes, the clock ticks on its own
+  listening() {
+    const d = this.data;
+    return this.opened && d && !d.self && !d.stranger && d.id ? this.cloud.listeningOf?.(d.id) || null : null;
+  }
+
+  renderListen() {
+    const box = this.el.querySelector('.pf-listen');
+    if (!box) return;
+    const l = this.listening();
+    const key = l ? [l.state, l.title, l.artist, l.album, l.cover, l.link, l.duration].join('\u0001') : '';
+    if (key !== box._key) {
+      box._key = key;
+      box.hidden = !l;
+      box.dataset.state = l?.state || '';
+      box.innerHTML = l ? this.listenHTML(l) : '';
+      const img = box.querySelector('img');
+      if (img) img.addEventListener('error', () => img.remove(), { once: true });
+    }
+    this.tickListen();
+  }
+
+  listenHTML(l) {
+    const meta = [l.artist, l.album].filter(Boolean).join(' · ');
+    return `${l.cover ? `<img class="pf-listen-cover" src="${esc(l.cover)}" alt="" width="72" height="72" referrerpolicy="no-referrer" loading="lazy" decoding="async">` : ''}
+      <div class="pf-listen-text"><p class="pf-listen-kicker">🎧 ${esc(t(l.state === 'paused' ? 'listenHeadPaused' : 'listenHead'))}</p>
+      <p class="pf-listen-title" title="${esc(l.title)}">${esc(l.title)}</p>${meta ? `<p class="pf-listen-artist" title="${esc(meta)}">${esc(meta)}</p>` : ''}
+      <p class="pf-listen-time"><i${l.duration ? '' : ' hidden'}></i><span></span></p></div>
+      ${l.link ? `<a class="pf-listen-link" href="${esc(l.link)}" target="_blank" rel="noopener noreferrer" title="${esc(t('listenOpenHint'))}">${esc(t('listenOpen'))}</a>` : ''}`;
+  }
+
+  tickListen() {
+    const l = this.listening(), time = this.el.querySelector('.pf-listen-time');
+    if (!l || !time) return;
+    const p = listenPosition(l);
+    time.querySelector('span').textContent = l.duration ? `${clock(p)} / ${clock(l.duration)}` : clock(p);
+    if (l.duration) time.querySelector('i').style.setProperty('--w', `${Math.round((p / l.duration) * 1000) / 10}%`);
   }
 
   strangerHTML(d) {

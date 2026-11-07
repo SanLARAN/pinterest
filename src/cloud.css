@@ -72,6 +72,12 @@
 .cloud-row-actions button { font-size: 12px; padding: 8px 12px; }
 .cloud-person .friend-state.offline { color: var(--ash-dim); }
 .cloud-person .friend-state.lobby, .cloud-person .friend-state.playing { color: var(--amber); }
+/* 5.0j: what a friend plays in Justify; with a link it opens in the player's own browser */
+.cloud-person .friend-listen { display: block; margin-top: 4px; font-size: 12px; line-height: 1.5; color: var(--amber); overflow-wrap: anywhere; }
+.cloud-person .friend-listen.paused { color: var(--ash); }
+.cloud-person a.friend-listen { text-decoration: none; }
+.cloud-person a.friend-listen:hover { text-decoration: underline; text-underline-offset: 3px; }
+.cloud-person a.friend-listen:focus-visible { outline: 2px solid var(--bone); outline-offset: 2px; }
 .cloud-person .cloud-name {
   display: block; padding: 0; min-height: 0; border: 0; background: none; color: var(--bone); font: 700 15px var(--mono);
   letter-spacing: 0; text-align: left; cursor: pointer; overflow-wrap: anywhere;
