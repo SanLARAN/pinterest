@@ -69,6 +69,15 @@ export const HOUSES = [
   { id: 'h15', kind: 'house', x: -160, z: -312, ry: 2.8 },
   { id: 'h16', kind: 'hut', x: 22, z: -128, ry: -2.2 },
 ];
+// which house a player wakes up in (chapter 4): a different one for each seat, chosen from the night's seed
+// (5.0d: here, not in game/level2.js — the crash film needs it too, and the chapter machine imports the film)
+export function houseFor(seed, slot) {
+  const n = HOUSES.length;
+  const first = (seed >>> 0) % n;
+  const step = 5; // (co-prime with 16: four seats, four houses far apart)
+  return HOUSES[(first + (slot | 0) * step) % n];
+}
+
 export const HOUSE_DIMS = {
   house: { W: 7.2, D: 5.6, H: 2.7, gap: [0.5, 1.9] },
   hut: { W: 4.6, D: 4.0, H: 2.3, gap: [-0.7, 0.7] },

@@ -6,8 +6,8 @@
 //
 //   1 convoy     film  the highway at night, the convoy, the tentacle across the road     (5.0b)
 //   2 road       play  the dirt road: the driver, the forks and the navigator, the Корень  (5.0c)
-//   3 crash      film  the pine, the black                                                  (5.0d)
-//   4 village    play  tied up in a random house, the Сторож, finding each other           (5.0d)
+//   3 crash      film  the arm missing, the pine, the black, the pieces                     (5.0d ✓)
+//   4 village    play  tied up in a random house, the Сторож, finding each other           (5.0d ✓)
 //   5 generator  play  the map pieces put together, the generator at the mouth of the bog  (5.0e)
 //   6 escape     play  the Kugoo bikes down the causeway                                    (5.0f)
 //   7 cliff      play  off the cliff into the lake → the pier, the old fisherman, the end   (5.0f)
@@ -26,17 +26,19 @@ import * as THREE from 'three';
 import { t } from '../core/i18n.js';
 import { smoothstep } from '../core/rng.js';
 import { shared } from '../render/sonar.js';
-import { HIGHWAY, ROADS, CRASH, HOUSES, GATE, GENERATOR, CAUSEWAY, CLIFF } from '../world/swamp.js';
+import { HIGHWAY, ROADS, CRASH, GATE, GENERATOR, CAUSEWAY, CLIFF, houseFor } from '../world/swamp.js';
 import { swimming } from './water.js';
 import { ConvoyFilm } from './convoyFilm.js';
 import { RoadDrive } from './roadDrive.js';
+import { CrashFilm } from './crashFilm.js';
+import { VillagePlay } from './village.js';
 import { haloMaterial } from './glowsticks.js';
 import { beaconTexture } from './roadTraffic.js';
 
 export const CHAPTERS = [
   { id: 'convoy', film: true, dur: 9 },
   { id: 'road' },
-  { id: 'crash', film: true, dur: 6 },
+  { id: 'crash', film: true, dur: 19 },
   { id: 'village' },
   { id: 'generator' },
   { id: 'escape' },
@@ -46,23 +48,18 @@ export const TITLE_T = 5; // s the chapter's title stays up
 const TAIL = 4.5; // s from the lake to the end of the level (the pier film arrives in 5.0f)
 const SLOT_GAP = 1.6; // m between players at a shared start
 // the chapters that have their own film (the rest of the films are still stand-ins)
-export const FILMS = { convoy: ConvoyFilm };
+export const FILMS = { convoy: ConvoyFilm, crash: CrashFilm };
 // (5.0c) the chapters that have their own play: the controller drives the chapter (its camera, its lights, its
 // end — `done` — and its restart after a death — `restart`, both decided on the host)
-export const PLAYS = { road: RoadDrive };
+export const PLAYS = { road: RoadDrive, village: VillagePlay }; // (5.0d: the village — the play walks you itself)
 
 // the yaw that looks from (fx, fz) toward (tx, tz) (the player looks along (-sin yaw, -cos yaw))
 export function faceYaw(fx, fz, tx, tz) {
   return Math.atan2(-(tx - fx), -(tz - fz));
 }
 
-// which house a player wakes up in (chapter 4): a different one for each seat, chosen from the night's seed
-export function houseFor(seed, slot) {
-  const n = HOUSES.length;
-  const first = (seed >>> 0) % n;
-  const step = 5; // (co-prime with 16: four seats, four houses far apart)
-  return HOUSES[(first + slot * step) % n];
-}
+// which house a player wakes up in (chapter 4): world/swamp.js keeps the rule
+export { houseFor };
 
 // where a chapter starts for the player in this seat
 export function chapterStart(id, world, slot = 0, seed = 0) {
@@ -246,10 +243,10 @@ export class Level2 {
     g.fx.fade = Math.max(g.fx.fade, smoothstep(0, 1.2, this.t));
     if (this.play) {
       // the chapter's own play: it ends, or it starts again, on the host's word
-      this.play.update(dt, raw);
+      const pev = this.play.update(dt, raw) || null; // (a play you walk in returns your steps)
       if (g.auth && this.play.restart) this.goto(this.i);
       else if (g.auth && this.play.done) this.next();
-      return null;
+      return pev;
     }
     if (C.film) {
       // (the stand-in film: you stand where it happens and look about; Enter goes on)

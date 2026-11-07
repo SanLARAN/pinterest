@@ -163,6 +163,15 @@ export class NetSync {
       case 'dv': // (5.0c) «Топь», chapter 2: the host's car, the chase behind it, the roots (game/roadDrive.js)
         if (!this.host && isHostMsg && d) g.level2?.play?.applyNet?.(d);
         break;
+      case 'vg': // (5.0d) chapter 4, the village: the keeper and everyone's rope (game/village.js)
+        if (!this.host && isHostMsg && d) g.level2?.play?.applyVillage?.(d);
+        break;
+      case 'vq': // ...a guest in a rope: how far it has given, how many creaks so far
+        if (this.host && Array.isArray(d)) g.level2?.play?.hostStruggle?.(pid, d);
+        break;
+      case 'vu': // ...a guest untied someone (the host checks they were at the post)
+        if (this.host && typeof d === 'string') g.level2?.play?.hostUntie?.(d, pid);
+        break;
       case 'ob':
         if (d) {
           g.objectives.netMerge(d, g.remotes.get(pid));

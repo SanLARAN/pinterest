@@ -239,14 +239,16 @@ test('a whole «Топь» Game: it starts in chapter 1 and walks every chapter 
   car.x = CRASH.x + 20; car.z = CRASH.z + 22;
   frame(game);
   assert.equal(game.level2.chapter.id, 'crash');
-  // 3 → 4: the film runs its length and goes on by itself
-  for (let i = 0; i < 60 * 7; i++) frame(game, 1 / 60);
+  // 3 → 4: the film (5.0d: «Удар») runs its length and goes on by itself
+  for (let i = 0; i < 60 * 20 && game.level2.chapter.id === 'crash'; i++) frame(game, 1 / 60);
   assert.equal(game.level2.chapter.id, 'village');
   const H = world.houses.find((h) => h.id === houseFor(game.baseSeed, 0).id);
   assert.ok(Math.hypot(game.player.x - H.x, game.player.z - H.z) < 4, 'you come to inside your house');
-  // 4 → 5 → 6: to the gate; the generator wants your hand on it
-  put(game, GATE.x - 8, GATE.z);
-  frame(game);
+  // 4 → 5 → 6: (5.0d) free of the rope and out of the house ends the village; the generator wants your hand on it
+  game.level2.play.mine.st = 'free';
+  game.level2.play.K.x += 400;
+  put(game, H.x + 12, H.z + 12);
+  for (let i = 0; i < 60 * 3; i++) frame(game);
   assert.equal(game.level2.chapter.id, 'generator');
   put(game, GENERATOR.x + 1.6, GENERATOR.z + 1.2);
   for (let i = 0; i < 10; i++) frame(game);

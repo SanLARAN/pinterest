@@ -36,7 +36,7 @@
 
 ```bash
 npm install
-npm test            # node:test, 69 файлов, 589 тестов (5.0j) — все должны быть зелёными
+npm test            # node:test, 70 файлов, 601 тест (5.0d) — все должны быть зелёными
 npm run dev         # http://localhost:5173 (сайт игры — http://localhost:5173/site/)
 npm run build:pages # сборка в play/ — без неё деплой покажет старую версию
 npm run build:site  # сайт игры в dist/site/ → https://sanlaran.github.io/pinterest/site/
@@ -45,7 +45,7 @@ npm run build:site  # сайт игры в dist/site/ → https://sanlaran.githu
 - Менял картинку — **скриншот в кадре**, а не описание шейдера.
 - Headless-браузер (SwiftShader) даёт ~4 fps: не ждать таймером, а прыгать по состоянию
   (`window.__hush.opening.seek(t)`, `game.startDawn()`) и шагать кадры вручную.
-- Полезные URL: `?nosplash` (без заставки перед меню, 3.1q), `?map=bog&chapter=N` (Топь с главы N, 5.0a), `?nointro`, `?night`, `?t=500`, `?nomic`, `?fps`, `?sfx`, `?speed=2`, `?room=КОД`.
+- Полезные URL: `?nosplash` (без заставки перед меню, 3.1q), `?map=bog&chapter=N` (Топь с главы N, 5.0a; 3 — фильм «Удар», 4 — деревня, 5.0d), `?nointro`, `?night`, `?t=500`, `?nomic`, `?fps`, `?sfx`, `?speed=2`, `?room=КОД`.
 - Ловушки и рецепты харнесса — `docs/CONTEXT.md` §6.
 - Сайт и голосование: в тестах и харнессе **никогда не отправлять настоящий голос** — Supabase подменять (`page.route`, поддельный `fetch`).
 

@@ -7,6 +7,23 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v:'5.0d',date:'2026-11-07',
+    ru:{title:'Топь, главы 3 и 4: «Удар» и «Деревня»',items:[
+      'Глава 3 — фильм. Щупальце в последний раз встаёт за машиной и бьёт мимо, водитель бросает руль, дорога кончается — и сосна. Белый удар, звон в ушах, темнота. А потом обрывки: обломки в свете уцелевшей фары, две высокие тени, земля под тобой в свете чужого фонаря, столб за спиной.',
+      'Глава 4 — «Деревня». Ты приходишь в себя привязанным к столбу в чужом доме. Каждый — в своём. Рви верёвку: A, потом D, снова и снова. Каждый рывок скрипит.',
+      'Новый монстр — Сторож. Высокий, в длинном плаще и капюшоне, с фонарём. Он обходит дома и у каждой двери светит внутрь. Скрип он слышит издалека: придёт и затянет узлы заново. Пока фонарь близко, замри. Его свет виден сквозь щели стен раньше, чем он сам.',
+      'Вырвался — открой дверь (E) и найди остальных: они привязаны в других домах, развязать — держать E. Бег он слышит, шаг вблизи тоже, присед — нет. Увидит тебя на свободе — догонит, унесёт на плече и привяжет снова. Во второй раз он верёвкой не обойдётся.',
+      'Когда все живые свободны и снаружи, глава кончается. Один погиб — глава заново. В коопе упавший ждёт, пока остальные выберутся: Сторожа и верёвки ведёт хост.',
+    ]},
+    en:{title:'The Mire, chapters 3 and 4: «The Crash» and «The Village»',items:[
+      'Chapter 3 is a film. The arm rears up behind the car one last time and misses, the driver throws the wheel, the road runs out — and the pine. A white blow, ringing in your ears, black. Then pieces: the wreck in its one surviving headlight, two tall shapes, the ground under you in someone else\'s lantern light, a post at your back.',
+      'Chapter 4 is «The Village». You come to tied to a post in a house that is not yours. Everyone is in a different one. Tear at the rope: A, then D, again and again. Every pull creaks.',
+      'A new monster, the Keeper. Tall, in a long coat and a hood, with a lantern. He walks from house to house and shines it in at every door. He hears a creak from far off: he will come in and pull the knots tight again. While his lantern is close, keep still. His light shows through the gaps in the walls before he does.',
+      'Once you are free, open the door (E) and find the others: they are tied up in other houses, and you untie them by holding E. He hears running, and walking up close, but not crouching. If he sees you loose he runs you down, carries you back over his shoulder and ties you up again. The second time he does not bother with the rope.',
+      'When everyone still alive is free and outside, the chapter is over. Alone, if you die the chapter starts again. In co-op the fallen wait for the others to get out; the host runs the Keeper and the ropes.',
+    ]},
+  },
+  {
     v:'5.0j',date:'2026-11-07',
     ru:{title:'Друзья: «🎧 Слушает…»',items:[
       'Аккаунт музыкального плеера Justify теперь тот же, что в игре. Если друг слушает музыку в Justify, у него в списке друзей появляется строка «🎧 Слушает: трек — исполнитель», а на паузе — «🎧 На паузе».',

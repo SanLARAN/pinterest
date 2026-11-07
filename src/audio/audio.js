@@ -2778,6 +2778,76 @@ export class AudioEngine {
     for (let i = 0; i < Math.round(4 + 8 * k); i++) this._noiseBurst(t + 0.02 + Math.random() * 0.3, { type: 'highpass', f: 3500 + Math.random() * 4000, a: 0.0005, d: 0.03, gain: 0.12 * k, dest: o });
   }
 
+  // (5.0d) the car into the pine: the whole body folding at once — a deep blow, sheet metal tearing, the glass
+  // going, and things in the cabin still falling a moment later
+  crashSmash(x, y, z) {
+    if (!this.ready) return;
+    const t = this.now, o = this._far(x, y, z, 6, 0.6, 0.6);
+    this._tone(t, { f: 72, fEnd: 26, a: 0.002, d: 0.9, gain: 1.4, dest: o });
+    this._noiseBurst(t, { buf: this.brown, type: 'lowpass', f: 900, fEnd: 90, a: 0.002, d: 0.7, gain: 1.5, dest: o, rev: 0.5 });
+    this._noiseBurst(t + 0.02, { f: 1800, fEnd: 500, q: 2, a: 0.004, d: 0.5, gain: 0.5, dest: o }); // the metal
+    this._tone(t + 0.03, { type: 'square', f: 180, fEnd: 120, a: 0.002, d: 0.6, gain: 0.07, dest: o });
+    for (let i = 0; i < 22; i++) this._noiseBurst(t + 0.03 + Math.random() * 0.5, { type: 'highpass', f: 3000 + Math.random() * 5000, a: 0.0005, d: 0.02 + Math.random() * 0.05, gain: 0.18, dest: o }); // glass
+    for (let i = 0; i < 5; i++) this._noiseBurst(t + 0.7 + Math.random() * 1.2, { buf: this.brown, type: 'lowpass', f: 700, a: 0.003, d: 0.08, gain: 0.2, dest: o }); // settling
+    // and in you: a blow on the body bus
+    this._tone(t, { f: 58, fEnd: 24, a: 0.002, d: 0.8, gain: 1.0, dest: this.body });
+  }
+
+  // the ring after it: a high whine that fills everything, then slowly lets the world back. { set(k), stop() }
+  ringing() {
+    if (!this.ready) return null;
+    const t = this.now;
+    const out = this._gain(0);
+    out.connect(this.body);
+    const o1 = this._osc('sine', 4180), o2 = this._osc('sine', 4235); // two close tones: it beats, like ears do
+    o1.connect(out); o2.connect(out);
+    o1.start(t); o2.start(t);
+    out.gain.setTargetAtTime(0.09, t, 0.02);
+    let dead = false;
+    const self = this;
+    return {
+      set(k) {
+        if (dead) return;
+        out.gain.setTargetAtTime(0.09 * Math.max(0, k), self.now, 0.3);
+      },
+      stop(fade = 1.5) {
+        if (dead) return;
+        dead = true;
+        const now = self.now;
+        out.gain.cancelScheduledValues(now);
+        out.gain.setTargetAtTime(0, now, fade / 4);
+        try { o1.stop(now + fade + 0.5); o2.stop(now + fade + 0.5); } catch { /* */ }
+      },
+    };
+  }
+
+  // a rope tied to a post taking a body's weight: hemp creaking against wood. k: how hard it was pulled
+  ropeCreak(x, y, z, k = 1) {
+    if (!this.ready) return;
+    const t = this.now, o = this._far(x, y, z, 3, 1.0, 0.25);
+    const f = 300 + Math.random() * 220;
+    this._noiseBurst(t, { type: 'bandpass', f, fEnd: f * 0.7, q: 7, a: 0.03, d: 0.22 + Math.random() * 0.1, gain: 0.5 * k, dest: o });
+    this._tone(t + 0.02, { type: 'sawtooth', f: f * 0.5, fEnd: f * 0.42, a: 0.03, d: 0.18, gain: 0.025 * k, dest: o }); // the wood answering
+  }
+
+  // the keeper's boots: slow and heavy, a man who knows the ground
+  keeperStep(x, y, z, k = 1) {
+    if (!this.ready) return;
+    const t = this.now, o = this._far(x, y, z, 4, 1.0, 0.3);
+    this._tone(t, { f: 90, fEnd: 50, a: 0.004, d: 0.12, gain: 0.32 * k, dest: o });
+    this._noiseBurst(t, { buf: this.brown, type: 'lowpass', f: 520, a: 0.004, d: 0.14, gain: 0.5 * k, dest: o });
+    if (Math.random() < 0.5) this._noiseBurst(t + 0.04, { type: 'bandpass', f: 1200 + Math.random() * 800, q: 3, a: 0.002, d: 0.04, gain: 0.08 * k, dest: o }); // a twig
+  }
+
+  // his lantern's bail squeaking in its ring as it swings
+  lanternSqueak(x, y, z) {
+    if (!this.ready) return;
+    const t = this.now, o = this._far(x, y, z, 3, 1.1, 0.2);
+    const f = 1700 + Math.random() * 500;
+    this._tone(t, { f, fEnd: f * 1.12, a: 0.03, d: 0.12, gain: 0.035, dest: o });
+    this._tone(t + 0.16, { f: f * 1.1, fEnd: f * 0.96, a: 0.03, d: 0.1, gain: 0.025, dest: o });
+  }
+
   genHum(x, y, z, spinning = false) {
     if (!this.ready) return null;
     const t = this.now;
