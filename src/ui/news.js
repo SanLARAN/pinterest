@@ -7,6 +7,23 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v:'5.0f',date:'2026-11-07',
+    ru:{title:'Топь, главы 6 и 7: «Побег» и «Обрыв» — уровень целиком',items:[
+      'Глава 6 — на Kugoo по гати через болото. У каждого свой байк, физика как на полигоне: W — газ, S — тормоз, A/D — наклон, Shift — вес назад. С ворот на гать ведёт пандус. Сама гать узкая и без перил: съехал — топь.',
+      'Из болота встают щупальца и ложатся поперёк настила. Видно, как поднимается, — притормози и пережди или успей проскочить. Под ударом или въехав в лежащее — конец.',
+      'Корень выходит сквозь настил прямо перед тобой — с одного края. Уйди на другую сторону: середина в его досягаемости, дальний край нет. Выбросило из седла — встаёшь и едешь дальше.',
+      'Глава 7 — «Обрыв». От конца гати старая насыпь огибает холм и выводит на вершину. Как только кто-то поднимется наверх, за спиной встаёт самое большое из них — шесть секунд, и оно ударит по холму. С обрыва — в чёрное озеро.',
+      'Финал: выплываешь и плывёшь к фонарю на причале. Там с удочкой сидит старик и говорит одну фразу. «Топь» можно пройти от начала до конца.',
+    ]},
+    en:{title:'The Mire, chapters 6 and 7: «The Escape» and «The Cliff» — the whole level',items:[
+      'Chapter 6: the Kugoo bikes down the causeway across the bog. Each of you has a bike and the same physics as on the training ground: W gas, S brake, A/D lean, Shift weight back. A ramp leads from the gate onto the causeway. The causeway itself is narrow and has no rail: ride off it and the bog takes you.',
+      'Arms rise out of the bog and lay themselves across the planks. You can see one coming up: brake and wait it out, or race it. Under the blow, or riding into one that lies across the causeway, is the end.',
+      'The Root comes up through the planks right in front of you, on one side. Get to the other side: the middle is within its reach, the far edge is not. If you are thrown from the saddle, you get up and ride on.',
+      'Chapter 7: «The Cliff». From the end of the causeway an old embankment winds round the hill and up to the top. As soon as someone reaches the top, the biggest of them rises behind you — six seconds, and it comes down on the hill. Off the cliff into the black lake.',
+      'The ending: you come up and swim for the lantern on the pier. An old man sits there with a fishing rod and says one line. The Mire can be played from start to finish.',
+    ]},
+  },
+  {
     v:'5.0e',date:'2026-11-07',
     ru:{title:'Топь, главы 4 и 5: карта и «Генератор»',items:[
       'В деревне теперь есть карта болота, порванная на четыре куска. В коопе у каждого свой кусок, остальные лежат на столах в домах, мимо которых ходит Сторож. Одному: твой кусок при тебе, три других — в домах.',

@@ -446,5 +446,5 @@ test('the words and the sounds of chapters 3 and 4', () => {
   for (const s of ['crashSmash', 'ringing', 'tyreScreech', 'armSlam', 'keeperStep', 'ropeTie', 'heartbeat']) assert.ok(cf.includes(s + '?.('), s);
   const vl = src('src/game/village.js');
   for (const s of ['ropeCreak', 'keeperStep', 'lanternSqueak', 'koThud', 'cleaverStrike', 'ropeRub']) assert.ok(vl.includes(s + '?.('), s);
-  assert.deepEqual(CHAPTERS.filter((c) => FILMS[c.id] || PLAYS[c.id]).map((c) => c.id), ['convoy', 'road', 'crash', 'village', 'generator']);
+  assert.deepEqual(CHAPTERS.filter((c) => FILMS[c.id] || PLAYS[c.id]).map((c) => c.id), ['convoy', 'road', 'crash', 'village', 'generator', 'escape', 'cliff']);
 });

@@ -81,7 +81,7 @@ export class NetSync {
       if (g.torch && g.torch.on) f |= PF.torch;
       if (g.torch && g.torch.on && g.torch.dip) f |= PF.dip;
       const loud = g.mic.state === 'on' ? g.mic.loud : 0;
-      this.send('ps', [r2(p.x), r2(p.y), r2(p.z), r3(p.yaw), r3(p.pitch), r2(p.speed), f, r2(loud), Math.floor(g.score), g.torch ? r2(g.torch.charge) : 0, kindIndex(g.inventory.equipped), g.inventory.active ? 1 : g.fieldView.watch > 0.2 ? 2 : 0, g.motos && g.motos.rider >= 0 ? g.motos.rider : -1]);
+      this.send('ps', [r2(p.x), r2(p.y), r2(p.z), r3(p.yaw), r3(p.pitch), r2(p.speed), f, r2(loud), Math.floor(g.score), g.torch ? r2(g.torch.charge) : 0, kindIndex(g.inventory.equipped), g.inventory.active ? 1 : g.fieldView.watch > 0.2 ? 2 : 0, g.state === 'level2' && g.level2 ? g.level2.riding : g.motos && g.motos.rider >= 0 ? g.motos.rider : -1]);
     }
     // batched voice noise → host
     if (!this.host) {
@@ -180,6 +180,9 @@ export class NetSync {
         break;
       case 'gq': // ...a guest pulled the cord to the end (the host checks everyone is there)
         if (this.host) g.level2?.play?.hostStart?.(pid);
+        break;
+      case 'ew': // (5.0f) chapters 6–7, the ride: who is riding, swimming or down; the roots; the top; the pier film
+        if (!this.host && isHostMsg && d) g.level2?.play?.applyRide?.(d);
         break;
       case 'ob':
         if (d) {

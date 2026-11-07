@@ -260,17 +260,19 @@ test('a whole «Топь» Game: it starts in chapter 1 and walks every chapter 
   game.input.useHeld = false;
   for (let i = 0; i < 60 * 6.2; i++) frame(game);
   assert.equal(game.level2.chapter.id, 'escape');
-  // 6 → 7: the far end of the causeway
+  // 6 → 7: (5.0f) on the bike to the far end of the causeway
   const e = CAUSEWAY.pts[CAUSEWAY.pts.length - 1];
-  put(game, e[0] + 2, e[1] + 2);
+  const bk = game.level2.play.bike(game.level2.play.mine.i);
+  bk.x = e[0] - 1; bk.z = e[1] + 1;
   frame(game);
   assert.equal(game.level2.chapter.id, 'cliff');
-  // 7: into the lake, the picture goes, the level is won
-  put(game, LAKE.x, LAKE.z);
+  // 7: into the lake — the pier film — the level is won
+  bk.x = LAKE.x; bk.z = LAKE.z; bk.y = -1;
   frame(game);
-  assert.ok(game.level2.tail >= 0, 'the lake took you');
-  assert.equal(ended, null, 'not at once: the picture goes first');
-  for (let i = 0; i < 60 * 5; i++) frame(game);
+  frame(game); // (the host judges where you were last frame)
+  assert.equal(game.level2.play.mine.st, 'swim', 'the lake took you');
+  assert.equal(ended, null, 'not at once: the pier first');
+  for (let i = 0; i < 60 * 20 && game.state !== 'won'; i++) frame(game);
   assert.equal(game.state, 'won');
   assert.deepEqual(ended, { won: true, level2: true, coop: false, alive: true });
 });

@@ -207,7 +207,7 @@ export class RemotePlayer {
   _pose(dt) {
     if (this.riding >= 0 && this.alive) {
       // a rider: knees bent, chest over the bars, leaning with the machine they are on
-      const bike = this.game.motos?.bikes?.[this.riding];
+      const bike = (this.game.state === 'level2' && this.game.level2?.bikeOf?.(this.riding)) || this.game.motos?.bikes?.[this.riding]; // (5.0f: or «Топь»'s causeway)
       poseRider(this.rig, bike?.roll || 0, bike?.steer || 0, this.game.time || 0);
     } else if (this.swimming && this.alive) {
       poseSwimming(this.rig, (this.game.time || 0) * 3);

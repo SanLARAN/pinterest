@@ -28,7 +28,7 @@ test('the Angler works from the third night, walks faster than you walk and slow
   assert.ok(A.approach > CFG.PLAYER.walk && A.approach < CFG.PLAYER.sprint, 'you can outrun him — for a while');
   assert.ok(A.haul < A.approach, 'hauling a person is slower than coming for one');
   assert.ok(A.after > CFG.SPAWN_DELAY, 'never during the sleeping-forest calm');
-  assert.equal(PROTOCOL, 26); // 5.0e: the map and the mouth; 25 in 5.0d: the village; 24 in 5.0c: the drive; 23 in 5.0a: «Топь»; 22 in 4.1, 4.0: the camera, the arms (20 in 3.0y: ready ticks; 19 in 3.0s: the bog question; 18 in 2.1v: the Stray's stream)
+  assert.equal(PROTOCOL, 27); // 5.0f: the ride; 26 in 5.0e: the map and the mouth; 25 in 5.0d: the village; 24 in 5.0c: the drive; 23 in 5.0a: «Топь»; 22 in 4.1, 4.0: the camera, the arms (20 in 3.0y: ready ticks; 19 in 3.0s: the bog question; 18 in 2.1v: the Stray's stream)
   assert.ok(TYPES.includes('angler') && STATES.includes('haul') && STATES.includes('finish'), 'on the wire as a fifth monster');
 });
 

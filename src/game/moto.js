@@ -639,28 +639,37 @@ export class MotoPark {
     const paint = this.paints[i % this.paints.length];
     if (!this.cockpitMesh || this.cockpitPaint !== paint) {
       this._dropCockpit();
-      const holder = new THREE.Group();
-      const steer = new THREE.Mesh(partGeometry('steer', paint), g.world.material);
-      steer.frustumCulled = false;
-      steer.renderOrder = 3;
-      steer.position.set(-BAR[0], -BAR[1], -BAR[2]); // the grips' middle at the holder's origin
-      const turn = new THREE.Group();
-      turn.add(steer);
-      holder.add(turn);
-      holder.userData.turn = turn;
-      this.cockpitMesh = holder;
+      this.cockpitMesh = buildBars(paint, g.world.material);
       this.cockpitPaint = paint;
-      g.scene.add(holder);
+      g.scene.add(this.cockpitMesh);
     }
-    const b = this.bikes[i];
-    const m = this.cockpitMesh;
-    m.visible = true;
-    m.position.copy(camera.position);
-    m.quaternion.copy(camera.quaternion);
-    m.translateY(-0.36); // where an enduro's bars sit in your view: a hand below the eyes, half a metre out
-    m.translateZ(-0.5);
-    m.rotateZ((b?.roll || 0) * 0.3); // the view already leans with the machine: a little more for the bars
-    m.userData.turn.quaternion.setFromAxisAngle(AXIS, -(b?.steer || 0));
-    m.updateMatrixWorld();
+    placeBars(this.cockpitMesh, camera, this.bikes[i]);
   }
+}
+
+// (5.0e→5.0f) the rider's bars, for any ride (the training ground's, «Топь»'s causeway): the Kugoo's own steering,
+// its grips' middle at the holder's origin
+export function buildBars(paint, mat) {
+  const holder = new THREE.Group();
+  const steer = new THREE.Mesh(partGeometry('steer', paint), mat);
+  steer.frustumCulled = false;
+  steer.renderOrder = 3;
+  steer.position.set(-BAR[0], -BAR[1], -BAR[2]);
+  const turn = new THREE.Group();
+  turn.add(steer);
+  holder.add(turn);
+  holder.userData.turn = turn;
+  return holder;
+}
+
+// ...hung under the camera where an enduro's bars sit in your view: a hand below the eyes, half a metre out
+export function placeBars(m, camera, b) {
+  m.visible = true;
+  m.position.copy(camera.position);
+  m.quaternion.copy(camera.quaternion);
+  m.translateY(-0.36);
+  m.translateZ(-0.5);
+  m.rotateZ((b?.roll || 0) * 0.3); // the view already leans with the machine: a little more for the bars
+  m.userData.turn.quaternion.setFromAxisAngle(AXIS, -(b?.steer || 0));
+  m.updateMatrixWorld();
 }

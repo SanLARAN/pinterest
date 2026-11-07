@@ -22,7 +22,7 @@ import { createWorldMaterial } from '../render/sonar.js';
 import { GATE, GENERATOR, HOUSES } from '../world/swamp.js';
 import { haloMaterial } from './glowsticks.js';
 import { beaconTexture } from './roadTraffic.js';
-import { buildKugoo } from './moto.js';
+import { buildKugoo, newBike, poseKugoo } from './moto.js';
 import { RoadArm } from './roadArm.js';
 import { ROOT, rootPose, rootLife } from './roadDrive.js';
 import { poseSprawled } from './survivor.js';
@@ -91,6 +91,7 @@ export class BogMouth {
     this.leaves = [];
     this.halos = [];
     this.bikes = [];
+    this.rides = []; // (5.0f) each bike's state for the ride down the causeway (moto.js newBike), by bike index
     const w = game.world, scene = game.scene;
     if (!w?.swamp || !scene) return;
     const y = w.terrain.height(GATE.x, GATE.z);
@@ -155,13 +156,36 @@ export class BogMouth {
     if (this.bikes.length === count || !g.scene) return;
     for (const b of this.bikes) b.removeFromParent();
     const paints = [KIND.BONE, GK.REDPAINT, GK.GATE, GK.CARPAINT];
+    this.paints = paints;
     this.bikes = bikeSpots(count).map((p, i) => {
       const m = buildKugoo(paints[i % paints.length], g.world.material);
+      m.rotation.order = 'YXZ';
       m.position.set(p.x, g.world.terrain.height(p.x, p.z), p.z);
       m.rotation.set(0, p.yaw, 0);
       g.scene.add(m);
       return m;
     });
+    this.resetRides();
+  }
+
+  // (5.0f) every bike back at its place in the row, standing, still (a ride that starts again)
+  resetRides(spots = bikeSpots(this.bikes.length)) {
+    const w = this.g.world;
+    this.rides = spots.map((p, i) => {
+      const b = newBike(i, p.x, p.z, p.yaw);
+      b.y = w.walkHeight?.(p.x, p.z) ?? w.terrain.height(p.x, p.z);
+      return b;
+    });
+    this.rides.forEach((b, i) => this.placeRide(i));
+  }
+
+  // a bike's mesh where its state is (pitch, heading, lean; the wheels and the fork)
+  placeRide(i, b = this.rides[i]) {
+    const m = this.bikes[i];
+    if (!m || !b) return;
+    m.position.set(b.x, b.y, b.z);
+    m.rotation.set(b.pitch || 0, b.yaw, b.roll || 0, 'YXZ');
+    poseKugoo(m, b);
   }
 
   _halos() {

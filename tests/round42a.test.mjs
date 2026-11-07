@@ -453,5 +453,5 @@ test('4.2: the patch note leads its line (only 5.x above it), in both languages'
   assert.ok(n.ru.items.length >= 5);
   assert.match(n.ru.items.join(' '), /развязать/);
   assert.match(n.en.items.join(' '), /convertible/);
-  assert.equal(PROTOCOL, 26, '(5.0a, 5.0c, 5.0d and 5.0e moved it for «Топь») the look rides the existing outfit field; a 4.1 build in the room still plays');
+  assert.equal(PROTOCOL, 27, '(5.0a, 5.0c–5.0f moved it for «Топь») the look rides the existing outfit field; a 4.1 build in the room still plays');
 });

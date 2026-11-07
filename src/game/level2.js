@@ -9,8 +9,8 @@
 //   3 crash      film  the arm missing, the pine, the black, the pieces                     (5.0d ✓)
 //   4 village    play  tied up in a random house, the Сторож, finding each other           (5.0d ✓)
 //   5 generator  play  the map in one pair of hands, the nerves, the generator, the gate   (5.0e ✓)
-//   6 escape     play  the Kugoo bikes down the causeway                                    (5.0f)
-//   7 cliff      play  off the cliff into the lake → the pier, the old fisherman, the end   (5.0f)
+//   6 escape     play  the Kugoo bikes down the causeway, the arms across it, the roots     (5.0f ✓)
+//   7 cliff      play  off the cliff into the lake → the pier, the old fisherman, the end   (5.0f ✓)
 //
 // Until a chapter has its round, it plays as a plain stand-in: a film is a title over the place it happens, a
 // play chapter is walked on foot to its goal. That is enough to cross the whole level end to end. A chapter that
@@ -38,6 +38,7 @@ import { RoadDrive } from './roadDrive.js';
 import { CrashFilm } from './crashFilm.js';
 import { VillagePlay } from './village.js';
 import { GeneratorPlay, BogMouth, EDGE } from './bogMouth.js';
+import { EscapePlay, CliffPlay } from './bogRide.js';
 import { haloMaterial } from './glowsticks.js';
 import { beaconTexture } from './roadTraffic.js';
 
@@ -48,7 +49,7 @@ export const CHAPTERS = [
   { id: 'village' },
   { id: 'generator', stay: true }, // (5.0e: from where the village left you)
   { id: 'escape' },
-  { id: 'cliff' },
+  { id: 'cliff', stay: true }, // (5.0f: on from the end of the causeway, still on the bikes)
 ];
 export const TITLE_T = 5; // s the chapter's title stays up
 const TAIL = 4.5; // s from the lake to the end of the level (the pier film arrives in 5.0f)
@@ -57,7 +58,7 @@ const SLOT_GAP = 1.6; // m between players at a shared start
 export const FILMS = { convoy: ConvoyFilm, crash: CrashFilm };
 // (5.0c) the chapters that have their own play: the controller drives the chapter (its camera, its lights, its
 // end — `done` — and its restart after a death — `restart`, both decided on the host)
-export const PLAYS = { road: RoadDrive, village: VillagePlay, generator: GeneratorPlay }; // (5.0d/e: plays you walk in walk you themselves)
+export const PLAYS = { road: RoadDrive, village: VillagePlay, generator: GeneratorPlay, escape: EscapePlay, cliff: CliffPlay }; // (5.0d–f: every chapter is played now)
 
 // the yaw that looks from (fx, fz) toward (tx, tz) (the player looks along (-sin yaw, -cos yaw))
 export function faceYaw(fx, fz, tx, tz) {
@@ -130,6 +131,16 @@ export class Level2 {
   // how close death is, for the picture (the game's fx.danger)
   get danger() {
     return this.play?.danger || 0;
+  }
+
+  // (5.0f) the bike under you on the causeway (-1: none) — it rides the state packet, so friends draw you on it
+  get riding() {
+    return this.play?.riding ?? -1;
+  }
+
+  // ...and a bike's state by index (a friend's machine leans with them)
+  bikeOf(i) {
+    return this.mouth?.rides?.[i] || null;
   }
 
   get chapter() {

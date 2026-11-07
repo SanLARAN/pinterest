@@ -68,7 +68,7 @@ test('the shift is four days: 8-minute nights, 1:45 mornings, no 45-minute limit
   assert.equal(S.NIGHT, 480);
   assert.equal(S.MORNING, 105);
   assert.equal('RUN_SECONDS' in CFG, false);
-  assert.equal(PROTOCOL, 26); // 5.0e: the map and the mouth; 25 in 5.0d: the village; 24 in 5.0c: the drive; 23 in 5.0a: «Топь»; 22 in 4.1, 4.0: the camera, the arms (20 in 3.0y: ready ticks; 19 in 3.0s: the bog question; 18 in 2.1v: the Stray's stream)
+  assert.equal(PROTOCOL, 27); // 5.0f: the ride; 26 in 5.0e: the map and the mouth; 25 in 5.0d: the village; 24 in 5.0c: the drive; 23 in 5.0a: «Топь»; 22 in 4.1, 4.0: the camera, the arms (20 in 3.0y: ready ticks; 19 in 3.0s: the bog question; 18 in 2.1v: the Stray's stream)
 });
 
 test('danger steps every four minutes of a night and again with each dawn survived', () => {

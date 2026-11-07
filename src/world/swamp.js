@@ -111,6 +111,28 @@ export function bogMask(x, z) {
 }
 
 // a point's distance to a polyline, and the parameter along it
+// (5.0f) the embankment up the knoll: from the end of the causeway round the far side of the mound to its top,
+// rising evenly along its length
+export const RISE = { pts: [[196, -206], [201, -207], [206, -203], [212, -195], [224, -190], [236, -198], [234, -212], [228, -218]], w: 3.6 };
+RISE.cum = RISE.pts.reduce((a, p, i) => (i ? [...a, a[i - 1] + Math.hypot(p[0] - RISE.pts[i - 1][0], p[1] - RISE.pts[i - 1][1])] : [0]), []);
+RISE.len = RISE.cum[RISE.cum.length - 1];
+// how far (x, z) is from it, and how high it is there: { d, y, s }
+export function riseAt(x, z) {
+  let best = { d: 1e9, y: 0, s: 0 };
+  for (let i = 0; i < RISE.pts.length - 1; i++) {
+    const [ax, az] = RISE.pts[i], [bx, bz] = RISE.pts[i + 1];
+    const dx = bx - ax, dz = bz - az, len2 = dx * dx + dz * dz || 1;
+    let t = ((x - ax) * dx + (z - az) * dz) / len2;
+    t = t < 0 ? 0 : t > 1 ? 1 : t;
+    const d = Math.hypot(x - (ax + dx * t), z - (az + dz * t));
+    if (d < best.d) {
+      const s = RISE.cum[i] + Math.sqrt(len2) * t;
+      best = { d, s, y: LEVEL + 0.2 + (CLIFF.top - LEVEL - 0.2) * (s / RISE.len) };
+    }
+  }
+  return best;
+}
+
 function nearLine(pts, x, z) {
   let best = 1e9;
   for (let i = 0; i < pts.length - 1; i++) {
@@ -200,9 +222,13 @@ class SwampTerrain extends Terrain {
     // the causeway runs over the water: the peat under it stays drowned (the deck stands on posts)
     const cw = nearLine(CAUSEWAY.pts, x, z);
     if (cw < 6) h = lerp(h, Math.min(h, LEVEL - 0.6), 1 - smoothstep(1.5, 6, cw));
-    // the cliff: a knoll of rock and peat that ends in a sheer drop into the lake
+    // the cliff: a knoll of rock and peat that ends in a sheer drop into the lake. (5.0f) A steep mound, and the old
+    // embankment that winds up round its far side from the end of the causeway (a Kugoo climbs 8°; the old 27°
+    // flank looped it over backwards)
     const dc = Math.hypot(x - CLIFF.x, z - CLIFF.z);
-    if (dc < 40) h = Math.max(h, lerp(h, CLIFF.top, 1 - smoothstep(10, 38, dc)));
+    if (dc < 24) h = Math.max(h, lerp(h, CLIFF.top, 1 - smoothstep(10, 22, dc)));
+    const up = riseAt(x, z);
+    if (up.d < 7) h = Math.max(h, lerp(h, up.y, 1 - smoothstep(2.2, 7, up.d)));
     // the lake: cut straight down, so the cliff's edge is an edge
     const dl = Math.hypot(x - LAKE.x, z - LAKE.z);
     if (dl < LAKE.r + 3) h = lerp(h, LEVEL - LAKE.depth, 1 - smoothstep(LAKE.r - 5, LAKE.r + 1, dl));
@@ -311,6 +337,17 @@ function addWalk(world, walk, yMin = LEVEL + 0.18) {
   }
 }
 
+// (5.0f) a ramp of planks from the gate down onto the causeway: the bank fell 1.7 m in four metres, and a bike
+// went over its bars there. 13 m at under 8°, joining the causeway 9.5 m along it (it wins over the deck it lies on)
+export const RAMP = { from: [99, -170], s: 9.5, w: 3.4 };
+function addRamp(world) {
+  const [ax, az] = RAMP.from, [p0x, p0z] = CAUSEWAY.pts[0], [p1x, p1z] = CAUSEWAY.pts[1];
+  const L = Math.hypot(p1x - p0x, p1z - p0z), bx = p0x + ((p1x - p0x) / L) * RAMP.s, bz = p0z + ((p1z - p0z) / L) * RAMP.s;
+  const ya = world.terrain.height(ax, az) + 0.03, yb = LEVEL + 0.18;
+  world.addProp((ax + bx) / 2, (az + bz) / 2, (b) => deck(world, b, ax, az, bx, bz, RAMP.w, ya, yb));
+  world.walks.unshift({ ax, az, bx, bz, w: RAMP.w, y: (ya + yb) / 2, ya, yb, id: 'ramp' });
+}
+
 // ---------------------------------------------------------------- the place
 
 export function buildSwamp(world, t0) {
@@ -338,6 +375,7 @@ export function buildSwamp(world, t0) {
   for (const H of HOUSES) buildHouse(world, H, rng);
   buildGate(world);
   addWalk(world, CAUSEWAY);
+  addRamp(world);
   buildPier(world);
   genGrowth(world, rng);
 
@@ -561,10 +599,10 @@ function buildGate(world) {
   // lamp posts along the first legs of the causeway
   const lamps = [];
   const P = CAUSEWAY.pts;
-  for (let i = 0; i < P.length - 1; i++) {
-    const [ax, az] = P[i], [bx, bz] = P[i + 1];
+  for (const [Q, first] of [[P, 6], [RISE.pts, 11]]) for (let i = 0; i < Q.length - 1; i++) { // (5.0f: and up the embankment)
+    const [ax, az] = Q[i], [bx, bz] = Q[i + 1];
     const len = Math.hypot(bx - ax, bz - az), px = -(bz - az) / len, pz = (bx - ax) / len;
-    for (let d = 6; d < len; d += 22) lamps.push({ x: ax + (bx - ax) * (d / len) + px * 2.2, z: az + (bz - az) * (d / len) + pz * 2.2 });
+    for (let d = first; d < len; d += 22) lamps.push({ x: ax + (bx - ax) * (d / len) + px * 2.2, z: az + (bz - az) * (d / len) + pz * 2.2 });
   }
   world.swamp.lamps = lamps.map((l) => ({ ...l, y: Math.max(LEVEL, world.terrain.height(l.x, l.z)) + 3.2 }));
   for (const l of lamps) {

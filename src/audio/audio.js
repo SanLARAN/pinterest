@@ -2848,6 +2848,15 @@ export class AudioEngine {
     this._tone(t + 0.16, { f: f * 1.1, fEnd: f * 0.96, a: 0.03, d: 0.1, gain: 0.025, dest: o });
   }
 
+  // (5.0f) the bog closing over a rider: a heavy wet swallow, bubbles coming up after
+  bogGulp(x, y, z) {
+    if (!this.ready) return;
+    const t = this.now, o = this._far(x, y, z, 5, 0.8, 0.4);
+    this._noiseBurst(t, { buf: this.brown, type: 'lowpass', f: 380, fEnd: 120, a: 0.01, d: 0.6, gain: 0.9, dest: o });
+    this._tone(t + 0.05, { f: 90, fEnd: 40, a: 0.01, d: 0.5, gain: 0.4, dest: o });
+    for (let i = 0; i < 7; i++) this._tone(t + 0.6 + i * 0.18 + Math.random() * 0.1, { f: 300 + Math.random() * 400, fEnd: 700 + Math.random() * 500, a: 0.004, d: 0.06, gain: 0.06, dest: o }); // the bubbles
+  }
+
   // (5.0e) a piece of the map changing hands: dry paper, folded and unfolded
   paperRustle(x, y, z) {
     if (!this.ready) return;
