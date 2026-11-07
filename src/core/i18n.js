@@ -88,6 +88,7 @@ const STR = {
     l2Caught: 'ОНО НАСТИГЛО ВАС',
     l2Flipped: 'МАШИНУ ПЕРЕВЕРНУЛО',
     l2Again: 'глава начнётся сначала',
+    l2FellAlert: 'ОНО ВПЕРЕДИ — ДЕРЕВО ПОПЕРЁК ДОРОГИ',
     // 5.0d: chapter 4, the village and its keeper
     villageTied: 'A / D · рви верёвку — тихо: он слышит скрип',
     villageTiedTouch: 'ЭХО / стик · рви верёвку',
@@ -1197,6 +1198,7 @@ const STR = {
     l2Caught: 'IT CAUGHT YOU',
     l2Flipped: 'THE CAR WENT OVER',
     l2Again: 'the chapter starts again',
+    l2FellAlert: 'IT GOT AHEAD — A TREE ACROSS THE ROAD',
     // 5.0d: chapter 4, the village and its keeper
     villageTied: 'A / D · work the rope — quietly: he hears it creak',
     villageTiedTouch: 'ECHO / stick · work the rope',

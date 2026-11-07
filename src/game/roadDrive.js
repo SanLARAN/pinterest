@@ -26,6 +26,7 @@ import { MeshBuilder, KIND } from '../world/builder.js';
 import { ROADS, FORKS, CRASH, onRoad } from '../world/swamp.js';
 import { RoadArm, armRadius, ARM } from './roadArm.js';
 import { MOON } from './convoyFilm.js';
+import { BEATS, chaseWave, fellPlan, fellPosts, fellK, buildFallenPine, placeFallenPine, raimiShot } from './chaseBeats.js';
 
 const PI = Math.PI;
 const NO_LOOK = { dx: 0, dy: 0 };
@@ -258,6 +259,8 @@ export class Chase {
     this.T = { x: 0, z: 0 }; // where it comes down
     this.B = { x: 0, z: 0 }; // where it comes out of the ground
     this.side = 1;
+    this.override = null; // (5.0g) the next cycle's aim, if it is going for something else (the pine ahead)
+    this.aimed = null;
   }
 
   push(x, z) {
@@ -293,7 +296,7 @@ export class Chase {
   // its pace: rising over the chapter, and quicker while it is far behind (it is always within earshot)
   speed(gap = 0) {
     const tc = this.t - CHASE.start;
-    return lerp(CHASE.v0, CHASE.v1, smoothstep(0, CHASE.ramp, tc)) + clamp((gap - CHASE.leash) * CHASE.pull, 0, CHASE.pullMax);
+    return lerp(CHASE.v0, CHASE.v1, smoothstep(0, CHASE.ramp, tc)) + clamp((gap - CHASE.leash) * CHASE.pull, 0, CHASE.pullMax) + (tc > 0 ? chaseWave(tc) : 0); // (5.0g: the gap breathes)
   }
 
   // one frame. carS: where the car is on the track. Returns 'slam' on the frame it comes down
@@ -310,6 +313,8 @@ export class Chase {
     if (idx !== this.cycle) {
       this.cycle = idx;
       this.side = idx % 2 ? 1 : -1;
+      this.aimed = this.override;
+      this.override = null;
     }
     // it aims while it rises; at the top it is committed
     if (u < CHASE.rise) this._aim();
@@ -318,6 +323,11 @@ export class Chase {
   }
 
   _aim() {
+    if (this.aimed) {
+      this.T.x = this.aimed.T.x; this.T.z = this.aimed.T.z;
+      this.B.x = this.aimed.B.x; this.B.z = this.aimed.B.z;
+      return;
+    }
     const p = this.at(this.cs);
     this.T.x = p.x;
     this.T.z = p.z;
@@ -544,11 +554,20 @@ export class RoadDrive {
     this.cues = new Set();
     this.swelled = new Set(); // the roots whose swell has been seen and heard
     this.pose = null; // what is drawn (the host: the car itself; a guest: the host's car, smoothed)
+    // (5.0g) the chase, directed (game/chaseBeats.js): the pine it drops ahead, its own eyes at the start, the forest
+    // splitting where it moves, your heart
+    this.fell = null;
+    this.fellNext = 0;
+    this.nextCrack = 0;
+    this.beatT = 0;
+    this.lastU = 0;
   }
 
   // ---------------- begin / end ----------------
   begin(tries = 0) {
     const g = this.g;
+    this.tries = tries;
+    this.raimiOn = tries === 0; // (a first try opens on its eyes; a retry goes straight to the wheel)
     const p = pointAt(MAIN, START_S);
     this.car = new Car(p.x, p.z, yawOf(p.dx, p.dz), tries ? 4 : 9);
     this.car.settle(g.world);
@@ -569,6 +588,7 @@ export class RoadDrive {
     for (const h of this.halos || []) h.sp.material.dispose();
     this.halos = null;
     this.chaseArm?.dispose();
+    if (this.fellMesh) { this.fellMesh.removeFromParent(); this.fellMesh.geometry.dispose(); this.fellMesh = null; }
     for (const s of this.slots || []) {
       s.arm.dispose();
       s.bump.removeFromParent();
@@ -623,6 +643,9 @@ export class RoadDrive {
     // the chase, and two of everything a Корень needs (they come one at a time; two can overlap)
     this.chaseArm = new RoadArm(scene, this.mat);
     this.chaseArm.mesh.visible = false;
+    this.fellMesh = buildFallenPine(this.mat);
+    this.fellMesh.visible = false;
+    scene.add(this.fellMesh);
     this.slots = [0, 1].map(() => {
       const arm = new RoadArm(scene, this.mat);
       arm.mesh.visible = false;
@@ -672,6 +695,7 @@ export class RoadDrive {
   update(dt, raw) {
     const g = this.g;
     this.t += dt;
+    if (this.raimiOn && this.t >= BEATS.raimi) { this.raimiOn = false; this.cue('cut'); }
     this._seats();
     const look = g.inputMuted ? NO_LOOK : raw?.look || NO_LOOK;
     // the eyes: free about the seat; the driver's drift back to the road when the mouse lets go
@@ -686,6 +710,8 @@ export class RoadDrive {
     this._place(dt);
     this._crew();
     this._arms();
+    this._fellDraw(dt);
+    this._heart(dt);
     this._beams();
     this._map(dt);
     this._sound();
@@ -707,9 +733,16 @@ export class RoadDrive {
   // the host's machine: drive the car, move the chase, wake the roots
   _simulate(dt) {
     const g = this.g, c = this.car, input = g.input;
-    const driving = !this.dead && !g.inputMuted && !!input;
-    const thr = driving ? clamp(input.move?.y || 0, -1, 1) : 0;
-    const st = driving ? clamp(-(input.move?.x || 0) - (input.turn || 0), -1, 1) : 0;
+    const driving = !this.dead && !g.inputMuted && !!input && !this.raimiOn;
+    let thr = driving ? clamp(input.move?.y || 0, -1, 1) : 0;
+    let st = driving ? clamp(-(input.move?.x || 0) - (input.turn || 0), -1, 1) : 0;
+    if (this.raimiOn && !this.dead) {
+      // (5.0g) while the picture is its eyes, the car keeps to the ruts by itself at the pace it came in at
+      const pr = project(MAIN, c.x, c.z), p = pointAt(MAIN, pr.s + 8, {});
+      const [fx, fz] = c.fwd(), dx = p.x - c.x, dz = p.z - c.z;
+      st = clamp(Math.atan2(dx * fz - dz * fx, dx * fx + dz * fz) * 2.2, -1, 1); // (the angle to it, left positive: left is (fz, −fx))
+      thr = clamp((9 - c.v) * 0.3 + 0.62, 0, 1);
+    }
     c.onRoad = !!onRoad(c.x, c.z, 0.35);
     const n = Math.max(1, Math.ceil(dt * DRIVE.hz));
     for (let i = 0; i < n; i++) c.step(dt / n, this.dead ? (c.v > 0 ? -1 : 0) : thr, st);
@@ -718,19 +751,27 @@ export class RoadDrive {
       const a = this.rootAge.get(R.i);
       if (a !== undefined && rootStanding(a)) posts.push({ x: R.x, z: R.z, r: ROOT.r });
     }
+    if (this.fell && fellK(this.fell.age) > 0.8) posts.push(...fellPosts(this.fell));
+    if (this.fell) this.fell.age += dt;
     const impact = c.collide(g.world, posts);
     c.settle(g.world);
     if (impact > 2.5) this._hit(impact);
     if (this.dead) return;
     // the chase
     this.chase.push(c.x, c.z);
+    this._fellPlan();
     const ev = this.chase.update(dt, this.chase.carS(c.x, c.z));
     if (ev === 'slam') {
       this.cue('slam');
+      if (this.chase.aimed?.fell && !this.fell) {
+        this.fell = { ...this.chase.aimed.fell, age: 0 };
+        this.cue('fell');
+        this.chase.cs = Math.max(0, this.chase.cs - BEATS.fellCost); // (reaching that far ahead costs it ground)
+      }
       if (this._near(this.chase.T, CHASE.reach)) this._die('caught');
     }
     const { ph } = chasePhase(this.chase.u);
-    if (this.chase.on && ph === 'lie') {
+    if (this.chase.on && ph === 'lie' && !this.chase.aimed?.fell) { // (5.0g: reaching over the car to the pine, it lies on the pine, not on the road)
       // lying across the road: drive into it and it has you
       const T = this.chase.T, B = this.chase.B;
       const mx = T.x + (B.x - T.x) * 0.25, mz = T.z + (B.z - T.z) * 0.25;
@@ -758,6 +799,28 @@ export class RoadDrive {
     }
     // the end of the road
     if (Math.hypot(c.x - CRASH.x, c.z - CRASH.z) < GOAL_D) this.done = true;
+  }
+
+  // (5.0g) the smart pursuer: twice it gets ahead of you. When the time comes, it is close behind, the car is moving
+  // and the road ahead allows it, the next cycle of the arm reaches over the car and down onto a pine at the verge
+  // ahead — where the car will be about twelve metres short of when it lands
+  _fellPlan() {
+    const ch = this.chase, c = this.car, k = this.fellNext;
+    const tc = ch.t - CHASE.start;
+    if (k >= BEATS.fellAt.length || tc < BEATS.fellAt[k] || ch.override || ch.aimed || (this.fell && this.fell.age < 5)) return;
+    if (tc > BEATS.fellAt[k] + BEATS.fellLate) { this.fellNext++; return; }
+    if (c.v < 5 || ch.carS(c.x, c.z) - ch.cs > BEATS.fellGap) return;
+    let R = null, q = null;
+    for (const r of ROUTES) { const p = project(r, c.x, c.z); if (p.d < r.w / 2 + 1 && (!q || p.d < q.d)) { R = r; q = p; } }
+    if (!R) return;
+    const lands = (CHASE.cycle - ch.u) + CHASE.rise + CHASE.slam; // s until that blow lands
+    const plan = fellPlan(R, q.s + c.v * lands - BEATS.fellAhead + 20, k % 2 ? -1 : 1, pointAt); // (about two seconds to see it and slow)
+    if (!plan) return;
+    // out of the trees behind on the far side of the road, over the roof, down on the pine
+    const [fx, fz] = c.fwd();
+    const B = { x: c.x - fx * 6 + plan.d.x * 10, z: c.z - fz * 6 + plan.d.z * 10 };
+    ch.override = { T: plan.base, B, fell: plan };
+    this.fellNext++;
   }
 
   // how close the car (either end of it) comes to a point
@@ -825,6 +888,7 @@ export class RoadDrive {
       h: [ch.on ? 1 : 0, r2(ch.T.x), r2(ch.T.z), r2(ch.B.x), r2(ch.B.z), r2(ch.u)],
       r: roots,
       d: this.dead ? (this.dead.kind === 'flipped' ? 2 : 1) : 0,
+      f: this.fell ? [r2(this.fell.base.x), r2(this.fell.base.z), r3(this.fell.d.x), r3(this.fell.d.z), r2(this.fell.len), r2(this.fell.age)] : 0,
     };
   }
 
@@ -869,6 +933,11 @@ export class RoadDrive {
         if (was !== undefined && was < ROOT.swell && a >= ROOT.swell) this.cue('strike' + i);
       }
       for (const [i, a] of this.rootAge) this.rootAge.set(i, a + dt);
+    }
+    if (Array.isArray(d.f) && d.f.length >= 6 && d.f.every(Number.isFinite)) {
+      const [bx, bz, dx, dz, len, fa] = d.f;
+      if (!this.fell) { this.fell = { base: { x: bx, z: bz }, d: { x: dx, z: dz }, len, age: fa }; this.cue('fell'); }
+      else if (Math.abs(this.fell.age - fa) > 0.4) this.fell.age = fa;
     }
     if (d.d && !this.dead) this._die(d.d === 2 ? 'flipped' : 'caught');
   }
@@ -975,6 +1044,26 @@ export class RoadDrive {
     this.danger = cv.on ? clamp(1 - (dT - 6) / 30, 0, 1) : 0;
   }
 
+  _fellDraw(dt) {
+    const f = this.fell, m = this.fellMesh;
+    if (!m) return;
+    m.visible = !!f;
+    if (!f) return;
+    if (!this.g.auth) f.age += dt;
+    placeFallenPine(m, f, fellK(f.age), (x, z) => this.g.world.terrain.height(x, z));
+  }
+
+  // your own heart: louder and quicker the closer it is; in the opening shot the picture goes red
+  _heart(dt) {
+    if (this.raimiOn) { this.danger = 0.85; return; }
+    if (this.dead || this.danger < 0.25) { this.beatT = 0.25; return; }
+    this.beatT -= dt;
+    if (this.beatT <= 0) {
+      this.beatT = lerp(1.05, 0.42, this.danger);
+      this.g.audio?.heartbeat?.(0.2 + 0.45 * this.danger);
+    }
+  }
+
   _beams() {
     const c = this.car;
     const [fx, fz] = c.fwd();
@@ -986,6 +1075,12 @@ export class RoadDrive {
   lightSources(out) {
     if (!this.car3) return;
     const c = this.car, [fx, fz] = c.fwd();
+    if (this.raimiOn) {
+      // (5.0g) its own glow about its eyes: the trunks it rushes between flare red as they go by the lens
+      const ground = (x, z) => this.g.world.terrain.height(x, z);
+      const r = raimiShot(this.t / BEATS.raimi, this.t, (q, o) => this.chase.at(q, o), this.chase.carS(c.x, c.z), c, ground);
+      out.push({ x: r.p[0], y: r.p[1] + 0.6, z: r.p[2], I: 1.6, c: [0.95, 0.16, 0.1], R: 12, prio: 1, near: 0.2, id: 'raimi' });
+    }
     out.push({ x: MOON.x, y: MOON.y, z: MOON.z, I: MOON.I, c: MOON.c, R: MOON.R, prio: 9, near: 2, id: 'moon' });
     const D = this.car3.userData.M.P.dash;
     this._local(D[0], D[1] + 0.05, 0, _w);
@@ -1007,6 +1102,17 @@ export class RoadDrive {
   // ---------------- the camera ----------------
   applyCamera(camera) {
     if (!this.car3) return false;
+    if (this.self) this.self.rig.nodes.head.visible = !!this.raimiOn; // (seen from behind: you have a head)
+    if (this.raimiOn) {
+      const ground = (x, z) => this.g.world.terrain.height(x, z), c = this.car;
+      const r = raimiShot(this.t / BEATS.raimi, this.t, (s, o) => this.chase.at(s, o), this.chase.carS(c.x, c.z), c, ground);
+      camera.position.set(r.p[0], r.p[1], r.p[2]);
+      _w.set(r.l[0], r.l[1], r.l[2]);
+      camera.lookAt(_w);
+      camera.rotateZ(r.roll);
+      if (Math.abs(camera.fov - r.fov) > 0.05) { camera.fov = r.fov; camera.updateProjectionMatrix(); }
+      return true;
+    }
     this._eye(this.seat, _v);
     camera.position.copy(_v);
     this.car3.userData.body.getWorldQuaternion(_q);
@@ -1017,7 +1123,7 @@ export class RoadDrive {
     const c = this.car, k = clamp(Math.abs(c.v) / 10, 0, 1) * (c.onRoad ? 0.004 : 0.012);
     camera.rotateZ(Math.sin(this.t * 19) * k);
     camera.rotateX(Math.sin(this.t * 23 + 1) * k);
-    const fov = fovFor(camera.aspect) + clamp(Math.abs(c.v) * 0.3, 0, 5);
+    const fov = fovFor(camera.aspect) + clamp(Math.abs(c.v) * 0.3, 0, 5) + this.danger * 7; // (5.0g: the edges pull away as it closes)
     if (Math.abs(camera.fov - fov) > 0.05) {
       camera.fov = fov;
       camera.updateProjectionMatrix();
@@ -1073,9 +1179,31 @@ export class RoadDrive {
       const ph = chasePhase(cv.u).ph;
       this.rumble.set(cv.on ? (ph === 'rise' || ph === 'slam' ? 1 : 0.6) : 0);
     }
+    this._forest(au, cv);
     for (const key of this.cues) {
-      if (key === 'slam') au.armSlam?.(cv.T.x, this.g.world.terrain.height(cv.T.x, cv.T.z) + 1, cv.T.z, 0.75);
-      else if (key === 'knock') au.armSlam?.(c.x, c.y + 1, c.z, 0.45);
+      if (key === 'slam') {
+        const g = this.g, y = g.world.terrain.height(cv.T.x, cv.T.z), d = Math.hypot(c.x - cv.T.x, c.z - cv.T.z);
+        au.armSlam?.(cv.T.x, y + 1, cv.T.z, 0.75);
+        // a near miss is felt: the car jumps, the forest is lit for a moment, the earth goes up
+        g.addTrauma?.(clamp(1 - d / 26, 0, 1) * 0.55);
+        if (d < 12) g.fx.glitch = Math.max(g.fx.glitch, 0.3);
+        g.pulses?.emit(cv.T.x, y + 0.5, cv.T.z, g.time, { radius: 46, strength: 0.9, speed: 30, decay: 0.6, color: [1, 0.45, 0.35], kind: 'shard' });
+        g.particles?.burst(cv.T.x, y + 0.4, cv.T.z, 34, { color: [0.3, 0.25, 0.2], speed: 6, up: 3, life: 1.3, size: 0.09, gravity: -9, drag: 0.7 });
+      } else if (key === 'fell') {
+        const f = this.fell, g = this.g;
+        if (f) {
+          const y = g.world.terrain.height(f.base.x, f.base.z);
+          au.treeFall?.(f.base.x, y + 2, f.base.z);
+          g.particles?.burst(f.base.x, y + 4, f.base.z, 40, { color: [0.18, 0.24, 0.12], speed: 5, up: 2, life: 1.8, size: 0.08, gravity: -5, drag: 0.6 });
+          if (g.auth || this.seat === 0) g.hud.flashAlert?.(t('l2FellAlert'), 'warn', 1.8);
+        }
+      } else if (key === 'cut') {
+        // the shot ends on the wheel: the roar right behind
+        au.armGroan?.(cv.B.x || c.x, c.y + 4, cv.B.z || c.z, 1);
+        this.g.addTrauma?.(0.45);
+        this.g.fx.white = Math.max(this.g.fx.white, 0.12);
+      }
+      if (key === 'knock') au.armSlam?.(c.x, c.y + 1, c.z, 0.45);
       else if (key === 'bump') au.carHit?.(c.x, c.y + 0.8, c.z, clamp((this._k || 5) / 12, 0.2, 1));
       else if (key === 'die') { au.armSlam?.(c.x, c.y + 1, c.z, 1); au.carHit?.(c.x, c.y + 0.8, c.z, 1); }
       else if (key.startsWith('swell')) {
@@ -1095,9 +1223,36 @@ export class RoadDrive {
     this.cues.clear();
   }
 
+  // (5.0g) where it moves the forest splits: trunks cracking along its body, needles and bark coming down where it
+  // comes up, the birds going up ahead of it — on every machine, from the drawn chase
+  _forest(au, cv) {
+    const g = this.g;
+    if (!cv.on) return;
+    const newCycle = cv.u < this.lastU - 0.5;
+    this.lastU = cv.u;
+    const c = this.car, mid = { x: (cv.T.x + cv.B.x) / 2, z: (cv.T.z + cv.B.z) / 2 };
+    const near = clamp(1 - Math.hypot(c.x - mid.x, c.z - mid.z) / 45, 0, 1);
+    if (this.t >= this.nextCrack) {
+      this.nextCrack = this.t + (BEATS.crack[0] + Math.random() * (BEATS.crack[1] - BEATS.crack[0])) * (1.25 - near * 0.5);
+      const k = 0.2 + Math.random() * 0.6;
+      const x = cv.B.x + (cv.T.x - cv.B.x) * k, z = cv.B.z + (cv.T.z - cv.B.z) * k;
+      au.treeCrack?.(x, g.world.terrain.height(x, z) + 3, z, 0.5 + near * 0.6);
+    }
+    if (newCycle) {
+      const yB = g.world.terrain.height(cv.B.x, cv.B.z);
+      g.particles?.burst(cv.B.x, yB + 3, cv.B.z, 26, { color: [0.2, 0.24, 0.13], speed: 4, up: 2.5, life: 1.6, size: 0.08, gravity: -5, drag: 0.7, spread: 3 });
+      if (Math.random() < 0.4) {
+        // crows out of the crowns ahead of it, scattering up and away
+        const ax = cv.T.x + (c.x - cv.T.x) * 0.5, az = cv.T.z + (c.z - cv.T.z) * 0.5, y = g.world.terrain.height(ax, az) + 9;
+        g.particles?.burst(ax, y, az, 14, { color: [0.05, 0.05, 0.06], speed: 3, up: 4, life: 2.6, size: 0.16, gravity: 0.6, drag: 0.35, spread: 6 });
+        au.crowsFlush?.(ax, y, az);
+      }
+    }
+  }
+
   _hud() {
     const g = this.g;
-    if (this.dead || this.t < 5.2) return;
+    if (this.dead || this.t < 5.2 || this.raimiOn) return;
     if (this.t - (this._hintT ?? -9) < 1) return;
     this._hintT = this.t;
     const s = this.seat, coop = this.seats.size > 1;

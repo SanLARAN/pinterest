@@ -111,6 +111,39 @@ export function bogMask(x, z) {
 }
 
 // a point's distance to a polyline, and the parameter along it
+// (5.0g) the forest closing on the dirt road: how far past its edge the first trunks stand
+export const ROAD_VERGE = 1.6;
+
+// a young spruce at the verge: a short trunk and two skirts of needles, head-high to twice that
+function youngSpruce(world, x, y, z, s, rng) {
+  const ry = rng.float(0, 6.283), h = rng.float(1.6, 3.2);
+  world.addProp(x, z, (b) => {
+    b.place(x, y - 0.1, z, rng.float(-0.06, 0.06), ry, rng.float(-0.06, 0.06), s);
+    b.cylinder(4, 0.09, 0.05, h * 0.35, KIND.BARK, { capTop: false });
+    b.cone(6, h * 0.42, h * 0.62, KIND.LEAF, { y0: h * 0.12, phase: ry });
+    b.cone(6, h * 0.28, h * 0.5, KIND.LEAF, { y0: h * 0.5, phase: ry + 1 });
+  });
+  world.col.circle(x, z, 0.16 * s, 3 * s, CAP.TREE);
+}
+
+// a pine at the verge leaning out over the road (toward yaw): its crown hangs over the ruts
+function leaningPine(world, x, y, z, s, toward, rng) {
+  const lean = rng.float(0.1, 0.2), trunkH = rng.float(2.0, 3.2), r0 = rng.float(1.6, 2.1), ph = rng.float(0, 6);
+  world.addProp(x, z, (b) => {
+    // tilt about the axis across the lean: Rz after turning to face the road
+    b.place(x, y - 0.3, z, 0, toward, -lean, s);
+    b.cylinder(5, 0.27, 0.12, trunkH + 4.5, KIND.BARK, { capTop: false });
+    let yb = trunkH, r = r0;
+    for (let i = 0; i < 3; i++) {
+      const hh = 2.6 - i * 0.28;
+      b.cone(7, r, hh, KIND.LEAF, { y0: yb, phase: ph + i });
+      yb += hh * 0.56;
+      r *= 0.73;
+    }
+  });
+  world.col.circle(x, z, 0.3 * s, 10 * s, CAP.TREE);
+}
+
 // (5.0f) the embankment up the knoll: from the end of the causeway round the far side of the mound to its top,
 // rising evenly along its length
 export const RISE = { pts: [[196, -206], [201, -207], [206, -203], [212, -195], [224, -190], [236, -198], [234, -212], [228, -218]], w: 3.6 };
@@ -665,6 +698,33 @@ function genGrowth(world, rng) {
     const s = rng.float(0.8, 1.3);
     if (rng.chance(0.78)) world.pine(x, y, z, s, rng);
     else world.birch(x, y, z, s, rng);
+  }
+
+  // ---- (forest pass 2) the walls of the dirt road. In a dark forest the trees are the dark: young spruce crowding
+  // the verge, pines leaning out over the ruts, the old forest close behind them — beyond the headlights a wall, and
+  // the thing behind the car breaks through it. (The road itself and a strip either side stay clear: a car swerving
+  // round a root has its metre and a half.)
+  const segs = [];
+  for (const R of ROADS) for (let i = 0; i < R.pts.length - 1; i++) {
+    const [ax, az] = R.pts[i], [bx, bz] = R.pts[i + 1];
+    segs.push({ R, ax, az, bx, bz, L: Math.hypot(bx - ax, bz - az) });
+  }
+  const total = segs.reduce((a, q) => a + q.L, 0);
+  for (let i = 0; i < Math.round(total * 9); i++) {
+    let pick = rng.float(0, total), q = segs[0];
+    for (const g of segs) { if (pick < g.L) { q = g; break; } pick -= g.L; }
+    const ux = (q.bx - q.ax) / q.L, uz = (q.bz - q.az) / q.L, side = rng.chance(0.5) ? 1 : -1;
+    const lat = q.R.w / 2 + ROAD_VERGE + Math.pow(rng.next(), 1.7) * 21; // (crowded at the verge, thinning back)
+    const along = rng.float(0, q.L);
+    const x = q.ax + ux * along - uz * lat * side, z = q.az + uz * along + ux * lat * side;
+    if (onRoad(x, z, ROAD_VERGE) || depth(x, z) > 0.02 || !clear(x, z, 0.4) || nearHouse(x, z, 2)) continue;
+    const near = lat < q.R.w / 2 + ROAD_VERGE + 3.2;
+    if (!world.col.free(x, z, near ? 0.75 : 1.15)) continue;
+    const y = world.terrain.height(x, z);
+    if (near && rng.chance(0.62)) youngSpruce(world, x, y, z, rng.float(0.7, 1.35), rng);
+    else if (near) leaningPine(world, x, y, z, rng.float(0.85, 1.2), Math.atan2(ux * side, uz * side), rng); // (Ry·Rz: the crown goes to (cos t, −sin t) — toward the road)
+    else if (rng.chance(0.8)) world.pine(x, y, z, rng.float(0.85, 1.35), rng);
+    else world.birch(x, y, z, rng.float(0.8, 1.2), rng);
   }
 
   // ---- dead trees standing in the water: the drowned forest the bog swallowed

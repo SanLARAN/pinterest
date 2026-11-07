@@ -90,6 +90,11 @@ function bot(game, drive, { vmax = 13, thrMax = 1, dodge = true } = {}) {
     if (!dodge && a < ROOT.swell) continue;
     if (R.s > pr.s - 3 && R.s < pr.s + 40) lat = -Math.sign(R.lat) * 1.5;
   }
+  // (5.0g) a pine down across the road ahead: slow, and through on the far half
+  if (drive.fell) {
+    const f = drive.fell, qt = project(MAIN, f.base.x + f.d.x * f.len, f.base.z + f.d.z * f.len), qb = project(MAIN, f.base.x, f.base.z);
+    if (qt.s - pr.s > -3 && qt.s - pr.s < 22) { lat = qb.lat > 0 ? -1.9 : 1.9; vmax = Math.min(vmax, 6.5); }
+  }
   const p = pointAt(MAIN, pr.s + 7 + Math.abs(c.v) * 0.55);
   const tx = p.x + p.dz * lat, tz = p.z - p.dx * lat;
   const dx = tx - c.x, dz = tz - c.z;
@@ -332,7 +337,7 @@ test('co-op: the host drives, the guest draws the host\'s car; the seats go by l
   host.input.move.y = 1;
   for (let i = 0; i < 60; i++) host.update(1 / 30, { events: [], move: { x: 0, z: 0 }, look: { dx: 0, dy: 0 } });
   const pk = H.pack();
-  assert.deepEqual(Object.keys(pk).sort(), ['c', 'd', 'h', 'r']);
+  assert.deepEqual(Object.keys(pk).sort(), ['c', 'd', 'f', 'h', 'r']); // (5.0g: f — the pine it dropped across the road)
   assert.ok(JSON.stringify(pk).length < 400, `small on the wire (${JSON.stringify(pk).length} bytes)`);
   const { game: guest } = mkGame('bog', still());
   guest.setupSolo();
@@ -406,6 +411,7 @@ test('in the seat: the camera is in the car, the hands are off the kit, and leav
   game.setupSolo();
   game.reset({ seed: 5, chapter: 1 });
   const dr = game.level2.play;
+  dr.raimiOn = false; // (5.0g: past its own eyes at the start)
   game.update(1 / 30, { events: [], move: { x: 0, z: 0 }, look: { dx: 0, dy: 0 } });
   const cam = new THREE.PerspectiveCamera(60, 1.6, 0.05, 600);
   game.applyView(cam, 1);

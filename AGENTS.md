@@ -36,7 +36,7 @@
 
 ```bash
 npm install
-npm test            # node:test, 72 файла, 620 тестов (5.0f) — все должны быть зелёными
+npm test            # node:test, 73 файла, 628 тестов (5.0g) — все должны быть зелёными
 npm run dev         # http://localhost:5173 (сайт игры — http://localhost:5173/site/)
 npm run build:pages # сборка в play/ — без неё деплой покажет старую версию
 npm run build:site  # сайт игры в dist/site/ → https://sanlaran.github.io/pinterest/site/

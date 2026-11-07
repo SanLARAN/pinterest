@@ -2848,6 +2848,42 @@ export class AudioEngine {
     this._tone(t + 0.16, { f: f * 1.1, fEnd: f * 0.96, a: 0.03, d: 0.1, gain: 0.025, dest: o });
   }
 
+  // (5.0g) a trunk splitting in the dark where the thing is moving: a dry crack, a creak, splinters. k: how near
+  treeCrack(x, y, z, k = 0.7) {
+    if (!this.ready) return;
+    const t = this.now, o = this._far(x, y, z, 9, 0.6, 0.6);
+    this._noiseBurst(t, { type: 'highpass', f: 1400, a: 0.0008, d: 0.05 + Math.random() * 0.04, gain: 0.55 * k, dest: o }); // the crack
+    this._noiseBurst(t + 0.01, { buf: this.brown, type: 'lowpass', f: 600, fEnd: 180, a: 0.002, d: 0.25, gain: 0.5 * k, dest: o });
+    const f = 160 + Math.random() * 120;
+    this._tone(t + 0.04, { type: 'sawtooth', f, fEnd: f * 0.6, a: 0.02, d: 0.3 + Math.random() * 0.3, gain: 0.03 * k, dest: o }); // the wood groaning
+    for (let i = 0; i < 3 + Math.floor(Math.random() * 4); i++) this._noiseBurst(t + 0.05 + Math.random() * 0.35, { type: 'bandpass', f: 2200 + Math.random() * 2500, q: 2, a: 0.001, d: 0.02, gain: 0.12 * k, dest: o }); // splinters
+  }
+
+  // crows startled out of the crowns: wings beating hard, two or three harsh calls
+  crowsFlush(x, y, z) {
+    if (!this.ready) return;
+    const t = this.now, o = this._far(x, y, z, 10, 0.6, 0.5);
+    for (let i = 0; i < 14; i++) this._noiseBurst(t + i * 0.05 + Math.random() * 0.03, { type: 'bandpass', f: 700 + Math.random() * 500, q: 1.2, a: 0.004, d: 0.04, gain: 0.14, dest: o }); // wings
+    for (let i = 0; i < 3; i++) {
+      const tt = t + 0.15 + i * (0.22 + Math.random() * 0.2), f = 620 + Math.random() * 180;
+      this._tone(tt, { type: 'sawtooth', f, fEnd: f * 0.72, a: 0.01, d: 0.16, gain: 0.05, dest: o }); // caw
+      this._noiseBurst(tt, { type: 'bandpass', f: f * 2, q: 3, a: 0.01, d: 0.14, gain: 0.08, dest: o });
+    }
+  }
+
+  // a pine coming down across the road: the trunk giving at its foot, a long tearing creak, the crown thrashing
+  // through the others, the ground taking it
+  treeFall(x, y, z) {
+    if (!this.ready) return;
+    const t = this.now, o = this._far(x, y, z, 10, 0.5, 0.7);
+    this.treeCrack(x, y, z, 1.2);
+    this._noiseBurst(t + 0.05, { type: 'bandpass', f: 260, fEnd: 140, q: 6, a: 0.1, d: 0.8, gain: 0.45, dest: o });
+    this._tone(t + 0.05, { type: 'sawtooth', f: 120, fEnd: 70, a: 0.1, d: 0.8, gain: 0.05, dest: o });
+    for (let i = 0; i < 10; i++) this._noiseBurst(t + 0.4 + i * 0.05, { type: 'bandpass', f: 900 + Math.random() * 900, q: 1, a: 0.01, d: 0.08, gain: 0.15, dest: o }); // the crown in the branches
+    this._tone(t + 0.95, { f: 70, fEnd: 30, a: 0.002, d: 0.6, gain: 1.0, dest: o }); // down
+    this._noiseBurst(t + 0.95, { buf: this.brown, type: 'lowpass', f: 500, a: 0.002, d: 0.5, gain: 0.9, dest: o, rev: 0.5 });
+  }
+
   // (5.0f) the bog closing over a rider: a heavy wet swallow, bubbles coming up after
   bogGulp(x, y, z) {
     if (!this.ready) return;

@@ -7,6 +7,23 @@ const KEY = 'hush.news.v1';
 // newest first. date: YYYY-MM-DD
 export const NEWS = [
   {
+    v:'5.0g',date:'2026-11-07',
+    ru:{title:'Топь: погоня как в кино, лес гуще',items:[
+      'Погоня на грунтовке начинается его глазами: две секунды низко над колеёй, между стволами, в его красном свете, прямо к твоим стоп-сигналам. Потом — руль.',
+      'Лес вдоль дороги стал в разы гуще: молодые ёлки у самой обочины, сосны нависают над колеёй, за ними стена тьмы. Фары высвечивают тоннель.',
+      'Его слышно раньше, чем видно: трещат стволы там, где оно ползёт, сыплется хвоя, из крон взлетают вороны. Каждый удар — промах на волосок: машину трясёт, лес на миг вспыхивает.',
+      'Оно умеет срезать путь: тянется через машину и валит сосну поперёк дороги впереди. Сбрось скорость и проскочи по свободной половине.',
+      'Чем ближе оно, тем громче твоё сердце и тем шире расползается картинка по краям. Дистанция не стоит на месте: оно то наседает, то отстаёт.',
+    ]},
+    en:{title:'The Mire: a chase like a film, a thicker forest',items:[
+      'The chase on the dirt road opens through its eyes: two seconds low over the ruts, between the trunks, in its own red light, straight at your tail lamps. Then the wheel is yours.',
+      'The forest along the road is far thicker now: young spruce right at the verge, pines hanging over the ruts, a wall of dark behind them. Your headlights cut a tunnel.',
+      'You hear it before you see it: trunks cracking where it crawls, needles raining down, crows bursting out of the crowns. Every blow just misses you: the car shakes and the forest flares for an instant.',
+      'It knows how to cut you off: it reaches over the car and brings a pine down across the road ahead. Slow down and slip past on the free half.',
+      'The closer it gets, the louder your heart and the wider the picture stretches at the edges. The gap never sits still: it closes in, then falls back.',
+    ]},
+  },
+  {
     v:'5.0f',date:'2026-11-07',
     ru:{title:'Топь, главы 6 и 7: «Побег» и «Обрыв» — уровень целиком',items:[
       'Глава 6 — на Kugoo по гати через болото. У каждого свой байк, физика как на полигоне: W — газ, S — тормоз, A/D — наклон, Shift — вес назад. С ворот на гать ведёт пандус. Сама гать узкая и без перил: съехал — топь.',
